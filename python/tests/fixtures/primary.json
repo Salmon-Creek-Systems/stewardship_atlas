@@ -1,0 +1,16 @@
+{
+    "config_sources": {
+        "secrets": "secrets.json",
+        "env": "env.json"
+    },
+    "app_name": "MyApp",
+    "api_key": "$secrets::api_key",
+    "environment": "$env::stage",
+    "nested": {
+        "value": "$secrets::nested_key"
+    },
+    "array": [
+        "$secrets::array_item",
+        "regular_string"
+    ]
+} 
