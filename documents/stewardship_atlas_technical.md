@@ -2,7 +2,7 @@
 
   
 
-![](sa_dataarch.png)<!-- {"width":544} -->
+
 # Definitions
 * ***Dataswale***: core dataset at the heart of a Stewardship Atlas.
 * ***Layer***: A named typed canonicalized dataset in a Dataswale.
@@ -14,18 +14,16 @@
 
 # Configuration
 Configuration is implemented as JSON. Where appropriate , valid GeoJSON should be used - for example, when defining regions for computation or artifacts, they should be simple Polygon Feature Collections. Some templating and interpolation may be used for generating a Stewardship Atlas, but in the end the configuration for it must be a single “flat vanilla” JSON file and kept with the data. We currently store some aspects of Atlas state in the configuration file (eg, versions) which is probably a Bad Idea.
-### Dataswale
+## Dataswale
 * name
 * description
 * bounding box
-* cos
+* CRS
 * metadata (m/c times, authors, access, etc)
 * data_root
 * versions (?)
 * assets
-  * name
-  * type (FeatureCollection, raster)
-Together with a specific implementation to manage the assets.
+
 ## Atlas
 * dataswale
 * assets
@@ -33,14 +31,25 @@ Together with a specific implementation to manage the assets.
   * out_layers
   * ~~asset_type: [inlet, outlet, eddy]~~
   * asset_configuration: [asset_config_name or JSON]
-  * 
+## Asset
+While some assets will have additional configuration data, they all need to have at least  the following:
+* asset_type : [inlet, eddy, outlet]
+* fetch_type : label mapping to specific implemented method
+* interaction : would a user directly engage with the data (maybe this is in the Atlas Layer conf actually…)
+* data_type: vector, raster, lidar 
+* inpath_template
+* outpath_template
+* attribution
+  * url
+  * description
+  * license
+  * citation
 
 
 
 # Implementation 
-
-### Implementation
-Possible substrates include:
+## Dataswale
+Possible substrates for the Dataswale include:
 * geojson in local/cloud files
 * GeoParquet in cloud storage 
 * local GPKG
@@ -54,7 +63,7 @@ Any implementation should provide some basic shared functionality:
 * alter_deltas
 * add_deltas
 
-### ## Delta
+## Delta Queue
 A FeatureCollection with at target asset. Each feature has AnnotationProperties and AnnotationGeometry.
 There are three operations supported - this is specified by a “annotation_type” Property as one of:
 
@@ -63,8 +72,9 @@ AnnotationProperties is a JSON object. It can have the following “special” f
 * annotation_schema: a simple schema describing the fields of the AnnotationProperties.
 * annotation_join: specifies how the AnnoGeom will be spatially joined against the asset record geometries, defaulting to SimpleIntersection.
 * annotation_timestamp: what it says on the tin. Annos are applied in this order.
+* annotation_property_match: in addition to the Spatial Join it may be useful to allow specification of matches against properties. This can be used to “tune” spatial joins to make them more or less specific.
 
-Inlets
+### Inlets
 Inlets take data from somewhere in the world and move it into the Dataswale  as canonically formatted assets. In particular, an `inlet` always generates a Delta associated with a given Asset (or set of assets I suppose). The inlet should do as little processing of the delta as possible so this can be done in one place uniformly when the deltas are applied to their assets.
 #### Examples:
 * `fetch_uri`
@@ -73,6 +83,7 @@ Inlets take data from somewhere in the world and move it into the Dataswale  as 
 * `load_ogr`
 * `load_tiff`
 	
+
 ### Eddy
 Eddies process assets into new assets within the dataswale. So they can make a lot of simplifying assumptions about their data, its quality, and formatting.
 #### Examples
@@ -80,3 +91,18 @@ Eddies process assets into new assets within the dataswale. So they can make a l
 * `alter_properties`
 ### Outlet
 Outlets process the dataswale into some external artifact. This can be a direct translation of the dataswale into some natural format, like a GPKG; a map or representation of some aspect of the data; or some bit of code or tooling.
+
+#### Examples
+* COG
+* map_image
+* MBTiles
+* GPKG
+* SQL interface
+* API interface
+* PDF
+* GeoPDF
+* Gazeteer
+* RunBook
+  * HTML
+  * PDF
+* 
