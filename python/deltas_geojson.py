@@ -8,6 +8,8 @@ from typing import Iterator, Dict, Any, List, Tuple
 import geojson
 from geojson import Feature, FeatureCollection
 
+import versioning
+
 # Configure logging
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -69,44 +71,31 @@ def transform(feature: Feature, config: Dict[str, Any]) -> Feature:
     
     return feature
 
-def add_deltas(feature_collection: FeatureCollection, config: Dict[str, Any]) -> Tuple[int, str]:
+def add_deltas(config: Dict[str, Any], asset_name: str, feature_collection: FeatureCollection, ) -> Tuple[int, str]:
     """
     Add a new delta file to the layer's deltas directory.
     
     Args:
         feature_collection: GeoJSON FeatureCollection to store
         config: Configuration dictionary
-    
+        asset_name: the asset generating the delta
     Returns:
         Tuple of (number of features written, path to written file)
     
     Raises:
         InvalidDelta: If the feature collection is invalid
-    """
-    if not isinstance(feature_collection, FeatureCollection):
-        raise InvalidDelta("Input must be a GeoJSON FeatureCollection")
-    
-    try:
-        # Validate the feature collection
-        geojson.dumps(feature_collection)
-    except Exception as e:
-        raise InvalidDelta("Invalid GeoJSON", {"error": str(e)})
-    
+    """    
     # Create timestamp-based filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    deltas_dir = Path(config['data_root']) / f"deltas_{config['name']}"
-    filename = f"delta_{timestamp}.geojson"
-    filepath = deltas_dir / filename
+    layer_name = config['assets'][asset_name]['config']['out_layer']
+    local_filename = f"deltas/{layer_name}/{asset_name}_{timestamp}.geojson"
+    outpath = versioning.atlas_path(config, local_filename)
+
+    with versioning.atlas_file(outpath, mode="wt") as outfile:
+        json.dump(feature_collection, outfile)
     
-    # Write the file
-    try:
-        with open(filepath, 'w') as f:
-            json.dump(feature_collection, f)
-    except Exception as e:
-        raise InvalidDelta("Failed to write delta file", {"error": str(e), "path": str(filepath)})
-    
-    logger.info(f"Wrote {len(feature_collection['features'])} features to {filepath}")
-    return len(feature_collection['features']), str(filepath)
+    logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
+    return len(feature_collection['features']), str(outpath)
 
 def queue(config: Dict[str, Any]) -> Iterator[Feature]:
     """

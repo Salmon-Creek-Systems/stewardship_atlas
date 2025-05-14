@@ -27,12 +27,12 @@ def load(config_path: str) -> Dict[str, Any]:
 
     with open(config_path, 'r') as f:
         config_str = f.read()
-        print(f"Loaded:\n{config_str}")
+        # print(f"Loaded:\n{config_str}")
         config = json.loads(config_str)
     
     # Get config_sources from primary config if it exists
     config_sources = config.get("config_sources", {})
-    print(f"config sources at init: {config_sources}")
+    # print(f"config sources at init: {config_sources}")
     if not isinstance(config_sources, dict):
         raise ValueError("'config_sources' must be a dictionary")
     # config.pop("config_sources", None)  # Remove it from the config
@@ -71,7 +71,7 @@ def load(config_path: str) -> Dict[str, Any]:
             label, key = parts
             label = label[1:]  # Remove the $ prefix
             
-            print(f"config sources in interpolate_value: {config_sources}")
+            # print(f"config sources in interpolate_value: {config_sources}")
             # Check if we have config_sources when we need it
             if not config_sources:
                 raise KeyError("Variable interpolation requires a 'config_sources' section")

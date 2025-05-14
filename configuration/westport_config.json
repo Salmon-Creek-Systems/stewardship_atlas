@@ -3,21 +3,26 @@
     "inlets": "inlets_config.json"
 
 },
- "data_root": "/root/data",
+ "data_root": "/root/swales",
  "name": "westport",
  "description": "Westport VFD",
  "dataswale": {
-     "crs": "EPSG:4269",
-     
+     "crs": "EPSG:4269",     
      "bbox": "$bbox::westportvfd",
-     "versions": ["staging"]
+     "versions": ["staging"],
+     "layers": [
+	 {"name": "roads", "datatype": "vector"}
+	 ]
  },
  "assets":{
      "dem": {
          "out_layer": "dem",
          "config": "$inlets::opentopo_dem"
+     },
+     "public_roads" : {
+	 "config": "$inlets::overture_roads"
      }
-}
+ }
 }
 
 
