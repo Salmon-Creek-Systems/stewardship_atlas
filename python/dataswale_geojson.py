@@ -1,12 +1,12 @@
 import geojson
 
-def create(dataswale_config) -> str:
-    
+def create(config) -> str:
+    pass
 
 def delete():
     pass
 
-def cnew_version():
+def new_version():
     pass
 
 def asset():

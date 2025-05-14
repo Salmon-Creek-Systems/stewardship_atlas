@@ -24,8 +24,11 @@ def load(config_path: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Primary config file not found: {config_path}")
         
     # Load primary config
+
     with open(config_path, 'r') as f:
-        config = json.load(f)
+        config_str = f.read()
+        print(f"Loaded:\n{config_str}")
+        config = json.loads(config_str)
     
     # Get config_sources from primary config if it exists
     config_sources = config.get("config_sources", {})

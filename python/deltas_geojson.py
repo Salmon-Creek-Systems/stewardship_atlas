@@ -37,6 +37,7 @@ def create(config: Dict[str, Any]) -> None:
     if not config.get('name'):
         raise ValueError("Configuration must include 'name' field")
     if not config.get('data_root'):
+        print(f"WWTF: config: {config}")
         raise ValueError("Configuration must include 'data_root' field")
     
     deltas_dir = Path(config['data_root']) / f"deltas_{config['name']}"

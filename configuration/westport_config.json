@@ -3,19 +3,21 @@
     "inlets": "inlets_config.json"
 
 },
-"name": "westport",
-"description": "Westport VFD",
-"dataswale": {
-    "crs": "EPSG:4269",
-     "data_root": "/root/data",
-    "bbox": "$bbox::westportvfd",
-    "versions": ["staging"]
-},
-"assets":{
-    "dem": {
-        "out_layer": "dem",
-        "config": "$inlets::opentopo_dem"
-    }
+ "data_root": "/root/data",
+ "name": "westport",
+ "description": "Westport VFD",
+ "dataswale": {
+     "crs": "EPSG:4269",
+     
+     "bbox": "$bbox::westportvfd",
+     "versions": ["staging"]
+ },
+ "assets":{
+     "dem": {
+         "out_layer": "dem",
+         "config": "$inlets::opentopo_dem"
+     }
+}
 }
 
 
