@@ -89,7 +89,19 @@ def transform(feature: Feature, config: Dict[str, Any]) -> Feature:
     
     return feature
 
-def add_deltas(config: Dict[str, Any], asset_name: str, feature_collection: FeatureCollection, delta_action: str) -> Tuple[int, str]:
+def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> str:
+    """
+    Return the path to the delta file for a given asset and delta action.
+    """
+       # Create timestamp-based filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    layer_name = config['assets'][asset_name]['config']['out_layer']
+    #local_filename = f"deltas/{layer_name}/{asset_name}__{timestamp}__{delta_action}"
+    return versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.geojson"
+
+
+
+def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_collection: FeatureCollection, delta_action: str) -> Tuple[int, str]:
     """
     Add a new delta file to the layer's deltas directory.
     
@@ -103,17 +115,11 @@ def add_deltas(config: Dict[str, Any], asset_name: str, feature_collection: Feat
     Raises:
         InvalidDelta: If the feature collection is invalid
     """    
-    # Create timestamp-based filename
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    layer_name = config['assets'][asset_name]['config']['out_layer']
-    local_filename = f"deltas/{layer_name}/{asset_name}__{timestamp}__{delta_action}"
-    outpath = versioning.atlas_path(config, local_filename)
-
-    with versioning.atlas_file(outpath + ".geojson", mode="wt") as outfile:
+ 
+    outpath = delta_path(config, asset_name, delta_action)
+    with versioning.atlas_file(outpath, mode="wt") as outfile:
         json.dump(feature_collection, outfile)
-    with versioning.atlas_file(outpath + ".delta.json", mode="wt") as outfile:
-        dc = {"action": delta_action, "join": "simple_intersect"}    
-        json.dump(dc, outfile)
+    
     
     logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
     return len(feature_collection['features']), str(outpath)

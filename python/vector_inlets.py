@@ -36,5 +36,34 @@ LOAD spatial;
         features.append(f)
     feature_collection = geojson.FeatureCollection(features)
   
-    delta_queue(config,name, feature_collection)
+    delta_queue.add_deltas_from_features(config,name, feature_collection, 'create')
     return len(feature_collection['features'])
+
+
+def local_ogr(config, name, delta_queue):
+    """Load OGR datafile and store in versioned directory"""
+   
+    # Get input path from template
+    inlet_config = config['assets'][name]['config']
+    inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
+    outpath = delta_queue.delta_path(config, name, 'create')
+
+    # Extract data using ogr2ogr and CLI args
+    args = ['ogr2ogr', '-f', 'GeoJSON', '-t_srs', atlas_config['crs']]
+    if 'geometry' in inlet_config:
+        # Add spatial filter if geometry is specified
+        bbox = inlet_config['geometry']['bbox']
+        args.extend(['-spat',
+                    str(bbox['west']), str(bbox['south']),
+                    str(bbox['east']), str(bbox['north'])])
+        args.extend(['-spat_srs', config['crs']])
+    args.extend([outpath, inpath])
+    if 'layer' in inlet_config:
+        args.append(inlet_config['layer'])
+    
+    print(f"Running ogr2ogr with args: {args}")
+    subprocess.check_output(args)
+
+    if 'alterations' in inlet_config:
+        alter_geojson(outpath, inlet_config['alterations'])
+    return outpath
