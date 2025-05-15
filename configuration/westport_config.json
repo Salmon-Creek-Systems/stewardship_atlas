@@ -20,6 +20,7 @@
          "config": "$inlets::opentopo_dem"
      },
      "public_roads" : {
+	 "out_layer": "roads",
 	 "config": "$inlets::overture_roads"
      }
  }

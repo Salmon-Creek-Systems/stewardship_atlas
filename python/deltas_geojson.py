@@ -106,7 +106,7 @@ def add_deltas(config: Dict[str, Any], asset_name: str, feature_collection: Feat
     # Create timestamp-based filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     layer_name = config['assets'][asset_name]['config']['out_layer']
-    local_filename = f"deltas/{layer_name}/{asset_name}_{timestamp}"
+    local_filename = f"deltas/{layer_name}/{asset_name}__{timestamp}__{delta_action}"
     outpath = versioning.atlas_path(config, local_filename)
 
     with versioning.atlas_file(outpath + ".geojson", mode="wt") as outfile:
@@ -118,62 +118,61 @@ def add_deltas(config: Dict[str, Any], asset_name: str, feature_collection: Feat
     logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
     return len(feature_collection['features']), str(outpath)
 
-def apply_deltas(config: Dict[str, Any], layer: FeatureCollection) -> FeatureCollection:
+def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
     """
    Apply all delta file sin order.
 
     """
-    deltas_dir = versioning.atlas_path(config, f"{config['name']}/deltas/{layer_name}")
+    deltas_dir = versioning.atlas_path(config, "deltas") / layer_name
     processed_dir = deltas_dir / "processed"
+    work_dir = deltas_dir / "work"
     
     # Get all .geojson files in the deltas directory
-    delta_files = sorted(deltas_dir.glob("*.geojson"))
+    delta_files = deltas_dir.glob("*.geojson")
     
-    # start a local duckdb  
-
-
-
     # start an empypty layer file
-    layer_path = versioning.atlas_path(config, f"{config['name']}/")
-    with versioning.atlas_file(layer_path / "layer.geojson", mode="wt") as outfile:
+    layer_filepath = work_dir / f"{layer_name}.geojson"
+    with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
         geojson.dump(FeatureCollection(features=[]), outfile)
-
+    logger.info(f"Starting Apply Deltas: {deltas_dir}: {delta_files} -> {work_dir}")
     for i,filepath in enumerate(delta_files):
-        asset_name, ts, action = filepath.stem.split("_")
-
+        logger.info(f"delta file {filepath}")
+        asset_name, ts, action = filepath.stem.split("__")
+        logger.info(f"delta file {filepath}: {asset_name} @ {ts} -> {action}")
         if action == "create":
-                # read the layer file
-                with versioning.atlas_file(layer_path / "layer.geojson", mode="rt") as infile:
-                    layer = geojson.load(infile)
+            logger.info(f"delta file {filepath}: {asset_name} @ {ts} -> {action}")
+            # read the layer file
+            with versioning.atlas_file(layer_filepath, mode="rt") as infile:
+                layer = geojson.load(infile)
 
-                with versioning.atlas_file(filepath, mode="rt") as infile:
-                    delta = geojson.load(infile)
+            with versioning.atlas_file(filepath, mode="rt") as infile:
+                delta = geojson.load(infile)
 
-                with versioning.atlas_file(layer_path / "layer.geojson", mode="wt") as outfile:
-                    geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
+            with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
+                geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
 
-            elif action == "update":
-                con = duckdb.connect(":memory:")    
-                # Load the delta file into a table called delta
-                con.sql(f"CREATE TABLE layer AS SELECT * FROM read_json('{layer_path}/layer.geojson')")
-                # Perform a spatial join between layer and delta
-                con.sql(f"CREATE TABLE delta AS SELECT * FROM read_json('{filepath}')")
-                # join the two tables on the geometry column    
-                con.sql("""
-                CREATE TABLE new_layer AS 
-                SELECT layer.*, delta.* 
-                FROM layer 
-                JOIN delta 
-                ON ST_Intersects(layer.geometry, delta.geometry)
-                """)
+        elif action == "update":
+            con = duckdb.connect(":memory:")    
+            # Load the delta file into a table called delta
+            con.sql(f"CREATE TABLE layer AS SELECT * FROM read_json('{layer_path}/layer.geojson')")
+            # Perform a spatial join between layer and delta
+            con.sql(f"CREATE TABLE delta AS SELECT * FROM read_json('{filepath}')")
+            # join the two tables on the geometry column    
+            con.sql("""
+            CREATE TABLE new_layer AS 
+            SELECT layer.*, delta.* 
+            FROM layer 
+            JOIN delta 
+            ON ST_Intersects(layer.geometry, delta.geometry)
+            """)
+            
+            # write the new layer to the layer file
+            with versioning.atlas_file(layer_path / "layer.geojson", mode="wt") as outfile:
+                geojson.dump(FeatureCollection(features=new_layer['features']), outfile)
+        else:
+            raise InvalidDelta(f"Invalid action: {action}") 
 
-                # write the new layer to the layer file
-                with versioning.atlas_file(layer_path / "layer.geojson", mode="wt") as outfile:
-                    geojson.dump(FeatureCollection(features=new_layer['features']), outfile)
-            else:
-                raise InvalidDelta(f"Invalid action: {action}") 
-
-            return geojson.load(open(layer_path / "layer.geojson"))
+    return geojson.load(open(layer_filepath))
     
     
 
