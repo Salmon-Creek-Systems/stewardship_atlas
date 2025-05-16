@@ -93,7 +93,7 @@ def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> st
     """
     Return the path to the delta file for a given asset and delta action.
     """
-    delta_type = config['assets'][asset_name]['config']['delta_type']
+    delta_type = config['assets'][asset_name]['config']['data_type']
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     layer_name = config['assets'][asset_name]['out_layer']
     p =  versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.{delta_type}"
@@ -140,7 +140,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
     layer_filepath = work_dir / f"{layer_name}.geojson"
     with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
         geojson.dump(FeatureCollection(features=[]), outfile)
-    logger.info(f"Starting Apply Deltas: {deltas_dir}: {delta_files} -> {work_dir}")
+    logger.info(f"Starting Apply Deltas: {deltas_dir}: {list(delta_files)} -> {work_dir}")
     for i,filepath in enumerate(delta_files):
         logger.info(f"delta file {filepath}")
         asset_name, ts, action = filepath.stem.split("__")
