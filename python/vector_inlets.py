@@ -1,7 +1,8 @@
-import logging
+import logging, subprocess
 import duckdb
 import geojson
 
+import versioning
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -49,14 +50,14 @@ def local_ogr(config, name, delta_queue):
     outpath = delta_queue.delta_path(config, name, 'create')
 
     # Extract data using ogr2ogr and CLI args
-    args = ['ogr2ogr', '-f', 'GeoJSON', '-t_srs', atlas_config['crs']]
+    args = ['ogr2ogr', '-f', 'GeoJSON', '-t_srs', config['dataswale']['crs']]
     if 'geometry' in inlet_config:
         # Add spatial filter if geometry is specified
-        bbox = inlet_config['geometry']['bbox']
+        bbox = config['dataswale']['bbox']
         args.extend(['-spat',
                     str(bbox['west']), str(bbox['south']),
                     str(bbox['east']), str(bbox['north'])])
-        args.extend(['-spat_srs', config['crs']])
+        args.extend(['-spat_srs', config['dataswale']['crs']])
     args.extend([outpath, inpath])
     if 'layer' in inlet_config:
         args.append(inlet_config['layer'])
@@ -65,5 +66,6 @@ def local_ogr(config, name, delta_queue):
     subprocess.check_output(args)
 
     if 'alterations' in inlet_config:
-        alter_geojson(outpath, inlet_config['alterations'])
+        pass
+        #alter_geojson(outpath, inlet_config['alterations'])
     return outpath

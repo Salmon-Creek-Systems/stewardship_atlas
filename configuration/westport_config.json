@@ -11,7 +11,8 @@
      "bbox": "$bbox::westportvfd",
      "versions": ["staging"],
      "layers": [
-	 {"name": "roads", "datatype": "vector"}
+	 {"name": "roads", "datatype": "vector"},
+	 {"name": "creeks", "datatype": "vector"}
 	 ]
  },
  "assets":{
@@ -22,6 +23,10 @@
      "public_roads" : {
 	 "out_layer": "roads",
 	 "config": "$inlets::overture_roads"
+     },
+     "public_creeks" : {
+         "out_layer": "creeks",
+         "config": "$inlets::nhd_creeks"
      }
  }
 }

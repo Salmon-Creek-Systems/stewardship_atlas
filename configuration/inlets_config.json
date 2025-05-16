@@ -29,42 +29,44 @@
   }
 
 },
-"nhd_creeks":  {
+    "nhd_creeks":  {
 	"asset_type": "inlet",
 	"fetch_type": "local_ogr",
 	"interaction": "import",
 	"data_type": "geojson",
-  "name": "nhd_creeks",
-  "description": "External creek vector source",
-  "feature_type": "linestring",
-  "color": [110, 110, 255],
-  "layer": "NHDFlowline",
-  "inpath_template": "NHD_H_California_State_GPKG.gpkg",
-  "alterations": {
-      "canonicalize": [
-        {
-          "to": "name",
-          "from": [
-            "gnis_name"
-          ],
-          "remove_prefix": []
-        }
-      ],
-      "vector_width": {
-        "attribute": "fcode_description",
-        "map": {
-          "Stream/River: Hydrographic Category = Ephemeral": 5,
-          "Stream/River: Hydrographic Category = Perennial": 7,
-          "Stream/River: Hydrographic Category = Intermittent": 3,
-          "Artificial Path": 1
-        },
-        "default": 1
-      }
-    },
-    "attribution": {
-      "url": "https://www.usgs.gov/nhd",
-      "description": "USGS National Hydrography Dataset",
-      "license": "https://www.usgs.gov/nhd/license",
-      "citation": "USGS NHD"
-    } 
-}
+	"name": "nhd_creeks",
+	"description": "External creek vector source",
+	"feature_type": "linestring",
+	"color": [110, 110, 255],
+	"layer": "NHDFlowline",
+	"inpath_template": "NHD_H_California_State_GPKG.gpkg",
+	"geometry": "dataswale",
+	"alterations": {
+	    "canonicalize": [
+		{
+		    "to": "name",
+		    "from": [
+			"gnis_name"
+		    ],
+		    "remove_prefix": []
+		}
+	    ],
+	    "vector_width": {
+		"attribute": "fcode_description",
+		"map": {
+		    "Stream/River: Hydrographic Category = Ephemeral": 5,
+		    "Stream/River: Hydrographic Category = Perennial": 7,
+		    "Stream/River: Hydrographic Category = Intermittent": 3,
+		    "Artificial Path": 1
+		},
+		"default": 1
+	    }
+	},
+	"attribution": {
+	    "url": "https://www.usgs.gov/nhd",
+	    "description": "USGS National Hydrography Dataset",
+	    "license": "https://www.usgs.gov/nhd/license",
+	    "citation": "USGS NHD"
+	} 
+    }
+}    
