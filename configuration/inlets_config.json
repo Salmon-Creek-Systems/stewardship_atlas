@@ -12,8 +12,8 @@
         "license": "https://portal.opentopography.org/api/terms",
         "citation": "https://portal.opentopography.org/api/terms"
     }
-},
-"overture_roads":  {
+  },
+    "overture_roads":  {
 	"asset_type": "inlet",
 	"fetch_type": "overture_duckdb",
 	"interaction": "import",
@@ -26,23 +26,22 @@
 	    "description": "Open Topography's Global DEM",
 	    "license": "https://portal.opentopography.org/api/terms",
 	    "citation": "https://portal.opentopography.org/api/terms"
-  }
-"local_hillshade":  {
+	}
+    },
+    "local_hillshade":  {
 	"asset_type": "inlet",
 	"fetch_type": "local_raster",
 	"interaction": "import",
 	"data_type": "tiff",
 	"out_layer": "basemap",
-	"inpath_template": "hillshade.tif",
+	"inpath_template": "westport_dem_2m_hillshade.tiff",
 	"attribution": {
 	    "url": "https://portal.opentopography.org/api/terms",
 	    "description": "Open Topography's Global DEM",
 	    "license": "https://portal.opentopography.org/api/terms",
 	    "citation": "https://portal.opentopography.org/api/terms"
-  }
-
-},
-},
+	}
+    },
     "nhd_creeks":  {
 	"asset_type": "inlet",
 	"fetch_type": "local_ogr",

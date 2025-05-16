@@ -16,7 +16,7 @@ def local_raster(config=None, name=None, delta_queue=None):
     Do some CRS and rescaling if needed."""
     inlet_config = config['assets'][name]['config']
     inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
-    outpath = delta_queue.delta_path(config, inlet_config['out_layer'], 'create')
+    outpath = delta_queue.delta_path(config, name, 'create')
 
     # TODO make this do more - should select subregion, etc.
     shutil.copy(inpath, outpath)
