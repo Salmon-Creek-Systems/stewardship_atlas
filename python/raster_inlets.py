@@ -13,7 +13,7 @@ logger.setLevel(logging.INFO)
 def resample_raster_gdal(config, inpath, resample_width=400):
     """Resample raster to target CRS using versioned paths"""
     logger.info(f"Resampling for: [{inpath}]")
-    temp_path = inpath.parent / "tmp." + inpath.stem
+    temp_path = inpath.parent / f"tmp.{inpath.stem}"
 
     # Move input to temp path
     os.rename(inpath, temp_path)
@@ -33,8 +33,8 @@ def resample_raster_gdal(config, inpath, resample_width=400):
 
 def set_crs_raster(config, inpath):
     """Set CRS for raster using versioned paths"""
-    temp_path = infile.parent / "tmp" + infile.stem
-    logger.debug(f"Setting raster CRS to {swale_config['crs']}: {outpath}")
+    temp_path = inpath.parent / f"tmp.{inpath.stem}"
+    logger.debug(f"Setting raster CRS to {config['dataswale']['crs']}: {inpath}")
     subprocess.check_output(['gdalwarp', '-t_srs', config['dataswale']['crs'], inpath, temp_path])
     # Move temp file to final location
     os.rename(temp_path, inpath)  

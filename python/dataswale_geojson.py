@@ -1,5 +1,6 @@
 import geojson
 import logging
+import shutil
 
 
 
@@ -45,8 +46,11 @@ def refresh_raster_layer(config, name, delta_queue_builder):
     """
     Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.
     """
+    
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.tiff'
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
     deltas_dir = versioning.atlas_path(config, "deltas") / name
+    
     for inpath in deltas_dir.glob("*.tiff"):
         shutil.copy(inpath, layer_path)
     return layer_path
