@@ -10,6 +10,35 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
+def resample_raster_gdal(config, inpath, resample_width=400):
+    """Resample raster to target CRS using versioned paths"""
+    logger.info(f"Resampling for: [{inpath}]")
+    temp_path = inpath.parent / "tmp." + inpath.stem
+
+    # Move input to temp path
+    os.rename(inpath, temp_path)
+    logger.debug(f"Resampling raster to {config['dataswale']['crs']} @ width {resample_width}: {inpath}")
+    
+    # Perform resampling
+    subprocess.check_output([
+        'gdalwarp', '-r', 'bilinear',
+        '-ts', str(resample_width), '0',
+        '-t_srs', config['dataswale']['crs'],
+        temp_path, inpath
+    ])
+    # TODO - remove temp path
+    return inpath
+
+
+
+def set_crs_raster(config, inpath):
+    """Set CRS for raster using versioned paths"""
+    temp_path = infile.parent / "tmp" + infile.stem
+    logger.debug(f"Setting raster CRS to {swale_config['crs']}: {outpath}")
+    subprocess.check_output(['gdalwarp', '-t_srs', config['dataswale']['crs'], inpath, temp_path])
+    # Move temp file to final location
+    os.rename(temp_path, inpath)  
+    return inpath
 
 def local_raster(config=None, name=None, delta_queue=None):
     """Fetch data from local file and save to versioned outpath.
@@ -28,7 +57,7 @@ def local_raster(config=None, name=None, delta_queue=None):
     # then resample
     if inlet_config.get('resample', False):
         logger.info(f"resampling to {inlet_config['resample']}")
-        resample_raster_gdal(inlet_config['resample'], config, outpath)
+        resample_raster_gdal( config, outpath,inlet_config['resample'])
     return outpath
 
 def fetch_url(config=None, name=None):
