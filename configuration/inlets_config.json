@@ -27,7 +27,21 @@
 	    "license": "https://portal.opentopography.org/api/terms",
 	    "citation": "https://portal.opentopography.org/api/terms"
   }
+"local_hillshade":  {
+	"asset_type": "inlet",
+	"fetch_type": "local_raster",
+	"interaction": "import",
+	"data_type": "tiff",
+	"out_layer": "basemap",
+	"inpath_template": "hillshade.tif",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+  }
 
+},
 },
     "nhd_creeks":  {
 	"asset_type": "inlet",

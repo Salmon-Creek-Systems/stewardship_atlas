@@ -11,6 +11,7 @@
      "bbox": "$bbox::westportvfd",
      "versions": ["staging"],
      "layers": [
+	 {"name": "basemap", "datatype": "raster"},
 	 {"name": "roads", "datatype": "vector"},
 	 {"name": "creeks", "datatype": "vector"}
 	 ]
@@ -27,6 +28,10 @@
      "public_creeks" : {
          "out_layer": "creeks",
          "config": "$inlets::nhd_creeks"
+     },
+     "local_hillshade" : {
+         "out_layer": "basemap",
+         "config": "$inlets::local_hillshade"
      }
  }
 }

@@ -1,6 +1,35 @@
+import logging, subprocess
+import os, shutil, zipfile, io
+import versioning
+
+# Configure logging
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 
+def local_raster(config=None, name=None, delta_queue=None):
+    """Fetch data from local file and save to versioned outpath.
+    Do some CRS and rescaling if needed."""
+    inlet_config = config['assets'][name]['config']
+    inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
+    outpath = delta_queue.delta_path(config, inlet_config['out_layer'], 'create')
+
+    # TODO make this do more - should select subregion, etc.
+    shutil.copy(inpath, outpath)
+
+    
+    logger.info(f"Setting raster CRS to {config['dataswale']['crs']}")
+        # first, set the crs
+    set_crs_raster(config, outpath)
+    # then resample
+    if inlet_config.get('resample', False):
+        logger.info(f"resampling to {inlet_config['resample']}")
+        resample_raster_gdal(inlet_config['resample'], config, outpath)
+    return outpath
 
 def fetch_url(config=None, name=None):
     """Fetch data from URL and save to versioned outpath"""
@@ -24,35 +53,29 @@ def fetch_url(config=None, name=None):
         west=config['dataswale']['bbox']['west'],
         **config)
     logger.debug(f"Fetching data from URL: {url}")
-    if url.startswith('file://'):
-        logger.debug(f"Fetching local file: {url}") 
-        infile_path  = url[7:]
-        # copy from infile_path to outfile
-        shutil.copy(infile_path, outpath)
-        #return outpath
-        print(f"..local copy from {infile_path} to {outpath}.")
-    else:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            
-            # Handle zip files
-            if url.endswith('.zip') or  inlet_config.get('unzip', False):
-                logger.debug("Extracting zip contents")
-                with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-                    z.extractall(os.path.dirname(outpath))
-            else:
-                # Write content directly to file
-                with open(outpath, 'wb') as f:
-                    f.write(response.content)
-                    logger.debug(f"Successfully wrote content to: {outpath}")
+ 
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        
+        # Handle zip files
+        if url.endswith('.zip') or  inlet_config.get('unzip', False):
+            logger.debug("Extracting zip contents")
+            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+                z.extractall(os.path.dirname(outpath))
+        else:
+            # Write content directly to file
+            with open(outpath, 'wb') as f:
+                f.write(response.content)
+                logger.debug(f"Successfully wrote content to: {outpath}")
                     
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch URL {url}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing data from {url}: {e}")
-            raise
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch URL {url}: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error processing data from {url}: {e}")
+        raise
 
     #if inlet_config.get('unzip', False):
     #    with ZipFile(BytesIO(r.content)) as zip_ref:
