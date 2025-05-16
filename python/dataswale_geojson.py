@@ -26,14 +26,30 @@ def new_version():
 def asset():
     pass
 
-def refresh_layer(config, name, delta_queue_builder):
+def refresh_vector_layer(config, name, delta_queue_builder):
     """
     Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.
     """
+
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
+
     fc = delta_queue_builder(config, name)
     logger.info(f"Writing to {layer_path} FC: {fc}")
     
     with versioning.atlas_file(layer_path, 'wt') as outfile:
         geojson.dump(fc, outfile)
     return layer_path
+
+
+def refresh_raster_layer(config, name, delta_queue_builder):
+    """
+    Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.
+    """
+    layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.tiff'
+    deltas_dir = versioning.atlas_path(config, "deltas") / inlet_config['out_layer']
+    for inpath in deltas_dir.glob("*.tiff"):
+        shutil.copy(inpath, layer_path)
+    return layer_path
+
+
+    # move file unchanged to layer location from delta....raster deltas are currently silly

@@ -93,10 +93,10 @@ def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> st
     """
     Return the path to the delta file for a given asset and delta action.
     """
-    
+    delta_type = config['assets'][asset_name]['config']['delta_type']
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     layer_name = config['assets'][asset_name]['out_layer']
-    p =  versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.geojson"
+    p =  versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.{delta_type}"
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
