@@ -193,6 +193,35 @@ The module includes the following main functions:</p>
       <div class='octowrap'>
         <a class='octothorpe' href='#section-10'>#</a>
       </div>
+      <p>Return the path to the delta file for a given asset and delta action.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">delta_path</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">asset_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">delta_action</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">delta_type</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">asset_name</span><span class="p">][</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;data_type&#39;</span><span class="p">]</span>
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">_%H%M%S&quot;</span><span class="p">)</span>
+    <span class="n">layer_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">asset_name</span><span class="p">][</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span>
+    <span class="n">p</span> <span class="o">=</span>  <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span><span class="s2">&quot;deltas&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">asset_name</span><span class="si">}</span><span class="s2">__</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">__</span><span class="si">{</span><span class="n">delta_action</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">delta_type</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">p</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
       <p>Add a new delta file to the layer&rsquo;s deltas directory.</p>
 <p>Args:
     feature_collection: GeoJSON FeatureCollection to store
@@ -204,43 +233,7 @@ Returns:
     InvalidDelta: If the feature collection is invalid</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">add_deltas</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">asset_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">feature_collection</span><span class="p">:</span> <span class="n">FeatureCollection</span><span class="p">,</span> <span class="n">delta_action</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-11'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-11'>#</a>
-      </div>
-      <p>Create timestamp-based filename</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">_%H%M%S&quot;</span><span class="p">)</span>
-    <span class="n">layer_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">asset_name</span><span class="p">][</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span>
-    <span class="n">local_filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;deltas/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">asset_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">local_filename</span><span class="p">)</span>
-
-    <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">outpath</span> <span class="o">+</span> <span class="s2">&quot;.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
-        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">,</span> <span class="n">outfile</span><span class="p">)</span>
-    <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">outpath</span> <span class="o">+</span> <span class="s2">&quot;.delta.json&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
-        <span class="n">dc</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="n">delta_action</span><span class="p">,</span> <span class="s2">&quot;join&quot;</span><span class="p">:</span> <span class="s2">&quot;simple_intersect&quot;</span><span class="p">}</span>    
-        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">dc</span><span class="p">,</span> <span class="n">outfile</span><span class="p">)</span>
-    
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> features to </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">outpath</span><span class="p">)</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-12'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-12'>#</a>
-      </div>
-      <p>Apply all delta file sin order.</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">apply_deltas</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">layer</span><span class="p">:</span> <span class="n">FeatureCollection</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureCollection</span><span class="p">:</span></pre></div>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">add_deltas_from_features</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">asset_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">feature_collection</span><span class="p">:</span> <span class="n">FeatureCollection</span><span class="p">,</span> <span class="n">delta_action</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -252,8 +245,14 @@ Returns:
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">deltas_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/deltas/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="n">processed_dir</span> <span class="o">=</span> <span class="n">deltas_dir</span> <span class="o">/</span> <span class="s2">&quot;processed&quot;</span></pre></div>
+      <div class="highlight"><pre> 
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">delta_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">asset_name</span><span class="p">,</span> <span class="n">delta_action</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">,</span> <span class="n">outfile</span><span class="p">)</span>
+    
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> features to </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">outpath</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -262,10 +261,10 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-14'>#</a>
       </div>
-      <p>Get all .geojson files in the deltas directory</p>
+      <p>Apply all delta file sin order.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">delta_files</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">deltas_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.geojson&quot;</span><span class="p">))</span></pre></div>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">apply_deltas</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">layer_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureCollection</span><span class="p">:</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -274,10 +273,12 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-15'>#</a>
       </div>
-      <p>start a local duckdb  </p>
+      
     </div>
     <div class='code'>
-      <div class="highlight"><pre></pre></div>
+      <div class="highlight"><pre>    <span class="n">deltas_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;deltas&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer_name</span>
+    <span class="n">processed_dir</span> <span class="o">=</span> <span class="n">deltas_dir</span> <span class="o">/</span> <span class="s2">&quot;processed&quot;</span>
+    <span class="n">work_dir</span> <span class="o">=</span> <span class="n">deltas_dir</span> <span class="o">/</span> <span class="s2">&quot;work&quot;</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -286,17 +287,10 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-16'>#</a>
       </div>
-      <p>start an empypty layer file</p>
+      <p>Get all .geojson files in the deltas directory</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/&quot;</span><span class="p">)</span>
-    <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
-        <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[]),</span> <span class="n">outfile</span><span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">filepath</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">delta_files</span><span class="p">):</span>
-        <span class="n">asset_name</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">action</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">&quot;create&quot;</span><span class="p">:</span></pre></div>
+      <div class="highlight"><pre>    <span class="n">delta_files</span> <span class="o">=</span> <span class="n">deltas_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.geojson&quot;</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -305,20 +299,19 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-17'>#</a>
       </div>
-      <p>read the layer file</p>
+      <p>start an empypty layer file</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;rt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">infile</span><span class="p">:</span>
-                    <span class="n">layer</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">infile</span><span class="p">)</span>
-
-                <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;rt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">infile</span><span class="p">:</span>
-                    <span class="n">delta</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">infile</span><span class="p">)</span>
-
-                <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
-                    <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">delta</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="n">outfile</span><span class="p">)</span>
-
-            <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">&quot;update&quot;</span><span class="p">:</span>
-                <span class="n">con</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;:memory:&quot;</span><span class="p">)</span></pre></div>
+      <div class="highlight"><pre>    <span class="n">layer_filepath</span> <span class="o">=</span> <span class="n">work_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+    <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_filepath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+        <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="p">[]),</span> <span class="n">outfile</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting Apply Deltas: </span><span class="si">{</span><span class="n">deltas_dir</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">delta_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">filepath</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">delta_files</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;delta file </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">asset_name</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">action</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;__&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;delta file </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">asset_name</span><span class="si">}</span><span class="s2"> @ </span><span class="si">{</span><span class="n">ts</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">&quot;create&quot;</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;delta file </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">asset_name</span><span class="si">}</span><span class="s2"> @ </span><span class="si">{</span><span class="n">ts</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -327,10 +320,20 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-18'>#</a>
       </div>
-      <p>Load the delta file into a table called delta</p>
+      <p>read the layer file</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CREATE TABLE layer AS SELECT * FROM read_json(&#39;</span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2">/layer.geojson&#39;)&quot;</span><span class="p">)</span></pre></div>
+      <div class="highlight"><pre>            <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_filepath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;rt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">infile</span><span class="p">:</span>
+                <span class="n">layer</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">infile</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;rt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">infile</span><span class="p">:</span>
+                <span class="n">delta</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">infile</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_filepath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+                <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">delta</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="n">outfile</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">&quot;update&quot;</span><span class="p">:</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;:memory:&quot;</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -339,10 +342,10 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-19'>#</a>
       </div>
-      <p>Perform a spatial join between layer and delta</p>
+      <p>Load the delta file into a table called delta</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CREATE TABLE delta AS SELECT * FROM read_json(&#39;</span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&#39;)&quot;</span><span class="p">)</span></pre></div>
+      <div class="highlight"><pre>            <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CREATE TABLE layer AS SELECT * FROM read_json(&#39;</span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2">/layer.geojson&#39;)&quot;</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -351,16 +354,10 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-20'>#</a>
       </div>
-      <p>join the two tables on the geometry column    </p>
+      <p>Perform a spatial join between layer and delta</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">                CREATE TABLE new_layer AS </span>
-<span class="s2">                SELECT layer.*, delta.* </span>
-<span class="s2">                FROM layer </span>
-<span class="s2">                JOIN delta </span>
-<span class="s2">                ON ST_Intersects(layer.geometry, delta.geometry)</span>
-<span class="s2">                &quot;&quot;&quot;</span><span class="p">)</span></pre></div>
+      <div class="highlight"><pre>            <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CREATE TABLE delta AS SELECT * FROM read_json(&#39;</span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&#39;)&quot;</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -369,15 +366,33 @@ Returns:
       <div class='octowrap'>
         <a class='octothorpe' href='#section-21'>#</a>
       </div>
+      <p>join the two tables on the geometry column    </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            CREATE TABLE new_layer AS </span>
+<span class="s2">            SELECT layer.*, delta.* </span>
+<span class="s2">            FROM layer </span>
+<span class="s2">            JOIN delta </span>
+<span class="s2">            ON ST_Intersects(layer.geometry, delta.geometry)</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
       <p>write the new layer to the layer file</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>                <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
-                    <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">new_layer</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="n">outfile</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">InvalidDelta</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid action: </span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> 
+      <div class="highlight"><pre>            <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+                <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">new_layer</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="n">outfile</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InvalidDelta</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid action: </span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> 
 
-            <span class="k">return</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">layer_path</span> <span class="o">/</span> <span class="s2">&quot;layer.geojson&quot;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">layer_filepath</span><span class="p">))</span>
 
 </pre></div>
     </div>

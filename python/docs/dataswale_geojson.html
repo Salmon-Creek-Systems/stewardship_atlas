@@ -20,7 +20,9 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geojson</span></pre></div>
+      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geojson</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -29,11 +31,18 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-1'>#</a>
       </div>
-      
+      <p>Configure logging</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">config</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="k">pass</span></pre></div>
+      <div class="highlight"><pre><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">versioning</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -45,7 +54,7 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">():</span>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">config</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">pass</span></pre></div>
     </div>
   </div>
@@ -58,7 +67,7 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">new_version</span><span class="p">():</span>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">():</span>
     <span class="k">pass</span></pre></div>
     </div>
   </div>
@@ -71,7 +80,7 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">asset</span><span class="p">():</span>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">new_version</span><span class="p">():</span>
     <span class="k">pass</span></pre></div>
     </div>
   </div>
@@ -81,10 +90,11 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-5'>#</a>
       </div>
-      <p>Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.</p>
+      
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">refresh_layer</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">delta_queue_builder</span><span class="p">):</span></pre></div>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">asset</span><span class="p">():</span>
+    <span class="k">pass</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -93,16 +103,72 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-6'>#</a>
       </div>
+      <p>Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">refresh_vector_layer</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">delta_queue_builder</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">geojson&#39;</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">.geojson&#39;</span>
+
     <span class="n">fc</span> <span class="o">=</span> <span class="n">delta_queue_builder</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing to </span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2"> FC: </span><span class="si">{</span><span class="n">fc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
     <span class="k">with</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_file</span><span class="p">(</span><span class="n">layer_path</span><span class="p">,</span> <span class="s1">&#39;wt&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
         <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="n">outfile</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">layer_path</span>
-
-</pre></div>
+    <span class="k">return</span> <span class="n">layer_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">refresh_raster_layer</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">delta_queue_builder</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">.tiff&#39;</span>
+    <span class="n">layer_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">deltas_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;deltas&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span>
+    
+    <span class="k">for</span> <span class="n">inpath</span> <span class="ow">in</span> <span class="n">deltas_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.tiff&quot;</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">inpath</span><span class="p">,</span> <span class="n">layer_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">layer_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>move file unchanged to layer location from delta....raster deltas are currently silly</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
