@@ -81,5 +81,16 @@
 	    "license": "https://www.usgs.gov/nhd/license",
 	    "citation": "USGS NHD"
 	} 
+    },
+    "webmap":  {
+	"asset_type": "outlet",
+	"fetch_type": "webmap",
+	"interaction": "import",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+	}
     }
-}    
+}
