@@ -1,0 +1,123 @@
+def map_json(config, name):
+    # Calculate center and zoom from bbox
+    bbox = swale_config['geometry']['bbox']
+    center_lat = (bbox['north'] + bbox['south']) / 2
+    center_lon = (bbox['east'] + bbox['west']) / 2 
+    lat_diff = bbox['north'] - bbox['south']
+    zoom = 12  # Default zoom, could be calculated based on bbox size
+
+    map_config = {
+        "container": "map",
+        "style": {
+            "glyphs" : "https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf",
+            "version": 8,
+            "center": [center_lon, center_lat],
+            "zoom": zoom
+            }
+    }
+    map_sources = {}
+    map_layers = []
+    outlet_config = config['assets'][name]
+
+    # for each layer, we add a source and display layer, and possibly a label layer
+    for layer_name in outlet_config['in_layers']:
+        layer = config['layers'][layer_name]
+        sources[layer_name] =  {
+                'type': 'image' if layer['type'] == 'raster' else 'geojson',
+                'url': f'../layers/{layer_name}/{layer_name}.{layer['type']}',
+                'coordinates': bbox_to_corners(config['geometry']['bbox'])
+            }
+        map_layer = {
+                'id': f"{layer_name}-layer",
+                'type': layer['type'],
+                'source': layer_name
+                }
+        if layer['type'] == 'raster':
+            map_layer['paint'] = {
+                    "raster-opacity": 0.1,
+                    "raster-contrast": 0.3}
+        elif layer['type'] == 'vector':
+            map_layer['paint'] = {
+                    "fill-color": rgb_to_css(a.get('fill_color', [150,150,150])),
+                    "color": rgb_to_css(a.get('color', [150,150,150])),
+                    "line-color": rgb_to_css(a.get('color', [150,150,150])) ,
+                     'line-width': ['get', 'vector_width']
+            }
+
+        map_layers.append(map_layer)
+        if False: #layer.get('add_labels', False):
+            
+            label_layer = {
+                    "id": f"{label_name}-label-layer",
+                    "type": "symbol",
+                    "source": layer_name,
+                    "layout": {
+                        "symbol-placement": layer['feature_type'],#symbol_placement[layer['feature_type']],
+                        "text-offset": [0,2],
+                        "text-font": ["Open Sans Regular"],
+                        "text-field": ["get", "name"],
+                        "text-size": 20
+                        }})
+ 
+            if  layer.get('feature_type', 'line') == 'note':    
+                label_layer.update({
+                    'paint': {
+                        'text-halo-width': 2,
+                        'text-halo-blur': 1,
+                        'text-halo-color': '#FF9999',
+                        'text-color': '#000000'
+                    }
+                    })
+            map_layers.append(label_layer)
+        #else:
+        #    logger.error(f"not an outlet layer: {layer_name}.")
+    map_config['style']['sources'] = map_sources
+    map_config['style']['layers'] = map_layers
+  
+    return map_config
+
+def generate_map_page(title, map_config, output_path):
+    """Generate the complete HTML page for viewing a map"""
+    # Read template files
+    with open('../templates/map.html', 'r') as f:
+        template = f.read()
+
+    with open(output_path, 'w') as f:
+        f.write(template.format(
+            title=title,
+            map_config=json.dump(map_config,  indent=2)
+        ))
+
+
+
+
+def outlet_webmap(config, name):
+    """Generate an interactive web map using MapLibre GL JS.
+    This creates statis HTML and JS files which can be loaded or served directly.
+    
+    map.html is where we insert a JSON doc with all the layer information.
+    map.js is used to do dynamic map processing. 
+    For example, we seem to have to load images used for markers in the map there after the map HTML is fully loaded.
+
+    So let's consider doing it all dynamically in the JS.
+    """
+    
+
+    # Generate base map configuration
+    map_config = webmap_json(config, name)
+    webmap_dir = versioning.atlas_path(config, "outlets") / name
+    webmap_dir.mkdir(parents=True, exist_ok=True)
+    basemap_dir = versioning.atlas_path(config, "layers") / "basemap"
+    
+    # make a JPG of basemap tiff..
+    # TODO this should be a tiling URL instead of a local file..
+    # TODO maybe resampling happens here?
+    tiff2jpg(f"{basemap_dir}/basemap.tiff", webmap_dir / "basemap.jpg")
+    
+    subprocess.run(['cp', '-r', '../templates/css/', webmap_dir / "css"])
+    #subprocess.run(['cp', '../templates/js/map.js', f"{webmap_dir}/js/"])
+    
+    output_path = webmap_dir / "index.html"
+    html_path = generate_map_page("test Webmap", map_config, output_path)  
+  
+    return output_path

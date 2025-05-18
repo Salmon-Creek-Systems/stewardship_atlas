@@ -32,6 +32,10 @@
      "local_hillshade" : {
          "out_layer": "basemap",
          "config": "$inlets::local_hillshade"
+     },
+     "webmap" : {
+        "in_layers": ["basemap", "roads", "creeks"],
+        "config": "$inlets::webmap"
      }
  }
 }
