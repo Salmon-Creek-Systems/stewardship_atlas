@@ -35,31 +35,54 @@ def webmap_json(config, name):
     map_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
+
+    maplibre_type_from_geometry_type = {
+        'point': 'symbol',
+        'polygon': 'fill',
+        'linestring': 'line',
+        'raster': 'raster'
+}
     
     # for each layer, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
         map_sources[layer_name] =  {
-                'type': 'image' if layer['datatype'] == 'raster' else 'geojson',
-                'url': f"../layers/{layer_name}/{layer_name}.{layer['datatype']}",
-                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])
-            }
+            'type': 'image', 
+            'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
+            'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])
+        } if layer['datatype'] == 'raster' else {
+                'type': 'geojson',
+                'data': f"../../layers/{layer_name}/{layer_name}.geojson"
+                }
+           
         map_layer = {
                 'id': f"{layer_name}-layer",
-                'type': layer['datatype'],
                 'source': layer_name
                 }
-        if layer['datatype'] == 'raster':
-            map_layer['paint'] = {
-                    "raster-opacity": 0.1,
-                    "raster-contrast": 0.3}
-        elif layer['datatype'] == 'vector':
-            map_layer['paint'] = {
+        if layer['geometry_type'] == 'raster':            
+            map_layer.update({
+                'type': 'raster',
+                'paint' : {
+                "raster-opacity": 0.1,
+                "raster-contrast": 0.3}})
+                              
+        elif layer['geometry_type'] == 'polygon':
+            #map_layer['paint'] = {
+            map_layer.update({
+                'type': 'fill',
+                'paint': {
                     "fill-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
-                    "color": utils.rgb_to_css(layer.get('color', [150,150,150])),
-                    "line-color": utils.rgb_to_css(layer.get('color', [150,150,150])) ,
-                     'line-width': ['get', 'vector_width']
-            }
+                    "fill-outline-color": utils.rgb_to_css(layer.get('color', [150,150,150]))}
+            })
+        elif layer['geometry_type'] == 'linestring':
+            map_layer.update({
+                'type': 'line',
+                'paint': {
+                    "line-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150]))
+                    }
+                })
+                
+            
 
         map_layers.append(map_layer)
         if False: #layer.get('add_labels', False):            
