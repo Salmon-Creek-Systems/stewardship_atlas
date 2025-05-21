@@ -46,9 +46,12 @@ graph TB
     SourceC --> Inlet4
     Outlet --> PDF
     
+    %% Make all connectors white and thicker
+    linkStyle default stroke:#FFFFFF,stroke-width:6px
+    
     %% Styling
     classDef atlas fill:#5C4033,stroke:#000,stroke-width:4px,color:#000,font-weight:bold,font-size:40px
-    classDef dataswale fill:#8B4513,stroke:#000,stroke-width:4px,color:#000,font-weight:bold,font-size:20px
+    classDef dataswale fill:#8B4513,stroke:#000,stroke-width:4px,color:#000,font-weight:bold,font-size:20px,padding:20px
     classDef layer fill:#CD853F,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
     classDef inlet fill:#006400,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
     classDef queue fill:#90EE90,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
