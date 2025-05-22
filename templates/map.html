@@ -13,7 +13,7 @@
         <div class="input-group">
             <label>Basemap:</label><br/>
             <select id="basemap-select" class="input-field">
-                <option value="basemap">Basemap</option>
+                <option value="basemap">LIDAR Hillshade</option>
                 <option value="satellite">Satellite (ESRI)</option>
                 <option value="usgs">USGS Topo</option>
                 <option value="terrain">OpenMapTiles Terrain</option>
@@ -138,7 +138,7 @@ const map = new maplibregl.Map(MAP_CONFIG);
         // Hide all basemap layers first
         const layers = map.getStyle().layers;
         for (const layer of layers) {{
-            if (layer.id === 'basemap' || 
+            if (layer.id === 'basemap-layer' || 
                 layer.id === 'satellite-layer' || 
                 layer.id === 'usgs-layer' || 
                 layer.id === 'terrain-layer') {{
@@ -151,7 +151,7 @@ const map = new maplibregl.Map(MAP_CONFIG);
 	switch (selectedBasemap) {{
             case 'basemap':
                 // The default basemap is already in the style, just make it visible
-                map.setLayoutProperty('basemap', 'visibility', 'visible');
+                map.setLayoutProperty('basemap-layer', 'visibility', 'visible');
                 break;
             case 'satellite':
                 map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
