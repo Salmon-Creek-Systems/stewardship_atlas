@@ -150,6 +150,7 @@ const map = new maplibregl.Map(MAP_CONFIG);
         // Show the selected basemap
 	switch (selectedBasemap) {{
             case 'basemap':
+                // The default basemap is already in the style, just make it visible
                 map.setLayoutProperty('basemap', 'visibility', 'visible');
                 break;
             case 'satellite':
@@ -164,8 +165,11 @@ const map = new maplibregl.Map(MAP_CONFIG);
         }}
     }});
 
-    // Set initial visibility of basemap layer to visible
-    map.setLayoutProperty('basemap', 'visibility', 'visible');
+    // Set initial visibility - hide all basemaps except the default one
+    map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+    map.setLayoutProperty('usgs-layer', 'visibility', 'none');
+    map.setLayoutProperty('terrain-layer', 'visibility', 'none');
+    // The default basemap should already be visible from the style
 }}); 
 
 
