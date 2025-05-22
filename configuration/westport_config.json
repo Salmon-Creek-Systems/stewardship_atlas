@@ -11,9 +11,9 @@
      "bbox": "$bbox::westportvfd",
      "versions": ["staging"],
      "layers": [
-	 {"name": "basemap", "datatype": "raster", "geometry_type": "raster"},
-	 {"name": "roads", "datatype": "vector", "geometry_type": "linestring"},
-	 {"name": "creeks", "datatype": "vector", "geometry_type": "linestring"}
+	 {"name": "basemap", "geometry_type": "raster"},
+	 {"name": "roads", "geometry_type": "linestring"},
+	 {"name": "creeks", "geometry_type": "linestring"}
 	 ]
  },
  "assets":{

@@ -35,13 +35,6 @@ def webmap_json(config, name):
     map_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
-
-    maplibre_type_from_geometry_type = {
-        'point': 'symbol',
-        'polygon': 'fill',
-        'linestring': 'line',
-        'raster': 'raster'
-}
     
     # for each layer, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
@@ -50,11 +43,11 @@ def webmap_json(config, name):
             'type': 'image', 
             'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
             'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])
-        } if layer['datatype'] == 'raster' else {
+        } if layer['geometry_type'] == 'raster' else {
                 'type': 'geojson',
                 'data': f"../../layers/{layer_name}/{layer_name}.geojson"
                 }
-           
+        # Add Display Layer
         map_layer = {
                 'id': f"{layer_name}-layer",
                 'source': layer_name
@@ -81,17 +74,16 @@ def webmap_json(config, name):
                     "line-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150]))
                     }
                 })
-                
-            
-
         map_layers.append(map_layer)
-        if False: #layer.get('add_labels', False):            
+        
+        # Maybe add label/icon layer:
+        if layer.get('add_labels', False):            
             label_layer = {
                     "id": f"{label_name}-label-layer",
                     "type": "symbol",
                     "source": layer_name,
                     "layout": {
-                        "symbol-placement": layer['feature_type'],#symbol_placement[layer['feature_type']],
+                        "symbol-placement": map_layer['type'],
                         "text-offset": [0,2],
                         "text-font": ["Open Sans Regular"],
                         "text-field": ["get", "name"],
@@ -99,7 +91,7 @@ def webmap_json(config, name):
                         }
                 }
  
-            if  layer.get('feature_type', 'line') == 'note':    
+            if  map_layer.get('type', 'line') == 'note':    
                 label_layer.update({
                     'paint': {
                         'text-halo-width': 2,
