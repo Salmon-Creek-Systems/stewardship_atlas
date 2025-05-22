@@ -33,6 +33,7 @@
 	"fetch_type": "local_raster",
 	"interaction": "import",
 	"data_type": "tiff",
+	"resample_width": 2000,
 	"out_layer": "basemap",
 	"inpath_template": "westport_dem_2m_hillshade.tiff",
 	"attribution": {

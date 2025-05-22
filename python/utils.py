@@ -38,6 +38,40 @@ def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
     
     return jpg_path
 
+def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
+    """Canonicalize raster to target CRS using versioned paths"""
+    
+    logger.info(f"Canonicalizing raster: {inpath}")
+    # inpath = Path(inpath)
+    temp_path = inpath.parent / f"tmp.{inpath.name}"
+    os.rename(inpath, temp_path)
+  
+       # Perform resampling
+
+    # get the bounding box of the ras
+    # <xmin> <ymin> <xmax> <ymax>
+    extent_str = f"{bbox['west']} {bbox['south']} {bbox['east']} {bbox['north']}"
+    warp_args = [ 'gdalwarp', '-t_srs', target_srs, '-te', extent_str]
+    if resample_width:
+        warp_args += [ '-ts', str(resample_width), '0', '-r', 'bilinear']
+    warp_args += [str(inpath), str(outpath)]
+    logger.info(f"Warp args: {warp_args}")
+    subprocess.check_output(warp_args)
+    # TODO - remove temp path
+    return inpath
+
+
+
+
+    subprocess.check_output(['gdalwarp', '-t_srs', config['dataswale']['crs'], str(inpath), str(temp_path)])
+    # Move temp file to final location
+    os.rename(temp_path, inpath)  
+    return inpath
+
+
+
+
+
 def resample_raster_gdal(config, inpath, resample_width=400):
     """Resample raster to target CRS using versioned paths"""
     logger.info(f"Resampling for: [{inpath}]")

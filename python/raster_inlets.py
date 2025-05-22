@@ -17,18 +17,15 @@ def local_raster(config=None, name=None, delta_queue=None):
     Do some CRS and rescaling if needed."""
     inlet_config = config['assets'][name]['config']
     inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
-    outpath = delta_queue.delta_path(config, name, 'create')
-
-    # TODO make this do more - should select subregion, etc.
-    shutil.copy(inpath, outpath)
+    outpath = delta_queue.delta_path(config, inlet_config['out_layer'], 'create')
+    logger.info(f"Delta raster in {outpath}")   
+    return utils.canonicalize_raster(inpath, 
+                                    outpath, 
+                                    config['dataswale']['crs'], 
+                                    config['dataswale']['bbox'], 
+                                    inlet_config.get('resample_width', None))
+    
+    
 
     
-    logger.info(f"Setting raster CRS to {config['dataswale']['crs']}")
-        # first, set the crs
-    utils.set_crs_raster(config, outpath)
-    # then resample
-    if inlet_config.get('resample', False):
-        logger.info(f"resampling to {inlet_config['resample']}")
-        utils.resample_raster_gdal( config, outpath,inlet_config['resample'])
-    return outpath
 
