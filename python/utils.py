@@ -42,22 +42,18 @@ def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
     """Canonicalize raster to target CRS using versioned paths"""
     
     logger.info(f"Canonicalizing raster: {inpath}")
-    # inpath = Path(inpath)
-    temp_path = inpath.parent / f"tmp.{inpath.name}"
-    os.rename(inpath, temp_path)
-  
-       # Perform resampling
 
-    # get the bounding box of the ras
     # <xmin> <ymin> <xmax> <ymax>
-    extent_str = f"{bbox['west']} {bbox['south']} {bbox['east']} {bbox['north']}"
-    warp_args = [ 'gdalwarp', '-t_srs', target_srs, '-te', extent_str]
+    #extent_str = f"{bbox['west']} {bbox['south']} {bbox['east']} {bbox['north']}"
+
+    extent = [str(bbox['west']), str(bbox['south']),str(bbox['east']), str(bbox['north'])]
+    
+    warp_args = [ 'gdalwarp', '-t_srs', target_srs, '-te'] + extent
     if resample_width:
         warp_args += [ '-ts', str(resample_width), '0', '-r', 'bilinear']
     warp_args += [str(inpath), str(outpath)]
     logger.info(f"Warp args: {warp_args}")
     subprocess.check_output(warp_args)
-    # TODO - remove temp path
     return inpath
 
 

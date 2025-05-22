@@ -149,7 +149,7 @@ def outlet_webmap(config, name):
     # TODO maybe resampling happens here?
     # TODO here is where we should be using Dagster and actual asset mgmt
     basemap_path = basemap_dir / "basemap.jpg"
-    if True: #basemap_path.exists():
+    if basemap_path.exists():
         logger.info(f"Using extant basemap: {basemap_path}.")
     else:
         logger.info(f"Generating basemap: {basemap_path}.")
