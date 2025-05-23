@@ -170,6 +170,10 @@ const map = new maplibregl.Map(MAP_CONFIG);
     map.setLayoutProperty('usgs-layer', 'visibility', 'none');
     map.setLayoutProperty('terrain-layer', 'visibility', 'none');
     // The default basemap should already be visible from the style
+    // layers we need to load dynamically follow:
+    {dynamic_layers}
+
+
 }}); 
 
 

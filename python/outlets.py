@@ -15,6 +15,11 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 def webmap_json(config, name):
+    """Generate a JSON object for a web map in MapLibre.
+    We will set up sources and layers as static content loaded initially in HTML where possible.
+    Layers which invole dynamic content - marker images for example - will be added seperately 
+    since the layer must be set up inside the callback for the image load.
+    """
     # Calculate center and zoom from bbox
     bbox = config['dataswale']['bbox']
     center_lat = (bbox['north'] + bbox['south']) / 2
@@ -22,6 +27,7 @@ def webmap_json(config, name):
     lat_diff = bbox['north'] - bbox['south']
     zoom = 12  # Default zoom, could be calculated based on bbox size
 
+    # Set up the map config general properties
     map_config = {
         "container": "map",
         "style": {
@@ -36,7 +42,7 @@ def webmap_json(config, name):
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
     
-    # for each layer, we add a source and display layer, and possibly a label layer
+    # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
         map_sources[layer_name] =  {
@@ -101,13 +107,17 @@ def webmap_json(config, name):
                         'text-color': '#000000'
                     }
                 })
-            map_layers.append(label_layer)
+            if "symbol" not in layer:
+                map_layers.append(map_layer)
+            else:
+                dynamic_layers.append(map_layer)
+
         #else:
         #    logger.error(f"not an outlet layer: {layer_name}.")
     map_config['style']['sources'] = map_sources
     map_config['style']['layers'] = map_layers
   
-    return map_config
+    return {"map_config": map_config, "dynamic_layers": dynamic_layers}
 
 def generate_map_page(title, map_config_data, output_path):
     """Generate the complete HTML page for viewing a map"""
@@ -115,9 +125,27 @@ def generate_map_page(title, map_config_data, output_path):
     with open('../templates/map.html', 'r') as f:
         template = f.read()
     logger.info(f"About to generate HTML to {output_path}: {template}.")
+    # TODO there is a much better way to do this, just handlign it dynamically in JS.
+    # For now though, let's just generate the JS as a string. Ugh.
+    js_bit = ""
+    for dynamic_layer in map_config_data['dynamic_layers']:
+        im_uri = dynamic_layer['url']
+        im_name = dynamic_layer['name']
+        layer_json = dynamic_layer
+        js_bit += """
+unused_image_{im_name} = await map.loadImage('{im_uri}',
+    (error, image) => {
+        if (error) throw error;
+        // Add the image to the map style.                                                              
+        map.addImage('{im_name}', image);
+        map.addLayer(  {layer_json} );
+        });
+
+""".format(**locals())
     processed_template = template.format(
             title=title,
-            map_config=json.dumps(map_config_data,  indent=2))
+            map_config=json.dumps(map_config_data['map_config'],  indent=2),
+            dynamic_layers=js_bit)
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)          
