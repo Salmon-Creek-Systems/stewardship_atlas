@@ -1,5 +1,5 @@
 
-import logging, subprocess
+import logging, subprocess, json
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ def set_crs_raster(config, inpath):
 
 def alter_geojson(json_path, alt_conf, sample_names=True):
     """Alter GeoJSON properties"""
-   
+    logger.info(f"Altering GeoJSON in {json_path} with {alt_conf}.")
     with open(json_path, 'r') as f:
         data = json.load(f)
     

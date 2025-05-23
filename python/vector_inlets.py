@@ -3,6 +3,7 @@ import duckdb
 import geojson
 
 import versioning
+import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -37,7 +38,10 @@ LOAD spatial;
         features.append(f)
     feature_collection = geojson.FeatureCollection(features)
   
-    delta_queue.add_deltas_from_features(config,name, feature_collection, 'create')
+    delta_paths = delta_queue.add_deltas_from_features(config,name, feature_collection, 'create')
+    if 'alterations' in inlet_config:
+        for outpath in delta_paths:
+            utils.alter_geojson(outpath, inlet_config['alterations'])
     return len(feature_collection['features'])
 
 
@@ -66,6 +70,5 @@ def local_ogr(config, name, delta_queue):
     subprocess.check_output(args)
 
     if 'alterations' in inlet_config:
-        
         utils.alter_geojson(outpath, inlet_config['alterations'])
     return outpath

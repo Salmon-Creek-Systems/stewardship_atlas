@@ -122,7 +122,7 @@ def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_co
     
     
     logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
-    return len(feature_collection['features']), str(outpath)
+    return [ str(outpath) ]
 
 def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
     """

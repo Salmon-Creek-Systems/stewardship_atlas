@@ -71,8 +71,9 @@ def webmap_json(config, name):
             map_layer.update({
                 'type': 'line',
                 'paint': {
-                    "line-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150]))
-                    }
+                    "line-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
+                    "line-width": ["get", "vector_width"]
+                }
                 })
         map_layers.append(map_layer)
         
