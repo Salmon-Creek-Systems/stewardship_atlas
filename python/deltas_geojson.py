@@ -152,6 +152,8 @@ def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
                 layer = geojson.load(infile)
 
             with versioning.atlas_file(filepath, mode="rt") as infile:
+                
+                # for now, apply transforms to delta here, as static file...
                 delta = geojson.load(infile)
 
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:

@@ -99,3 +99,52 @@ def set_crs_raster(config, inpath):
     # Move temp file to final location
     os.rename(temp_path, inpath)  
     return inpath
+
+
+
+def alter_geojson(json_path, alt_conf, sample_names=True):
+    """Alter GeoJSON properties"""
+   
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    for feature in data['features']:
+        # Handle property canonicalization
+        if 'canonicalize' in alt_conf:
+            for canon in alt_conf['canonicalize']:
+                value = None
+                if canon.get('concat') is not None:
+                    value = canon['concat'].join( [feature['properties'].get(src,'') for src in canon['from'] ] )
+                else:
+                    for src in canon['from']:
+                        if src in feature['properties']:
+                            value = feature['properties'][src]
+                            if value:
+                                if 'remove_prefix' in canon:
+                                    for prefix in canon['remove_prefix']:
+                                        if value.startswith(prefix):
+                                            value = value[len(prefix):].strip()
+                            break
+                
+
+                if canon['to'] == 'REMOVE':
+                    for src in canon['from']:
+                        feature['properties'].pop(src, None)
+                else:        
+                    if value is None:
+                        if 'default' in canon:
+                            feature['properties'][canon['to']] = canon['default']
+                    else:
+                        feature['properties'][canon['to']] = value        
+        # Handle vector width
+        if 'vector_width' in alt_conf:
+            width_conf = alt_conf['vector_width']
+            if 'attribute' in width_conf:
+                attr_value = feature['properties'].get(width_conf['attribute'])
+                width = width_conf['map'].get(attr_value, width_conf['default'])
+                feature['properties']['vector_width'] = width
+            else:
+                feature['properties']['vector_width'] = width_conf['default']
+    
+    with open(json_path, 'w') as f:
+        json.dump(data, f)

@@ -66,6 +66,6 @@ def local_ogr(config, name, delta_queue):
     subprocess.check_output(args)
 
     if 'alterations' in inlet_config:
-        pass
-        #alter_geojson(outpath, inlet_config['alterations'])
+        
+        utils.alter_geojson(outpath, inlet_config['alterations'])
     return outpath
