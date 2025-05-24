@@ -39,8 +39,10 @@ def webmap_json(config, name):
     }
     map_sources = {}
     map_layers = []
+    dynamic_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
+    
     
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
@@ -77,7 +79,7 @@ def webmap_json(config, name):
             map_layer.update({
                 'type': 'line',
                 'paint': {
-                    "line-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
+                    "line-color": utils.rgb_to_css(layer.get('color', [150,150,150])),
                     "line-width": ["get", "vector_width"]
                 }
                 })

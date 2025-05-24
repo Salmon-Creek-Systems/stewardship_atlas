@@ -134,13 +134,14 @@ def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
     work_dir = deltas_dir / "work"
     
     # Get all .geojson files in the deltas directory
-    delta_files = deltas_dir.glob("*.geojson")
+    delta_files = list(deltas_dir.glob("*.geojson"))
+
     
     # start an empypty layer file
     layer_filepath = work_dir / f"{layer_name}.geojson"
     with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
         geojson.dump(FeatureCollection(features=[]), outfile)
-    logger.info(f"Starting Apply Deltas: {deltas_dir}: {list(delta_files)} -> {work_dir}")
+    logger.info(f"Starting Apply Deltas: {deltas_dir}: {delta_files} -> {work_dir}")
     for i,filepath in enumerate(delta_files):
         logger.info(f"delta file {filepath}")
         asset_name, ts, action = filepath.stem.split("__")

@@ -12,7 +12,7 @@
      "versions": ["staging"],
      "layers": [
 	 {"name": "basemap", "geometry_type": "raster"},
-	 {"name": "roads", "geometry_type": "linestring"},
+	 {"name": "roads", "geometry_type": "linestring", "color": [100, 255, 80]},
 	 {"name": "creeks", "geometry_type": "linestring"}
 	 ]
  },
