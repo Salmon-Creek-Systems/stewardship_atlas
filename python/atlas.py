@@ -15,6 +15,7 @@ import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
+import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
-
+from typing import List, Dict, Tuple, Any
 
 DEFAULT_LAYERS = [
     {"name": "basemap", "geometry_type": "raster"},
@@ -83,6 +84,13 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     """
     Create a new version of the stewardship atlas and a config file.
     """
+
+    # create core config in /staging, built from args here and metadata.json
+    if feature_collection:
+        feature = feature_collection['features'][0]
+        name = feature['properties']['name']
+        bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
+
     
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)
@@ -91,11 +99,6 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'layers' ).mkdir(parents=True, exist_ok=True)
 
-    # create core config in /staging, built from args here and metadata.json
-    if feature_collection:
-        feature = feature_collection['features'][0]
-        name = feature['properties']['name']
-        bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'])
 
     config['data_root'] = data_root
     config['name'] = name
@@ -103,13 +106,13 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['dataswale']['layers'] = layers
     config['assets'] = assets
     
-    inlets_config = json.load(open("vector_inlets.json"))
-    for asset in config['assets']:
+    inlets_config = json.load(open("../configuration/inlets_config.json"))
+    for asset_name, asset in config['assets'].items():
         asset['config'] = inlets_config[asset['config_def']]
         
     logger.info(f"built a config: {config}")
     json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)
-
+    return config
 
     # populate
 
@@ -120,4 +123,3 @@ def delete():
 def new_version():
     pass
 
-def asset():
