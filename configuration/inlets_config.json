@@ -14,105 +14,105 @@
     }
   },
     "overture_roads":  {
-	"asset_type": "inlet",
-	"fetch_type": "overture_duckdb",
-	"interaction": "import",
-	"data_type": "geojson",
-	"out_layer": "roads",
-	"color": [110, 110, 255],
-	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
-		"outpath_template": "overture_roads.geojson",
+		"asset_type": "inlet",
+		"fetch_type": "overture_duckdb",
+		"interaction": "import",
+		"data_type": "geojson",
+		"out_layer": "roads",
+		"color": [110, 110, 255],
+		"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+			"outpath_template": "overture_roads.geojson",
+			"attribution": {
+				"url": "https://portal.opentopography.org/api/terms",
+				"description": "Open Topography's Global DEM",
+				"license": "https://portal.opentopography.org/api/terms",
+				"citation": "https://portal.opentopography.org/api/terms"
+			},
+			"alterations": {
+				"canonicalize": [
+					{
+						"to": "name",
+						"from": [
+						"FULLRDNAME"
+						],
+						"remove_prefix": []
+					}
+				],
+				"vector_width": {
+					"attribute": "class",
+					"map": {
+						"primary": 9,
+						"secondary": 7,
+						"tertiary": 5
+					},
+					"default": 2
+				}
+		}
+	},			
+    "local_hillshade":  {
+		"asset_type": "inlet",
+		"fetch_type": "local_raster",
+		"interaction": "import",
+		"data_type": "tiff",
+		"resample_width": 2000,
+		"out_layer": "basemap",
+		"inpath_template": "westport_dem_2m_hillshade.tiff",
 		"attribution": {
 			"url": "https://portal.opentopography.org/api/terms",
 			"description": "Open Topography's Global DEM",
 			"license": "https://portal.opentopography.org/api/terms",
 			"citation": "https://portal.opentopography.org/api/terms"
-		},
-		"alterations": {
-			"canonicalize": [
-				{
-					"to": "name",
-					"from": [
-					"FULLRDNAME"
-					],
-					"remove_prefix": []
-				}
-			],
-			"vector_width": {
-				"attribute": "class",
-				"map": {
-					"primary": 9,
-					"secondary": 7,
-					"tertiary": 5
-				},
-				"default": 2
-			}
-		}
-	},			
-    "local_hillshade":  {
-	"asset_type": "inlet",
-	"fetch_type": "local_raster",
-	"interaction": "import",
-	"data_type": "tiff",
-	"resample_width": 2000,
-	"out_layer": "basemap",
-	"inpath_template": "westport_dem_2m_hillshade.tiff",
-	"attribution": {
-	    "url": "https://portal.opentopography.org/api/terms",
-	    "description": "Open Topography's Global DEM",
-	    "license": "https://portal.opentopography.org/api/terms",
-	    "citation": "https://portal.opentopography.org/api/terms"
 	}
 	},
     "nhd_creeks":  {
-	"asset_type": "inlet",
-	"fetch_type": "local_ogr",
-	"interaction": "import",
-	"data_type": "geojson",
-	"name": "nhd_creeks",
-	"description": "External creek vector source",
-	"feature_type": "linestring",
-	"color": [110, 110, 255],
-	"layer": "NHDFlowline",
-	"inpath_template": "NHD_H_California_State_GPKG.gpkg",
-	"geometry": "dataswale",
-	"alterations": {
-	    "canonicalize": [
-		{
-		    "to": "name",
-		    "from": [
-			"gnis_name"
-		    ],
-		    "remove_prefix": []
-		}
-	    ],
-	    "vector_width": {
-		"attribute": "fcode_description",
-		"map": {
-		    "Stream/River: Hydrographic Category = Ephemeral": 5,
-		    "Stream/River: Hydrographic Category = Perennial": 7,
-		    "Stream/River: Hydrographic Category = Intermittent": 3,
-		    "Artificial Path": 1
+		"asset_type": "inlet",
+		"fetch_type": "local_ogr",
+		"interaction": "import",
+		"data_type": "geojson",
+		"name": "nhd_creeks",
+		"description": "External creek vector source",
+		"feature_type": "linestring",
+		"color": [110, 110, 255],
+		"layer": "NHDFlowline",
+		"inpath_template": "NHD_H_California_State_GPKG.gpkg",
+		"geometry": "dataswale",
+		"alterations": {
+			"canonicalize": [
+			{
+				"to": "name",
+				"from": [
+				"gnis_name"
+				],
+				"remove_prefix": []
+			}
+			],
+			"vector_width": {
+			"attribute": "fcode_description",
+			"map": {
+				"Stream/River: Hydrographic Category = Ephemeral": 5,
+				"Stream/River: Hydrographic Category = Perennial": 7,
+				"Stream/River: Hydrographic Category = Intermittent": 3,
+				"Artificial Path": 1
+			},
+			"default": 1
+			}
 		},
-		"default": 1
-	    }
-	},
-	"attribution": {
-	    "url": "https://www.usgs.gov/nhd",
-	    "description": "USGS National Hydrography Dataset",
-	    "license": "https://www.usgs.gov/nhd/license",
-	    "citation": "USGS NHD"
-	} 
+		"attribution": {
+			"url": "https://www.usgs.gov/nhd",
+			"description": "USGS National Hydrography Dataset",
+			"license": "https://www.usgs.gov/nhd/license",
+			"citation": "USGS NHD"
+		} 
     },
     "webmap":  {
-	"asset_type": "outlet",
-	"fetch_type": "webmap",
-	"interaction": "import",
-	"attribution": {
-	    "url": "https://portal.opentopography.org/api/terms",
-	    "description": "Open Topography's Global DEM",
-	    "license": "https://portal.opentopography.org/api/terms",
-	    "citation": "https://portal.opentopography.org/api/terms"
-	}
+		"asset_type": "outlet",
+		"fetch_type": "webmap",
+		"interaction": "import",
+		"attribution": {
+			"url": "https://portal.opentopography.org/api/terms",
+			"description": "Open Topography's Global DEM",
+			"license": "https://portal.opentopography.org/api/terms",
+			"citation": "https://portal.opentopography.org/api/terms"
+		}
     }
 }

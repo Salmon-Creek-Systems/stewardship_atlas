@@ -27,6 +27,14 @@ def bbox_to_polygon(b):
     return corners + [corners[0]]
 
 
+def geojson_to_bbox(geojson):
+    return {
+        'west': geojson[0][0],
+        'east': geojson[2][0],
+        'north': geojson[1][1],
+        'south': geojson[3][1]
+    }
+
 def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
     """Convert TIFF to JPG using versioned paths"""
     # Construct JPG path
