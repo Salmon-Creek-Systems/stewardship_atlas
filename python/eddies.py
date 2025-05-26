@@ -9,8 +9,8 @@ import duckdb
 import geojson
 from osgeo import gdal, ogr
 import subprocess
-from atlas_versioning import resolve_versioned_path
-from atlas_inlets import alter_geojson
+import versioning
+import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)

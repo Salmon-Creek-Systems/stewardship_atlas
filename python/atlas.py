@@ -65,6 +65,10 @@ DEFAULT_ASSETS = {
             "out_layer": "basemap",
             "config_def": "local_hillshade"
         },
+        "opentopo_dem" : {
+            "out_layer": "basemap",
+            "config_def": "opentopo_dem"
+        },    
         "webmap" : {
             "in_layers": ["basemap", "roads", "creeks"],
             "config_def": "webmap"
@@ -109,7 +113,10 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
         asset['config'] = inlets_config[asset['config_def']]
-        
+    for layer in layers:
+        (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
+        (p / 'staging' / 'deltas' / layer['name'] / 'work').mkdir(parents=True, exist_ok=True)
+         
     logger.info(f"built a config: {config}")
     json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)
     return config

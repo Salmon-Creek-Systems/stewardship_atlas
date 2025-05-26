@@ -1,8 +1,9 @@
-import logging, subprocess
+import logging, subprocess, requests
 import os, shutil, zipfile, io
 import versioning
 import utils
 from pathlib import Path
+from typing import List, Dict, Tuple, Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ def local_raster(config=None, name=None, delta_queue=None):
     
     
 
-def url_raster(config: Dict[str, Any], name: str, delta_queue: DeltaQueue):
+def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
     """Fetch data from URL and save to versioned outpath"""
     inlet_config = config['assets'][name]['config']
     bbox = config['dataswale']['bbox']
