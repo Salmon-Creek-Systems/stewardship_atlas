@@ -13,6 +13,22 @@
         "citation": "https://portal.opentopography.org/api/terms"
     }
   },
+  "dem": {
+		"name": "dem",
+		"asset_type": "inlet",
+		"fetch_type": "fetch_url",
+		"interaction": "import",
+		"data_type": "tiff",
+		"inpath_template": "https://portal.opentopography.org/API/globaldem?demtype=COP30&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff&API_Key=b53534ba23d967feedbae2c7f85bfc4b",
+		"outpath_template": "/staging/dem.tiff",
+		"attribution": {
+			"url": "https://portal.opentopography.org/api/terms",
+			"description": "Open Topography's Global DEM",
+			"license": "https://portal.opentopography.org/api/terms",
+			"citation": "https://portal.opentopography.org/api/terms"
+		}
+  },
+
     "overture_roads":  {
 		"asset_type": "inlet",
 		"fetch_type": "overture_duckdb",
