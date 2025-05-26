@@ -41,17 +41,29 @@ DEFAULT_CONFIG = {
         "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
         "versions": ["staging"],
         "layers": [
+        {"name": "elevation", "geometry_type": "raster"},
+        {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
         {"name": "basemap", "geometry_type": "raster"},
-        {"name": "roads", "geometry_type": "linestring", "color": [100, 255, 80]},
-        {"name": "creeks", "geometry_type": "linestring"}
+        {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
+        {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]}
         ]
     
     }
 }
 DEFAULT_ASSETS = {
         "dem": {
-            "out_layer": "dem",
+            "out_layer": "elevation",
             "config_def": "opentopo_dem"
+        },
+        "contours": {
+            "in_layer": "elevation",
+            "out_layer": "contours",
+            "config_def": "contours"
+        },
+        "hillshade": {
+            "in_layer": "elevation",
+            "out_layer": "basemap",
+            "config_def": "hillshade"
         },
         "public_roads" : {
         "out_layer": "roads",

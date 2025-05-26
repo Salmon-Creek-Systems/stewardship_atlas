@@ -55,5 +55,13 @@ def refresh_raster_layer(config, name, delta_queue_builder):
         shutil.copy(inpath, layer_path)
     return layer_path
 
+def eddy(config:Dict[str, Any], eddy_name:str):
+    """Apply Eddy to transform a dataswale layer into a new layer."
+    """
+    
+    in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f'{out_layer}.tiff'
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(in_path, out_path)
+    return out_path
 
-    # move file unchanged to layer location from delta....raster deltas are currently silly

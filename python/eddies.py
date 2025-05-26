@@ -23,7 +23,7 @@ logger.setLevel(logging.DEBUG)
 
 
 
-def generate_contours(dem_path, output_path, interval=10):
+def generate_contours(config:Dict[str, Any],eddy_name:str):
     """
     Generate contour lines from DEM data and save as GeoJSON.
     
@@ -32,9 +32,10 @@ def generate_contours(dem_path, output_path, interval=10):
         output_dir (str): Directory to save output contours
         interval (float): Contour interval in meters
     """
-    # Create output filename
-    #base_name = os.path.splitext(os.path.basename(dem_path))[0]
-    #output_geojson = os.path.join(output_dir, f"{base_name}_contours.geojson")
+    eddy = config['assets'][eddy_name]
+    in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
+    out_path = versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.geojson'
+    interval = eddy['config']['interval']
     
     # Open the DEM dataset
     dem_ds = gdal.Open(dem_path)
@@ -94,9 +95,13 @@ def generate_contours(dem_path, output_path, interval=10):
 
 
 
-def hillshade(dem_path, outpath, intensity=0.25):
+def hillshade(  config:Dict[str, Any], eddy_name:str):
     # Open DEM and get data
-    ds = gdal.Open(dem_path)
+    eddy = config['assets'][eddy_name]
+    in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
+    out_path = versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.tiff'
+    intensity = eddy['config']['intensity']
+    ds = gdal.Open(in_path)
     elevation = ds.ReadAsArray()
     
     # Calculate hillshade
