@@ -30,7 +30,10 @@ DEFAULT_LAYERS = [
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
-    {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]}
+    {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
+    {"name": "ponds", "geometry_type": "polygon", "color": [255, 255, 0]},
+    {"name": "helilanding", "geometry_type": "polygon", "color": [255, 0, 0], "symbol": "helipad.png"},
+    {"name": "buildings", "geometry_type": "polygon", "color": [255, 0, 0]}
 ]
 
 

@@ -167,5 +167,27 @@
 			"license": "https://portal.opentopography.org/api/terms",
 			"citation": "https://portal.opentopography.org/api/terms"
 		}
-    }
+    },
+	"webedit": {
+		"name": "webedit",
+		"asset_type": "outlet",
+		"fetch_type": "webedit",
+		"interaction": "backend",
+		"data_type": "html",
+		"layers": [
+		  "ponds",
+		  "roads",
+		  "helilanding"
+		],
+		"outpath_template": "/webedit/",
+		"attribution": {
+		  "url": "https://maplibre.org",
+		  "description": "Terra draw tool for the atlas.",
+		  "license": "https://maplibre.org",
+		  "citation": "MapLibre"
+		}
+	}
+	
+
+
 }
