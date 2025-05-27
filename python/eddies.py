@@ -1,4 +1,4 @@
-
+from typing import Iterator, Dict, Any, List, Tuple
 import os, glob, json, sys
 import logging
 from matplotlib.colors import LightSource
@@ -23,7 +23,7 @@ logger.setLevel(logging.DEBUG)
 
 
 
-def generate_contours(config:Dict[str, Any],eddy_name:str):
+def contours_gdal(config:Dict[str, Any],eddy_name:str):
     """
     Generate contour lines from DEM data and save as GeoJSON.
     
@@ -95,13 +95,13 @@ def generate_contours(config:Dict[str, Any],eddy_name:str):
 
 
 
-def hillshade(  config:Dict[str, Any], eddy_name:str):
+def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
     # Open DEM and get data
     eddy = config['assets'][eddy_name]
     in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
     out_path = versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.tiff'
     intensity = eddy['config']['intensity']
-    ds = gdal.Open(in_path)
+    ds = gdal.Open(str(in_path))
     elevation = ds.ReadAsArray()
     
     # Calculate hillshade
@@ -115,18 +115,23 @@ def hillshade(  config:Dict[str, Any], eddy_name:str):
         # Blend hillshade with white background based on intensity
         hillshade = hillshade * intensity + background * (1 - intensity)
     
-    logger.debug("Calculated hillshade")
+    logger.debug("Calculated hillshade: {in_path} -> {out_path} ({intensity})")
     
     # Save hillshade
     driver = gdal.GetDriverByName('GTiff')
-    out_ds = driver.Create(outpath, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Float32)
+    out_ds = driver.Create(str(out_path), ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Float32)
     out_ds.SetGeoTransform(ds.GetGeoTransform())
     out_ds.SetProjection(ds.GetProjection())
     out_ds.GetRasterBand(1).WriteArray(hillshade)
-    logger.debug(f"Saved hillshade to: {outpath}")
+    logger.debug(f"Saved hillshade to: {out_path}")
     
     # Clean up
     ds = None
     out_ds = None
     
-    return outpath
+    return out_path
+
+
+asset_methods = {
+    "generate_contours": contours_gdal,
+    'derived_hillshade': hillshade_gdal}

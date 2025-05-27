@@ -1,7 +1,8 @@
 import geojson
 import logging
 import shutil
-
+from typing import Iterator, Dict, Any, List, Tuple
+import eddies
 
 
 # Configure logging
@@ -58,10 +59,13 @@ def refresh_raster_layer(config, name, delta_queue_builder):
 def eddy(config:Dict[str, Any], eddy_name:str):
     """Apply Eddy to transform a dataswale layer into a new layer."
     """
+    eddy_config = config['assets'][eddy_name]
+    f = eddies.asset_methods[eddy_name]
+    return f(config, eddy_name)
     
-    in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
-    out_path = versioning.atlas_path(config, 'layers') / out_layer / f'{out_layer}.tiff'
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(in_path, out_path)
-    return out_path
+    #in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
+    #out_path = versioning.atlas_path(config, 'layers') / out_layer / f'{out_layer}.tiff'
+    #out_path.parent.mkdir(parents=True, exist_ok=True)
+    #shutil.copy(in_path, out_path)
+    #return out_path
 

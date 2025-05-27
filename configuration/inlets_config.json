@@ -28,7 +28,43 @@
 			"citation": "https://portal.opentopography.org/api/terms"
 		}
   },
-
+     "derived_hillshade": {
+         "name": "hillshade",
+         "asset_type": "eddy",
+         "fetch_type": "hillshade",
+         "data_type": "tiff",
+         "resample": 5000,
+	 "intensity": 0.5,
+         "inpath_template": "/staging/dem.tiff",
+         "outpath_template": "/staging/hillshade.tiff",
+          "attribution": {
+            "url": "https://www.scvfd.fireatlas.org",
+            "description": "Hillshade derived from DEM",
+            "license": "https://www.scvfd.fireatlas.org",
+            "citation": "https://www.scvfd.fireatlas.org"
+          }
+        },
+    "gdal_contours": {
+            "name": "gdal_contours",
+	    "color": [2, 219, 9],
+	    "interval": 20,
+            "vector_width": 2,
+            "asset_type": "eddy",
+            "interaction": "backend",
+            "fetch_type": "contours",
+            "data_type": "geojson",
+            "add_labels": false,
+            "alterations": {
+		"vector_width": {"default": 2},
+		"label_attribute": "elevation"
+            },
+            "attribution": {
+                "url": "https://www.scvfd.fireatlas.org",
+		"description": "Merged road vector data",
+		"license": "https://www.scvfd.fireatlas.org",
+		"citation": "https://www.scvfd.fireatlas.org"
+            }
+        },
     "overture_roads":  {
 		"asset_type": "inlet",
 		"fetch_type": "overture_duckdb",
@@ -48,7 +84,8 @@
 				"canonicalize": [
 					{
 						"to": "name",
-						"from": [
+					    "from": [
+						"primary_name",
 						"FULLRDNAME"
 						],
 						"remove_prefix": []
@@ -103,14 +140,14 @@
 			}
 			],
 			"vector_width": {
-			"attribute": "fcode_description",
-			"map": {
+			    "attribute": "fcode_description",
+			    "map": {
 				"Stream/River: Hydrographic Category = Ephemeral": 5,
 				"Stream/River: Hydrographic Category = Perennial": 7,
 				"Stream/River: Hydrographic Category = Intermittent": 3,
 				"Artificial Path": 1
-			},
-			"default": 1
+			    },
+			    "default": 1
 			}
 		},
 		"attribution": {

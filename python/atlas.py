@@ -26,10 +26,13 @@ logger.setLevel(logging.INFO)
 from typing import List, Dict, Tuple, Any
 
 DEFAULT_LAYERS = [
+    {"name": "elevation", "geometry_type": "raster"},
+    {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
-	 {"name": "roads", "geometry_type": "linestring", "color": [100, 255, 80]},
-	 {"name": "creeks", "geometry_type": "linestring"}
-	 ]
+    {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
+    {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]}
+]
+
 
 
 DEFAULT_CONFIG = {
@@ -40,48 +43,49 @@ DEFAULT_CONFIG = {
         "crs": "EPSG:4269",     
         "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
         "versions": ["staging"],
-        "layers": [
-        {"name": "elevation", "geometry_type": "raster"},
-        {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
-        {"name": "basemap", "geometry_type": "raster"},
-        {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
-        {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]}
-        ]
-    
+        "layers": []   
     }
 }
 DEFAULT_ASSETS = {
         "dem": {
+            "type": "inlet",
             "out_layer": "elevation",
             "config_def": "opentopo_dem"
         },
-        "contours": {
+        "gdal_contours": {
+            "type": "eddy",            
             "in_layer": "elevation",
             "out_layer": "contours",
-            "config_def": "contours"
+            "config_def": "gdal_contours"
         },
-        "hillshade": {
+        "derived_hillshade": {
+            "type": "eddy",
             "in_layer": "elevation",
             "out_layer": "basemap",
-            "config_def": "hillshade"
+            "config_def": "derived_hillshade"
         },
         "public_roads" : {
+        "type": "inlet",
         "out_layer": "roads",
         "config_def": "overture_roads"
         },
         "public_creeks" : {
+            "type": "inlet",
             "out_layer": "creeks",
             "config_def": "nhd_creeks"
         },
         "local_hillshade" : {
+            "type": "inlet",
             "out_layer": "basemap",
             "config_def": "local_hillshade"
         },
         "opentopo_dem" : {
+            "type": "inlet",
             "out_layer": "basemap",
             "config_def": "opentopo_dem"
         },    
         "webmap" : {
+            "type": "outlet",
             "in_layers": ["basemap", "roads", "creeks"],
             "config_def": "webmap"
         }
@@ -125,9 +129,12 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
         asset['config'] = inlets_config[asset['config_def']]
+        if asset['type'] == 'inlet':
+            (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
     for layer in layers:
         (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
-        (p / 'staging' / 'deltas' / layer['name'] / 'work').mkdir(parents=True, exist_ok=True)
+
+
          
     logger.info(f"built a config: {config}")
     json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)

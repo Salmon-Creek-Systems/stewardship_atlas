@@ -88,7 +88,7 @@ def webmap_json(config, name):
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
             label_layer = {
-                    "id": f"{label_name}-label-layer",
+                    "id": f"{layer_name}-label-layer",
                     "type": "symbol",
                     "source": layer_name,
                     "layout": {
@@ -110,9 +110,9 @@ def webmap_json(config, name):
                     }
                 })
             if "symbol" not in layer:
-                map_layers.append(map_layer)
+                map_layers.append(label_layer)
             else:
-                dynamic_layers.append(map_layer)
+                dynamic_layers.append(label_layer)
 
         #else:
         #    logger.error(f"not an outlet layer: {layer_name}.")
