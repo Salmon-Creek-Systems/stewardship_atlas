@@ -32,7 +32,7 @@ DEFAULT_LAYERS = [
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
     {"name": "ponds", "geometry_type": "polygon", "color": [255, 255, 0]},
-    {"name": "helilanding", "geometry_type": "polygon", "color": [255, 0, 0], "symbol": "helipad.png"},
+    {"name": "helilandings", "geometry_type": "point", "color": [255, 0, 0], "add_labels": True, "symbol": "helipad.png"},
     {"name": "buildings", "geometry_type": "polygon", "color": [255, 0, 0]}
 ]
 
@@ -89,7 +89,7 @@ DEFAULT_ASSETS = {
         },    
         "webmap" : {
             "type": "outlet",
-            "in_layers": ["basemap", "roads", "creeks"],
+            "in_layers": ["basemap", "roads", "creeks", "helilandings"],
             "config_def": "webmap"
         }
     }

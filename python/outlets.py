@@ -71,6 +71,7 @@ def webmap_json(config, name):
             #map_layer['paint'] = {
             map_layer.update({
                 'type': 'fill',
+                'symbol_placement': 'line-center',
                 'paint': {
                     "fill-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
                     "fill-outline-color": utils.rgb_to_css(layer.get('color', [150,150,150]))}
@@ -78,11 +79,21 @@ def webmap_json(config, name):
         elif layer['geometry_type'] == 'linestring':
             map_layer.update({
                 'type': 'line',
+                'symbol_placement': 'line',
                 'paint': {
                     "line-color": utils.rgb_to_css(layer.get('color', [150,150,150])),
                     "line-width": ["get", "vector_width"]
                 }
                 })
+        elif layer['geometry_type'] == 'point':
+            map_layer.update({
+                'type': 'circle',
+                'symbol_placement': 'point',
+                "icon-color": utils.rgb_to_css(layer.get('color', [150,150,150])),
+                "icon-size": 20
+                
+                })
+        
         map_layers.append(map_layer)
         
         # Maybe add label/icon layer:
@@ -92,7 +103,7 @@ def webmap_json(config, name):
                     "type": "symbol",
                     "source": layer_name,
                     "layout": {
-                        "symbol-placement": map_layer['type'],
+                        "symbol-placement": map_layer['symbol_placement'],
                         "text-offset": [0,2],
                         "text-font": ["Open Sans Regular"],
                         "text-field": ["get", "name"],
@@ -112,6 +123,11 @@ def webmap_json(config, name):
             if "symbol" not in layer:
                 map_layers.append(label_layer)
             else:
+                label_layer['symbol'] = layer['symbol']
+                label_layer['name'] = layer['name']
+                label_layer['layout']['icon-image'] = layer['name']
+                label_layer['layout']['icon-color'] = utils.rgb_to_css(layer.get('color', [150,150,150]))
+                
                 dynamic_layers.append(label_layer)
 
         #else:
@@ -131,17 +147,17 @@ def generate_map_page(title, map_config_data, output_path):
     # For now though, let's just generate the JS as a string. Ugh.
     js_bit = ""
     for dynamic_layer in map_config_data['dynamic_layers']:
-        im_uri = dynamic_layer['url']
+        im_uri = "local/" + dynamic_layer['symbol']
         im_name = dynamic_layer['name']
         layer_json = dynamic_layer
         js_bit += """
 unused_image_{im_name} = await map.loadImage('{im_uri}',
-    (error, image) => {
+    (error, image) => {{
         if (error) throw error;
         // Add the image to the map style.                                                              
         map.addImage('{im_name}', image);
         map.addLayer(  {layer_json} );
-        });
+        }});
 
 """.format(**locals())
     processed_template = template.format(
