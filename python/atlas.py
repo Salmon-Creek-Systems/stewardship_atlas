@@ -91,7 +91,13 @@ DEFAULT_ASSETS = {
             "type": "outlet",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
             "config_def": "webmap"
-        }
+        },
+         "runbook": {
+            "type": "outlet",
+            "name": "runbook",
+            "in_layers": ["basemap", "roads", "creeks", "helilandings"],
+            "config_def": "runbook"}
+           
     }
 
 DEFAULT_DATA_ROOT = "/root/swales"

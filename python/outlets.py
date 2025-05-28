@@ -210,3 +210,201 @@ def outlet_webmap(config, name):
     html_path = generate_map_page("test Webmap", map_config, output_path)  
   
     return output_path
+
+
+def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
+    """Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful."""
+    swale_name = config['dataswale']['name']
+    outpath = versioning.atlas_path(config, 'staging') / "outlets" / outlet_name / f"{layer}_{region['name']}.geojson"
+    logger.info(f"Extracting region {region['name']} of vector layer {layer} to {outpath} from {inpath}.")
+
+    grass_init(swale_name)  
+    import grass.script as gs
+    clip_bbox = region['bbox']
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
+    gs.read_command('v.clip', flags='r', input=layer, output=f'{layer}_clip')
+    
+    gs.read_command('v.out.ogr', input=f'{layer}_clip', output=outpath, format='GeoJSON')
+    return outpath
+
+def extract_region_layer_raster_grass(config, outlet_name, layer, region):
+    """Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful."""
+    swale_name = config['dataswale']['name']
+    inpath = versioning.atlas_path(config, 'layers') / layer / f"{layer}.tiff"
+    outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.tiff"
+    
+    logger.info(f"Extracting region {region['name']} of raster layer {layer} to {outpath} from {inpath}.")
+    #import grass.script as gs
+    # staging_path = f"{data_root}/{swale_name}/{version_string}/staging"
+    grass_init(swale_name)
+    import grass.script as gs
+    import grass.jupyter as gj    
+    clip_bbox = region['bbox']
+    # Can't we extract more efficiently here? We read the whole file then just use part of it - EACH TIME
+    gs.read_command('r.in.gdal', input=inpath, output=layer)
+    gs.read_command('g.region', raster=layer)
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
+    # outpath = f"{staging_path}/{layer}_{region['name']}.tiff"
+    gs.read_command('r.out.gdal', input=layer, output=outpath, format='GTiff')
+ 
+    return outpath
+
+
+def build_region_map_grass(config, outlet_name, region):
+
+    grass_init(config['dataswale']['name'])
+    import grass.script as gs
+    import grass.jupyter as gj
+    if region['name'] == 'all':
+        size = 9000
+    else:
+        size = 2400
+    m = gj.Map(height=size, width=size)
+    clip_bbox = region['bbox']
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
+    # load region layers
+    raster_name = 'hillshadered_' + region['name']
+    print(f"making map image for {region}.")
+    gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
+    gs.read_command('r.colors', map=raster_name, color='grey')
+    
+    gs.read_command('r.mapcalc.simple', expression="1", output='ones')
+    gs.read_command('r.colors', map='ones', color='grey1.0')
+    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent='25', overwrite=True)
+    
+    m.d_rast(map='blended')   
+    # m.d_rast(map=raster_name)  
+    # add layers to map
+    for lc,lp in region['vectors']:
+        if lc['name'] in region.get('config', {}):
+            for update_key, update_value in region['config'].items():
+                lc[update_key] = update_value
+                print(f"region config override: {region['name']} | {lc['name']}: {region['config']} -> {lc}")
+        gs.read_command('v.import', input=lp, output=lc['name'])
+        # clunky but need to skip empty sets
+        lame = json.load(open(lp))
+        if len(lame['features']) < 1:
+            continue
+        if lc.get('feature_type', 'line') == 'point':
+            c = lc.get('color', (100,100,100))
+            if lc.get('add_labels', False):
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         icon=lc.get('symbol', 'basic/diamond'),size=10,
+                         label_size=15,
+                         attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
+            else:
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         icon=lc.get('symbol', 'basic/diamond'),size=10)
+        else:
+            # This is interesting: vector width comes from features or layer conf? Former, right?
+            # m.d_vect(map=lc['name'], color=lc.get('color', 'gray'), width=lc.get('width_base',5))
+            c = lc.get('color', (100,100,100))
+            fc = lc.get('fill_color', c)
+            m.d_vect(map=lc['name'],
+                     color=f"{c[0]}:{c[1]}:{c[2]}",
+                     fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                     width_column='vector_width',
+                     attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
+                     label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=25)
+   
+    m.d_grid(size=0.5,color='black')
+    m.d_legend_vect()
+
+    # export map
+    outpath = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.png"
+    m.save(outpath)
+    # return path to map
+    return outpath
+    
+
+def outlet_regions_grass(config, outlet_name, regions = [], region_html=[], skips=[]):
+    """Process regions for gazetteer and runbook outputs using versioned paths."""
+    swale_name = config['dataswale']['name']
+    outlet_config = config['assets'][outlet_name]
+    if 'region_maps' not in skips:
+        # Set up Grass environment
+        grass_init(swale_name)
+        import grass.script as gs
+        
+        # Process each layer
+        for layer in outlet_config['layers']:
+            logger.debug(f"Processing layer: {layer}")
+            lc = outlet_config['layers'][layer]
+            
+            # Resolve staging path then extract data for each region for current layer:
+            staging_path = versioning.atlas_path(config, "layers") / layer / f"{layer}.{lc['data_type']}"
+            
+            if lc['data_type'] in ['geojson']:
+                gs.read_command('v.import', input=staging_path, output=layer)
+                for region in regions:
+                    logger.debug(f"Processing vector region: {region['name']}")
+                    region['vectors'].append([lc, extract_region_layer_ogr_grass(config, outlet_name, layer, region)])
+            else:
+                gs.read_command('r.in.gdal', input=staging_path, output=layer)
+                for region in regions:
+                    logger.debug(f"Processing raster region: {region['name']}")
+                    region['raster'] = [lc,
+                                        extract_region_layer_raster_grass(config, outlet_name, layer, region)]
+                
+        # Build maps for each region
+        for region in regions:
+            logger.debug(f"Building map for region: {region['name']}")
+            # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
+            build_region_map_grass(config, outlet_name, region)
+    
+    # Write output files
+    for outfile_path, outfile_content in regions_html:
+        versioned_path = versioning.atlas_path(config, "outlets") / outlet_name / outfile_path
+        # os.makedirs(os.path.dirname(versioned_path), exist_ok=True)
+        logger.debug(f"Writing region output to: {versioned_path}")
+        with open(versioned_path, "w") as f:
+            f.write(outfile_content)
+    
+    return regions
+
+def outlet_runbook( config, outlet_name, skips=[]):
+    outlet_config = config['assets'][outlet_name]
+    
+    regions = outlet_config['regions']
+
+    swale_name = config['dataswale']['name']
+    outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
+    index_html = "<html><body><h1>Run Book</h1><ul>"
+    for i,r in enumerate(regions):
+        index_html += f"<li><a href='{swale_name}_page_{i}.html'>{r['caption']}</a></li>"
+    index_html += "</ul></body></html>"
+    with open(f"{outlet_dir}/index.html", "w") as f:
+        f.write(index_html)
+    
+    html_template = """
+<html></body><table><tr><TD><A HREF="../runbook/"><img src='page_{region_name_lower}_minimap.png' width=400/></A></TD></td>
+<td>
+<center><h1>{caption}</h1></center>
+<pre>{map_collar}</pre>
+<center><p>{text}</p><i>Click map to zoom, advance to previous/next page in RunBook, or "Home" to return to menu.</i><hr>
+(<a href='{swale_name}_page_{prev_region}.html'>prev</a>) (<a href='{swale_name}_page_{next_region}.html'>next</a>)
+<a href="..">HOME</a></center></td></tr></TABLE>
+<a href='page_{name}.png'><img src='page_{name}.png' width=1200/></a></center></body></html>"""
+    # outpath_template = outlet_config['outpath_template'].format(**swale_config)
+    gaz_html = []
+    md = f"# {swale_name} RunBook\n\n"
+
+    for i,r in enumerate(regions):
+        r['next_region']=(i+1) % len(regions)
+        r['prev_region']=(i-1) % len(regions)
+        map_collar = build_map_collar(config, swale_name, r['bbox'], layers = outlet_config['layers'])
+        gaz_html.append(
+            (outlet_config['outpath_template'].format(
+                i=i,region_name=r['name'],**swale_config),
+             html_template.format(i=i, region_name=r['name'], region_name_lower=r['name'].lower(),
+                                  swale_name=swale_name, map_collar=map_collar, **r)))
+        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/page_{r['name']}.png)\n{r['caption']}\n\n{r['text']}\n\n"
+    with open(f"{outlet_dir}/dataswale.md", "w") as f:
+        f.write(md)
+    if 'region_content' not in skips:
+        res =  outlet_regions_grass(config, outlet_name, regions, gaz_html, skips=skips)
+        print(subprocess.check_output(['pandoc', f"{outlet_dir}/dataswale.md", '-o', f"{outlet_dir}/runbook.pdf"]))
+        
+    return regions
