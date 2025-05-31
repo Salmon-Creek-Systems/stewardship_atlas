@@ -185,18 +185,18 @@
 		  "description": "Terra draw tool for the atlas.",
 		  "license": "https://maplibre.org",
 		  "citation": "MapLibre"
-		},
+		}
 	},
 	"runbook": {
 		"asset_type": "outlet",
 		"layers": [
-                "hillshade",
-                "contours",
-                "creeky",
-                "tsunami",
-                "buildings",
-                "helilanding",
-                "overture_roads"],
+                    "hillshade",
+                    "contours",
+                    "creeks",
+                    "tsunami",
+                    "buildings",
+                    "helilanding",
+                    "overture_roads"],
             "fetch_type": "runbook",
             "interaction": "interface",
             "data_type": "html",
@@ -210,27 +210,28 @@
             },	    
             "regions": [
                 {"bbox": {
-                    'west': -121.19978063408502,
-                    'east': -121.20391109005016,
-                    'north': 39.23863749098538,
-                    'south': 39.24416744687048},
-                "name": "Rock Loop",
+                    "east": -121.19978063408502,
+                    "west": -121.20391109005016,
+                    "south": 39.23863749098538,
+                    "north": 39.24416744687048},
+                "name": "RockLoop",
                 "caption": "Double loop with Ginger and big rocks.",
                 "vectors": [],
                 "raster": "",
                 "text": "Hwy20 to the County Lnie"},
                 {"bbox": {
-                    'west': -121.19978063408502,
-                    'east': -121.20391109005016,
-                    'north': 39.23863749098538,
-                    'south': 39.24416744687048},
+                    "east": -121.19978063408502,
+                    "west": -121.20391109005016,
+                    "south": 39.23863749098538,
+                    "north": 39.24416744687048},
                 "name": "GolfCourses",
                 "caption": "Golf Courses",
                 "vectors": [],
                 "raster": "",
                 "text": "Golf Courses"}]
-				}
-			}
+	}
+}
+			
 
 
 

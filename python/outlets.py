@@ -1,6 +1,7 @@
 import subprocess
 import json
-
+import sys,os
+from pathlib import Path
 
 import utils
 import versioning
@@ -211,12 +212,31 @@ def outlet_webmap(config, name):
   
     return output_path
 
+def grass_init(swale_name):
+    grass = '/usr/bin/grass'
+    sys.path.insert(
+        0,subprocess.check_output([grass, "--config", "python_path"], text=True).strip())
+
+    import grass.jupyter as gj
+    my_env = os.environ.copy()
+    my_env["PYTHONPATH"] = f"/usr/lib/grass83/etc/python:{my_env['PATH']}"
+    loc_path =  Path("/root/grassdata/") / swale_name
+    if not loc_path.exists():
+        print(f"Creating Grass LOC: {loc_path}...")
+        print(subprocess.check_output([grass, '-c', 'EPSG:4269', '-e',str(loc_path)], env=my_env))
+            
+    GRASS_LOC = swale_name
+    # GRASS_LOC = GRASS_LOC_NAME + datetime.datetime.now().strftime("%I:%M%p_%B-%d-%Y")
+
+    return gj.init("~/grassdata", GRASS_LOC, "PERMANENT")
+    
+
 
 def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
     """Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful."""
-    swale_name = config['dataswale']['name']
-    outpath = versioning.atlas_path(config, 'staging') / "outlets" / outlet_name / f"{layer}_{region['name']}.geojson"
-    logger.info(f"Extracting region {region['name']} of vector layer {layer} to {outpath} from {inpath}.")
+    swale_name = config['name']
+    outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.geojson"
+    logger.info(f"Extracting region {region['name']} of vector layer {layer} to {outpath}.")
 
     grass_init(swale_name)  
     import grass.script as gs
@@ -229,11 +249,11 @@ def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
 
 def extract_region_layer_raster_grass(config, outlet_name, layer, region):
     """Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful."""
-    swale_name = config['dataswale']['name']
+    swale_name = config['name']
     inpath = versioning.atlas_path(config, 'layers') / layer / f"{layer}.tiff"
     outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.tiff"
     
-    logger.info(f"Extracting region {region['name']} of raster layer {layer} to {outpath} from {inpath}.")
+    logger.info(f"Extracting region {region['name']} of raster layer {layer} to {outpath}.")
     #import grass.script as gs
     # staging_path = f"{data_root}/{swale_name}/{version_string}/staging"
     grass_init(swale_name)
@@ -252,7 +272,7 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region):
 
 def build_region_map_grass(config, outlet_name, region):
 
-    grass_init(config['dataswale']['name'])
+    grass_init(config['name'])
     import grass.script as gs
     import grass.jupyter as gj
     if region['name'] == 'all':
@@ -319,34 +339,37 @@ def build_region_map_grass(config, outlet_name, region):
     return outpath
     
 
-def outlet_regions_grass(config, outlet_name, regions = [], region_html=[], skips=[]):
+def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
-    swale_name = config['dataswale']['name']
+    swale_name = config['name']
     outlet_config = config['assets'][outlet_name]
     if 'region_maps' not in skips:
         # Set up Grass environment
         grass_init(swale_name)
         import grass.script as gs
         
-        # Process each layer
-        for layer in outlet_config['layers']:
-            logger.debug(f"Processing layer: {layer}")
-            lc = outlet_config['layers'][layer]
+        # Process each input layer
+        for lc in config['dataswale']['layers']:
+            if lc['name'] not in outlet_config['in_layers']:
+                continue
+            layer_format = 'tiff' if lc['geometry_type'] in ['raster'] else 'geojson'
+            logger.debug(f"Processing layer: {lc}")
+            # lc = config['dataswale']['layers'][layer]
             
             # Resolve staging path then extract data for each region for current layer:
-            staging_path = versioning.atlas_path(config, "layers") / layer / f"{layer}.{lc['data_type']}"
+            staging_path = versioning.atlas_path(config, "layers") / lc['name'] / f"{lc['name']}.{layer_format}"
             
-            if lc['data_type'] in ['geojson']:
-                gs.read_command('v.import', input=staging_path, output=layer)
+            if layer_format in ['geojson']:
+                gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
-                    region['vectors'].append([lc, extract_region_layer_ogr_grass(config, outlet_name, layer, region)])
+                    region['vectors'].append([lc, extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region)])
             else:
-                gs.read_command('r.in.gdal', input=staging_path, output=layer)
+                gs.read_command('r.in.gdal', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing raster region: {region['name']}")
                     region['raster'] = [lc,
-                                        extract_region_layer_raster_grass(config, outlet_name, layer, region)]
+                                        extract_region_layer_raster_grass(config, outlet_name, lc['name'], region)]
                 
         # Build maps for each region
         for region in regions:
@@ -358,7 +381,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], region_html=[], skip
     for outfile_path, outfile_content in regions_html:
         versioned_path = versioning.atlas_path(config, "outlets") / outlet_name / outfile_path
         # os.makedirs(os.path.dirname(versioned_path), exist_ok=True)
-        logger.debug(f"Writing region output to: {versioned_path}")
+        logger.info(f"Writing region output to: {versioned_path}")
         with open(versioned_path, "w") as f:
             f.write(outfile_content)
     
@@ -367,13 +390,13 @@ def outlet_regions_grass(config, outlet_name, regions = [], region_html=[], skip
 def outlet_runbook( config, outlet_name, skips=[]):
     outlet_config = config['assets'][outlet_name]
     
-    regions = outlet_config['regions']
+    regions = outlet_config['config']['regions']
 
-    swale_name = config['dataswale']['name']
+    swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
     index_html = "<html><body><h1>Run Book</h1><ul>"
     for i,r in enumerate(regions):
-        index_html += f"<li><a href='{swale_name}_page_{i}.html'>{r['caption']}</a></li>"
+        index_html += f"<li><a href='{r['name'].lower()}.html'>{r['caption']}</a></li>"
     index_html += "</ul></body></html>"
     with open(f"{outlet_dir}/index.html", "w") as f:
         f.write(index_html)
@@ -394,11 +417,12 @@ def outlet_runbook( config, outlet_name, skips=[]):
     for i,r in enumerate(regions):
         r['next_region']=(i+1) % len(regions)
         r['prev_region']=(i-1) % len(regions)
-        map_collar = build_map_collar(config, swale_name, r['bbox'], layers = outlet_config['layers'])
+        map_collar = "None" #build_map_collar(config, swale_name, r['bbox'], layers = outlet_config['layers'])
         gaz_html.append(
-            (outlet_config['outpath_template'].format(
-                i=i,region_name=r['name'],**swale_config),
-             html_template.format(i=i, region_name=r['name'], region_name_lower=r['name'].lower(),
+            #(outlet_config['config']['outpath_template'].format(
+            #    i=i,region_name=r['name'],**config).lower(),
+            (outlet_dir / f"{r['name'].lower()}.html",
+            html_template.format(i=i, region_name=r['name'], region_name_lower=r['name'].lower(),
                                   swale_name=swale_name, map_collar=map_collar, **r)))
         md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/page_{r['name']}.png)\n{r['caption']}\n\n{r['text']}\n\n"
     with open(f"{outlet_dir}/dataswale.md", "w") as f:

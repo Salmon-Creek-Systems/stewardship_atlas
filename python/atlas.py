@@ -140,6 +140,8 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         asset['config'] = inlets_config[asset['config_def']]
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
+        elif asset['type'] == 'outlet':
+            (p / 'staging' / 'outlets' / asset_name / 'work' ).mkdir(parents=True, exist_ok=True)
     for layer in layers:
         (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
 

@@ -29,10 +29,10 @@ def bbox_to_polygon(b):
 
 def geojson_to_bbox(geojson):
     return {
-        'west': geojson[0][0],
-        'east': geojson[2][0],
-        'north': geojson[3][1],
-        'south': geojson[1][1]
+        "west": geojson[0][0],
+        "east": geojson[2][0],
+        "north": geojson[3][1],
+        "south": geojson[1][1]
     }
 
 def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
