@@ -1,6 +1,7 @@
 import subprocess
 import json, csv
 import sys,os
+from io import StringIO
 from pathlib import Path
 import duckdb
 
@@ -462,7 +463,7 @@ def sql_query_duckdb(config: dict, outlet_name: str, query: str):
     with duckdb.connect(str(data_path)) as conn:
         return conn.execute(query).fetchall()
     
-def sql_query(config: dict, outlet_name: str, query: str):
+def sql_query(config: dict, outlet_name: str, query: str, return_format: str = 'csv'):
     """Query the DDB for an outlet."""
     result_rows = sql_query_duckdb(config, outlet_name, query)
 
@@ -474,7 +475,7 @@ def sql_query(config: dict, outlet_name: str, query: str):
     elif return_format == 'csv':
         
         writer = csv.writer(file_like)
-        writer.writerow(result_rows[0].keys())
+        # writer.writerow(result_rows[0].keys())
         for row in result_rows:
             writer.writerow(row)
         
