@@ -1,5 +1,5 @@
 import subprocess
-import json
+import json, csv
 import sys,os
 from pathlib import Path
 import duckdb
@@ -456,5 +456,30 @@ def outlet_sql_duckdb(config: dict, outlet_name: str):
     return data_path
 
 
+def sql_query_duckdb(config: dict, outlet_name: str, query: str):
+    """Query the DDB for an outlet."""
+    data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
+    with duckdb.connect(str(data_path)) as conn:
+        return conn.execute(query).fetchall()
+    
+def sql_query(config: dict, outlet_name: str, query: str):
+    """Query the DDB for an outlet."""
+    result_rows = sql_query_duckdb(config, outlet_name, query)
+
+    file_like = StringIO()
+    if return_format == 'json':
+        json.dump(result_rows, file_like)
+        return file_like.getvalue()
+
+    elif return_format == 'csv':
+        
+        writer = csv.writer(file_like)
+        writer.writerow(result_rows[0].keys())
+        for row in result_rows:
+            writer.writerow(row)
+        
+    else:
+        raise ValueError(f"Invalid return format: {return_format}")
+    return file_like.getvalue()
 
 
