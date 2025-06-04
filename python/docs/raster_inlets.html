@@ -20,10 +20,12 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span><span class="o">,</span><span class="w"> </span><span class="nn">subprocess</span>
+      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span><span class="o">,</span><span class="w"> </span><span class="nn">subprocess</span><span class="o">,</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="o">,</span><span class="w"> </span><span class="nn">shutil</span><span class="o">,</span><span class="w"> </span><span class="nn">zipfile</span><span class="o">,</span><span class="w"> </span><span class="nn">io</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">versioning</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span></pre></div>
+<span class="kn">import</span><span class="w"> </span><span class="nn">utils</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -48,10 +50,10 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-2'>#</a>
       </div>
-      <p>Resample raster to target CRS using versioned paths</p>
+      <p>Fetch data from local file and save to versioned outpath.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">resample_raster_gdal</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">inpath</span><span class="p">,</span> <span class="n">resample_width</span><span class="o">=</span><span class="mi">400</span><span class="p">):</span></pre></div>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">local_raster</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -63,9 +65,61 @@
       
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resampling for: [</span><span class="si">{</span><span class="n">inpath</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
-    <span class="n">inpath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inpath</span><span class="p">)</span>
-    <span class="n">temp_path</span> <span class="o">=</span> <span class="n">inpath</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;tmp.</span><span class="si">{</span><span class="n">inpath</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span></pre></div>
+      <div class="highlight"><pre>    <span class="n">Do</span> <span class="n">some</span> <span class="n">CRS</span> <span class="ow">and</span> <span class="n">rescaling</span> <span class="k">if</span> <span class="n">needed</span><span class="o">.</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    inlet_config = config[&#39;assets&#39;][name][&#39;config&#39;]</span>
+<span class="s2">    inpath = versioning.atlas_path(config, &quot;local&quot;) / inlet_config[&#39;inpath_template&#39;].format(**config)</span>
+<span class="s2">    outpath = delta_queue.delta_path(config, name, &#39;create&#39;)</span>
+<span class="s2">    logger.info(f&quot;Delta raster in </span><span class="si">{outpath}</span><span class="s2">&quot;)   </span>
+<span class="s2">    return utils.canonicalize_raster(inpath, </span>
+<span class="s2">                                    outpath, </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;crs&#39;], </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;bbox&#39;], </span>
+<span class="s2">                                    inlet_config.get(&#39;resample_width&#39;, None))</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="n">Fetch</span> <span class="n">data</span> <span class="kn">from</span><span class="w"> </span><span class="nn">URL</span> <span class="ow">and</span> <span class="n">save</span> <span class="n">to</span> <span class="n">versioned</span> <span class="n">outpath</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    inlet_config = config[&#39;assets&#39;][name][&#39;config&#39;]</span>
+<span class="s2">    bbox = config[&#39;dataswale&#39;][&#39;bbox&#39;]</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">    outpath = delta_queue.delta_path(config, name, &#39;create&#39;)</span>
+<span class="s2">    workdir = outpath.parent / &#39;work&#39;</span>
+<span class="s2">    workfile = workdir / outpath.name </span>
+<span class="s2">    </span>
+<span class="s2">    url = inlet_config[&#39;inpath_template&#39;].format(</span>
+<span class="s2">        north=bbox[&#39;north&#39;],</span>
+<span class="s2">        south=bbox[&#39;south&#39;],</span>
+<span class="s2">        east=bbox[&#39;east&#39;],</span>
+<span class="s2">        west=bbox[&#39;west&#39;],</span>
+<span class="s2">        **config)</span>
+<span class="s2">    logger.debug(f&quot;Fetching data from URL: </span><span class="si">{url}</span><span class="s2">&quot;)</span>
+<span class="s2">    try:</span>
+<span class="s2">        response = requests.get(url)</span>
+<span class="s2">        response.raise_for_status()</span>
+
+<span class="s2">        if url.endswith(&#39;.zip&#39;) or  inlet_config.get(&#39;unzip&#39;, False):</span>
+<span class="s2">            logger.debug(&quot;Extracting zip contents&quot;)</span>
+<span class="s2">            with zipfile.ZipFile(io.BytesIO(response.content)) as z:</span>
+<span class="s2">                z.extractall(os.path.dirname(workfile))</span>
+<span class="s2">        else:</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">            with open(workfile, &#39;wb&#39;) as f:</span>
+<span class="s2">                f.write(response.content)</span>
+<span class="s2">                logger.debug(f&quot;Successfully wrote content to: </span><span class="si">{workfile}</span><span class="s2">&quot;)</span>
+<span class="s2">                </span>
+<span class="s2">    except requests.exceptions.RequestException as e:</span>
+<span class="s2">        logger.error(f&quot;Failed to fetch URL </span><span class="si">{url}</span><span class="s2">: </span><span class="si">{e}</span><span class="s2">&quot;)</span>
+<span class="s2">        raise</span>
+<span class="s2">    except Exception as e:</span>
+<span class="s2">        logger.error(f&quot;Error processing data from </span><span class="si">{url}</span><span class="s2">: </span><span class="si">{e}</span><span class="s2">&quot;)</span>
+<span class="s2">        raise</span>
+<span class="s2"> </span>
+<span class="s2">    return utils.canonicalize_raster(workfile, </span>
+<span class="s2">                                    outpath, </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;crs&#39;], </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;bbox&#39;], </span>
+<span class="s2">                                    inlet_config.get(&#39;resample_width&#39;, None))</span>
+
+</pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -74,11 +128,10 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-4'>#</a>
       </div>
-      <p>Move input to temp path</p>
+      
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">inpath</span><span class="p">,</span> <span class="n">temp_path</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resampling raster to </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> @ width </span><span class="si">{</span><span class="n">resample_width</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">inpath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+      <div class="highlight"><pre></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -87,15 +140,10 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-5'>#</a>
       </div>
-      <p>Perform resampling</p>
+      <p>inpath = versioning.atlas_path(config, &ldquo;local&rdquo;) / inlet_config[&lsquo;inpath_template&rsquo;].format(**config)</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span>
-        <span class="s1">&#39;gdalwarp&#39;</span><span class="p">,</span> <span class="s1">&#39;-r&#39;</span><span class="p">,</span> <span class="s1">&#39;bilinear&#39;</span><span class="p">,</span>
-        <span class="s1">&#39;-ts&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">resample_width</span><span class="p">),</span> <span class="s1">&#39;0&#39;</span><span class="p">,</span>
-        <span class="s1">&#39;-t_srs&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">],</span>
-        <span class="nb">str</span><span class="p">(</span><span class="n">temp_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">inpath</span><span class="p">)</span>
-    <span class="p">])</span></pre></div>
+      <div class="highlight"><pre></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -104,124 +152,7 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-6'>#</a>
       </div>
-      <p>TODO - remove temp path</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>    <span class="k">return</span> <span class="n">inpath</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-7'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-7'>#</a>
-      </div>
-      <p>Set CRS for raster using versioned paths</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">set_crs_raster</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">inpath</span><span class="p">):</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-8'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-8'>#</a>
-      </div>
-      
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>    <span class="n">inpath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inpath</span><span class="p">)</span>
-    <span class="n">temp_path</span> <span class="o">=</span> <span class="n">inpath</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;tmp.</span><span class="si">{</span><span class="n">inpath</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Setting raster CRS to </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">inpath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span><span class="s1">&#39;gdalwarp&#39;</span><span class="p">,</span> <span class="s1">&#39;-t_srs&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">inpath</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">temp_path</span><span class="p">)])</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-9'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-9'>#</a>
-      </div>
-      <p>Move temp file to final location</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>    <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">temp_path</span><span class="p">,</span> <span class="n">inpath</span><span class="p">)</span>  
-    <span class="k">return</span> <span class="n">inpath</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-10'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-10'>#</a>
-      </div>
-      <p>Fetch data from local file and save to versioned outpath.</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">local_raster</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-11'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-11'>#</a>
-      </div>
-      
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>    <span class="n">Do</span> <span class="n">some</span> <span class="n">CRS</span> <span class="ow">and</span> <span class="n">rescaling</span> <span class="k">if</span> <span class="n">needed</span><span class="o">.</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">    inlet_config = config[&#39;assets&#39;][name][&#39;config&#39;]</span>
-<span class="s2">    inpath = versioning.atlas_path(config, &quot;local&quot;) / inlet_config[&#39;inpath_template&#39;].format(**config)</span>
-<span class="s2">    outpath = delta_queue.delta_path(config, name, &#39;create&#39;)</span>
-<span class="s2">#DIVIDER</span>
-<span class="s2">    shutil.copy(inpath, outpath)</span>
-
-<span class="s2">    </span>
-<span class="s2">    logger.info(f&quot;Setting raster CRS to </span><span class="si">{config[&#39;dataswale&#39;][&#39;crs&#39;]}</span><span class="s2">&quot;)</span>
-<span class="s2">#DIVIDER</span>
-<span class="s2">    set_crs_raster(config, outpath)</span>
-<span class="s2">#DIVIDER</span>
-<span class="s2">    if inlet_config.get(&#39;resample&#39;, False):</span>
-<span class="s2">        logger.info(f&quot;resampling to </span><span class="si">{inlet_config[&#39;resample&#39;]}</span><span class="s2">&quot;)</span>
-<span class="s2">        resample_raster_gdal( config, outpath,inlet_config[&#39;resample&#39;])</span>
-<span class="s2">    return outpath</span>
-
-</pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-12'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-12'>#</a>
-      </div>
-      <p>TODO make this do more - should select subregion, etc.</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-13'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-13'>#</a>
-      </div>
-      <p>first, set the crs</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-14'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-14'>#</a>
-      </div>
-      <p>then resample</p>
+      <p>Write content directly to file</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre></pre></div>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>atlas.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>atlas.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>This module provides functionality for creating and processing atlas data.
+This implementation  depends on GeoJSON andDuckDB for spatial joins and data processing.
+The module includes the following main functions:</p>
+<ul>
+<li>create: Create the deltas directory structure for a stewart atlas and a config file.</li>
+<li>new_version: Create a new version of the stewart atlas and a config file.</li>
+<li>asset: Create an asset for a stewart atlas and a config file.</li>
+</ul>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">utils</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Configure logging</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="n">DEFAULT_LAYERS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;raster&quot;</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;contours&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">80</span><span class="p">]},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;raster&quot;</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">55</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">200</span><span class="p">]},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;ponds&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">]},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="s2">&quot;helipad.png&quot;</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;buildings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]}</span>
+<span class="p">]</span>
+
+
+
+<span class="n">DEFAULT_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;data_root&quot;</span><span class="p">:</span> <span class="s2">&quot;/root/swales&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Nameless&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Underscripted&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;dataswale&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;crs&quot;</span><span class="p">:</span> <span class="s2">&quot;EPSG:4269&quot;</span><span class="p">,</span>     
+        <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;north&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;south&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;east&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;west&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+        <span class="s2">&quot;versions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;staging&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;layers&quot;</span><span class="p">:</span> <span class="p">[]</span>   
+    <span class="p">}</span>
+<span class="p">}</span>
+<span class="n">DEFAULT_ASSETS</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;dem&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;opentopo_dem&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;gdal_contours&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;eddy&quot;</span><span class="p">,</span>            
+            <span class="s2">&quot;in_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;contours&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;gdal_contours&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;derived_hillshade&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;eddy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;in_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;elevation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;derived_hillshade&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;public_roads&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;overture_roads&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;public_creeks&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;nhd_creeks&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;local_hillshade&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;local_hillshade&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;opentopo_dem&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;opentopo_dem&quot;</span>
+        <span class="p">},</span>    
+        <span class="s2">&quot;webmap&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;in_layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;webmap&quot;</span>
+        <span class="p">},</span>
+         <span class="s2">&quot;runbook&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;runbook&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;in_layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;runbook&quot;</span><span class="p">}</span>
+           
+    <span class="p">}</span>
+
+<span class="n">DEFAULT_DATA_ROOT</span> <span class="o">=</span> <span class="s2">&quot;/root/swales&quot;</span>
+
+<span class="n">DEFAULT_BBOX</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;north&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;south&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;east&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;west&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Create a new version of the stewardship atlas and a config file.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_CONFIG</span><span class="p">,</span> 
+           <span class="n">layers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">DEFAULT_LAYERS</span><span class="p">,</span> 
+           <span class="n">assets</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_ASSETS</span><span class="p">,</span> 
+           <span class="n">data_root</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_DATA_ROOT</span><span class="p">,</span> 
+           <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Nameless&quot;</span><span class="p">,</span>
+           <span class="n">bbox</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEFAULT_BBOX</span><span class="p">,</span>
+           <span class="n">feature_collection</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>create core config in /staging, built from args here and metadata.json</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">if</span> <span class="n">feature_collection</span><span class="p">:</span>
+        <span class="n">feature</span> <span class="o">=</span> <span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">feature</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">bbox</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">geojson_to_bbox</span><span class="p">(</span><span class="n">feature</span><span class="p">[</span><span class="s1">&#39;geometry&#39;</span><span class="p">][</span><span class="s1">&#39;coordinates&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+
+    
+    <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_root</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    
+    <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;outlets&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;layers&#39;</span> <span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;data_root&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_root</span>
+    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bbox</span>
+    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layers</span>
+    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">assets</span>
+    
+    <span class="n">inlets_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;../configuration/inlets_config.json&quot;</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">asset_name</span><span class="p">,</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">inlets_config</span><span class="p">[</span><span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config_def&#39;</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;inlet&#39;</span><span class="p">:</span>
+            <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;deltas&#39;</span> <span class="o">/</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="s1">&#39;work&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span><span class="p">:</span>
+            <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;outlets&#39;</span> <span class="o">/</span> <span class="n">asset_name</span> <span class="o">/</span> <span class="s1">&#39;work&#39;</span> <span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">:</span>
+        <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;layers&#39;</span> <span class="o">/</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+         
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;built a config: </span><span class="si">{</span><span class="n">config</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;atlas_config.json&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">config</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>populate</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">():</span>
+    <span class="k">pass</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">new_version</span><span class="p">():</span>
+    <span class="k">pass</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

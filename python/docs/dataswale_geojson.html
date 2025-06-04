@@ -22,7 +22,9 @@
     <div class='code'>
       <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geojson</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span></pre></div>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">eddies</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -165,7 +167,37 @@
       <div class='octowrap'>
         <a class='octothorpe' href='#section-10'>#</a>
       </div>
-      <p>move file unchanged to layer location from delta....raster deltas are currently silly</p>
+      <p>Apply Eddy to transform a dataswale layer into a new layer.&rdquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">eddy</span><span class="p">(</span><span class="n">config</span><span class="p">:</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">eddy_name</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">eddy_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">eddy_name</span><span class="p">]</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">eddies</span><span class="o">.</span><span class="n">asset_methods</span><span class="p">[</span><span class="n">eddy_name</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">eddy_name</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>in_path = versioning.atlas_path(config, &lsquo;layers&rsquo;) / in_layer / f&rsquo;{in_layer}.tiff&rsquo;
+out_path = versioning.atlas_path(config, &lsquo;layers&rsquo;) / out_layer / f&rsquo;{out_layer}.tiff&rsquo;
+out_path.parent.mkdir(parents=True, exist_ok=True)
+shutil.copy(in_path, out_path)
+return out_path</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre></pre></div>

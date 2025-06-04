@@ -2,6 +2,7 @@ import subprocess
 import json
 import sys,os
 from pathlib import Path
+import duckdb
 
 import utils
 import versioning
@@ -432,3 +433,21 @@ def outlet_runbook( config, outlet_name, skips=[]):
         print(subprocess.check_output(['pandoc', f"{outlet_dir}/dataswale.md", '-o', f"{outlet_dir}/runbook.pdf"]))
         
     return regions
+
+def outlet_sql_duckdb(config: dict, outlet_name: str):
+    """Create DDB tables for SQL queries."""
+    outlet_config = config['assets'][outlet_name]
+    data_path = versioning.atlas_path(config, "outlets") / "atlas.db"
+    with duckdb.connect(data_path) as conn:
+        for layer in config['dataswale']['layers']:
+            if layer['geometry_type'] == 'raster':
+                continue
+            layer_path = versioning.atlas_path(config, "layers") / layer['name']
+            logger.info(f"Creating DDB tables for {layer_path} into {data_path}.")
+            sql = f"CREATE TABLE {layer['name']} AS SELECT * FROM ST_Read('{layer_path}');"    
+            logger.info(str(conn.execute(sql)))
+    return data_path
+
+
+
+

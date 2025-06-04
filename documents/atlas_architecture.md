@@ -1,0 +1,75 @@
+graph TB
+    %% External sources in a single row
+    SourceA[Source A] --- SourceB[Source B] --- SourceC[Source C]
+    linkStyle 0,1 stroke-width:0px
+    
+    %% Main structure
+    Atlas[<i>Atlas</i>]
+    PDF[PDF Artifact]
+    
+    %% Atlas contents
+    subgraph Atlas
+        %% Inlets at top
+        Inlet1[Vector Inlet 1] --> DeltaQueue1[Delta Queue 1]
+        Inlet2[Vector Inlet 2] --> DeltaQueue1
+        Inlet3[Vector Inlet 3] --> DeltaQueue2[Delta Queue 2]
+        Inlet4[Vector Inlet 4] --> DeltaQueue2
+        
+        %% Dataswale in middle
+        Dataswale[<i>Dataswale</i>]
+        
+        %% Layers in a single row inside Dataswale
+        subgraph Dataswale
+            direction LR
+            Layer1[Layer 1]
+            Layer2[Layer 2]
+            Layer3[Layer 3]
+            Layer4[Layer 4]
+        end
+        
+        %% Connect delta queues to their layers
+        DeltaQueue1 --> Layer1
+        DeltaQueue2 --> Layer2
+        
+        %% Eddy
+        Layer2 -->|Eddy| Layer3
+        
+        %% Outlet at bottom
+        Layer1 --> Outlet[PDF Outlet]
+        Layer3 --> Outlet
+    end
+    
+    %% External connections
+    SourceA --> Inlet1
+    SourceB --> Inlet2
+    SourceC --> Inlet3
+    SourceC --> Inlet4
+    Outlet --> PDF
+    
+    %% Styling
+    classDef atlas fill:#5C4033,stroke:#000,stroke-width:4px,color:#000,font-weight:bold,font-size:40px
+    classDef dataswale fill:#8B4513,stroke:#000,stroke-width:4px,color:#000,font-weight:bold,font-size:20px
+    classDef layer fill:#CD853F,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef inlet fill:#006400,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef queue fill:#90EE90,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef outlet fill:#FFD700,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef artifact fill:#FFA500,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef source fill:#228B22,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    
+    %% Light styling for secondary components (blue shades)
+    classDef inlet2 fill:#4682B4,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef queue2 fill:#87CEEB,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    classDef source2 fill:#1E90FF,stroke:#000,stroke-width:4px,color:#000,font-weight:bold
+    
+    class Atlas atlas
+    class Dataswale dataswale
+    class Layer1,Layer2,Layer3,Layer4 layer
+    class Inlet1,Inlet2 inlet
+    class DeltaQueue1 queue
+    class Inlet3,Inlet4 inlet2
+    class DeltaQueue2 queue2
+    class Outlet outlet
+    class PDF artifact
+    class SourceA,SourceB source
+    class SourceC source2
+    

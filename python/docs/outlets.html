@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>outlets.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>outlets.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span><span class="o">,</span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">utils</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">versioning</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Configure logging</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Generate a JSON object for a web map in MapLibre.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">webmap_json</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>We will set up sources and layers as static content loaded initially in HTML where possible.
+Layers which invole dynamic content - marker images for example - will be added seperately 
+since the layer must be set up inside the callback for the image load.</p>
+<p>Calculate center and zoom from bbox</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">bbox</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span>
+    <span class="n">center_lat</span> <span class="o">=</span> <span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">center_lon</span> <span class="o">=</span> <span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span> 
+    <span class="n">lat_diff</span> <span class="o">=</span> <span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">]</span>
+    <span class="n">zoom</span> <span class="o">=</span> <span class="mi">12</span>  <span class="c1"># Default zoom, could be calculated based on bbox size</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Set up the map config general properties</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">map_config</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="s2">&quot;map&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;style&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;glyphs&quot;</span> <span class="p">:</span> <span class="s2">&quot;https://fonts.undpgeohub.org/fonts/</span><span class="si">{fontstack}</span><span class="s2">/</span><span class="si">{range}</span><span class="s2">.pbf&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+            <span class="s2">&quot;center&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">center_lon</span><span class="p">,</span> <span class="n">center_lat</span><span class="p">],</span>
+            <span class="s2">&quot;zoom&quot;</span><span class="p">:</span> <span class="n">zoom</span>
+            <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="n">map_sources</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">map_layers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">dynamic_layers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">name</span><span class="p">]</span>
+    <span class="n">layers_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]:</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>for each layer used in outlet, we add a source and display layer, and possibly a label layer</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">outlet_config</span><span class="p">[</span><span class="s1">&#39;in_layers&#39;</span><span class="p">]:</span>
+        <span class="n">layer</span> <span class="o">=</span> <span class="n">layers_dict</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
+        <span class="n">map_sources</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span> <span class="o">=</span>  <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;image&#39;</span><span class="p">,</span> 
+            <span class="s1">&#39;url&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;../../layers/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">.tiff.jpg&quot;</span><span class="p">,</span>
+            <span class="s1">&#39;coordinates&#39;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">bbox_to_corners</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">])</span>
+        <span class="p">}</span> <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;raster&#39;</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;geojson&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;../../layers/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+                <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Add Display Layer</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">map_layer</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">-layer&quot;</span><span class="p">,</span>
+                <span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">layer_name</span>
+                <span class="p">}</span>
+        <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;raster&#39;</span><span class="p">:</span>            
+            <span class="n">map_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;raster&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;paint&#39;</span> <span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;raster-opacity&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span>
+                <span class="s2">&quot;raster-contrast&quot;</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">}})</span>
+                              
+        <span class="k">elif</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;polygon&#39;</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>map_layer[&lsquo;paint&rsquo;] = {</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">map_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;symbol_placement&#39;</span><span class="p">:</span> <span class="s1">&#39;line-center&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;fill-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;fill_color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">])),</span>
+                    <span class="s2">&quot;fill-outline-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">]))}</span>
+            <span class="p">})</span>
+        <span class="k">elif</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;linestring&#39;</span><span class="p">:</span>
+            <span class="n">map_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;line&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;symbol_placement&#39;</span><span class="p">:</span> <span class="s1">&#39;line&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;line-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">])),</span>
+                    <span class="s2">&quot;line-width&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span> <span class="s2">&quot;vector_width&quot;</span><span class="p">]</span>
+                <span class="p">}</span>
+                <span class="p">})</span>
+        <span class="k">elif</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;point&#39;</span><span class="p">:</span>
+            <span class="n">map_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;circle&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;symbol_placement&#39;</span><span class="p">:</span> <span class="s1">&#39;point&#39;</span><span class="p">,</span>
+                <span class="s2">&quot;icon-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">])),</span>
+                <span class="s2">&quot;icon-size&quot;</span><span class="p">:</span> <span class="mi">20</span>
+                
+                <span class="p">})</span>
+        
+        <span class="n">map_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">map_layer</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Maybe add label/icon layer:</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;add_labels&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>            
+            <span class="n">label_layer</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">-label-layer&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;symbol&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">layer_name</span><span class="p">,</span>
+                    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;symbol-placement&quot;</span><span class="p">:</span> <span class="n">map_layer</span><span class="p">[</span><span class="s1">&#39;symbol_placement&#39;</span><span class="p">],</span>
+                        <span class="s2">&quot;text-offset&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">],</span>
+                        <span class="s2">&quot;text-font&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Open Sans Regular&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;text-field&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;text-size&quot;</span><span class="p">:</span> <span class="mi">20</span>
+                        <span class="p">}</span>
+                <span class="p">}</span>
+ 
+            <span class="k">if</span>  <span class="n">map_layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;line&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span>    
+                <span class="n">label_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                    <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;text-halo-width&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                        <span class="s1">&#39;text-halo-blur&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                        <span class="s1">&#39;text-halo-color&#39;</span><span class="p">:</span> <span class="s1">&#39;#FF9999&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;text-color&#39;</span><span class="p">:</span> <span class="s1">&#39;#000000&#39;</span>
+                    <span class="p">}</span>
+                <span class="p">})</span>
+            <span class="k">if</span> <span class="s2">&quot;symbol&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">layer</span><span class="p">:</span>
+                <span class="n">map_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label_layer</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-image&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-color&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">]))</span>
+                
+                <span class="n">dynamic_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label_layer</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>else:
+   logger.error(f&rdquo;not an outlet layer: {layer_name}.&rdquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">map_config</span><span class="p">[</span><span class="s1">&#39;style&#39;</span><span class="p">][</span><span class="s1">&#39;sources&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">map_sources</span>
+    <span class="n">map_config</span><span class="p">[</span><span class="s1">&#39;style&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">map_layers</span>
+  
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;map_config&quot;</span><span class="p">:</span> <span class="n">map_config</span><span class="p">,</span> <span class="s2">&quot;dynamic_layers&quot;</span><span class="p">:</span> <span class="n">dynamic_layers</span><span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>Generate the complete HTML page for viewing a map</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">generate_map_page</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">map_config_data</span><span class="p">,</span> <span class="n">output_path</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Read template files</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;../templates/map.html&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;About to generate HTML to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">template</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>TODO there is a much better way to do this, just handlign it dynamically in JS.
+For now though, let&rsquo;s just generate the JS as a string. Ugh.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">js_bit</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">dynamic_layer</span> <span class="ow">in</span> <span class="n">map_config_data</span><span class="p">[</span><span class="s1">&#39;dynamic_layers&#39;</span><span class="p">]:</span>
+        <span class="n">im_uri</span> <span class="o">=</span> <span class="s2">&quot;local/&quot;</span> <span class="o">+</span> <span class="n">dynamic_layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span>
+        <span class="n">im_name</span> <span class="o">=</span> <span class="n">dynamic_layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">layer_json</span> <span class="o">=</span> <span class="n">dynamic_layer</span>
+        <span class="n">js_bit</span> <span class="o">+=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">unused_image_</span><span class="si">{im_name}</span><span class="s2"> = await map.loadImage(&#39;</span><span class="si">{im_uri}</span><span class="s2">&#39;,</span>
+<span class="s2">    (error, image) =&gt; {{</span>
+<span class="s2">        if (error) throw error;</span>
+<span class="s2">        // Add the image to the map style.                                                              </span>
+<span class="s2">        map.addImage(&#39;</span><span class="si">{im_name}</span><span class="s2">&#39;, image);</span>
+<span class="s2">        map.addLayer(  </span><span class="si">{layer_json}</span><span class="s2"> );</span>
+<span class="s2">        }});</span>
+
+<span class="s2">&quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="nb">locals</span><span class="p">())</span>
+    <span class="n">processed_template</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="n">title</span><span class="p">,</span>
+            <span class="n">map_config</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">map_config_data</span><span class="p">[</span><span class="s1">&#39;map_config&#39;</span><span class="p">],</span>  <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+            <span class="n">dynamic_layers</span><span class="o">=</span><span class="n">js_bit</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f_out</span><span class="p">:</span>
+      <span class="n">f_out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">processed_template</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>Generate an interactive web map using MapLibre GL JS.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_webmap</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>This creates statis HTML and JS files which can be loaded or served directly.</p>
+<p>map.html is where we insert a JSON doc with all the layer information.
+map.js is used to do dynamic map processing. 
+For example, we seem to have to load images used for markers in the map there after the map HTML is fully loaded.</p>
+<p>So let&rsquo;s consider doing it all dynamically in the JS.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>Generate base map configuration</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="n">map_config</span> <span class="o">=</span> <span class="n">webmap_json</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">webmap_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">name</span>
+    <span class="n">webmap_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">basemap_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;basemap&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>make a JPG of basemap tiff..
+TODO this should be a tiling URL instead of a local file..
+TODO maybe resampling happens here?
+TODO here is where we should be using Dagster and actual asset mgmt</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">basemap_path</span> <span class="o">=</span> <span class="n">basemap_dir</span> <span class="o">/</span> <span class="s2">&quot;basemap.jpg&quot;</span>
+    <span class="k">if</span> <span class="n">basemap_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using extant basemap: </span><span class="si">{</span><span class="n">basemap_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating basemap: </span><span class="si">{</span><span class="n">basemap_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">utils</span><span class="o">.</span><span class="n">tiff2jpg</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">basemap_dir</span><span class="si">}</span><span class="s2">/basemap.tiff&quot;</span><span class="p">,</span> <span class="n">basemap_path</span><span class="p">)</span>
+    
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;cp&#39;</span><span class="p">,</span> <span class="s1">&#39;-r&#39;</span><span class="p">,</span> <span class="s1">&#39;../templates/css/&#39;</span><span class="p">,</span> <span class="n">webmap_dir</span> <span class="o">/</span> <span class="s2">&quot;css&quot;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>subprocess.run([&lsquo;cp&rsquo;, &lsquo;../templates/js/map.js&rsquo;, f&rdquo;{webmap_dir}/js/&rdquo;])</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">webmap_dir</span> <span class="o">/</span> <span class="s2">&quot;index.html&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating webmap HTML in </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="n">html_path</span> <span class="o">=</span> <span class="n">generate_map_page</span><span class="p">(</span><span class="s2">&quot;test Webmap&quot;</span><span class="p">,</span> <span class="n">map_config</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>  
+  
+    <span class="k">return</span> <span class="n">output_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">grass_init</span><span class="p">(</span><span class="n">swale_name</span><span class="p">):</span>
+    <span class="n">grass</span> <span class="o">=</span> <span class="s1">&#39;/usr/bin/grass&#39;</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span>
+        <span class="mi">0</span><span class="p">,</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span><span class="n">grass</span><span class="p">,</span> <span class="s2">&quot;--config&quot;</span><span class="p">,</span> <span class="s2">&quot;python_path&quot;</span><span class="p">],</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.jupyter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gj</span>
+    <span class="n">my_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">my_env</span><span class="p">[</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/usr/lib/grass83/etc/python:</span><span class="si">{</span><span class="n">my_env</span><span class="p">[</span><span class="s1">&#39;PATH&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">loc_path</span> <span class="o">=</span>  <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/root/grassdata/&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">swale_name</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">loc_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating Grass LOC: </span><span class="si">{</span><span class="n">loc_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span><span class="n">grass</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;EPSG:4269&#39;</span><span class="p">,</span> <span class="s1">&#39;-e&#39;</span><span class="p">,</span><span class="nb">str</span><span class="p">(</span><span class="n">loc_path</span><span class="p">)],</span> <span class="n">env</span><span class="o">=</span><span class="n">my_env</span><span class="p">))</span>
+            
+    <span class="n">GRASS_LOC</span> <span class="o">=</span> <span class="n">swale_name</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>GRASS_LOC = GRASS_LOC_NAME + datetime.datetime.now().strftime(&ldquo;%I:%M%p_%B-%d-%Y&rdquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">return</span> <span class="n">gj</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="s2">&quot;~/grassdata&quot;</span><span class="p">,</span> <span class="n">GRASS_LOC</span><span class="p">,</span> <span class="s2">&quot;PERMANENT&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">extract_region_layer_ogr_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">region</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span>  <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracting region </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> of vector layer </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="n">grass_init</span><span class="p">(</span><span class="n">swale_name</span><span class="p">)</span>  
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.script</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gs</span>
+    <span class="n">clip_bbox</span> <span class="o">=</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">],</span><span class="n">e</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">],</span><span class="n">w</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">])</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.clip&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">layer</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s1">_clip&#39;</span><span class="p">)</span>
+    
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.out.ogr&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s1">_clip&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">outpath</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;GeoJSON&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <p>Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">extract_region_layer_raster_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">region</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">inpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">.tiff&quot;</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span>  <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.tiff&quot;</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracting region </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> of raster layer </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>import grass.script as gs
+staging_path = f&rdquo;{data_root}/{swale_name}/{version_string}/staging&rdquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">grass_init</span><span class="p">(</span><span class="n">swale_name</span><span class="p">)</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.script</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gs</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.jupyter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gj</span>    
+    <span class="n">clip_bbox</span> <span class="o">=</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Can&rsquo;t we extract more efficiently here? We read the whole file then just use part of it - EACH TIME</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.in.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">inpath</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">layer</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">raster</span><span class="o">=</span><span class="n">layer</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">],</span><span class="n">e</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">],</span><span class="n">w</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>outpath = f&rdquo;{staging_path}/{layer}_{region[&lsquo;name&rsquo;]}.tiff&rdquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.out.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">layer</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">outpath</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;GTiff&#39;</span><span class="p">)</span>
+ 
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">build_region_map_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">region</span><span class="p">):</span>
+
+    <span class="n">grass_init</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.script</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gs</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">grass.jupyter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gj</span>
+    <span class="k">if</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="mi">9000</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="mi">2400</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">gj</span><span class="o">.</span><span class="n">Map</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="n">size</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">clip_bbox</span> <span class="o">=</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;g.region&#39;</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">],</span><span class="n">e</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">],</span><span class="n">w</span><span class="o">=</span><span class="n">clip_bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>load region layers</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">raster_name</span> <span class="o">=</span> <span class="s1">&#39;hillshadered_&#39;</span> <span class="o">+</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;making map image for </span><span class="si">{</span><span class="n">region</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.in.gdal&#39;</span><span class="p">,</span>  <span class="n">band</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="nb">input</span><span class="o">=</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;raster&#39;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">output</span><span class="o">=</span><span class="n">raster_name</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.colors&#39;</span><span class="p">,</span> <span class="nb">map</span><span class="o">=</span><span class="n">raster_name</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;grey&#39;</span><span class="p">)</span>
+    
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.mapcalc.simple&#39;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;ones&#39;</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.colors&#39;</span><span class="p">,</span> <span class="nb">map</span><span class="o">=</span><span class="s1">&#39;ones&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;grey1.0&#39;</span><span class="p">)</span>
+    <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.blend&#39;</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="s2">&quot;c&quot;</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="n">raster_name</span><span class="p">,</span> <span class="n">second</span><span class="o">=</span><span class="s1">&#39;ones&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;blended&#39;</span><span class="p">,</span> <span class="n">percent</span><span class="o">=</span><span class="s1">&#39;25&#39;</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    
+    <span class="n">m</span><span class="o">.</span><span class="n">d_rast</span><span class="p">(</span><span class="nb">map</span><span class="o">=</span><span class="s1">&#39;blended&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>m.d_rast(map=raster_name)<br />
+add layers to map</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">for</span> <span class="n">lc</span><span class="p">,</span><span class="n">lp</span> <span class="ow">in</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;vectors&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">region</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,</span> <span class="p">{}):</span>
+            <span class="k">for</span> <span class="n">update_key</span><span class="p">,</span> <span class="n">update_value</span> <span class="ow">in</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">lc</span><span class="p">[</span><span class="n">update_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">update_value</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;region config override: </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> | </span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">lc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.import&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">lp</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>clunky but need to skip empty sets</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">lame</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">lp</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lame</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;feature_type&#39;</span><span class="p">,</span> <span class="s1">&#39;line&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;point&#39;</span><span class="p">:</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;add_labels&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="n">m</span><span class="o">.</span><span class="n">d_vect</span><span class="p">(</span><span class="nb">map</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                         <span class="n">color</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                         <span class="n">icon</span><span class="o">=</span><span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;symbol&#39;</span><span class="p">,</span> <span class="s1">&#39;basic/diamond&#39;</span><span class="p">),</span><span class="n">size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                         <span class="n">label_size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+                         <span class="n">attribute_column</span><span class="o">=</span><span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;alterations&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;label_attribute&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">m</span><span class="o">.</span><span class="n">d_vect</span><span class="p">(</span><span class="nb">map</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                         <span class="n">color</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                         <span class="n">icon</span><span class="o">=</span><span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;symbol&#39;</span><span class="p">,</span> <span class="s1">&#39;basic/diamond&#39;</span><span class="p">),</span><span class="n">size</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>This is interesting: vector width comes from features or layer conf? Former, right?
+m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gray&rsquo;), width=lc.get(&lsquo;width_base&rsquo;,5))</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">c</span> <span class="o">=</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">))</span>
+            <span class="n">fc</span> <span class="o">=</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;fill_color&#39;</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">d_vect</span><span class="p">(</span><span class="nb">map</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+                     <span class="n">color</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                     <span class="n">fill_color</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">fc</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">fc</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">fc</span> <span class="o">!=</span> <span class="s1">&#39;none&#39;</span> <span class="k">else</span> <span class="s1">&#39;none&#39;</span><span class="p">,</span>
+                     <span class="n">width_column</span><span class="o">=</span><span class="s1">&#39;vector_width&#39;</span><span class="p">,</span>
+                     <span class="n">attribute_column</span><span class="o">=</span><span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;alterations&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;label_attribute&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">),</span>
+                     <span class="n">label_color</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">c</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">label_size</span><span class="o">=</span><span class="mi">25</span><span class="p">)</span>
+   
+    <span class="n">m</span><span class="o">.</span><span class="n">d_grid</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">d_legend_vect</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>export map</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;page_</span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.png&quot;</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">outpath</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>return path to map</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>Process regions for gazetteer and runbook outputs using versioned paths.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_regions_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">regions</span> <span class="o">=</span> <span class="p">[],</span> <span class="n">regions_html</span><span class="o">=</span><span class="p">[],</span> <span class="n">skips</span><span class="o">=</span><span class="p">[]):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s1">&#39;region_maps&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">skips</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>Set up Grass environment</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">grass_init</span><span class="p">(</span><span class="n">swale_name</span><span class="p">)</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">grass.script</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gs</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>Process each input layer</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">lc</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">outlet_config</span><span class="p">[</span><span class="s1">&#39;in_layers&#39;</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="n">layer_format</span> <span class="o">=</span> <span class="s1">&#39;tiff&#39;</span> <span class="k">if</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;raster&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="s1">&#39;geojson&#39;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing layer: </span><span class="si">{</span><span class="n">lc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>lc = config[&lsquo;dataswale&rsquo;][&lsquo;layers&rsquo;][layer]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>Resolve staging path then extract data for each region for current layer:</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">staging_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">layer_format</span><span class="si">}</span><span class="s2">&quot;</span>
+            
+            <span class="k">if</span> <span class="n">layer_format</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;geojson&#39;</span><span class="p">]:</span>
+                <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;v.import&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">staging_path</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing vector region: </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">region</span><span class="p">[</span><span class="s1">&#39;vectors&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">lc</span><span class="p">,</span> <span class="n">extract_region_layer_ogr_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">region</span><span class="p">)])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">gs</span><span class="o">.</span><span class="n">read_command</span><span class="p">(</span><span class="s1">&#39;r.in.gdal&#39;</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">staging_path</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing raster region: </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">region</span><span class="p">[</span><span class="s1">&#39;raster&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">lc</span><span class="p">,</span>
+                                        <span class="n">extract_region_layer_raster_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">region</span><span class="p">)]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      <p>Build maps for each region</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Building map for region: </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      <p>build_region_minimap(swale_config, swale_config[&lsquo;data_root&rsquo;], swale_name, version_string,  outlet_config[&lsquo;name&rsquo;], region)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">build_region_map_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">region</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-42'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-42'>#</a>
+      </div>
+      <p>Write output files</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">for</span> <span class="n">outfile_path</span><span class="p">,</span> <span class="n">outfile_content</span> <span class="ow">in</span> <span class="n">regions_html</span><span class="p">:</span>
+        <span class="n">versioned_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span> <span class="n">outfile_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-43'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-43'>#</a>
+      </div>
+      <p>os.makedirs(os.path.dirname(versioned_path), exist_ok=True)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing region output to: </span><span class="si">{</span><span class="n">versioned_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">versioned_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">outfile_content</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">regions</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-44'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-44'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_runbook</span><span class="p">(</span> <span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">skips</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
+    
+    <span class="n">regions</span> <span class="o">=</span> <span class="n">outlet_config</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;regions&#39;</span><span class="p">]</span>
+
+    <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">outlet_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> 
+    <span class="n">index_html</span> <span class="o">=</span> <span class="s2">&quot;&lt;html&gt;&lt;body&gt;&lt;h1&gt;Run Book&lt;/h1&gt;&lt;ul&gt;&quot;</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">regions</span><span class="p">):</span>
+        <span class="n">index_html</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;li&gt;&lt;a href=&#39;</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2">.html&#39;&gt;</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;caption&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/a&gt;&lt;/li&gt;&quot;</span>
+    <span class="n">index_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;/ul&gt;&lt;/body&gt;&lt;/html&gt;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">outlet_dir</span><span class="si">}</span><span class="s2">/index.html&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">index_html</span><span class="p">)</span>
+    
+    <span class="n">html_template</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">&lt;html&gt;&lt;/body&gt;&lt;table&gt;&lt;tr&gt;&lt;TD&gt;&lt;A HREF=&quot;../runbook/&quot;&gt;&lt;img src=&#39;page_</span><span class="si">{region_name_lower}</span><span class="s2">_minimap.png&#39; width=400/&gt;&lt;/A&gt;&lt;/TD&gt;&lt;/td&gt;</span>
+<span class="s2">&lt;td&gt;</span>
+<span class="s2">&lt;center&gt;&lt;h1&gt;</span><span class="si">{caption}</span><span class="s2">&lt;/h1&gt;&lt;/center&gt;</span>
+<span class="s2">&lt;pre&gt;</span><span class="si">{map_collar}</span><span class="s2">&lt;/pre&gt;</span>
+<span class="s2">&lt;center&gt;&lt;p&gt;</span><span class="si">{text}</span><span class="s2">&lt;/p&gt;&lt;i&gt;Click map to zoom, advance to previous/next page in RunBook, or &quot;Home&quot; to return to menu.&lt;/i&gt;&lt;hr&gt;</span>
+<span class="s2">(&lt;a href=&#39;</span><span class="si">{swale_name}</span><span class="s2">_page_</span><span class="si">{prev_region}</span><span class="s2">.html&#39;&gt;prev&lt;/a&gt;) (&lt;a href=&#39;</span><span class="si">{swale_name}</span><span class="s2">_page_</span><span class="si">{next_region}</span><span class="s2">.html&#39;&gt;next&lt;/a&gt;)</span>
+<span class="s2">&lt;a href=&quot;..&quot;&gt;HOME&lt;/a&gt;&lt;/center&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/TABLE&gt;</span>
+<span class="s2">&lt;a href=&#39;page_</span><span class="si">{name}</span><span class="s2">.png&#39;&gt;&lt;img src=&#39;page_</span><span class="si">{name}</span><span class="s2">.png&#39; width=1200/&gt;&lt;/a&gt;&lt;/center&gt;&lt;/body&gt;&lt;/html&gt;&quot;&quot;&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-45'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-45'>#</a>
+      </div>
+      <p>outpath_template = outlet_config[&lsquo;outpath_template&rsquo;].format(**swale_config)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">gaz_html</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">md</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;# </span><span class="si">{</span><span class="n">swale_name</span><span class="si">}</span><span class="s2"> RunBook</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">regions</span><span class="p">):</span>
+        <span class="n">r</span><span class="p">[</span><span class="s1">&#39;next_region&#39;</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">regions</span><span class="p">)</span>
+        <span class="n">r</span><span class="p">[</span><span class="s1">&#39;prev_region&#39;</span><span class="p">]</span><span class="o">=</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">regions</span><span class="p">)</span>
+        <span class="n">map_collar</span> <span class="o">=</span> <span class="s2">&quot;None&quot;</span> <span class="c1">#build_map_collar(config, swale_name, r[&#39;bbox&#39;], layers = outlet_config[&#39;layers&#39;])</span>
+        <span class="n">gaz_html</span><span class="o">.</span><span class="n">append</span><span class="p">(</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-46'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-46'>#</a>
+      </div>
+      <p>(outlet_config[&lsquo;config&rsquo;][&lsquo;outpath_template&rsquo;].format(
+   i=i,region_name=r[&lsquo;name&rsquo;],**config).lower(),</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="p">(</span><span class="n">outlet_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2">.html&quot;</span><span class="p">,</span>
+            <span class="n">html_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">region_name</span><span class="o">=</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span> <span class="n">region_name_lower</span><span class="o">=</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+                                  <span class="n">swale_name</span><span class="o">=</span><span class="n">swale_name</span><span class="p">,</span> <span class="n">map_collar</span><span class="o">=</span><span class="n">map_collar</span><span class="p">,</span> <span class="o">**</span><span class="n">r</span><span class="p">)))</span>
+        <span class="n">md</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;## </span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">![</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">](</span><span class="si">{</span><span class="n">outlet_dir</span><span class="si">}</span><span class="s2">/page_</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.png)</span><span class="se">\n</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;caption&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;text&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">outlet_dir</span><span class="si">}</span><span class="s2">/dataswale.md&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">md</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s1">&#39;region_content&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">skips</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span>  <span class="n">outlet_regions_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">gaz_html</span><span class="p">,</span> <span class="n">skips</span><span class="o">=</span><span class="n">skips</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">([</span><span class="s1">&#39;pandoc&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">outlet_dir</span><span class="si">}</span><span class="s2">/dataswale.md&quot;</span><span class="p">,</span> <span class="s1">&#39;-o&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">outlet_dir</span><span class="si">}</span><span class="s2">/runbook.pdf&quot;</span><span class="p">]))</span>
+        
+    <span class="k">return</span> <span class="n">regions</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-47'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-47'>#</a>
+      </div>
+      <p>Create DDB tables for SQL queries.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_sql_duckdb</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-48'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-48'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;atlas.db&quot;</span>
+    <span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">data_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;raster&#39;</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating DDB tables for </span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2"> into </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;CREATE TABLE </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> AS SELECT * FROM ST_Read(&#39;</span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2">&#39;);&quot;</span>    
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">data_path</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

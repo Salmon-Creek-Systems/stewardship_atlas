@@ -3,19 +3,35 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from datetime import datetime
 
 # Add the python directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import geojson
-from deltas_geojson import create, add_deltas, transform, queue, InvalidDelta
+from deltas_geojson import (
+    create, 
+    add_deltas_from_features, 
+    transform, 
+    delta_path,
+    apply_deltas,
+    InvalidDelta
+)
 
 class TestDeltasGeoJSON(unittest.TestCase):
     def setUp(self):
         self.test_config = {
             "name": "test_layer",
             "data_root": "test_data",
-            "vector_width": 3
+            "vector_width": 3,
+            "assets": {
+                "test_asset": {
+                    "config": {
+                        "data_type": "geojson"
+                    },
+                    "out_layer": "test_layer"
+                }
+            }
         }
         with open("python/tests/fixtures/simple_delta.geojson", "r") as f:
             self.test_feature_collection = geojson.load(f)
@@ -66,60 +82,57 @@ class TestDeltasGeoJSON(unittest.TestCase):
         transformed = transform(feature, {"name": "test", "data_root": "test"})
         self.assertEqual(transformed["properties"]["vector_width"], 2)
 
-    def test_add_deltas(self):
-        """Test that add_deltas() correctly writes and validates GeoJSON"""
+    def test_delta_path(self):
+        """Test that delta_path() generates correct paths"""
+        path = delta_path(self.test_config, "test_asset", "create")
+        
+        # Check path structure
+        self.assertTrue(path.endswith(".geojson"))
+        self.assertIn("test_asset", path)
+        self.assertIn("create", path)
+        
+        # Check timestamp format
+        timestamp = path.split("__")[1]
+        try:
+            datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        except ValueError:
+            self.fail("Timestamp in path is not in correct format")
+
+    def test_add_deltas_from_features(self):
+        """Test that add_deltas_from_features() correctly writes GeoJSON"""
         # Create directory structure
         create(self.test_config)
         
         # Add deltas
-        count, path = add_deltas(self.test_feature_collection, self.test_config)
+        paths = add_deltas_from_features(self.test_config, "test_asset", self.test_feature_collection, "create")
         
-        self.assertEqual(count, len(self.test_feature_collection["features"]))
-        self.assertTrue(Path(path).exists())
+        self.assertEqual(len(paths), 1)
+        self.assertTrue(Path(paths[0]).exists())
         
         # Verify file contents
-        with open(path, "r") as f:
+        with open(paths[0], "r") as f:
             saved_data = json.load(f)
         self.assertEqual(saved_data, self.test_feature_collection)
-        
-        # Test invalid input
-        with self.assertRaises(InvalidDelta) as cm:
-            add_deltas({"type": "Feature"}, self.test_config)
-        self.assertIn("Input must be a GeoJSON FeatureCollection", str(cm.exception))
 
-    def test_queue(self):
-        """Test that queue() correctly processes and moves files"""
+    def test_apply_deltas(self):
+        """Test that apply_deltas() correctly processes delta files"""
         # Create directory structure
         create(self.test_config)
         
-        # Add a test file
-        count, path = add_deltas(self.test_feature_collection, self.test_config)
+        # Add a test delta
+        paths = add_deltas_from_features(self.test_config, "test_asset", self.test_feature_collection, "create")
         
-        # Process queue
-        features = list(queue(self.test_config))
+        # Apply deltas
+        result = apply_deltas(self.test_config, "test_layer")
         
-        self.assertEqual(len(features), len(self.test_feature_collection["features"]))
-        self.assertTrue(all(f["properties"]["vector_width"] == self.test_config["vector_width"] for f in features))
+        # Verify result
+        self.assertIsInstance(result, geojson.FeatureCollection)
+        self.assertEqual(len(result["features"]), len(self.test_feature_collection["features"]))
         
-        # Verify file was moved to processed
-        self.assertFalse(Path(path).exists())
-        processed_path = Path(self.test_config["data_root"]) / f"deltas_{self.test_config['name']}" / "processed" / Path(path).name
-        self.assertTrue(processed_path.exists())
-
-    def test_queue_invalid_file(self):
-        """Test that queue() handles invalid files correctly"""
-        # Create directory structure
-        create(self.test_config)
-        
-        # Create an invalid file
-        invalid_path = Path(self.test_config["data_root"]) / f"deltas_{self.test_config['name']}" / "invalid.geojson"
-        with open(invalid_path, "w") as f:
-            f.write("invalid json")
-        
-        # Test queue processing
-        with self.assertRaises(InvalidDelta) as cm:
-            list(queue(self.test_config))
-        self.assertIn("Invalid JSON in", str(cm.exception))
+        # Verify file was created in work directory
+        work_dir = Path(self.test_config["data_root"]) / f"deltas_{self.test_config['name']}" / "work"
+        layer_file = work_dir / f"{self.test_config['name']}.geojson"
+        self.assertTrue(layer_file.exists())
 
 if __name__ == '__main__':
     unittest.main() 
