@@ -96,7 +96,14 @@ DEFAULT_ASSETS = {
             "type": "outlet",
             "name": "runbook",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
-            "config_def": "runbook"}
+             "config_def": "runbook"},
+    "sqldb": {
+        "type": "outlet",
+        "name": "sqldb",
+        "layers": ["basemap", "roads", "creeks"]
+        }
+
+    
            
     }
 
@@ -137,7 +144,8 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
-        asset['config'] = inlets_config[asset['config_def']]
+        if 'config_def' in asset:
+            asset['config'] = inlets_config[asset['config_def']]
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
         elif asset['type'] == 'outlet':

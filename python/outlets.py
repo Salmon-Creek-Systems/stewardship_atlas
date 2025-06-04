@@ -437,15 +437,22 @@ def outlet_runbook( config, outlet_name, skips=[]):
 def outlet_sql_duckdb(config: dict, outlet_name: str):
     """Create DDB tables for SQL queries."""
     outlet_config = config['assets'][outlet_name]
-    data_path = versioning.atlas_path(config, "outlets") / "atlas.db"
-    with duckdb.connect(data_path) as conn:
+    data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
+    with duckdb.connect(str(data_path)) as conn:
+        conn.execute("INSTALL spatial; LOAD spatial; ")
         for layer in config['dataswale']['layers']:
             if layer['geometry_type'] == 'raster':
+                logger.info(f"skipping raster layer {layer['name']}...")
                 continue
-            layer_path = versioning.atlas_path(config, "layers") / layer['name']
+            if layer['name'] not in outlet_config.get('layers', config['dataswale']['layers']):
+                logger.info(f"skipping un-included layer {layer['name']} from { outlet_config.get('layers', config['dataswale']['layers'])}...")
+                continue
+            layer_path = versioning.atlas_path(config, "layers") / layer['name'] / f"{layer['name']}.geojson"
             logger.info(f"Creating DDB tables for {layer_path} into {data_path}.")
-            sql = f"CREATE TABLE {layer['name']} AS SELECT * FROM ST_Read('{layer_path}');"    
-            logger.info(str(conn.execute(sql)))
+            sql = f"DROP TABLE IF EXISTS {layer['name']}; ;CREATE TABLE {layer['name']} AS SELECT * FROM ST_Read('{layer_path}');"
+            
+            logger.info(f"executing SQL: {sql}")
+            conn.execute(sql)
     return data_path
 
 
