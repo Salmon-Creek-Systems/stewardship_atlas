@@ -26,7 +26,7 @@ import sys, os, subprocess, time, json, string, random, math
 import atlas
 import dataswale_gpkg
 import atlas_outlets
-
+import versioning   
 
 app = FastAPI()
 logger.logger.setLevel(0)
@@ -51,6 +51,10 @@ class PinToPOIPayload(BaseModel):
     url: str
     poi_type: str
     asset: str
+
+class SQLQueryPayload(BaseModel):
+    query: str
+    return_format: str = 'csv'  # Default to CSV format
 
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
@@ -155,9 +159,9 @@ async def store_json(swalename: str, payload: JSONPayload):
             json.dump(payload.data, f, indent=2)
         logger.logger.info(f"Successfully stored JSON data at: {outpath}")
 
-        ac = json.load(open(f"/root/data/{swalename}_atlas_config.json"))
-        dc = json.load(open(f"/root/data/{swalename}/stage/dataswale_config.json"))
-        res = atlas.asset_materialize(ac, dc, ac['assets'][layer])
+        ac = json.load(open(versioning.atlas_path(swalename, "atlas_config.json")))
+        #dc = json.load(open(versioning.atlas_path(swalename, "dataswale_config.json")))
+        res = atlas.asset_materialize(ac,  ac['assets'][layer])
         res2 = "No Res2"
         if layer.endswith("_deltas"):
             print(f"refreshing {layer}")
@@ -295,4 +299,30 @@ async def publish_status_check(swale: str):
             "log": publish_status["log"]
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sql_query/{swalename}")
+async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
+    try:
+        # Load config
+        #ac = json.load(open(f"/root/data/{swalename}_atlas_config.json"))
+        config_path = versioning.atlas_path(swalename, "atlas_config.json")
+        ac = json.load(open(config_path))
+
+        # Execute query using outlets.sql_query
+        result = atlas_outlets.sql_query(
+            config=ac,
+            outlet_name=swalename,
+            query=payload.query,
+            return_format=payload.return_format
+        )
+        
+        return {
+            "status": "success",
+            "result": result
+        }
+    except Exception as e:
+        print(f"ERROR executing SQL query. {e}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))

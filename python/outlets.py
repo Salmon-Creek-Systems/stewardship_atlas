@@ -484,3 +484,202 @@ def sql_query(config: dict, outlet_name: str, query: str, return_format: str = '
     return file_like.getvalue()
 
 
+
+def make_attribution_html(atlas_config, swale_config, lc):
+    outpath = versioning.atlas_path(atlas_config, "outlets") / swale_config['name'] / f"{lc['name']}"
+
+
+    
+    download_uri = lc.get('inpath_template', 'outpath_template')
+    os.makedirs(outpath, exist_ok=True)
+    with open(outpath + "/attribution.html", "w") as f:
+        f.write(f"""
+<html>
+<body>
+<h1>{lc['name']}</h1>
+<p>Description: {lc['attribution']['description']}</p>
+<p>About: {lc['attribution']['url']}</p>
+<p>Source: {download_uri}</p>
+<p>License: {lc['attribution']['license']}</p>
+</body>
+</html>
+        """)
+
+
+def make_root_html(atlas_config):
+    atlas_html = f"<HTML><BODY><CENTER><h1>Dataswales</h1>"
+    atlas_html += "<HR width='40%'><UL>".join( [f"<LI><A HREF='{a['name']}/index.html'>{a['name']}</A></LI>" for a in atlas_config['dataswales'] ] ) + "</UL>"
+    atlas_html += "<h2>Curation</h2>"
+    atlas_html += "<HR width='40%'>".join( [x for x in ['Refresh', 'Publish Version'] ])
+    atlas_html += "<h2>Tools and Interfaces</h2>"
+    atlas_html += "<HR width='40%'>".join( [x for x in ['Notebook', 'Pipeline', 'Tools'] ])
+    atlas_html += "</BODY></HTML>"
+    outpath = f"{atlas_config['data_root']}/index.html"
+    with open(outpath, "w") as f:
+        f.write(atlas_html)
+    return outpath
+
+def make_console_html(config,
+                     displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[],
+                      admin_controls=[], console_type='ADMINISTRATION', use_cases=[]):
+    """Generate HTML for the console interface."""
+    logger.info(f"Making Console for {console_type}...")
+    
+    # Read the template file
+    template_path = Path('../templates/console.html')
+    with open(template_path, 'r') as f:
+        template = f.read()
+    
+    # Prepare the data for the template
+    data = {
+        'version_string': config.get('version_string', 'UNKNOWN_VERSION'),
+        'versions': displayed_versions,
+        'logo': config.get('logo', ''),
+        'swaleName': config['name'],
+        'consoleType': console_type,
+        'interfaces': displayed_interfaces,
+        'downloads': displayed_downloads,
+        'useCases': use_cases,
+        'layers': displayed_inlets
+    }
+    
+    # Insert the data initialization script
+    script_tag = f'<script>initializePage({json.dumps(data)});</script>'
+    html = template.replace('</body>', f'{script_tag}</body>')
+    
+    return html
+
+
+def make_swale_html(config, outlet_config, store_materialized=True):
+    """Generate HTML for the swale interface."""
+    # Get version string
+    version_string = config.get('version_string', 'staging')
+    
+    # Create output directory
+    outpath = versioning.atlas_path(config, "html", version_string)
+    outpath.mkdir(parents=True, exist_ok=True)
+    logger.debug(f"Created output directory: {outpath}")
+    
+    # Copy CSS
+    css_dir = outpath / 'css'
+    css_dir.mkdir(exist_ok=True)
+    subprocess.run(['cp', '../templates/css/console.css', str(css_dir)])
+    
+    # Get interfaces and downloads based on access level
+    public_interfaces = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] == 'outlet' 
+        and ac.get('interaction') == 'interface' 
+        and ac.get('access') == 'public'
+    ]
+    
+    public_downloads = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] == 'outlet' 
+        and ac.get('interaction') == 'download' 
+        and ac.get('access') == 'public'
+    ]
+    
+    internal_interfaces = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] == 'outlet' 
+        and ac.get('interaction') == 'interface' 
+        and ac.get('access') in ('internal', 'public')
+    ]
+    
+    internal_downloads = [
+        ac for ac in config['assets'].values() 
+        if ac.get('interaction') == 'download' 
+        and ac['asset_type'] == 'outlet'  
+        and ac.get('access') in ('internal', 'public')
+    ]
+    
+    admin_interfaces = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] == 'outlet' 
+        and ac.get('interaction') == 'interface' 
+        and ac.get('access') in ('admin', 'internal', 'public')
+    ]
+    
+    admin_downloads = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] == 'outlet' 
+        and ac.get('interaction') == 'download' 
+        and ac.get('access') in ('admin', 'internal', 'public')
+    ]
+
+    admin_inlets = [
+        ac for ac in config['assets'].values() 
+        if ac['asset_type'] in ('inlet', 'eddy') 
+        and ac.get('interaction') == 'interface'
+    ]
+    
+    # Define use cases
+    internal_usecases = [
+        {"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
+        {"name": "GIS Practitioner", "cases": ["Download Layer GeoJSON", "Download GeoPKG", "Add a layer as GeoJSON"]},
+        {"name": "Administrator", "cases": ["Go to Admin interface", "Switch Version"]}
+    ]
+    
+    # Generate admin view
+    admin_html = make_console_html(
+        config,
+        console_type='ADMINISTRATION',
+        displayed_interfaces=admin_interfaces, 
+        displayed_downloads=admin_downloads, 
+        displayed_inlets=admin_inlets, 
+        displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
+        admin_controls=[],
+        use_cases=[]
+    )
+    
+    admin_path = outpath / "admin.html"
+    with open(admin_path, "w") as f:
+        f.write(admin_html)
+    logger.debug(f"Wrote admin view to: {admin_path}")
+
+    # Generate internal view
+    internal_html = make_console_html(
+        config,
+        console_type='INTERNAL',
+        displayed_interfaces=internal_interfaces, 
+        displayed_downloads=internal_downloads, 
+        displayed_inlets=[], 
+        displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
+        admin_controls=[],
+        use_cases=internal_usecases
+    )
+    
+    internal_path = outpath / "internal.html"
+    with open(internal_path, "w") as f:
+        f.write(internal_html)
+    logger.debug(f"Wrote internal view to: {internal_path}")
+        
+    # Generate public view
+    public_html = make_console_html(
+        config,
+        console_type='PUBLIC',
+        displayed_interfaces=public_interfaces, 
+        displayed_downloads=public_downloads, 
+        displayed_inlets=[], 
+        displayed_versions=[],
+        use_cases=internal_usecases,
+        admin_controls=[("Internal", "internal.html")]
+    )
+    
+    public_path = outpath / "index.html"
+    with open(public_path, "w") as f:
+        f.write(public_html)
+    logger.debug(f"Wrote public view to: {public_path}")
+
+    return outpath
+
+def outlet_html(config, outlet_name):
+    """Generate HTML for all outlets."""
+    outlet_config = config['assets'][outlet_name]
+    # Create HTML for each swale
+    for swale in config.get('dataswales', []):
+        make_swale_html(config, outlet_config)
+        
+    return versioning.atlas_path(config, "html")
+   
