@@ -97,6 +97,10 @@ DEFAULT_ASSETS = {
             "name": "runbook",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
              "config_def": "runbook"},
+    "html": {
+            "type": "outlet",
+            "name": "html",
+             "config_def": "static_html"},
     "sqldb": {
         "type": "outlet",
         "name": "sqldb",

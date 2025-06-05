@@ -168,6 +168,7 @@
 			"citation": "https://portal.opentopography.org/api/terms"
 		}
     },
+    
 	"webedit": {
 		"name": "webedit",
 		"asset_type": "outlet",
@@ -187,6 +188,18 @@
 		  "citation": "MapLibre"
 		}
 	},
+        "static_html":  {
+		"asset_type": "outlet",
+		"fetch_type": "html",
+		"interaction": "backend",
+		"attribution": {
+			"url": "https://portal.opentopography.org/api/terms",
+			"description": "Open Topography's Global DEM",
+			"license": "https://portal.opentopography.org/api/terms",
+			"citation": "https://portal.opentopography.org/api/terms"
+		}
+    },
+
 	"runbook": {
 		"asset_type": "outlet",
 		"layers": [
