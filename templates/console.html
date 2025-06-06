@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="css/console.css">
+</head>
+<body>
+    <center>
+    <table cellpadding=5 valign='top'>
+        <tr>
+            <td style="width:20%" align="right"><img id="logo" height=100 width=100 /></td>
+            <td><h1><span id="swale-name"></span> Fire Atlas <BR>
+		<span id="console-type"></span>
+    </h1>(version: <span id="version-string"></span>)</td>
+        </tr>
+        <tr valign='top'>
+            <td bgcolor="#cccccc">
+              <center><h2>MAPS</h2></center>
+                <div id="interfaces-section" style="display: none;">
+                    <h4>Interfaces</h4>
+                    <ul id="interfaces-list"></ul>
+                </div>
+                <div id="downloads-section" style="display: none;">
+                    <h4>Downloads</h4>
+                    <ul id="downloads-list"></ul>
+ 
+
+                </div>
+            </td>
+            
+            
+
+
+            
+            <td ROWSPAN=2 id="layers-section" style="display: none;">
+                <center><h2>LAYERS</h2></center>
+                <ul id="layers-list"></ul>
+		<ul id="usecases-list"></ul>
+		
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <h2>HELP</h2>
+                <div id="help-section" style="margin: 20px;">
+                <ul id="help-list">
+                    <li>
+                        <a href="https://fireatlas.org/help">About</a>
+                    </li>
+                    <li>
+                        <a href="https://fireatlas.org/help">Help</a>
+                    </li>
+                    <li>
+                        <a href="https://fireatlas.org/help">How To: Add Roads</a>
+                    </li>
+                    <li>
+                        <a href="https://fireatlas.org/help">How To: Add Buildings</a>
+                    </li>
+                    <li>
+                        <a href="https://fireatlas.org/help">How To: Change Attributes</a>
+                    </li>
+                    
+
+                    <li>
+                        <a href="https://fireatlas.org/help">Contact</a>
+                    </li>
+
+                </ul>    
+
+            </div>
+                <h2>VERSIONS</h2>
+                <div id="versions-section" style="margin: 20px;">
+             
+                    <button id="publish-button" onclick="startPublish()">Publish Atlas</button>
+
+                
+        
+                <ul id="versions-list"></ul>    
+            </div>
+                </td>
+         
+        </tr>
+    
+    </table>
+    </center>
+
+    <script>
+        // Initialize the page with data
+        function initializePage(data) {
+            document.getElementById('logo').src = data.logo;
+            document.getElementById('version-string').textContent = data.version_string;
+            document.getElementById('swale-name').textContent = data.swaleName;
+            document.getElementById('console-type').textContent = data.consoleType;
+
+            // Setup interfaces
+            if (data.interfaces && data.interfaces.length > 0) {
+                const interfacesList = document.getElementById('interfaces-list');
+                data.interfaces.forEach(item => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `../${item.name}/`;
+                    a.textContent = item.name;
+                    li.appendChild(a);
+                    interfacesList.appendChild(li);
+                });
+                document.getElementById('interfaces-section').style.display = 'block';
+            }
+
+            // Setup downloads
+            if (data.downloads && data.downloads.length > 0) {
+                const downloadsList = document.getElementById('downloads-list');
+                data.downloads.forEach(item => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `../${item.name}/`;
+                    a.textContent = item.name;
+                    li.appendChild(a);
+                    downloadsList.appendChild(li);
+                });
+                document.getElementById('downloads-section').style.display = 'block';
+            }
+
+            // Setup versions
+            if (data.versions && data.versions.length > 0) {
+                const versionsList = document.getElementById('versions-list');
+                data.versions.forEach(item => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `../../${item}/html/admin.html`;
+                    a.textContent = item;
+                    li.appendChild(a);
+                    versionsList.appendChild(li);
+                });
+                document.getElementById('versions-section').style.display = 'block';
+            }
+
+            // Setup use cases
+            if (data.useCases && data.useCases.length > 0) {
+                const useCasesList = document.getElementById('usecases-list');
+                data.useCases.forEach(item => {
+                    const li = document.createElement('li');
+                    //const a = document.createElement('a');
+                    //a.href = `../${item.name}/`;
+                    li.textContent = item.name;
+		    //const casesList = document.createElement('ul');
+		    //item.cases.forEach(ic => {
+		//	const icli = document.createElement('li');
+		//	icli.textContent = ic.name;
+		//	li.appendChild(icli);
+		  //  });
+		    //li.appendChild(casesList);
+                    useCasesList.appendChild(li);
+                });
+                document.getElementById('layers-section').style.display = 'block';
+            }
+
+
+
+            // Setup layers
+            if (data.layers && data.layers.length > 0) {
+                const layersList = document.getElementById('layers-list');
+
+                data.layers.forEach(item => {
+		    // Link to outlet directory
+		    const li = document.createElement('li');
+                    const a1 = document.createElement('a');
+                    a1.href = `../${item.name}/`;
+                    a1.textContent = item.name;
+                    li.appendChild(a1);
+
+		    // Link to web edit for layer
+                    const a2 = document.createElement('a');
+                    a2.href = `../webedit/${item.name}_delta.html`;
+                    a2.textContent = ' (draw) ';
+                    li.appendChild(document.createTextNode(' '));
+                    li.appendChild(a2);
+
+
+		    // Link to web anno for layer
+                    const al = document.createElement('a');
+                    al.href = `../webedit/${item.name}_annos.html`;
+                    al.textContent = ' (annotate) ';
+                    li.appendChild(document.createTextNode(' '));
+                    li.appendChild(al);
+
+
+		    
+		    // Link to metadata file
+                    const a3 = document.createElement('a');
+                    a3.href = `${item.name}/attribution.html`;
+                    a3.textContent = ' (source) ';
+                    li.appendChild(document.createTextNode(' '));
+                    li.appendChild(a3);
+
+		    // Link to refresh/materialize
+                    const refreshLink = document.createElement('a');
+                    refreshLink.href = '#';
+                    refreshLink.textContent = ' (refresh) ';
+                    refreshLink.onclick = function(e) {
+                        e.preventDefault();
+                        fetch(`http://fireatlas.org:9998/refresh?swale=scvfd&asset=${item.name}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    alert('Refresh successful!');
+                                    window.location.reload();  // Reload the current page
+                                } else {
+                                    alert('Refresh failed: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                alert('Error during refresh: ' + error);
+                            });
+                    };
+                    li.appendChild(document.createTextNode(' '));
+                    //li.appendChild(refreshLink);
+
+                    layersList.appendChild(li);
+                });
+                document.getElementById('layers-section').style.display = 'block';
+            }
+        }
+
+        function startPublish() {
+            const statusDiv = document.getElementById('publish-status');
+            const publishButton = document.getElementById('publish-button');
+            
+            // Disable button during processing
+            publishButton.disabled = true;
+            statusDiv.innerHTML = 'Processing...';
+            
+            fetch('http://fireatlas.org:9998/publish?swale=scvfd')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.publishing) {
+                        // Start polling for completion
+                        statusDiv.innerHTML = 'Publishing in progress...';
+                        pollPublishStatus();
+                    }
+                })
+                .catch(error => {
+                    statusDiv.innerHTML = 'Error: ' + error;
+                    publishButton.disabled = false;
+                });
+        }
+        
+        function pollPublishStatus() {
+            const statusDiv = document.getElementById('publish-status');
+            const publishButton = document.getElementById('publish-button');
+            
+            fetch('http://fireatlas.org:9998/publish-status?swale=scvfd')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.publishing) {
+                        // Still publishing, check again in 5 seconds
+			statusDiv.innerHTML = 'Publishing in progress...<HR>' + data.log.join("<BR>\n");
+                        setTimeout(pollPublishStatus, 5000);
+                    } else {
+                        // Publishing complete
+                        statusDiv.innerHTML = 'Publishing complete!';
+                        publishButton.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    statusDiv.innerHTML = 'Error: ' + error;
+                    publishButton.disabled = false;
+                });
+        }
+    </script>
+</body>
+</html> 

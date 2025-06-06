@@ -556,33 +556,34 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     version_string = config.get('version_string', 'staging')
     
     # Create output directory
-    outpath = versioning.atlas_path(config, "html", version_string)
+    outpath = versioning.atlas_path(config, "outlets") / outlet_config['name']
     outpath.mkdir(parents=True, exist_ok=True)
-    logger.debug(f"Created output directory: {outpath}")
+    logger.info(f"Created output directory: {outpath}")
     
     # Copy CSS
     css_dir = outpath / 'css'
+    logger.info(f"Creating CSS dir: {css_dir}")
     css_dir.mkdir(exist_ok=True)
     subprocess.run(['cp', '../templates/css/console.css', str(css_dir)])
     
     # Get interfaces and downloads based on access level
     public_interfaces = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] == 'outlet' 
+        if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
         and ac.get('access') == 'public'
     ]
     
     public_downloads = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] == 'outlet' 
+        if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'download' 
         and ac.get('access') == 'public'
     ]
     
     internal_interfaces = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] == 'outlet' 
+        if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
         and ac.get('access') in ('internal', 'public')
     ]
@@ -590,27 +591,27 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     internal_downloads = [
         ac for ac in config['assets'].values() 
         if ac.get('interaction') == 'download' 
-        and ac['asset_type'] == 'outlet'  
+        and ac['type'] == 'outlet'  
         and ac.get('access') in ('internal', 'public')
     ]
     
     admin_interfaces = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] == 'outlet' 
+        if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
         and ac.get('access') in ('admin', 'internal', 'public')
     ]
     
     admin_downloads = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] == 'outlet' 
+        if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'download' 
         and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
     admin_inlets = [
         ac for ac in config['assets'].values() 
-        if ac['asset_type'] in ('inlet', 'eddy') 
+        if ac['type'] in ('inlet', 'eddy') 
         and ac.get('interaction') == 'interface'
     ]
     
@@ -678,8 +679,8 @@ def outlet_html(config, outlet_name):
     """Generate HTML for all outlets."""
     outlet_config = config['assets'][outlet_name]
     # Create HTML for each swale
-    for swale in config.get('dataswales', []):
-        make_swale_html(config, outlet_config)
+    #for swale in config.get('dataswales', []):
+    make_swale_html(config, outlet_config)
         
     return versioning.atlas_path(config, "html")
    

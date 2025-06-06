@@ -1,0 +1,95 @@
+#controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    background: white;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+#feature-text {
+    margin-bottom: 10px;
+    padding: 5px;
+    width: 200px;
+}
+#save-button {
+    padding: 10px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+}
+#save-button:hover {
+    background: #f0f0f0;
+}
+.input-group {
+    margin-bottom: 10px;
+}
+.input-field {
+    width: 100%;
+    padding: 5px;
+}
+#basemap-select {
+    margin-bottom: 15px;
+}
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+.button {
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+    text-align: center;
+    text-decoration: none;
+}
+.link-button {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    color: #333;
+}
+.link-button:hover {
+    background: #e0e0e0;
+}
+.warning-button {
+    padding: 10px;
+    background: #fff0f0;
+    border: 1px solid #ffcccc;
+    border-radius: 4px;
+    cursor: pointer;
+    flex: 1;
+}
+.warning-button:hover {
+    background: #ffe0e0;
+}
+
+/* Progress bar styles */
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill {
+    width: 0%;
+    height: 100%;
+    background-color: #4CAF50;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    line-height: 20px;
+    color: #333;
+    font-size: 12px;
+} 

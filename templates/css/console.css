@@ -1,0 +1,61 @@
+/* Reset default list styling */
+ul {
+    list-style-type: none;
+    margin: 0;
+}
+
+/* Center the main content */
+body {
+    text-align: center;
+    font-family: Arial, sans-serif;
+}
+
+/* Table styling */
+table {
+    border-collapse: collapse;
+    margin: 0 auto;
+}
+
+td {
+    padding: 5px;
+    vertical-align: top;
+}
+
+/* Left sidebar styling */
+td[bgcolor="#cccccc"] {
+    width: 20%;
+    text-align: right;
+    background-color: #cccccc;
+}
+
+/* Logo styling */
+#logo {
+    height: 100px;
+    width: 100px;
+}
+
+/* Section visibility */
+#interfaces-section,
+#downloads-section,
+#layers-section {
+    display: none;
+}
+
+/* Publish section styling */
+#publish-section {
+    margin: 20px;
+}
+
+#publish-status {
+    margin-top: 10px;
+}
+
+/* Links styling */
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+a:hover {
+    text-decoration: underline;
+} 
