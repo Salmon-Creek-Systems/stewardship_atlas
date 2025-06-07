@@ -570,49 +570,55 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     public_interfaces = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
-        and ac.get('interaction') == 'interface' 
+        and ac.get('config',{}).get('interaction') == 'interface' 
         # and ac.get('access') == 'public'
     ]
     
     public_downloads = [
         ac for ac in config['assets'].values() 
-        if ac['type'] == 'outlet' 
-        and ac.get('interaction') == 'download' 
+        if ac['type'] == 'outlet'
+        and ac.get('config',{}).get('interaction') == 'download' 
+        # and ac.get('interaction') == 'download' 
         # and ac.get('access') == 'public'
     ]
     
     internal_interfaces = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
-        and ac.get('interaction') == 'interface' 
+        and ac.get('config',{}).get('interaction') == 'interface' 
+        #and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('internal', 'public')
     ]
     
     internal_downloads = [
-        ac for ac in config['assets'].values() 
-        if ac.get('interaction') == 'download' 
+        ac for ac in config['assets'].values()
+        if ac.get('config',{}).get('interaction') == 'download' 
+        #if ac.get('interaction') == 'download' 
         and ac['type'] == 'outlet'  
         # and ac.get('access') in ('internal', 'public')
     ]
     
     admin_interfaces = [
         ac for ac in config['assets'].values() 
-        if ac['type'] == 'outlet' 
-        and ac.get('interaction') == 'interface' 
+        if ac['type'] == 'outlet'
+        and ac.get('config',{}).get('interaction') == 'interface'         
+        # and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
     
     admin_downloads = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
-        and ac.get('interaction') == 'download' 
+        # and ac.get('interaction') == 'download'
+        and ac.get('config',{}).get('interaction') == 'download' 
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
     admin_inlets = [
         ac for ac in config['assets'].values() 
-        if ac['type'] in ('inlet', 'eddy') 
-        and ac.get('interaction') == 'interface'
+        if ac['type'] in ('inlet', 'eddy')
+        and ac.get('config',{}).get('interaction') == 'interface'         
+        # and ac.get('interaction') == 'interface'
     ]
     
     # Define use cases
