@@ -710,7 +710,7 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     
     return outpath / 'index.html'
    
-
+blah = """
 OUTLET_MATERIALIZER = {
     'outlet_gpkg': outlet_gpkg,
     'tiff': outlet_tiff,
@@ -723,4 +723,4 @@ OUTLET_MATERIALIZER = {
     'webedit': outlet_webmap_edit,
     'sqlquery': outlet_sqlquery
 }
-   
+"""
