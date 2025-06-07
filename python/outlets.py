@@ -532,7 +532,7 @@ def make_console_html(config,
     
     # Prepare the data for the template
     data = {
-        'version_string': config.get('version_string', 'UNKNOWN_VERSION'),
+        'version_string': config.get('version_string', 'staging'),
         'versions': displayed_versions,
         'logo': config.get('logo', ''),
         'swaleName': config['name'],
@@ -571,42 +571,42 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
-        and ac.get('access') == 'public'
+        # and ac.get('access') == 'public'
     ]
     
     public_downloads = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'download' 
-        and ac.get('access') == 'public'
+        # and ac.get('access') == 'public'
     ]
     
     internal_interfaces = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
-        and ac.get('access') in ('internal', 'public')
+        # and ac.get('access') in ('internal', 'public')
     ]
     
     internal_downloads = [
         ac for ac in config['assets'].values() 
         if ac.get('interaction') == 'download' 
         and ac['type'] == 'outlet'  
-        and ac.get('access') in ('internal', 'public')
+        # and ac.get('access') in ('internal', 'public')
     ]
     
     admin_interfaces = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'interface' 
-        and ac.get('access') in ('admin', 'internal', 'public')
+        # and ac.get('access') in ('admin', 'internal', 'public')
     ]
     
     admin_downloads = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('interaction') == 'download' 
-        and ac.get('access') in ('admin', 'internal', 'public')
+        # and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
     admin_inlets = [
