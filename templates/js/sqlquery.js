@@ -1,19 +1,24 @@
-// Initialize CodeMirror
-var editor = CodeMirror.fromTextArea(document.getElementById("sql-editor"), {
-    mode: "text/x-sql",
-    theme: "monokai",
-    lineNumbers: true,
-    indentWithTabs: true,
-    smartIndent: true,
-    lineWrapping: true,
-    matchBrackets: true,
-    autofocus: true
-});
+// Global variable to store the editor instance
+let editor;
 
-// Set sample query
-editor.setValue(`-- Sample query to get all roads
+// Initialize CodeMirror after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    editor = CodeMirror.fromTextArea(document.getElementById("sql-editor"), {
+        mode: "text/x-sql",
+        theme: "monokai",
+        lineNumbers: true,
+        indentWithTabs: true,
+        smartIndent: true,
+        lineWrapping: true,
+        matchBrackets: true,
+        autofocus: true
+    });
+
+    // Set sample query
+    editor.setValue(`-- Sample query to get all roads
 SELECT * FROM roads
 LIMIT 10;`);
+});
 
 async function executeQuery() {
     const resultsDiv = document.getElementById("results");

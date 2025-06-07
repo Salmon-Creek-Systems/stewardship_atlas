@@ -703,8 +703,24 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     css_dir.mkdir(exist_ok=True)
     js_dir.mkdir(exist_ok=True)
     
-    # Copy template files
-    subprocess.run(['cp', '../templates/sqlquery.html', str(outpath / 'index.html')])
+    # Get available tables from sqldb outlet
+    sqldb_config = config['assets'].get('sqldb', {})
+    available_tables = sqldb_config.get('layers', [])
+    tables_list = '\n'.join([f'<li>{table}</li>' for table in available_tables])
+    
+    # Read and process template
+    with open('../templates/sqlquery.html', 'r') as f:
+        template = f.read()
+    
+    # Replace placeholders
+    template = template.replace('{atlas_name}', config['name'])
+    template = template.replace('{tables_list}', tables_list)
+    
+    # Write processed template
+    with open(outpath / 'index.html', 'w') as f:
+        f.write(template)
+    
+    # Copy CSS and JS files
     subprocess.run(['cp', '../templates/css/sqlquery.css', str(css_dir)])
     subprocess.run(['cp', '../templates/js/sqlquery.js', str(js_dir)])
     

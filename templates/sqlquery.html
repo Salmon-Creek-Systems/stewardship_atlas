@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SQL Query Interface</title>
+    <title>SQL Query Interface - {atlas_name}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css" rel="stylesheet">
     <link href="css/sqlquery.css" rel="stylesheet">
@@ -11,7 +11,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>SQL Query Interface</h1>
+        <h1>SQL Query Interface - {atlas_name}</h1>
+        <div class="tables-section">
+            <h3>Available Tables:</h3>
+            <ul id="tables-list">
+                {tables_list}
+            </ul>
+        </div>
         <div class="query-container">
             <textarea id="sql-editor"></textarea>
             <div class="controls">
