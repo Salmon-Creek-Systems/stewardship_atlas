@@ -23,9 +23,10 @@ LIMIT 10;`);
 async function executeQuery() {
     const resultsDiv = document.getElementById("results");
     const format = document.getElementById("format").value;
+    const atlasName = document.querySelector('.container').dataset.atlasName;
     
     try {
-        const response = await fetch('/sql_query/{swalename}', {
+        const response = await fetch(`/sql_query/${atlasName}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
