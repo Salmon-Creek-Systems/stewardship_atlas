@@ -245,6 +245,21 @@
 	}
 }
 			
+"sqlquery": {
+    "asset_type": "outlet",
+    "name": "sqlquery",
+    "fetch_type": "sqlquery",
+    "interaction": "interface",
+    "data_type": "html",
+    "access": "internal",
+    "attribution": {
+        "url": "https://www.scvfd.fireatlas.org",
+        "description": "SQL Query Interface",
+        "license": "https://www.scvfd.fireatlas.org",
+        "citation": "https://www.scvfd.fireatlas.org"
+    }
+}
+			
 
 
 

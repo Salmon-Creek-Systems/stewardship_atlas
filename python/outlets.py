@@ -690,3 +690,37 @@ def outlet_html(config, outlet_name):
         
     return versioning.atlas_path(config, "html")
    
+
+def outlet_sqlquery(config: dict, outlet_name: str):
+    """Generate HTML interface for SQL queries."""
+    outlet_config = config['assets'][outlet_name]
+    outpath = versioning.atlas_path(config, "outlets") / outlet_name
+    outpath.mkdir(parents=True, exist_ok=True)
+    
+    # Create CSS and JS directories
+    css_dir = outpath / 'css'
+    js_dir = outpath / 'js'
+    css_dir.mkdir(exist_ok=True)
+    js_dir.mkdir(exist_ok=True)
+    
+    # Copy template files
+    subprocess.run(['cp', '../templates/sqlquery.html', str(outpath / 'index.html')])
+    subprocess.run(['cp', '../templates/css/sqlquery.css', str(css_dir)])
+    subprocess.run(['cp', '../templates/js/sqlquery.js', str(js_dir)])
+    
+    return outpath / 'index.html'
+   
+
+OUTLET_MATERIALIZER = {
+    'outlet_gpkg': outlet_gpkg,
+    'tiff': outlet_tiff,
+    'pdf': outlet_geopdf,
+    'html': outlet_html,
+    'gazetteer': outlet_gazetteer,
+    'runbook': outlet_runbook,
+    'webmap': outlet_webmap,
+    'webmap_public': outlet_webmap,
+    'webedit': outlet_webmap_edit,
+    'sqlquery': outlet_sqlquery
+}
+   

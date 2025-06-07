@@ -105,11 +105,13 @@ DEFAULT_ASSETS = {
         "type": "outlet",
         "name": "sqldb",
         "layers": ["basemap", "roads", "creeks"]
-        }
-
-    
-           
+    },
+    "sqlquery": {
+        "type": "outlet",
+        "name": "sqlquery",
+        "config_def": "sqlquery"
     }
+}
 
 DEFAULT_DATA_ROOT = "/root/swales"
 
