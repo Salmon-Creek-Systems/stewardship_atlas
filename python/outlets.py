@@ -460,6 +460,7 @@ def outlet_sql_duckdb(config: dict, outlet_name: str):
 def sql_query_duckdb(config: dict, outlet_name: str, query: str):
     """Query the DDB for an outlet."""
     data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
+    logger.info(f"Querying DDB: {data_path} with {query}")
     with duckdb.connect(str(data_path)) as conn:
         return conn.execute(query).fetchall()
     
@@ -706,7 +707,10 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     # Get available tables from sqldb outlet
     sqldb_config = config['assets'].get('sqldb', {})
     available_tables = sqldb_config.get('layers', [])
-    tables_list = '\n'.join([f'<li>{table}</li>' for table in available_tables])
+    for table in available_tables:
+        columns = sql_query(config, outlet_name, f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}'")
+        columns_list = ', '.join([f'<li>{column}</li>' for column in columns])
+        tables_list += f'<li>{table}: {columns_list}</li>\n' for table in available_tables])
     
     # Read and process template
     with open('../templates/sqlquery.html', 'r') as f:
