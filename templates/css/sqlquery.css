@@ -1,0 +1,41 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.query-container {
+    margin-bottom: 20px;
+}
+
+.CodeMirror {
+    height: 200px;
+    border: 1px solid #ddd;
+}
+
+.controls {
+    margin: 10px 0;
+}
+
+.results {
+    margin-top: 20px;
+}
+
+pre {
+    background: #f5f5f5;
+    padding: 10px;
+    overflow-x: auto;
+}
+
+select, button {
+    padding: 5px 10px;
+    margin-right: 10px;
+}
+
+.error {
+    color: red;
+} 
