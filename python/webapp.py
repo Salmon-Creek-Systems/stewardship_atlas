@@ -303,7 +303,9 @@ async def publish_status_check(swale: str):
 
 @app.post("/sql_query/{swalename}")
 async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
+    print("HELLLLO")
     try:
+        print(f"SQL Query [{swalename}]: {payload.query}")
         # Load config
         #ac = json.load(open(f"/root/data/{swalename}_atlas_config.json"))
         config_path = versioning.atlas_path(swalename, "atlas_config.json")

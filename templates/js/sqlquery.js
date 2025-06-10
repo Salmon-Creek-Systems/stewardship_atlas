@@ -26,7 +26,7 @@ async function executeQuery() {
     const atlasName = document.querySelector('.container').dataset.atlasName;
     
     try {
-        const response = await fetch(`https://internal.fireatlas.org/sql_query/${atlasName}:9998`, {
+        const response = await fetch(`https://internal.fireatlas.org:9998/sql_query/${atlasName}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

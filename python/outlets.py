@@ -707,10 +707,11 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     # Get available tables from sqldb outlet
     sqldb_config = config['assets'].get('sqldb', {})
     available_tables = sqldb_config.get('layers', [])
+    tables_list = ''
     for table in available_tables:
         columns = sql_query(config, outlet_name, f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}'")
         columns_list = ', '.join([f'<li>{column}</li>' for column in columns])
-        tables_list += f'<li>{table}: {columns_list}</li>\n' for table in available_tables])
+        tables_list += f'<li>{table}: {columns_list}</li>\n'
     
     # Read and process template
     with open('../templates/sqlquery.html', 'r') as f:
