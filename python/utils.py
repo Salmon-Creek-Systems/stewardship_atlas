@@ -28,11 +28,14 @@ def bbox_to_polygon(b):
 
 
 def geojson_to_bbox(geojson):
+    horiz = [geojson[i][0] for i in (0,1,2,3)]
+    vert = [geojson[i][1] for i in (0,1,2,3)]
+    
     return {
-        "west": geojson[0][0],
-        "east": geojson[2][0],
-        "north": geojson[3][1],
-        "south": geojson[1][1]
+        "west": min(horiz),
+        "east": max(horiz),
+        "north": max(vert),
+        "south": min(vert)
     }
 
 def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):

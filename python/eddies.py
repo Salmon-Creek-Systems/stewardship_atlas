@@ -34,10 +34,11 @@ def contours_gdal(config:Dict[str, Any],eddy_name:str):
     """
     eddy = config['assets'][eddy_name]
     in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
-    out_path = versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.geojson'
+    output_path = str(versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.geojson')
     interval = eddy['config']['interval']
     
     # Open the DEM dataset
+    dem_path = str(in_path)
     dem_ds = gdal.Open(dem_path)
     if dem_ds is None:
         raise ValueError(f"Could not open DEM file: {dem_path}")
@@ -133,5 +134,5 @@ def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
 
 
 asset_methods = {
-    "generate_contours": contours_gdal,
+    "gdal_contours": contours_gdal,
     'derived_hillshade': hillshade_gdal}

@@ -33,7 +33,8 @@ DEFAULT_LAYERS = [
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
     {"name": "ponds", "geometry_type": "polygon", "color": [255, 255, 0]},
     {"name": "helilandings", "geometry_type": "point", "color": [255, 0, 0], "add_labels": True, "symbol": "helipad.png"},
-    {"name": "buildings", "geometry_type": "polygon", "color": [255, 0, 0]}
+    {"name": "buildings", "geometry_type": "polygon", "color": [255, 0, 0]},
+    {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]}
 ]
 
 
@@ -67,10 +68,21 @@ DEFAULT_ASSETS = {
             "out_layer": "basemap",
             "config_def": "derived_hillshade"
         },
-        "public_roads" : {
+    "public_buildings" : {
         "type": "inlet",
-        "out_layer": "roads",
-        "config_def": "overture_roads"
+        "out_layer": "buildings",
+        "config_def": "overture_buildings"
+        },
+    "public_addresses" : {
+        "type": "inlet",
+        "out_layer": "addresses",
+        "config_def": "overture_addresses"
+    },
+
+        "public_roads" : {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "overture_roads"
         },
         "public_creeks" : {
             "type": "inlet",
@@ -87,12 +99,12 @@ DEFAULT_ASSETS = {
             "out_layer": "basemap",
             "config_def": "opentopo_dem"
         },    
-        "webmap" : {
+    "webmap" : {
             "type": "outlet",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
             "config_def": "webmap"
         },
-         "runbook": {
+    "runbook": {
             "type": "outlet",
             "name": "runbook",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
