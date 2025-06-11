@@ -35,7 +35,8 @@ DEFAULT_LAYERS = [
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05},
     {"name": "buildings", "geometry_type": "polygon", "color": [50, 0, 0]},
-    {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]}
+    {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
+    {"name": "parcels", "geometry_type": "polygon", "color": [0, 255, 255]}
 ]
 
 
@@ -79,7 +80,11 @@ DEFAULT_ASSETS = {
         "out_layer": "addresses",
         "config_def": "overture_addresses"
     },
-
+    "oa_parcels" : {
+        "type": "inlet",
+        "out_layer": "parcels",
+        "config_def": "local_parcels"
+    },
         "public_roads" : {
             "type": "inlet",
             "out_layer": "roads",
