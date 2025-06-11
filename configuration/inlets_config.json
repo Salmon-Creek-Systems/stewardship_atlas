@@ -63,15 +63,15 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
         },
-	"local_hydrants": {
+    "local_hydrants": {
         "name": "hydrants",
         "asset_type": "inlet", 
-		"symbol": "extra/half-circle",
+	"symbol": "extra/half-circle",
         "interaction": "interface",
         "fetch_type": "local_ogr",
         "data_type": "geojson",
         "feature_type": "point",
-		"inpath_template": "westport_hydrants.geojson",
+	"inpath_template": "westport_hydrants.geojson",
         "attribution": {
             "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
             "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
