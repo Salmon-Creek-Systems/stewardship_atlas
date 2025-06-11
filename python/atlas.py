@@ -98,7 +98,12 @@ DEFAULT_ASSETS = {
             "type": "inlet",
             "out_layer": "basemap",
             "config_def": "opentopo_dem"
-        },    
+        },
+    "local_helilandings" : {
+        "type": "inlet",
+        "out_layer": "helilandings",
+        "config_def": "local_helilandings"
+    },
     "webmap" : {
             "type": "outlet",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],

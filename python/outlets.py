@@ -129,7 +129,8 @@ def webmap_json(config, name):
                 label_layer['symbol'] = layer['symbol']
                 label_layer['name'] = layer['name']
                 label_layer['layout']['icon-image'] = layer['name']
-                label_layer['layout']['icon-color'] = utils.rgb_to_css(layer.get('color', [150,150,150]))
+                label_layer['layout']['icon-size'] = 0.2
+                label_layer['paint'] = {'icon-color' : utils.rgb_to_css(layer.get('color', [150,150,150]))}
                 
                 dynamic_layers.append(label_layer)
 

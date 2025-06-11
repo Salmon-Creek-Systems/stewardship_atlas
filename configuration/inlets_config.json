@@ -42,7 +42,27 @@
             "citation": "https://portal.opentopography.org/api/terms"
 	}
     },
-    
+    "local_helilandings": {
+        "name": "helilandings_delta",
+        "asset_type": "inlet", 
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "alterations": {
+            "vector_width": {
+		"default": 10
+            }
+        },
+	"inpath_template": "westport_helilandings.geojson",
+        "outpath_template": "/helilandings_delta",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+        },
     "opentopo_dem":  {
     "asset_type": "inlet",
     "fetch_type": "fetch_url",
