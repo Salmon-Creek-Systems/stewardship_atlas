@@ -33,6 +33,7 @@ DEFAULT_LAYERS = [
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
     {"name": "ponds", "geometry_type": "polygon", "color": [255, 255, 0]},
     {"name": "helilandings", "geometry_type": "point", "color": [255, 0, 0], "add_labels": True, "symbol": "helipad.png"},
+    {"name": "hydrants", "geometry_type": "point", "color": [255, 0, 0], "add_labels": True, "symbol": "hydrant.png"},
     {"name": "buildings", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]}
 ]
@@ -104,9 +105,14 @@ DEFAULT_ASSETS = {
         "out_layer": "helilandings",
         "config_def": "local_helilandings"
     },
+    "local_hydrants" : {
+        "type": "inlet",
+        "out_layer": "hydrants",
+        "config_def": "local_hydrants"
+    },
     "webmap" : {
             "type": "outlet",
-            "in_layers": ["basemap", "roads", "creeks", "helilandings"],
+            "in_layers": ["basemap", "roads", "creeks", "helilandings", "hydrants"],
             "config_def": "webmap"
         },
     "runbook": {
