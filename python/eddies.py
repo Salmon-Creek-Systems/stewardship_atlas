@@ -11,6 +11,7 @@ from osgeo import gdal, ogr
 import subprocess
 import versioning
 import utils
+import outlets
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -131,6 +132,84 @@ def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
     out_ds = None
     
     return out_path
+
+def centroid_gdal(config:Dict[str, Any], eddy_name:str):
+    eddy = config['assets'][eddy_name]
+    in_layer = eddy['in_layer']
+    out_layer = eddy['out_layer']
+    
+
+    in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.geojson'
+    out_path = versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.geojson'
+    
+    ds = gdal.Open(str(in_path))
+    fc = ds.GetLayer()
+    for feature in fc:
+        geom = feature.GetGeometryRef()
+        if geom is not None:
+            centroid = geom.Centroid()
+            feature['properties']['centroid'] = geojson.dumps(centroid)
+    
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+    
+    return out_path
+
+def delta_annotate_spatial_duckdb(config:Dict[str, Any], delta_name:str):
+    #in_layer = eddy['in_layer']
+    anno_in_path = versioning.atlas_path(config, 'deltas') / eddy['out_layer'] / f"{delta_name}.geojson"
+    feat_in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f"{eddy['in_layer']}.geojson"
+    anno_prefix = "anno_"
+    anno_prefix_len = len(anno_prefix)
+    feat_prefix = "feat_"
+    feat_prefix_len = len(feat_prefix)
+
+    # get duckdb
+
+    # make temp table for delta
+    outlets.sql_query(config, "sqldb", f"DROP TABLE IF EXISTS anno; CREATE TABLE anno AS SELECT COLUMNS('.*') AS \"anno_\\0\" FROM ST_Read('{anno_in_path}');")
+    outlets.sql_query(config, "sqldb", f"DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{feat_in_path}');")
+
+    # join delta to layers
+    res = duckdb.sql(f"SELECT * FROM anno LEFT JOIN feat ON ST_Intersects(anno.geom, feat.geom);")
+
+    # update layer features with delta feature properties
+    matching_features = [dict(zip(res.columns, row)) for row in res.fetchall()] 
+    print(f"DID Anno join! {sql}: {len(matching_features)}")
+    
+    # rewrite featuers with new attributes added
+    features = []
+    
+
+    for mf in matching_features:
+        print(f"about to assign geomtry from: {mf['geometry']}") 
+        f = geojson.Feature(geometry=geojson.loads(mf['geometry']))
+        for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k != 'geometry'):
+            f['properties'][k] = v
+        for k,v	in ( (k[anno_prefix_len:],v) for k,v in mf.items() if k.startswith(anno_prefix)):
+            if v:
+                f['properties'][k] = v
+        features.append(f)
+
+    feature_collection = geojson.FeatureCollection(features)
+    geojson.dump(feature_collection, open(outpath, 'w'))
+
+
+
+    # write out dlayer
+
+    # delete temp table
+
+
+    
+    conn = duckdb.connect(database=config['database'])
+    # Do intersection with parcels
+    query = f"""
+    SELECT 
+        a.id,
+        b.id as parcel_id
+    FROM {in_layer} a
+    """
 
 
 asset_methods = {

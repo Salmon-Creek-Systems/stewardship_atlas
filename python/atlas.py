@@ -77,7 +77,7 @@ DEFAULT_ASSETS = {
         },
     "public_addresses" : {
         "type": "inlet",
-        "out_layer": "addresses",
+        "out_layer": "parcels",
         "config_def": "overture_addresses"
     },
     "oa_parcels" : {
@@ -124,7 +124,30 @@ DEFAULT_ASSETS = {
             "type": "outlet",
             "name": "runbook",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
-             "config_def": "runbook"},
+             "config_def": "runbook",
+             "regions" : [
+                {"bbox": {
+                    "east": -121.19978063408502,
+                    "west": -121.20391109005016,
+                    "south": 39.23863749098538,
+                    "north": 39.24416744687048},
+                "name": "RockLoop",
+                "caption": "Double loop with Ginger and big rocks.",
+                "vectors": [],
+                "raster": "",
+                "text": "Hwy20 to the County Lnie"},
+                {"bbox": {
+                    "east": -121.19978063408502,
+                    "west": -121.20391109005016,
+                    "south": 39.23863749098538,
+                    "north": 39.24416744687048},
+                "name": "GolfCourses",
+                "caption": "Golf Courses",
+                "vectors": [],
+                "raster": "",
+                "text": "Golf Courses"}]
+
+    },
     "html": {
             "type": "outlet",
             "name": "html",

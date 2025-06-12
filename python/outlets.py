@@ -393,7 +393,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
 def outlet_runbook( config, outlet_name, skips=[]):
     outlet_config = config['assets'][outlet_name]
     
-    regions = outlet_config['config']['regions']
+    regions = outlet_config['regions']
 
     swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
@@ -463,6 +463,7 @@ def sql_query_duckdb(config: dict, outlet_name: str, query: str):
     data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
     logger.info(f"Querying DDB: {data_path} with {query}")
     with duckdb.connect(str(data_path)) as conn:
+        conn.execute("INSTALL spatial; LOAD spatial; ")
         return conn.execute(query).fetchall()
     
 def sql_query(config: dict, outlet_name: str, query: str, return_format: str = 'csv'):
