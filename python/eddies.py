@@ -155,11 +155,11 @@ def centroid_gdal(config:Dict[str, Any], eddy_name:str):
     
     return out_path
 
-def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str):
+def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", updated_properties: List[str] = []):
     #in_layer = eddy['in_layer']
     
     #eddy = config['assets'][eddy_name]
-    anno_in_path = versioning.atlas_path(config, 'deltas') / layer_name / f"{delta_name}.geojson"
+    anno_in_path = versioning.atlas_path(config, anno_type) / layer_name / f"{delta_name}.geojson"
     feat_in_path = versioning.atlas_path(config, 'layers') / layer_name / f"{layer_name}.geojson"
     
     anno_prefix = "anno_"
@@ -196,8 +196,9 @@ ON ST_Intersects(anno_geom, feat_geom);
         for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k not in ['feat_geom', 'anno_geom'] ):
             f['properties'][k] = v
         for k,v	in ( (k[anno_prefix_len:],v) for k,v in mf.items() if k.startswith(anno_prefix) and k not in [ 'feat_geom', 'anno_geom'] ):
-            if v:
-                f['properties'][k] = v
+            if len(updated_properties) == 0 or k in updated_properties:
+                if v:
+                    f['properties'][k] = v
         features.append(f)
 
     feature_collection = geojson.FeatureCollection(features)

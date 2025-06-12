@@ -26,6 +26,7 @@ logger.setLevel(logging.INFO)
 from typing import List, Dict, Tuple, Any
 
 DEFAULT_LAYERS = [
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50]},
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},

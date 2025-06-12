@@ -390,10 +390,29 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
     
     return regions
 
+def regions_from_geojson(path):
+    """Load regions from a GeoJSON file."""
+    regions = []
+    with open(path, 'r') as f:
+        for region in  json.load(f)['features']:
+            bbox = utils.geojson_to_bbox(region['geometry'])
+            regions.append({
+                'name': region['properties']['name'],
+                'caption': region['properties'].get('caption', region['properties']['name']),
+                'text': region['properties'].get('text', region['properties']['name']),
+                'bbox': bbox,
+                "vectors": [],
+                "raster": ""
+            })
+    return regions
+
 def outlet_runbook( config, outlet_name, skips=[]):
     outlet_config = config['assets'][outlet_name]
     
-    regions = outlet_config['regions']
+    #regions = outlet_config['regions']
+    # get regions layer
+    regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
+    regions = regions_from_geojson(regions_path)
 
     swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
