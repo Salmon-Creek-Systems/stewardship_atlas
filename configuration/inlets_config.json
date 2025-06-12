@@ -14,7 +14,15 @@
                     "to": "name"
                 }
             ]
-        }
+        },
+	"data_type": "geojson",
+	 "inpath_template": "SET s3_region='us-west-2'; SELECT  * EXCLUDE geometry, ST_AsGeoJSON(ST_MakeEnvelope(bbox.xmin-0.0006, bbox.ymin-0.0006, bbox.xmax+0.0006, bbox.ymax+0.0006)) as geom FROM   read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=addresses/type=*/*', filename=true, hive_partitioning=1) WHERE  bbox.xmin > {west}  AND bbox.xmax < {east}  AND bbox.ymin > {south}  AND bbox.ymax < {north}  AND street != 'NONE';",
+	"attribution": {
+        "url": "https://portal.opentopography.org/api/terms",
+            "description": "Overture", 
+            "license": "https://portal.opentopography.org/api/terms",
+            "citation": "https://portal.opentopography.org/api/terms"
+	}
     },
     "overture_buildings": {
         "name": "raw_buildings",
@@ -30,13 +38,23 @@
 	    "vector_width": {
 		"default": 5
             }
-            
 	},
-	"local_parcels": {
+	"data_type": "geojson",
+	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry,  ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=buildings/type=building/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+      "outpath_template": "/staging/raw_buildings.geojson",
+	"attribution": {
+        "url": "https://portal.opentopography.org/api/terms",
+            "description": "Overture", 
+            "license": "https://portal.opentopography.org/api/terms",
+            "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "local_parcels": {
         "name": "parcels",
         "asset_type": "inlet", 
         "interaction": "download",
         "fetch_type": "local_ogr",
+	"geometry": "dataswale",
         "data_type": "geojson",
         "feature_type": "polygon",
 		"inpath_template": "mendocino_parcels.geojson",
@@ -305,8 +323,7 @@
                 "description": "Runbook of the atlas, a linked set of specific submap/diagram pages.",
                 "license": "https://www.scvfd.fireatlas.org",
                 "citation": "https://www.scvfd.fireatlas.org"
-            }    
-           
+            }               
 	},
 
 			

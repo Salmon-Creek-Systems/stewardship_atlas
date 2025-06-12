@@ -155,10 +155,13 @@ def centroid_gdal(config:Dict[str, Any], eddy_name:str):
     
     return out_path
 
-def delta_annotate_spatial_duckdb(config:Dict[str, Any], delta_name:str):
+def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str):
     #in_layer = eddy['in_layer']
-    anno_in_path = versioning.atlas_path(config, 'deltas') / eddy['out_layer'] / f"{delta_name}.geojson"
-    feat_in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f"{eddy['in_layer']}.geojson"
+    
+    #eddy = config['assets'][eddy_name]
+    anno_in_path = versioning.atlas_path(config, 'deltas') / layer_name / f"{delta_name}.geojson"
+    feat_in_path = versioning.atlas_path(config, 'layers') / layer_name / f"{layer_name}.geojson"
+    
     anno_prefix = "anno_"
     anno_prefix_len = len(anno_prefix)
     feat_prefix = "feat_"
@@ -167,32 +170,39 @@ def delta_annotate_spatial_duckdb(config:Dict[str, Any], delta_name:str):
     # get duckdb
 
     # make temp table for delta
-    outlets.sql_query(config, "sqldb", f"DROP TABLE IF EXISTS anno; CREATE TABLE anno AS SELECT COLUMNS('.*') AS \"anno_\\0\" FROM ST_Read('{anno_in_path}');")
-    outlets.sql_query(config, "sqldb", f"DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{feat_in_path}');")
+    duckdb.sql("INSTALL spatial; LOAD spatial; ")
+    duckdb.sql( f"DROP TABLE IF EXISTS anno; CREATE TABLE anno AS SELECT COLUMNS('.*') AS \"anno_\\0\" FROM ST_Read('{anno_in_path}');")
+    duckdb.sql( f"DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{feat_in_path}');")
 
     # join delta to layers
-    res = duckdb.sql(f"SELECT * FROM anno LEFT JOIN feat ON ST_Intersects(anno.geom, feat.geom);")
+    res = duckdb.sql(f"""
+SELECT * EXCLUDE (anno_geom, feat_geom), 
+    ST_AsGeoJSON(feat_geom) AS geometry,
+    FROM anno LEFT JOIN feat 
+ON ST_Intersects(anno_geom, feat_geom);
+""")
 
     # update layer features with delta feature properties
     matching_features = [dict(zip(res.columns, row)) for row in res.fetchall()] 
-    print(f"DID Anno join! {sql}: {len(matching_features)}")
+    logger.info(f"DID Anno join!  {len(matching_features)}")
     
     # rewrite featuers with new attributes added
     features = []
     
 
     for mf in matching_features:
-        print(f"about to assign geomtry from: {mf['geometry']}") 
+        logger.debug(f"about to assign geomtry from: {mf['geometry']}") 
         f = geojson.Feature(geometry=geojson.loads(mf['geometry']))
-        for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k != 'geometry'):
+        for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k not in ['feat_geom', 'anno_geom'] ):
             f['properties'][k] = v
-        for k,v	in ( (k[anno_prefix_len:],v) for k,v in mf.items() if k.startswith(anno_prefix)):
+        for k,v	in ( (k[anno_prefix_len:],v) for k,v in mf.items() if k.startswith(anno_prefix) and k not in [ 'feat_geom', 'anno_geom'] ):
             if v:
                 f['properties'][k] = v
         features.append(f)
 
     feature_collection = geojson.FeatureCollection(features)
-    geojson.dump(feature_collection, open(outpath, 'w'))
+    geojson.dump(feature_collection, open(feat_in_path, 'w'))
+    return feat_in_path
 
 
 

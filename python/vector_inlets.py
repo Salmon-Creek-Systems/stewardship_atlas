@@ -50,6 +50,7 @@ def local_ogr(config, name, delta_queue):
    
     # Get input path from template
     inlet_config = config['assets'][name]['config']
+
     inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
     outpath = delta_queue.delta_path(config, name, 'create')
 
