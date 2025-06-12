@@ -9,9 +9,16 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 def rgb_to_css(rgb_tuple):
-    return f'rgb({rgb_tuple[0]}, {rgb_tuple[1]}, {rgb_tuple[2]})'
-             
-#def line_width(width_base, width_delta):
+    if len(rgb_tuple) == 3:
+        return f'rgb({rgb_tuple[0]}, {rgb_tuple[1]}, {rgb_tuple[2]})'
+    elif len(rgb_tuple) == 4:
+        return f'rgba({rgb_tuple[0]}, {rgb_tuple[1]}, {rgb_tuple[2]}, {rgb_tuple[3]})'
+    else:
+        logger.error(f"Unknown RGB tuple: {rgb_tuple}")
+
+    
+    
+##def line_width(width_base, width_delta):
 #    return width_base + width_delta
 
 def bbox_to_corners(b):

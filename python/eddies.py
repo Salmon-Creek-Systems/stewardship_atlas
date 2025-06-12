@@ -159,8 +159,15 @@ def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_n
     #in_layer = eddy['in_layer']
     
     #eddy = config['assets'][eddy_name]
-    anno_in_path = versioning.atlas_path(config, anno_type) / layer_name / f"{delta_name}.geojson"
+    if anno_type == "deltas":
+        anno_in_path = versioning.atlas_path(config, anno_type) / layer_name / f"{delta_name}.geojson"
+    elif anno_type == "layers":
+        anno_in_path = versioning.atlas_path(config, anno_type) / delta_name / f"{delta_name}.geojson"
+    else:
+        logger.error(f"Unknown annotation type: {anno_type}!")
     feat_in_path = versioning.atlas_path(config, 'layers') / layer_name / f"{layer_name}.geojson"
+
+    anno_out_path = anno_in_path.parent / "work" /  anno_in_path.name
     
     anno_prefix = "anno_"
     anno_prefix_len = len(anno_prefix)
@@ -191,7 +198,10 @@ ON ST_Intersects(anno_geom, feat_geom);
     
 
     for mf in matching_features:
-        logger.debug(f"about to assign geomtry from: {mf['geometry']}") 
+        logger.debug(f"about to assign geomtry from: {mf.get('geometry')}")
+        if not mf.get('geometry'):
+            logger.info(f"Skipping empty geometry for: {mf}")
+            continue
         f = geojson.Feature(geometry=geojson.loads(mf['geometry']))
         for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k not in ['feat_geom', 'anno_geom'] ):
             f['properties'][k] = v
@@ -203,6 +213,8 @@ ON ST_Intersects(anno_geom, feat_geom);
 
     feature_collection = geojson.FeatureCollection(features)
     geojson.dump(feature_collection, open(feat_in_path, 'w'))
+    logger.info(f"moving consumed delta anno: {anno_in_path} -> {anno_out_path}")
+    anno_in_path.rename(anno_out_path)
     return feat_in_path
 
 

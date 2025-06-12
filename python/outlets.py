@@ -74,7 +74,8 @@ def webmap_json(config, name):
             #map_layer['paint'] = {
             map_layer.update({
                 'type': 'fill',
-                'symbol_placement': 'line-center',
+                'symbol_placement': 'point',
+                'text_offset': [0,0],
                 'paint': {
                     "fill-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
                     "fill-outline-color": utils.rgb_to_css(layer.get('color', [150,150,150]))}
@@ -95,25 +96,28 @@ def webmap_json(config, name):
                 "icon-color": utils.rgb_to_css(layer.get('color', [150,150,150])),
                 "icon-size": 20
                 
-                })
+            })
+        
         
         map_layers.append(map_layer)
         
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
             label_layer = {
-                    "id": f"{layer_name}-label-layer",
-                    "type": "symbol",
-                    "source": layer_name,
-                    "layout": {
-                        "symbol-placement": map_layer['symbol_placement'],
-                        "text-offset": [0,2],
-                        "text-font": ["Open Sans Regular"],
-                        "text-field": ["get", "name"],
-                        "text-size": 20
-                        }
+                "id": f"{layer_name}-label-layer",
+                "type": "symbol",
+                "minzoom": 16,
+                "maxzoom": 24,
+                "source": layer_name,
+                "layout": {
+                    "symbol-placement": map_layer['symbol_placement'],
+                    "text-offset": map_layer.get('text_offset', [0,2]),
+                    "text-font": ["Open Sans Regular"],
+                    "text-field": ["get", "name"],
+                    "text-size": 10
                 }
- 
+            }
+            
             if  map_layer.get('type', 'line') == 'note':    
                 label_layer.update({
                     'paint': {
@@ -123,6 +127,12 @@ def webmap_json(config, name):
                         'text-color': '#000000'
                     }
                 })
+            elif map_layer.get('type', 'point') == "fill":
+                label_layer.update({
+                    'paint': {
+                        'text-color': 'rgb(255,255,255)'
+                    }
+                })                    
             if "symbol" not in layer:
                 map_layers.append(label_layer)
             else:

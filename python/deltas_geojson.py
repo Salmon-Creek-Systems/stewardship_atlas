@@ -180,7 +180,11 @@ def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
                 geojson.dump(FeatureCollection(features=new_layer['features']), outfile)
         else:
             raise InvalidDelta(f"Invalid action: {action}") 
-
+        delta_in_path = Path(filepath)
+        delta_out_path = delta_in_path.parent / "work" / delta_in_path.name
+        logger.info(f"moving consumed delta: {delta_in_path} -> {delta_out_path}")
+        delta_in_path.rename(delta_out_path)
+        
     return geojson.load(open(layer_filepath))
     
     
