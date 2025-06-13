@@ -31,8 +31,9 @@ DEFAULT_LAYERS = [
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
+     {"name": "internal_roads", "geometry_type": "linestring", "color": [200, 55, 50], "add_labels": True},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
-    {"name": "ponds", "geometry_type": "polygon", "color": [255, 255, 0]},
+    {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05},
     {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": True},
@@ -116,9 +117,14 @@ DEFAULT_ASSETS = {
         "out_layer": "hydrants",
         "config_def": "local_hydrants"
     },
+    "local_milemarkers" : {
+        "type": "inlet",
+        "out_layer": "milemarkers",
+        "config_def": "local_milemarkers"
+    },
     "webmap" : {
             "type": "outlet",
-            "in_layers": ["basemap", "parcels", "roads", "creeks", "buildings", "helilandings", "hydrants"],
+            "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers" "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap"
         },
     "runbook": {

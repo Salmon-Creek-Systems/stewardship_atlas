@@ -65,6 +65,49 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
+	"local_milemarkers": {
+        "name": "milemarkers",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+		"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "point",
+		"inpath_template": "postmiles_tenth.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          },
+		"alterations": {	
+		"canonicalize": [
+		    {
+			"to": "name",
+			"from": ["PMc"],
+			"remove_prefix": []
+		    }
+		],
+		"vector_width": {
+		    "default": 3
+		},
+	"require":  [
+		    ["endswith", ["0.0", "5.0"]],
+		    ["equals", [
+			["91.0", "Callbox #911 mm 91.08"],
+			["89.6","Callbox #896 mm 89.63"],
+			["87.1","Callbox #878 mm 87.15"],
+			["85.7","Callbox #860 mm 85.74"],
+			["84.0","Callbox #840 mm 84.0"],
+			["81.6","Callbox #817 mm 81.62"],
+			["79.1","Callbox #790 mm 79.12"],
+			["76.5","Callbox #768 mm 76.57"],
+			["71.8","Callbox #714 mm 71.84"]
+			]]
+			]
+		    
+			}
+		},	
     "local_helilandings": {
         "name": "helilandings_delta",
         "asset_type": "inlet", 
