@@ -16,7 +16,8 @@ def rgb_to_css(rgb_tuple):
     else:
         logger.error(f"Unknown RGB tuple: {rgb_tuple}")
 
-    
+def canonicalize_name(s):
+    return "_".join(s.lower().split()).strip()    
     
 ##def line_width(width_base, width_delta):
 #    return width_base + width_delta

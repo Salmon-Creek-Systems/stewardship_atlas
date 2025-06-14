@@ -63,7 +63,7 @@ def local_ogr(config, name, delta_queue):
                     str(bbox['west']), str(bbox['south']),
                     str(bbox['east']), str(bbox['north'])])
         args.extend(['-spat_srs', config['dataswale']['crs']])
-    args.extend([outpath, inpath])
+    args.extend([str(outpath), str(inpath)])
     if 'layer' in inlet_config:
         args.append(inlet_config['layer'])
     

@@ -260,10 +260,22 @@ def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
     gs.read_command('v.out.ogr', input=f'{layer}_clip', output=outpath, format='GeoJSON')
     return outpath
 
-def extract_region_layer_raster_grass(config, outlet_name, layer, region):
+def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jpg=False):
     """Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
-    inpath = versioning.atlas_path(config, 'layers') / layer / f"{layer}.tiff"
+
+    basemap_dir = versioning.atlas_path(config, "layers") / "basemap"
+    if use_jpg:
+        basemap_path = basemap_dir / "basemap.tiff.jpg"
+        if basemap_path.exists():
+            logger.info(f"Using extant basemap: {basemap_path}.")
+            inpath = basemap_path
+        else:
+            logger.info(f"Generating basemap: {basemap_path}.")
+            utils.tiff2jpg(f"{basemap_dir}/basemap.tiff", basemap_path)
+            inpath = basemap_path
+    else:
+        inpath = basemap_dir / f"{layer}.tiff"
     outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.tiff"
     
     logger.info(f"Extracting region {region['name']} of raster layer {layer} to {outpath}.")
@@ -404,12 +416,14 @@ def regions_from_geojson(path):
     """Load regions from a GeoJSON file."""
     regions = []
     with open(path, 'r') as f:
-        for region in  json.load(f)['features']:
-            bbox = utils.geojson_to_bbox(region['geometry'])
+        for i,region in  enumerate(json.load(f)['features']):
+            logger.info(f"Converting region {i} from GJ: {region}")
+            bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
+            default_name =  f"Region {i}"
             regions.append({
-                'name': region['properties']['name'],
-                'caption': region['properties'].get('caption', region['properties']['name']),
-                'text': region['properties'].get('text', region['properties']['name']),
+                'name': utils.canonicalize_name(region['properties'].get('name', default_name)),
+                'caption': region['properties'].get('caption', default_name),
+                'text': region['properties'].get('text', default_name),
                 'bbox': bbox,
                 "vectors": [],
                 "raster": ""

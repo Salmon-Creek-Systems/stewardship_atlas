@@ -65,6 +65,26 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
+        "internal_roads": {
+        "name": "milemarkers",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "line",
+	    "inpath_template": "usal_road_6_11.geojson",
+	    "alterations": {
+		"vector_width": {"default": 5}
+	    },
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+
 	"local_milemarkers": {
         "name": "milemarkers",
         "asset_type": "inlet", 

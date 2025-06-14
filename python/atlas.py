@@ -31,7 +31,7 @@ DEFAULT_LAYERS = [
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
-     {"name": "internal_roads", "geometry_type": "linestring", "color": [200, 55, 50], "add_labels": True},
+     {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1},
@@ -92,7 +92,13 @@ DEFAULT_ASSETS = {
             "out_layer": "roads",
             "config_def": "overture_roads"
         },
-        "public_creeks" : {
+        "internal_roads" : {
+            "type": "inlet",
+            "out_layer": "internal_roads",
+            "config_def": "internal_roads"
+        },
+
+    "public_creeks" : {
             "type": "inlet",
             "out_layer": "creeks",
             "config_def": "nhd_creeks"
@@ -124,7 +130,7 @@ DEFAULT_ASSETS = {
     },
     "webmap" : {
             "type": "outlet",
-            "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers" "creeks", "buildings", "helilandings", "hydrants"],
+            "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap"
         },
     "runbook": {
