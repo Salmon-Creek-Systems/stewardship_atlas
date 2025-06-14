@@ -21,8 +21,9 @@
     </div>
     <div class='code'>
       <div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="o">,</span><span class="w"> </span><span class="nn">csv</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span><span class="o">,</span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">io</span><span class="w"> </span><span class="kn">import</span> <span class="n">StringIO</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
 
@@ -158,7 +159,8 @@ since the layer must be set up inside the callback for the image load.</p>
     <div class='code'>
       <div class="highlight"><pre>            <span class="n">map_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
                 <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span>
-                <span class="s1">&#39;symbol_placement&#39;</span><span class="p">:</span> <span class="s1">&#39;line-center&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;symbol_placement&#39;</span><span class="p">:</span> <span class="s1">&#39;point&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;text_offset&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span>
                 <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
                     <span class="s2">&quot;fill-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;fill_color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">])),</span>
                     <span class="s2">&quot;fill-outline-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">]))}</span>
@@ -179,7 +181,8 @@ since the layer must be set up inside the callback for the image load.</p>
                 <span class="s2">&quot;icon-color&quot;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">])),</span>
                 <span class="s2">&quot;icon-size&quot;</span><span class="p">:</span> <span class="mi">20</span>
                 
-                <span class="p">})</span>
+            <span class="p">})</span>
+        
         
         <span class="n">map_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">map_layer</span><span class="p">)</span></pre></div>
     </div>
@@ -195,18 +198,20 @@ since the layer must be set up inside the callback for the image load.</p>
     <div class='code'>
       <div class="highlight"><pre>        <span class="k">if</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;add_labels&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>            
             <span class="n">label_layer</span> <span class="o">=</span> <span class="p">{</span>
-                    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">-label-layer&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;symbol&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">layer_name</span><span class="p">,</span>
-                    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span>
-                        <span class="s2">&quot;symbol-placement&quot;</span><span class="p">:</span> <span class="n">map_layer</span><span class="p">[</span><span class="s1">&#39;symbol_placement&#39;</span><span class="p">],</span>
-                        <span class="s2">&quot;text-offset&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">],</span>
-                        <span class="s2">&quot;text-font&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Open Sans Regular&quot;</span><span class="p">],</span>
-                        <span class="s2">&quot;text-field&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">],</span>
-                        <span class="s2">&quot;text-size&quot;</span><span class="p">:</span> <span class="mi">20</span>
-                        <span class="p">}</span>
+                <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">-label-layer&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;symbol&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;minzoom&quot;</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+                <span class="s2">&quot;maxzoom&quot;</span><span class="p">:</span> <span class="mi">24</span><span class="p">,</span>
+                <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">layer_name</span><span class="p">,</span>
+                <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;symbol-placement&quot;</span><span class="p">:</span> <span class="n">map_layer</span><span class="p">[</span><span class="s1">&#39;symbol_placement&#39;</span><span class="p">],</span>
+                    <span class="s2">&quot;text-offset&quot;</span><span class="p">:</span> <span class="n">map_layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;text_offset&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">]),</span>
+                    <span class="s2">&quot;text-font&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Open Sans Regular&quot;</span><span class="p">],</span>
+                    <span class="s2">&quot;text-field&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                    <span class="s2">&quot;text-size&quot;</span><span class="p">:</span> <span class="mi">10</span>
                 <span class="p">}</span>
- 
+            <span class="p">}</span>
+            
             <span class="k">if</span>  <span class="n">map_layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;line&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;note&#39;</span><span class="p">:</span>    
                 <span class="n">label_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
                     <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
@@ -216,13 +221,20 @@ since the layer must be set up inside the callback for the image load.</p>
                         <span class="s1">&#39;text-color&#39;</span><span class="p">:</span> <span class="s1">&#39;#000000&#39;</span>
                     <span class="p">}</span>
                 <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">map_layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;fill&quot;</span><span class="p">:</span>
+                <span class="n">label_layer</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                    <span class="s1">&#39;paint&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;text-color&#39;</span><span class="p">:</span> <span class="s1">&#39;rgb(255,255,255)&#39;</span>
+                    <span class="p">}</span>
+                <span class="p">})</span>                    
             <span class="k">if</span> <span class="s2">&quot;symbol&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">layer</span><span class="p">:</span>
                 <span class="n">map_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label_layer</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span>
                 <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
-                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-image&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
-                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-color&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">]))</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-image&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;symbol&#39;</span><span class="p">]</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;layout&#39;</span><span class="p">][</span><span class="s1">&#39;icon-size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;icon-size&#39;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+                <span class="n">label_layer</span><span class="p">[</span><span class="s1">&#39;paint&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;icon-color&#39;</span> <span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">rgb_to_css</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">,</span><span class="mi">150</span><span class="p">]))}</span>
                 
                 <span class="n">dynamic_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label_layer</span><span class="p">)</span></pre></div>
     </div>
@@ -467,7 +479,7 @@ TODO here is where we should be using Dagster and actual asset mgmt</p>
       <p>Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">extract_region_layer_raster_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">region</span><span class="p">):</span></pre></div>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">extract_region_layer_raster_grass</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">region</span><span class="p">,</span> <span class="n">use_jpg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -480,7 +492,19 @@ TODO here is where we should be using Dagster and actual asset mgmt</p>
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
-    <span class="n">inpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">.tiff&quot;</span>
+
+    <span class="n">basemap_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;basemap&quot;</span>
+    <span class="k">if</span> <span class="n">use_jpg</span><span class="p">:</span>
+        <span class="n">basemap_path</span> <span class="o">=</span> <span class="n">basemap_dir</span> <span class="o">/</span> <span class="s2">&quot;basemap.tiff.jpg&quot;</span>
+        <span class="k">if</span> <span class="n">basemap_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using extant basemap: </span><span class="si">{</span><span class="n">basemap_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">inpath</span> <span class="o">=</span> <span class="n">basemap_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating basemap: </span><span class="si">{</span><span class="n">basemap_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">utils</span><span class="o">.</span><span class="n">tiff2jpg</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">basemap_dir</span><span class="si">}</span><span class="s2">/basemap.tiff&quot;</span><span class="p">,</span> <span class="n">basemap_path</span><span class="p">)</span>
+            <span class="n">inpath</span> <span class="o">=</span> <span class="n">basemap_path</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">inpath</span> <span class="o">=</span> <span class="n">basemap_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">.tiff&quot;</span>
     <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span>  <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.tiff&quot;</span>
     
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracting region </span><span class="si">{</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> of raster layer </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></pre></div>
@@ -818,13 +842,63 @@ m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gr
       <div class='octowrap'>
         <a class='octothorpe' href='#section-44'>#</a>
       </div>
+      <p>Load regions from a GeoJSON file.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">regions_from_geojson</span><span class="p">(</span><span class="n">path</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-45'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-45'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">regions</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">region</span> <span class="ow">in</span>  <span class="nb">enumerate</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)[</span><span class="s1">&#39;features&#39;</span><span class="p">]):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Converting region </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> from GJ: </span><span class="si">{</span><span class="n">region</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">bbox</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">geojson_to_bbox</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;geometry&#39;</span><span class="p">][</span><span class="s1">&#39;coordinates&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">default_name</span> <span class="o">=</span>  <span class="sa">f</span><span class="s2">&quot;Region </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">regions</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">utils</span><span class="o">.</span><span class="n">canonicalize_name</span><span class="p">(</span><span class="n">region</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="n">default_name</span><span class="p">)),</span>
+                <span class="s1">&#39;caption&#39;</span><span class="p">:</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;caption&#39;</span><span class="p">,</span> <span class="n">default_name</span><span class="p">),</span>
+                <span class="s1">&#39;text&#39;</span><span class="p">:</span> <span class="n">region</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">,</span> <span class="n">default_name</span><span class="p">),</span>
+                <span class="s1">&#39;bbox&#39;</span><span class="p">:</span> <span class="n">bbox</span><span class="p">,</span>
+                <span class="s2">&quot;vectors&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s2">&quot;raster&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+            <span class="p">})</span>
+    <span class="k">return</span> <span class="n">regions</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-46'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-46'>#</a>
+      </div>
       
     </div>
     <div class='code'>
       <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_runbook</span><span class="p">(</span> <span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">skips</span><span class="o">=</span><span class="p">[]):</span>
-    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
-    
-    <span class="n">regions</span> <span class="o">=</span> <span class="n">outlet_config</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;regions&#39;</span><span class="p">]</span>
+    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-47'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-47'>#</a>
+      </div>
+      <p>regions = outlet_config[&lsquo;regions&rsquo;]
+get regions layer</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">regions_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;regions&quot;</span> <span class="o">/</span> <span class="s2">&quot;regions.geojson&quot;</span>
+    <span class="n">regions</span> <span class="o">=</span> <span class="n">regions_from_geojson</span><span class="p">(</span><span class="n">regions_path</span><span class="p">)</span>
 
     <span class="n">swale_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
     <span class="n">outlet_dir</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> 
@@ -847,10 +921,10 @@ m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gr
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-45'>
+  <div class='section' id='section-48'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-45'>#</a>
+        <a class='octothorpe' href='#section-48'>#</a>
       </div>
       <p>outpath_template = outlet_config[&lsquo;outpath_template&rsquo;].format(**swale_config)</p>
     </div>
@@ -866,10 +940,10 @@ m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gr
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-46'>
+  <div class='section' id='section-49'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-46'>#</a>
+        <a class='octothorpe' href='#section-49'>#</a>
       </div>
       <p>(outlet_config[&lsquo;config&rsquo;][&lsquo;outpath_template&rsquo;].format(
    i=i,region_name=r[&lsquo;name&rsquo;],**config).lower(),</p>
@@ -889,10 +963,10 @@ m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gr
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-47'>
+  <div class='section' id='section-50'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-47'>#</a>
+        <a class='octothorpe' href='#section-50'>#</a>
       </div>
       <p>Create DDB tables for SQL queries.</p>
     </div>
@@ -901,25 +975,710 @@ m.d_vect(map=lc[&lsquo;name&rsquo;], color=lc.get(&lsquo;color&rsquo;, &lsquo;gr
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-48'>
+  <div class='section' id='section-51'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-48'>#</a>
+        <a class='octothorpe' href='#section-51'>#</a>
       </div>
       
     </div>
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
-    <span class="n">data_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;atlas.db&quot;</span>
-    <span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">data_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span>  <span class="s2">&quot;atlas.db&quot;</span>
+    <span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;INSTALL spatial; LOAD spatial; &quot;</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]:</span>
             <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;geometry_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;raster&#39;</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;skipping raster layer </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
                 <span class="k">continue</span>
-            <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">outlet_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;layers&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">]):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;skipping un-included layer </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="w"> </span><span class="n">outlet_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;layers&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;layers&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">layer_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;layers&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating DDB tables for </span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2"> into </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-            <span class="n">sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;CREATE TABLE </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> AS SELECT * FROM ST_Read(&#39;</span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2">&#39;);&quot;</span>    
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)))</span>
-    <span class="k">return</span> <span class="n">data_path</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;DROP TABLE IF EXISTS </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">; ;CREATE TABLE </span><span class="si">{</span><span class="n">layer</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> AS SELECT * FROM ST_Read(&#39;</span><span class="si">{</span><span class="n">layer_path</span><span class="si">}</span><span class="s2">&#39;);&quot;</span>
+            
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;executing SQL: </span><span class="si">{</span><span class="n">sql</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-52'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-52'>#</a>
+      </div>
+      <p>Query the DDB for an outlet.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">sql_query_duckdb</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-53'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-53'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">data_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span> <span class="o">/</span>  <span class="s2">&quot;atlas.db&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Querying DDB: </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;INSTALL spatial; LOAD spatial; &quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-54'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-54'>#</a>
+      </div>
+      <p>Query the DDB for an outlet.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">sql_query</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">return_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;csv&#39;</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-55'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-55'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">result_rows</span> <span class="o">=</span> <span class="n">sql_query_duckdb</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+
+    <span class="n">file_like</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">return_format</span> <span class="o">==</span> <span class="s1">&#39;json&#39;</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result_rows</span><span class="p">,</span> <span class="n">file_like</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">file_like</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">elif</span> <span class="n">return_format</span> <span class="o">==</span> <span class="s1">&#39;csv&#39;</span><span class="p">:</span>
+        
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">file_like</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-56'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-56'>#</a>
+      </div>
+      <p>writer.writerow(result_rows[0].keys())</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">result_rows</span><span class="p">:</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid return format: </span><span class="si">{</span><span class="n">return_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">file_like</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-57'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-57'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">make_attribution_html</span><span class="p">(</span><span class="n">atlas_config</span><span class="p">,</span> <span class="n">swale_config</span><span class="p">,</span> <span class="n">lc</span><span class="p">):</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">atlas_config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">swale_config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+
+
+    
+    <span class="n">download_uri</span> <span class="o">=</span> <span class="n">lc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;inpath_template&#39;</span><span class="p">,</span> <span class="s1">&#39;outpath_template&#39;</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outpath</span> <span class="o">+</span> <span class="s2">&quot;/attribution.html&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">&lt;html&gt;</span>
+<span class="s2">&lt;body&gt;</span>
+<span class="s2">&lt;h1&gt;</span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/h1&gt;</span>
+<span class="s2">&lt;p&gt;Description: </span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;attribution&#39;</span><span class="p">][</span><span class="s1">&#39;description&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">&lt;p&gt;About: </span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;attribution&#39;</span><span class="p">][</span><span class="s1">&#39;url&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">&lt;p&gt;Source: </span><span class="si">{</span><span class="n">download_uri</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">&lt;p&gt;License: </span><span class="si">{</span><span class="n">lc</span><span class="p">[</span><span class="s1">&#39;attribution&#39;</span><span class="p">][</span><span class="s1">&#39;license&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">&lt;/body&gt;</span>
+<span class="s2">&lt;/html&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-58'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-58'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">make_root_html</span><span class="p">(</span><span class="n">atlas_config</span><span class="p">):</span>
+    <span class="n">atlas_html</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&lt;HTML&gt;&lt;BODY&gt;&lt;CENTER&gt;&lt;h1&gt;Dataswales&lt;/h1&gt;&quot;</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;HR width=&#39;40%&#39;&gt;&lt;UL&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;&lt;LI&gt;&lt;A HREF=&#39;</span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/index.html&#39;&gt;</span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/A&gt;&lt;/LI&gt;&quot;</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">atlas_config</span><span class="p">[</span><span class="s1">&#39;dataswales&#39;</span><span class="p">]</span> <span class="p">]</span> <span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;&lt;/UL&gt;&quot;</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;h2&gt;Curation&lt;/h2&gt;&quot;</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;HR width=&#39;40%&#39;&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Refresh&#39;</span><span class="p">,</span> <span class="s1">&#39;Publish Version&#39;</span><span class="p">]</span> <span class="p">])</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;h2&gt;Tools and Interfaces&lt;/h2&gt;&quot;</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;HR width=&#39;40%&#39;&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Notebook&#39;</span><span class="p">,</span> <span class="s1">&#39;Pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;Tools&#39;</span><span class="p">]</span> <span class="p">])</span>
+    <span class="n">atlas_html</span> <span class="o">+=</span> <span class="s2">&quot;&lt;/BODY&gt;&lt;/HTML&gt;&quot;</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">atlas_config</span><span class="p">[</span><span class="s1">&#39;data_root&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/index.html&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">atlas_html</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-59'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-59'>#</a>
+      </div>
+      <p>Generate HTML for the console interface.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">make_console_html</span><span class="p">(</span><span class="n">config</span><span class="p">,</span>
+                     <span class="n">displayed_interfaces</span><span class="o">=</span><span class="p">[],</span> <span class="n">displayed_downloads</span><span class="o">=</span><span class="p">[],</span> <span class="n">displayed_inlets</span><span class="o">=</span><span class="p">[],</span> <span class="n">displayed_versions</span><span class="o">=</span><span class="p">[],</span>
+                      <span class="n">admin_controls</span><span class="o">=</span><span class="p">[],</span> <span class="n">console_type</span><span class="o">=</span><span class="s1">&#39;ADMINISTRATION&#39;</span><span class="p">,</span> <span class="n">use_cases</span><span class="o">=</span><span class="p">[]):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-60'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-60'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Making Console for </span><span class="si">{</span><span class="n">console_type</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-61'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-61'>#</a>
+      </div>
+      <p>Read the template file</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">template_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;../templates/console.html&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">template_path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-62'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-62'>#</a>
+      </div>
+      <p>Prepare the data for the template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;version_string&#39;</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;version_string&#39;</span><span class="p">,</span> <span class="s1">&#39;staging&#39;</span><span class="p">),</span>
+        <span class="s1">&#39;versions&#39;</span><span class="p">:</span> <span class="n">displayed_versions</span><span class="p">,</span>
+        <span class="s1">&#39;logo&#39;</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;logo&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+        <span class="s1">&#39;swaleName&#39;</span><span class="p">:</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;consoleType&#39;</span><span class="p">:</span> <span class="n">console_type</span><span class="p">,</span>
+        <span class="s1">&#39;interfaces&#39;</span><span class="p">:</span> <span class="n">displayed_interfaces</span><span class="p">,</span>
+        <span class="s1">&#39;downloads&#39;</span><span class="p">:</span> <span class="n">displayed_downloads</span><span class="p">,</span>
+        <span class="s1">&#39;useCases&#39;</span><span class="p">:</span> <span class="n">use_cases</span><span class="p">,</span>
+        <span class="s1">&#39;layers&#39;</span><span class="p">:</span> <span class="n">displayed_inlets</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-63'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-63'>#</a>
+      </div>
+      <p>Insert the data initialization script</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">script_tag</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;&lt;script&gt;initializePage(</span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s1">);&lt;/script&gt;&#39;</span>
+    <span class="n">html</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;/body&gt;&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">script_tag</span><span class="si">}</span><span class="s1">&lt;/body&gt;&#39;</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">html</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-64'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-64'>#</a>
+      </div>
+      <p>Generate HTML for the swale interface.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">make_swale_html</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_config</span><span class="p">,</span> <span class="n">store_materialized</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-65'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-65'>#</a>
+      </div>
+      <p>Get version string</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">version_string</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;version_string&#39;</span><span class="p">,</span> <span class="s1">&#39;staging&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-66'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-66'>#</a>
+      </div>
+      <p>Create output directory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">outpath</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created output directory: </span><span class="si">{</span><span class="n">outpath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-67'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-67'>#</a>
+      </div>
+      <p>Copy CSS</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">css_dir</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s1">&#39;css&#39;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating CSS dir: </span><span class="si">{</span><span class="n">css_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">css_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;cp&#39;</span><span class="p">,</span> <span class="s1">&#39;../templates/css/console.css&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">css_dir</span><span class="p">)])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-68'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-68'>#</a>
+      </div>
+      <p>Get interfaces and downloads based on access level</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">public_interfaces</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span> 
+        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;interface&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-69'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-69'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;access&rsquo;) == &lsquo;public&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+    
+    <span class="n">public_downloads</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span>
+        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;download&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-70'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-70'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;interaction&rsquo;) == &lsquo;download&rsquo; 
+and ac.get(&lsquo;access&rsquo;) == &lsquo;public&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+    
+    <span class="n">internal_interfaces</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span> 
+        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;interface&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-71'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-71'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;interaction&rsquo;) == &lsquo;interface&rsquo; 
+and ac.get(&lsquo;access&rsquo;) in (&lsquo;internal&rsquo;, &lsquo;public&rsquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+    
+    <span class="n">internal_downloads</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;download&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-72'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-72'>#</a>
+      </div>
+      <p>if ac.get(&lsquo;interaction&rsquo;) == &lsquo;download&rsquo; </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="ow">and</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-73'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-73'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;access&rsquo;) in (&lsquo;internal&rsquo;, &lsquo;public&rsquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+    
+    <span class="n">admin_interfaces</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span>
+        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;interface&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-74'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-74'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;interaction&rsquo;) == &lsquo;interface&rsquo; 
+and ac.get(&lsquo;access&rsquo;) in (&lsquo;admin&rsquo;, &lsquo;internal&rsquo;, &lsquo;public&rsquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+    
+    <span class="n">admin_downloads</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-75'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-75'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;interaction&rsquo;) == &lsquo;download&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;download&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-76'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-76'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;access&rsquo;) in (&lsquo;admin&rsquo;, &lsquo;internal&rsquo;, &lsquo;public&rsquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span>
+
+    <span class="n">admin_inlets</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">ac</span> <span class="k">for</span> <span class="n">ac</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">ac</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;inlet&#39;</span><span class="p">,</span> <span class="s1">&#39;eddy&#39;</span><span class="p">)</span>
+        <span class="ow">and</span> <span class="n">ac</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;config&#39;</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;interaction&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;interface&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-77'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-77'>#</a>
+      </div>
+      <p>and ac.get(&lsquo;interaction&rsquo;) == &lsquo;interface&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-78'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-78'>#</a>
+      </div>
+      <p>Define use cases</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">internal_usecases</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Firefighter&quot;</span><span class="p">,</span> <span class="s2">&quot;cases&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Download Avenza version&quot;</span><span class="p">,</span> <span class="s2">&quot;Share a QR Code for Avenza&quot;</span><span class="p">,</span> <span class="s2">&quot;Mark an Incident&quot;</span><span class="p">,</span> <span class="s2">&quot;Mark a POI&quot;</span><span class="p">]},</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;GIS Practitioner&quot;</span><span class="p">,</span> <span class="s2">&quot;cases&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Download Layer GeoJSON&quot;</span><span class="p">,</span> <span class="s2">&quot;Download GeoPKG&quot;</span><span class="p">,</span> <span class="s2">&quot;Add a layer as GeoJSON&quot;</span><span class="p">]},</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Administrator&quot;</span><span class="p">,</span> <span class="s2">&quot;cases&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Go to Admin interface&quot;</span><span class="p">,</span> <span class="s2">&quot;Switch Version&quot;</span><span class="p">]}</span>
+    <span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-79'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-79'>#</a>
+      </div>
+      <p>Generate admin view</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">admin_html</span> <span class="o">=</span> <span class="n">make_console_html</span><span class="p">(</span>
+        <span class="n">config</span><span class="p">,</span>
+        <span class="n">console_type</span><span class="o">=</span><span class="s1">&#39;ADMINISTRATION&#39;</span><span class="p">,</span>
+        <span class="n">displayed_interfaces</span><span class="o">=</span><span class="n">admin_interfaces</span><span class="p">,</span> 
+        <span class="n">displayed_downloads</span><span class="o">=</span><span class="n">admin_downloads</span><span class="p">,</span> 
+        <span class="n">displayed_inlets</span><span class="o">=</span><span class="n">admin_inlets</span><span class="p">,</span> 
+        <span class="n">displayed_versions</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;published&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="s1">&#39;version_string&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;versions&#39;</span><span class="p">,</span> <span class="p">[])],</span>
+        <span class="n">admin_controls</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">use_cases</span><span class="o">=</span><span class="p">[]</span>
+    <span class="p">)</span>
+    
+    <span class="n">admin_path</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s2">&quot;admin.html&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">admin_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">admin_html</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote admin view to: </span><span class="si">{</span><span class="n">admin_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-80'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-80'>#</a>
+      </div>
+      <p>Generate internal view</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">internal_html</span> <span class="o">=</span> <span class="n">make_console_html</span><span class="p">(</span>
+        <span class="n">config</span><span class="p">,</span>
+        <span class="n">console_type</span><span class="o">=</span><span class="s1">&#39;INTERNAL&#39;</span><span class="p">,</span>
+        <span class="n">displayed_interfaces</span><span class="o">=</span><span class="n">internal_interfaces</span><span class="p">,</span> 
+        <span class="n">displayed_downloads</span><span class="o">=</span><span class="n">internal_downloads</span><span class="p">,</span> 
+        <span class="n">displayed_inlets</span><span class="o">=</span><span class="p">[],</span> 
+        <span class="n">displayed_versions</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;published&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="s1">&#39;version_string&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;versions&#39;</span><span class="p">,</span> <span class="p">[])],</span>
+        <span class="n">admin_controls</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">use_cases</span><span class="o">=</span><span class="n">internal_usecases</span>
+    <span class="p">)</span>
+    
+    <span class="n">internal_path</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s2">&quot;internal.html&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">internal_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">internal_html</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote internal view to: </span><span class="si">{</span><span class="n">internal_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-81'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-81'>#</a>
+      </div>
+      <p>Generate public view</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">public_html</span> <span class="o">=</span> <span class="n">make_console_html</span><span class="p">(</span>
+        <span class="n">config</span><span class="p">,</span>
+        <span class="n">console_type</span><span class="o">=</span><span class="s1">&#39;PUBLIC&#39;</span><span class="p">,</span>
+        <span class="n">displayed_interfaces</span><span class="o">=</span><span class="n">public_interfaces</span><span class="p">,</span> 
+        <span class="n">displayed_downloads</span><span class="o">=</span><span class="n">public_downloads</span><span class="p">,</span> 
+        <span class="n">displayed_inlets</span><span class="o">=</span><span class="p">[],</span> 
+        <span class="n">displayed_versions</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">use_cases</span><span class="o">=</span><span class="n">internal_usecases</span><span class="p">,</span>
+        <span class="n">admin_controls</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;Internal&quot;</span><span class="p">,</span> <span class="s2">&quot;internal.html&quot;</span><span class="p">)]</span>
+    <span class="p">)</span>
+    
+    <span class="n">public_path</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s2">&quot;index.html&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">public_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">public_html</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote public view to: </span><span class="si">{</span><span class="n">public_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-82'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-82'>#</a>
+      </div>
+      <p>Generate HTML for all outlets.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_html</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-83'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-83'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-84'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-84'>#</a>
+      </div>
+      <p>Create HTML for each swale
+for swale in config.get(&lsquo;dataswales&rsquo;, []):</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">make_swale_html</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_config</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;html&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-85'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-85'>#</a>
+      </div>
+      <p>Generate HTML interface for SQL queries.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">outlet_sqlquery</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-86'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-86'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">outlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">outlet_name</span><span class="p">]</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;outlets&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">outlet_name</span>
+    <span class="n">outpath</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-87'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-87'>#</a>
+      </div>
+      <p>Create CSS and JS directories</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">css_dir</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s1">&#39;css&#39;</span>
+    <span class="n">js_dir</span> <span class="o">=</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s1">&#39;js&#39;</span>
+    <span class="n">css_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">js_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-88'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-88'>#</a>
+      </div>
+      <p>Get available tables from sqldb outlet</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">sqldb_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sqldb&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">available_tables</span> <span class="o">=</span> <span class="n">sqldb_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;layers&#39;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">tables_list</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">available_tables</span><span class="p">:</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">sql_query</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">outlet_name</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;SELECT column_name FROM information_schema.columns WHERE table_name = &#39;</span><span class="si">{</span><span class="n">table</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="n">columns_list</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;&lt;li&gt;</span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s1">&lt;/li&gt;&#39;</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
+        <span class="n">tables_list</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;&lt;li&gt;</span><span class="si">{</span><span class="n">table</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">columns_list</span><span class="si">}</span><span class="s1">&lt;/li&gt;</span><span class="se">\n</span><span class="s1">&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-89'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-89'>#</a>
+      </div>
+      <p>Read and process template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;../templates/sqlquery.html&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-90'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-90'>#</a>
+      </div>
+      <p>Replace placeholders</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">template</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{atlas_name}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+    <span class="n">template</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{tables_list}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">tables_list</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-91'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-91'>#</a>
+      </div>
+      <p>Write processed template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outpath</span> <span class="o">/</span> <span class="s1">&#39;index.html&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">template</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-92'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-92'>#</a>
+      </div>
+      <p>Copy CSS and JS files</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;cp&#39;</span><span class="p">,</span> <span class="s1">&#39;../templates/css/sqlquery.css&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">css_dir</span><span class="p">)])</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="s1">&#39;cp&#39;</span><span class="p">,</span> <span class="s1">&#39;../templates/js/sqlquery.js&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">js_dir</span><span class="p">)])</span>
+    
+    <span class="k">return</span> <span class="n">outpath</span> <span class="o">/</span> <span class="s1">&#39;index.html&#39;</span>
+   
+<span class="n">blah</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">OUTLET_MATERIALIZER = {</span>
+<span class="s2">    &#39;outlet_gpkg&#39;: outlet_gpkg,</span>
+<span class="s2">    &#39;tiff&#39;: outlet_tiff,</span>
+<span class="s2">    &#39;pdf&#39;: outlet_geopdf,</span>
+<span class="s2">    &#39;html&#39;: outlet_html,</span>
+<span class="s2">    &#39;gazetteer&#39;: outlet_gazetteer,</span>
+<span class="s2">    &#39;runbook&#39;: outlet_runbook,</span>
+<span class="s2">    &#39;webmap&#39;: outlet_webmap,</span>
+<span class="s2">    &#39;webmap_public&#39;: outlet_webmap,</span>
+<span class="s2">    &#39;webedit&#39;: outlet_webmap_edit,</span>
+<span class="s2">    &#39;sqlquery&#39;: outlet_sqlquery</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span>
 
 </pre></div>
     </div>

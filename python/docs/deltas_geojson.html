@@ -402,7 +402,11 @@ Returns:
                 <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">new_layer</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]),</span> <span class="n">outfile</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">InvalidDelta</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid action: </span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> 
-
+        <span class="n">delta_in_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">delta_out_path</span> <span class="o">=</span> <span class="n">delta_in_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;work&quot;</span> <span class="o">/</span> <span class="n">delta_in_path</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;moving consumed delta: </span><span class="si">{</span><span class="n">delta_in_path</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">delta_out_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">delta_in_path</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">delta_out_path</span><span class="p">)</span>
+        
     <span class="k">return</span> <span class="n">geojson</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">layer_filepath</span><span class="p">))</span>
 
 </pre></div>

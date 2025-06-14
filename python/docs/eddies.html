@@ -32,7 +32,8 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">osgeo</span><span class="w"> </span><span class="kn">import</span> <span class="n">gdal</span><span class="p">,</span> <span class="n">ogr</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">versioning</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">utils</span></pre></div>
+<span class="kn">import</span><span class="w"> </span><span class="nn">utils</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">outlets</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -80,7 +81,7 @@
     <div class='code'>
       <div class="highlight"><pre>    <span class="n">eddy</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">eddy_name</span><span class="p">]</span>
     <span class="n">in_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;in_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">eddy</span><span class="p">[</span><span class="s2">&quot;in_layer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">.tiff&#39;</span>
-    <span class="n">out_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">eddy</span><span class="p">[</span><span class="s2">&quot;out_layer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">.geojson&#39;</span>
+    <span class="n">output_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">eddy</span><span class="p">[</span><span class="s2">&quot;out_layer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">.geojson&#39;</span><span class="p">)</span>
     <span class="n">interval</span> <span class="o">=</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;interval&#39;</span><span class="p">]</span></pre></div>
     </div>
   </div>
@@ -93,7 +94,8 @@
       <p>Open the DEM dataset</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">dem_ds</span> <span class="o">=</span> <span class="n">gdal</span><span class="o">.</span><span class="n">Open</span><span class="p">(</span><span class="n">dem_path</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">dem_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">in_path</span><span class="p">)</span>
+    <span class="n">dem_ds</span> <span class="o">=</span> <span class="n">gdal</span><span class="o">.</span><span class="n">Open</span><span class="p">(</span><span class="n">dem_path</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">dem_ds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not open DEM file: </span><span class="si">{</span><span class="n">dem_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
     </div>
@@ -339,11 +341,223 @@
       <div class="highlight"><pre>    <span class="n">ds</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">out_ds</span> <span class="o">=</span> <span class="kc">None</span>
     
-    <span class="k">return</span> <span class="n">out_path</span>
+    <span class="k">return</span> <span class="n">out_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">centroid_gdal</span><span class="p">(</span><span class="n">config</span><span class="p">:</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">eddy_name</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span>
+    <span class="n">eddy</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">eddy_name</span><span class="p">]</span>
+    <span class="n">in_layer</span> <span class="o">=</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;in_layer&#39;</span><span class="p">]</span>
+    <span class="n">out_layer</span> <span class="o">=</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span>
+    
+
+    <span class="n">in_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;in_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">eddy</span><span class="p">[</span><span class="s2">&quot;in_layer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">.geojson&#39;</span>
+    <span class="n">out_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">eddy</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">eddy</span><span class="p">[</span><span class="s2">&quot;out_layer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">.geojson&#39;</span>
+    
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">gdal</span><span class="o">.</span><span class="n">Open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">in_path</span><span class="p">))</span>
+    <span class="n">fc</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">GetLayer</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">fc</span><span class="p">:</span>
+        <span class="n">geom</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">GetGeometryRef</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">geom</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">centroid</span> <span class="o">=</span> <span class="n">geom</span><span class="o">.</span><span class="n">Centroid</span><span class="p">()</span>
+            <span class="n">feature</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="s1">&#39;centroid&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">centroid</span><span class="p">)</span>
+    
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">out_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span><span class="w"> </span><span class="nf">delta_annotate_spatial_duckdb</span><span class="p">(</span><span class="n">config</span><span class="p">:</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">layer_name</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">delta_name</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">anno_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;deltas&quot;</span><span class="p">,</span> <span class="n">updated_properties</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>in_layer = eddy[&lsquo;in_layer&rsquo;]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>eddy = config[&lsquo;assets&rsquo;][eddy_name]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">if</span> <span class="n">anno_type</span> <span class="o">==</span> <span class="s2">&quot;deltas&quot;</span><span class="p">:</span>
+        <span class="n">anno_in_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">anno_type</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">delta_name</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+    <span class="k">elif</span> <span class="n">anno_type</span> <span class="o">==</span> <span class="s2">&quot;layers&quot;</span><span class="p">:</span>
+        <span class="n">anno_in_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">anno_type</span><span class="p">)</span> <span class="o">/</span> <span class="n">delta_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">delta_name</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown annotation type: </span><span class="si">{</span><span class="n">anno_type</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+    <span class="n">feat_in_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;layers&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="n">layer_name</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2">.geojson&quot;</span>
+
+    <span class="n">anno_out_path</span> <span class="o">=</span> <span class="n">anno_in_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;work&quot;</span> <span class="o">/</span>  <span class="n">anno_in_path</span><span class="o">.</span><span class="n">name</span>
+    
+    <span class="n">anno_prefix</span> <span class="o">=</span> <span class="s2">&quot;anno_&quot;</span>
+    <span class="n">anno_prefix_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">anno_prefix</span><span class="p">)</span>
+    <span class="n">feat_prefix</span> <span class="o">=</span> <span class="s2">&quot;feat_&quot;</span>
+    <span class="n">feat_prefix_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">feat_prefix</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>get duckdb</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>make temp table for delta</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;INSTALL spatial; LOAD spatial; &quot;</span><span class="p">)</span>
+    <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span> <span class="sa">f</span><span class="s2">&quot;DROP TABLE IF EXISTS anno; CREATE TABLE anno AS SELECT COLUMNS(&#39;.*&#39;) AS </span><span class="se">\&quot;</span><span class="s2">anno_</span><span class="se">\\</span><span class="s2">0</span><span class="se">\&quot;</span><span class="s2"> FROM ST_Read(&#39;</span><span class="si">{</span><span class="n">anno_in_path</span><span class="si">}</span><span class="s2">&#39;);&quot;</span><span class="p">)</span>
+    <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span> <span class="sa">f</span><span class="s2">&quot;DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS(&#39;.*&#39;) AS </span><span class="se">\&quot;</span><span class="s2">feat_</span><span class="se">\\</span><span class="s2">0</span><span class="se">\&quot;</span><span class="s2"> FROM ST_Read(&#39;</span><span class="si">{</span><span class="n">feat_in_path</span><span class="si">}</span><span class="s2">&#39;);&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>join delta to layers</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">res</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">SELECT * EXCLUDE (anno_geom, feat_geom), </span>
+<span class="s2">    ST_AsGeoJSON(feat_geom) AS geometry,</span>
+<span class="s2">    FROM anno LEFT JOIN feat </span>
+<span class="s2">ON ST_Intersects(anno_geom, feat_geom);</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>update layer features with delta feature properties</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">matching_features</span> <span class="o">=</span> <span class="p">[</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">row</span><span class="p">))</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]</span> 
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DID Anno join!  </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">matching_features</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>rewrite featuers with new attributes added</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">features</span> <span class="o">=</span> <span class="p">[]</span>
+    
+
+    <span class="k">for</span> <span class="n">mf</span> <span class="ow">in</span> <span class="n">matching_features</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;about to assign geomtry from: </span><span class="si">{</span><span class="n">mf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;geometry&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;geometry&#39;</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping empty geometry for: </span><span class="si">{</span><span class="n">mf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">Feature</span><span class="p">(</span><span class="n">geometry</span><span class="o">=</span><span class="n">geojson</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">mf</span><span class="p">[</span><span class="s1">&#39;geometry&#39;</span><span class="p">]))</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span>	<span class="ow">in</span> <span class="p">(</span> <span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="n">feat_prefix_len</span><span class="p">:],</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">mf</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">feat_prefix</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;feat_geom&#39;</span><span class="p">,</span> <span class="s1">&#39;anno_geom&#39;</span><span class="p">]</span> <span class="p">):</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span>	<span class="ow">in</span> <span class="p">(</span> <span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="n">anno_prefix_len</span><span class="p">:],</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">mf</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">anno_prefix</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span> <span class="s1">&#39;feat_geom&#39;</span><span class="p">,</span> <span class="s1">&#39;anno_geom&#39;</span><span class="p">]</span> <span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">updated_properties</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">updated_properties</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">v</span><span class="p">:</span>
+                    <span class="n">f</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="n">features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="n">feature_collection</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+    <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">feat_in_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;moving consumed delta anno: </span><span class="si">{</span><span class="n">anno_in_path</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">anno_out_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">anno_in_path</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">anno_out_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">feat_in_path</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>write out dlayer</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>delete temp table</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">database</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;database&#39;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>Do intersection with parcels</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    SELECT </span>
+<span class="s2">        a.id,</span>
+<span class="s2">        b.id as parcel_id</span>
+<span class="s2">    FROM </span><span class="si">{</span><span class="n">in_layer</span><span class="si">}</span><span class="s2"> a</span>
+<span class="s2">    &quot;&quot;&quot;</span>
 
 
 <span class="n">asset_methods</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;generate_contours&quot;</span><span class="p">:</span> <span class="n">contours_gdal</span><span class="p">,</span>
+    <span class="s2">&quot;gdal_contours&quot;</span><span class="p">:</span> <span class="n">contours_gdal</span><span class="p">,</span>
     <span class="s1">&#39;derived_hillshade&#39;</span><span class="p">:</span> <span class="n">hillshade_gdal</span><span class="p">}</span>
 
 </pre></div>

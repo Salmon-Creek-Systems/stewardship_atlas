@@ -53,14 +53,19 @@ The module includes the following main functions:</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span>
 
 <span class="n">DEFAULT_LAYERS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;regions&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">]},</span>
     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;elevation&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;raster&quot;</span><span class="p">},</span>
     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;contours&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">80</span><span class="p">]},</span>
     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;raster&quot;</span><span class="p">},</span>
     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">55</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;internal_roads&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">155</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
     <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;linestring&quot;</span><span class="p">,</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">200</span><span class="p">]},</span>
-    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;ponds&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">]},</span>
-    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="s2">&quot;helipad.png&quot;</span><span class="p">},</span>
-    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;buildings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]}</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;milemarkers&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="s2">&quot;milemarker.png&quot;</span><span class="p">,</span> <span class="s2">&quot;icon-size&quot;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="s2">&quot;helipad.png&quot;</span><span class="p">,</span> <span class="s1">&#39;icon-size&#39;</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;hydrants&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="s2">&quot;hydrant.png&quot;</span><span class="p">,</span> <span class="s2">&quot;icon-size&quot;</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;buildings&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;fill_color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">],</span> <span class="s2">&quot;add_labels&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;addresses&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]},</span>
+    <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;parcels&quot;</span><span class="p">,</span> <span class="s2">&quot;geometry_type&quot;</span><span class="p">:</span> <span class="s2">&quot;polygon&quot;</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span> <span class="s2">&quot;fill_color&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]}</span>
 <span class="p">]</span>
 
 
@@ -94,12 +99,33 @@ The module includes the following main functions:</p>
             <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span>
             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;derived_hillshade&quot;</span>
         <span class="p">},</span>
-        <span class="s2">&quot;public_roads&quot;</span> <span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;public_buildings&quot;</span> <span class="p">:</span> <span class="p">{</span>
         <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;overture_roads&quot;</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;buildings&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;overture_buildings&quot;</span>
         <span class="p">},</span>
-        <span class="s2">&quot;public_creeks&quot;</span> <span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;public_addresses&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;parcels&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;overture_addresses&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;oa_parcels&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;parcels&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;local_parcels&quot;</span>
+    <span class="p">},</span>
+        <span class="s2">&quot;public_roads&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;overture_roads&quot;</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;internal_roads&quot;</span> <span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;internal_roads&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;internal_roads&quot;</span>
+        <span class="p">},</span>
+
+    <span class="s2">&quot;public_creeks&quot;</span> <span class="p">:</span> <span class="p">{</span>
             <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
             <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span>
             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;nhd_creeks&quot;</span>
@@ -113,19 +139,70 @@ The module includes the following main functions:</p>
             <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
             <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;basemap&quot;</span><span class="p">,</span>
             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;opentopo_dem&quot;</span>
-        <span class="p">},</span>    
-        <span class="s2">&quot;webmap&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="p">},</span>
+    <span class="s2">&quot;local_helilandings&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;local_helilandings&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;local_hydrants&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;hydrants&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;local_hydrants&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;local_milemarkers&quot;</span> <span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;out_layer&quot;</span><span class="p">:</span> <span class="s2">&quot;milemarkers&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;local_milemarkers&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;webmap&quot;</span> <span class="p">:</span> <span class="p">{</span>
             <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;in_layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;in_layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;parcels&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;internal_roads&quot;</span><span class="p">,</span> <span class="s2">&quot;milemarkers&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;buildings&quot;</span><span class="p">,</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">,</span> <span class="s2">&quot;hydrants&quot;</span><span class="p">],</span>
             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;webmap&quot;</span>
         <span class="p">},</span>
-         <span class="s2">&quot;runbook&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;runbook&quot;</span><span class="p">:</span> <span class="p">{</span>
             <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
             <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;runbook&quot;</span><span class="p">,</span>
             <span class="s2">&quot;in_layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">,</span> <span class="s2">&quot;helilandings&quot;</span><span class="p">],</span>
-            <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;runbook&quot;</span><span class="p">}</span>
-           
+             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;runbook&quot;</span><span class="p">,</span>
+             <span class="s2">&quot;regions&quot;</span> <span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;east&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">121.19978063408502</span><span class="p">,</span>
+                    <span class="s2">&quot;west&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">121.20391109005016</span><span class="p">,</span>
+                    <span class="s2">&quot;south&quot;</span><span class="p">:</span> <span class="mf">39.23863749098538</span><span class="p">,</span>
+                    <span class="s2">&quot;north&quot;</span><span class="p">:</span> <span class="mf">39.24416744687048</span><span class="p">},</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;RockLoop&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="s2">&quot;Double loop with Ginger and big rocks.&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;vectors&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s2">&quot;raster&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="s2">&quot;Hwy20 to the County Lnie&quot;</span><span class="p">},</span>
+                <span class="p">{</span><span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;east&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">121.19978063408502</span><span class="p">,</span>
+                    <span class="s2">&quot;west&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">121.20391109005016</span><span class="p">,</span>
+                    <span class="s2">&quot;south&quot;</span><span class="p">:</span> <span class="mf">39.23863749098538</span><span class="p">,</span>
+                    <span class="s2">&quot;north&quot;</span><span class="p">:</span> <span class="mf">39.24416744687048</span><span class="p">},</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;GolfCourses&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="s2">&quot;Golf Courses&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;vectors&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s2">&quot;raster&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="s2">&quot;Golf Courses&quot;</span><span class="p">}]</span>
+
+    <span class="p">},</span>
+    <span class="s2">&quot;html&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;html&quot;</span><span class="p">,</span>
+             <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;static_html&quot;</span><span class="p">},</span>
+    <span class="s2">&quot;sqldb&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;sqldb&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;basemap&quot;</span><span class="p">,</span> <span class="s2">&quot;roads&quot;</span><span class="p">,</span> <span class="s2">&quot;creeks&quot;</span><span class="p">]</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;sqlquery&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;outlet&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;sqlquery&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;config_def&quot;</span><span class="p">:</span> <span class="s2">&quot;sqlquery&quot;</span>
     <span class="p">}</span>
+<span class="p">}</span>
 
 <span class="n">DEFAULT_DATA_ROOT</span> <span class="o">=</span> <span class="s2">&quot;/root/swales&quot;</span>
 
@@ -193,7 +270,8 @@ The module includes the following main functions:</p>
     
     <span class="n">inlets_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;../configuration/inlets_config.json&quot;</span><span class="p">))</span>
     <span class="k">for</span> <span class="n">asset_name</span><span class="p">,</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">inlets_config</span><span class="p">[</span><span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config_def&#39;</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="s1">&#39;config_def&#39;</span> <span class="ow">in</span> <span class="n">asset</span><span class="p">:</span>
+            <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">inlets_config</span><span class="p">[</span><span class="n">asset</span><span class="p">[</span><span class="s1">&#39;config_def&#39;</span><span class="p">]]</span>
         <span class="k">if</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;inlet&#39;</span><span class="p">:</span>
             <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">&#39;staging&#39;</span> <span class="o">/</span> <span class="s1">&#39;deltas&#39;</span> <span class="o">/</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;out_layer&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="s1">&#39;work&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">elif</span> <span class="n">asset</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;outlet&#39;</span><span class="p">:</span>
