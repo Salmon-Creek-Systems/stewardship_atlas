@@ -431,6 +431,13 @@ def regions_from_geojson(path):
     return regions
 
 def outlet_runbook( config, outlet_name, skips=[]):
+    """
+    For a swale's "regions" layer, generate a runbook. This comprises a series of pages, one per region, linked by the "neighbor" array Property.
+    The HTML runbook is a simple HTML page with a list of links to the region pages, and a link to the home page. 
+    The PDF runbook is a simple PDF page with a list of links to the region pages, and a link to the home page.
+    """
+
+
     outlet_config = config['assets'][outlet_name]
     
     #regions = outlet_config['regions']
@@ -448,29 +455,34 @@ def outlet_runbook( config, outlet_name, skips=[]):
         f.write(index_html)
     
     html_template = """
-<html></body><table><tr><TD><A HREF="../runbook/"><img src='page_{region_name_lower}_minimap.png' width=400/></A></TD></td>
+<html></body><table><tr><TD><A HREF="../runbook/"><img src='region_{name}_minimap.png' width=400/></A></TD></td>
 <td>
 <center><h1>{caption}</h1></center>
 <pre>{map_collar}</pre>
 <center><p>{text}</p><i>Click map to zoom, advance to previous/next page in RunBook, or "Home" to return to menu.</i><hr>
-(<a href='{swale_name}_page_{prev_region}.html'>prev</a>) (<a href='{swale_name}_page_{next_region}.html'>next</a>)
+{neighbor_links_html}
 <a href="..">HOME</a></center></td></tr></TABLE>
-<a href='page_{name}.png'><img src='page_{name}.png' width=1200/></a></center></body></html>"""
+<a href='region_{name}.png'><img src='region_{name}.png' width=1200/></a></center></body></html>"""
     # outpath_template = outlet_config['outpath_template'].format(**swale_config)
+    #    (<a href='{swale_name}_page_{prev_region}.html'>prev</a>) (<a href='{swale_name}_page_{next_region}.html'>next</a>)
+    # 
     gaz_html = []
     md = f"# {swale_name} RunBook\n\n"
 
     for i,r in enumerate(regions):
-        r['next_region']=(i+1) % len(regions)
-        r['prev_region']=(i-1) % len(regions)
+        # r['next_region']=(i+1) % len(regions)
+        # r['prev_region']=(i-1) % len(regions)
+        nbr_links = [f"<a href='{nbr_name}.html'>{nbr_dir}</a>" for nbr_dir, nbr_name in r['neighbors'].items()]
+        nbr_links_html = " | ".join(nbr_links)
+
         map_collar = "None" #build_map_collar(config, swale_name, r['bbox'], layers = outlet_config['layers'])
         gaz_html.append(
             #(outlet_config['config']['outpath_template'].format(
             #    i=i,region_name=r['name'],**config).lower(),
-            (outlet_dir / f"{r['name'].lower()}.html",
-            html_template.format(i=i, region_name=r['name'], region_name_lower=r['name'].lower(),
+            (outlet_dir / f"{r['name']}.html",
+            html_template.format(i=i, region_name=r['name'], 
                                   swale_name=swale_name, map_collar=map_collar, **r)))
-        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/page_{r['name']}.png)\n{r['caption']}\n\n{r['text']}\n\n"
+        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/region_{r['name']}.png)\n{r['caption']}\n\n{r['text']}\n\n"
     with open(f"{outlet_dir}/dataswale.md", "w") as f:
         f.write(md)
     if 'region_content' not in skips:
@@ -480,7 +492,9 @@ def outlet_runbook( config, outlet_name, skips=[]):
     return regions
 
 def outlet_sql_duckdb(config: dict, outlet_name: str):
-    """Create DDB tables for SQL queries."""
+    """Create static DDB tables for SQL queries.
+    
+    """
     outlet_config = config['assets'][outlet_name]
     data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
     with duckdb.connect(str(data_path)) as conn:
