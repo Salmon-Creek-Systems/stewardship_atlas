@@ -31,10 +31,10 @@ DEFAULT_LAYERS = [
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
-     {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True},
+     {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True, "access": [ "admin"]},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
-    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1},
+    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1, "access": [ "internal", "admin"]},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05},
     {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": True},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
@@ -131,12 +131,14 @@ DEFAULT_ASSETS = {
     "webmap" : {
             "type": "outlet",
             "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
-            "config_def": "webmap"
+            "config_def": "webmap",
+            "access": ["admin"]
         },
     "runbook": {
             "type": "outlet",
             "name": "runbook",
             "in_layers": ["basemap", "roads", "creeks", "helilandings"],
+            "access": ["internal", "admin"],
              "config_def": "runbook",
              "regions" : [
                 {"bbox": {
@@ -173,13 +175,44 @@ DEFAULT_ASSETS = {
     "sqlquery": {
         "type": "outlet",
         "name": "sqlquery",
-        "config_def": "sqlquery"
+        "config_def": "sqlquery",
+        "access": ["admin"]
     }
 }
 
 DEFAULT_DATA_ROOT = "/root/swales"
 
 DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
+
+
+def add_htpasswds(config, path, access):
+    """Add htpasswd entries for users with access to a directory.
+    
+    Args:
+        path: Path to the directory to protect
+        access: List of access levels (e.g., ['admin', 'internal'])
+    """
+    htpasswd_file = path / '.htpasswd'
+    roles_path = Path(config['data_root']) / "roles" / f'{config['name']}_roles.json'
+
+    # Check if password file already exists
+    if not htpasswd_file.exists():
+        os.system(f"htpasswd -c {htpasswd_file}")
+        logger.info(f"Password file created at {htpasswd_file}")
+        return
+    
+    # Read roles from roles.json file
+    with open(roles_path, 'r') as f:
+        roles = json.load(f)
+  
+    # Add users based on access levels
+    for role in roles:
+        if role in access:
+            role_passwd = roles[role]
+            os.system(f"htpasswd {htpasswd_file} {role} {role_passwd}")
+            logger.info(f"Added {role} user  to {htpasswd_file}")
+
+
 def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
            layers: List[Dict[str, Any]] = DEFAULT_LAYERS, 
            assets: Dict[str, Any] = DEFAULT_ASSETS, 
@@ -218,11 +251,19 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             asset['config'] = inlets_config[asset['config_def']]
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
+            if asset.get('access',['public']).count('public') == 0:
+                # add htpasswrd to new directory
+                add_htpasswds(p / 'staging' / 'deltas' / asset['out_layer'], asset['accsss'])
         elif asset['type'] == 'outlet':
             (p / 'staging' / 'outlets' / asset_name / 'work' ).mkdir(parents=True, exist_ok=True)
+            if asset.get('access',['public']).count('public') == 0:
+                # add htpasswrd to new directory
+                add_htpasswds(p / 'staging' / 'outlets' / asset_name, asset['accsss'])
     for layer in layers:
         (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
-
+        if layer.get('access',['public']).count('public') == 0:
+            # add htpasswrd to new directory
+            add_htpasswds(p / 'staging' / 'layers' / layer['name'], layer['access'])
 
          
     logger.info(f"built a config: {config}")

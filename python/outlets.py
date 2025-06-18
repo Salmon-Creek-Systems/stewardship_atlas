@@ -631,6 +631,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('config',{}).get('interaction') == 'interface' 
+        and ac.get('access',['public']).count('public') > 0
         # and ac.get('access') == 'public'
     ]
     
@@ -638,6 +639,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet'
         and ac.get('config',{}).get('interaction') == 'download' 
+        and ac.get('access',['public']).count('public') > 0
         # and ac.get('interaction') == 'download' 
         # and ac.get('access') == 'public'
     ]
@@ -646,6 +648,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 
         and ac.get('config',{}).get('interaction') == 'interface' 
+        and ac.get('access',['public']).count('internal') > 0
         #and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('internal', 'public')
     ]
@@ -653,6 +656,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     internal_downloads = [
         ac for ac in config['assets'].values()
         if ac.get('config',{}).get('interaction') == 'download' 
+        and ac.get('access',['public']).count('internal') > 0
         #if ac.get('interaction') == 'download' 
         and ac['type'] == 'outlet'  
         # and ac.get('access') in ('internal', 'public')
@@ -662,6 +666,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet'
         and ac.get('config',{}).get('interaction') == 'interface'         
+        and ac.get('access',['public']).count('admin') > 0
         # and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
@@ -671,13 +676,15 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         if ac['type'] == 'outlet' 
         # and ac.get('interaction') == 'download'
         and ac.get('config',{}).get('interaction') == 'download' 
+        and ac.get('access',['public']).count('internal') > 0
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
     admin_inlets = [
         ac for ac in config['assets'].values() 
         if ac['type'] in ('inlet', 'eddy')
-        and ac.get('config',{}).get('interaction') == 'interface'         
+        and ac.get('config',{}).get('interaction') == 'interface'   
+        and ac.get('access',['public']).count('admin') > 0      
         # and ac.get('interaction') == 'interface'
     ]
     
