@@ -54,7 +54,7 @@
         "asset_type": "inlet", 
         "interaction": "download",
         "fetch_type": "local_ogr",
-	"geometry": "dataswale",
+		"geometry": "dataswale",
         "data_type": "geojson",
         "feature_type": "polygon",
 		"inpath_template": "mendocino_parcels.geojson",
@@ -65,17 +65,17 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
-        "internal_roads": {
-        "name": "milemarkers",
+    "internal_roads": {
+        "name": "internal_roads",
         "asset_type": "inlet", 
         "interaction": "download",
         "fetch_type": "local_ogr",
-	"geometry": "dataswale",
+		"geometry": "dataswale",
         "data_type": "geojson",
         "feature_type": "line",
-	    "inpath_template": "usal_road_6_11.geojson",
+	    "inpath_template": "westport_lidar_roads.geojson",
 	    "alterations": {
-		"vector_width": {"default": 5}
+			"vector_width": {"default": 5}
 	    },
         "attribution": {
             "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
@@ -152,12 +152,28 @@
     "local_hydrants": {
         "name": "hydrants",
         "asset_type": "inlet", 
+		"symbol": "extra/half-circle",
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+		"inpath_template": "westport_hydrants.geojson",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+	"local_turnouts": {
+        "name": "turnouts",
+        "asset_type": "inlet", 
 	"symbol": "extra/half-circle",
         "interaction": "interface",
         "fetch_type": "local_ogr",
         "data_type": "geojson",
         "feature_type": "point",
-	"inpath_template": "westport_hydrants.geojson",
+	"inpath_template": "westport_turnouts.geojson",
         "attribution": {
             "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
             "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",

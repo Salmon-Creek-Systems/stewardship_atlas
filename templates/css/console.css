@@ -58,4 +58,10 @@ a {
 
 a:hover {
     text-decoration: underline;
+}
+
+/* Layer list styling - first link (layer name) */
+#layers-list li a:first-child {
+    font-weight: bold;
+    font-size: 1.2em;
 } 

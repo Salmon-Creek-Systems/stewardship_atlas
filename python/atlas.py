@@ -31,7 +31,8 @@ DEFAULT_LAYERS = [
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True, "interaction": "interface"},
-     {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True, "access": [ "admin"]},
+    {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True, "access": [ "admin"]},
+    {"name": "turnouts", "geometry_type": "point", "color": [50, 255, 100], "add_labels": False, "access": [ "admin"]},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200], "interaction": "interface"},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1, "access": [ "internal", "admin"], "interaction": "interface"},
@@ -119,11 +120,16 @@ DEFAULT_ASSETS = {
         "out_layer": "helilandings",
         "config_def": "local_helilandings"
     },
-    "local_hydrants" : {
-        "type": "inlet",
-        "out_layer": "hydrants",
-        "config_def": "local_hydrants"
-    },
+        "local_hydrants" : {
+            "type": "inlet",
+            "out_layer": "hydrants",
+            "config_def": "local_hydrants"
+        },
+        "local_turnouts" : {
+            "type": "inlet",
+            "out_layer": "turnouts",
+            "config_def": "local_turnouts"
+        },
     "local_milemarkers" : {
         "type": "inlet",
         "out_layer": "milemarkers",
@@ -131,7 +137,13 @@ DEFAULT_ASSETS = {
     },
     "webmap" : {
             "type": "outlet",
-            "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
+            "in_layers": ["basemap", "parcels", "roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
+            "config_def": "webmap",
+            "access": ["internal", "admin"]
+        },
+    "internal_webmap" : {
+            "type": "outlet",
+            "in_layers": ["basemap", "parcels", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap",
             "access": ["internal", "admin"]
         },
