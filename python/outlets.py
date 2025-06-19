@@ -617,11 +617,11 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     
     # Create output directory
     outpath = versioning.atlas_path(config, "outlets") / outlet_config['name']
-    outpath.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Created output directory: {outpath}")
+    #outpath.mkdir(parents=True, exist_ok=True)
+    #logger.info(f"Created output directory: {outpath}")
     
     # Copy CSS
-    css_dir = outpath / 'css'
+    css_dir =  versioning.atlas_path(config, "local") / 'css'
     logger.info(f"Creating CSS dir: {css_dir}")
     css_dir.mkdir(exist_ok=True)
     subprocess.run(['cp', '../templates/css/console.css', str(css_dir)])
@@ -680,14 +680,13 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
-    admin_inlets = [
-        ac for ac in config['assets'].values() 
-        if ac['type'] in ('inlet', 'eddy')
-        and ac.get('config',{}).get('interaction') == 'interface'   
-        and ac.get('access',['public']).count('admin') > 0      
+    admin_layers = [
+        lc for lc in config['dataswale']['layers'] 
+        if lc.get('interaction','') == 'interface'
+        # and ac.get('access',['public']).count('admin') > 0      
         # and ac.get('interaction') == 'interface'
     ]
-    
+    logger.info(f"Generated Admin Layers: {admin_layers}")
     # Define use cases
     internal_usecases = [
         {"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
@@ -701,14 +700,15 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         console_type='ADMINISTRATION',
         displayed_interfaces=admin_interfaces, 
         displayed_downloads=admin_downloads, 
-        displayed_inlets=admin_inlets, 
+        displayed_inlets=admin_layers, 
         displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
         admin_controls=[],
         use_cases=[]
     )
     
-    admin_path = outpath / "admin.html"
-    with open(admin_path, "w") as f:
+    admin_path = outpath / "admin"
+    admin_path.mkdir(parents=True, exist_ok=True)
+    with open(admin_path / "index.html", "w") as f:
         f.write(admin_html)
     logger.debug(f"Wrote admin view to: {admin_path}")
 
@@ -724,8 +724,9 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         use_cases=internal_usecases
     )
     
-    internal_path = outpath / "internal.html"
-    with open(internal_path, "w") as f:
+    internal_path = outpath / "internal" 
+    internal_path.mkdir(parents=True, exist_ok=True)
+    with open(internal_path/ "index.html", "w") as f:
         f.write(internal_html)
     logger.debug(f"Wrote internal view to: {internal_path}")
         
@@ -741,8 +742,9 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         admin_controls=[("Internal", "internal.html")]
     )
     
-    public_path = outpath / "index.html"
-    with open(public_path, "w") as f:
+    public_path = outpath / "public"
+    public_path.mkdir(parents=True, exist_ok=True)
+    with open(public_path / "index.html", "w") as f:
         f.write(public_html)
     logger.debug(f"Wrote public view to: {public_path}")
 

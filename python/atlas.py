@@ -30,13 +30,13 @@ DEFAULT_LAYERS = [
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
-    {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True},
+    {"name": "roads", "geometry_type": "linestring", "color": [100, 55, 50], "add_labels": True, "interaction": "interface"},
      {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True, "access": [ "admin"]},
-    {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200]},
+    {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200], "interaction": "interface"},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
-    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1, "access": [ "internal", "admin"]},
-    {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05},
-    {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": True},
+    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1, "access": [ "internal", "admin"], "interaction": "interface"},
+    {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05, "interaction": "interface"},
+    {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": True, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
 ]
@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
     "data_root": "/root/swales",
     "name": "Nameless",
     "description": "Underscripted",
+    "logo": "/local/scs-smallgrass1.png",
     "dataswale": {
         "crs": "EPSG:4269",     
         "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
@@ -132,7 +133,7 @@ DEFAULT_ASSETS = {
             "type": "outlet",
             "in_layers": ["basemap", "parcels", "roads", "internal_roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap",
-            "access": ["admin"]
+            "access": ["internal", "admin"]
         },
     "runbook": {
             "type": "outlet",
@@ -193,23 +194,24 @@ def add_htpasswds(config, path, access):
         access: List of access levels (e.g., ['admin', 'internal'])
     """
     htpasswd_file = path / '.htpasswd'
-    roles_path = Path(config['data_root']) / "roles" / f'{config['name']}_roles.json'
+    roles_path = Path(config['data_root']) / "roles" / f"{config['name']}_roles.json"
 
-    # Check if password file already exists
-    if not htpasswd_file.exists():
-        os.system(f"htpasswd -c {htpasswd_file}")
-        logger.info(f"Password file created at {htpasswd_file}")
-        return
     
     # Read roles from roles.json file
     with open(roles_path, 'r') as f:
         roles = json.load(f)
   
     # Add users based on access levels
-    for role in roles:
+    for role, role_passwd in roles.items():
+        logger.info(f"checking for {role} in {access}")
         if role in access:
-            role_passwd = roles[role]
-            os.system(f"htpasswd {htpasswd_file} {role} {role_passwd}")
+            if not htpasswd_file.exists():
+                cli_str = f"htpasswd -bc {htpasswd_file} {role} {role_passwd}"
+            else:
+                cli_str = f"htpasswd -b {htpasswd_file} {role} {role_passwd}"
+
+            logger.info(cli_str)
+            os.system(cli_str)
             logger.info(f"Added {role} user  to {htpasswd_file}")
 
 
@@ -253,17 +255,17 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
             if asset.get('access',['public']).count('public') == 0:
                 # add htpasswrd to new directory
-                add_htpasswds(p / 'staging' / 'deltas' / asset['out_layer'], asset['accsss'])
+                add_htpasswds(config, p / 'staging' / 'deltas' / asset['out_layer'], asset['accsss'])
         elif asset['type'] == 'outlet':
             (p / 'staging' / 'outlets' / asset_name / 'work' ).mkdir(parents=True, exist_ok=True)
             if asset.get('access',['public']).count('public') == 0:
                 # add htpasswrd to new directory
-                add_htpasswds(p / 'staging' / 'outlets' / asset_name, asset['accsss'])
+                add_htpasswds(config,p / 'staging' / 'outlets' / asset_name, asset['access'])
     for layer in layers:
         (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
         if layer.get('access',['public']).count('public') == 0:
             # add htpasswrd to new directory
-            add_htpasswds(p / 'staging' / 'layers' / layer['name'], layer['access'])
+            add_htpasswds(config, p / 'staging' / 'layers' / layer['name'], layer['access'])
 
          
     logger.info(f"built a config: {config}")
