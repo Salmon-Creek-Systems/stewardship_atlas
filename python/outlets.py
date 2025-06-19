@@ -67,7 +67,7 @@ def webmap_json(config, name):
             map_layer.update({
                 'type': 'raster',
                 'paint' : {
-                "raster-opacity": 0.1,
+                "raster-opacity": 0.3,
                 "raster-contrast": 0.3}})
                               
         elif layer['geometry_type'] == 'polygon':
@@ -77,6 +77,7 @@ def webmap_json(config, name):
                 'symbol_placement': 'point',
                 'text_offset': [0,0],
                 'paint': {
+                    "fill-opacity": layer.get('fill_opacity', 1.0),
                     "fill-color": utils.rgb_to_css(layer.get('fill_color', [150,150,150])),
                     "fill-outline-color": utils.rgb_to_css(layer.get('color', [150,150,150]))}
             })
@@ -106,7 +107,7 @@ def webmap_json(config, name):
             label_layer = {
                 "id": f"{layer_name}-label-layer",
                 "type": "symbol",
-                "minzoom": 16,
+                "minzoom": 12,
                 "maxzoom": 24,
                 "source": layer_name,
                 "layout": {
@@ -136,11 +137,19 @@ def webmap_json(config, name):
             if "symbol" not in layer:
                 map_layers.append(label_layer)
             else:
-                label_layer['symbol'] = layer['symbol']
+                label_layer['symbol_source'] = layer['symbol']['png']
                 label_layer['name'] = layer['name']
-                label_layer['layout']['icon-image'] = layer['symbol']
+                label_layer['layout']['icon-image'] = layer['name']
                 label_layer['layout']['icon-size'] = layer.get('icon-size', 0.1)
-                label_layer['paint'] = {'icon-color' : utils.rgb_to_css(layer.get('color', [150,150,150]))}
+                label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'center')
+                label_layer['paint'] = {
+                    'icon-color' : utils.rgb_to_css(layer.get('color', [150,150,150])),
+                    'text-halo-color': 'rgba(200,200,200,0.5)',
+                    'text-halo-width': 5,
+                    'icon-halo-color': 'rgba(255,255,255,0.9)',
+                    'icon-halo-width': 10                    
+                    
+                }
                 
                 dynamic_layers.append(label_layer)
 
@@ -161,7 +170,7 @@ def generate_map_page(title, map_config_data, output_path):
     # For now though, let's just generate the JS as a string. Ugh.
     js_bit = ""
     for dynamic_layer in map_config_data['dynamic_layers']:
-        im_uri = "local/" + dynamic_layer['symbol']
+        im_uri = "/local/" + dynamic_layer['symbol_source']
         im_name = dynamic_layer['name']
         layer_json = dynamic_layer
         js_bit += """
@@ -670,7 +679,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         # and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
-    
+    logger.info(f"Generated Admin interfaces: {admin_interfaces}")
     admin_downloads = [
         ac for ac in config['assets'].values() 
         if ac['type'] == 'outlet' 

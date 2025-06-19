@@ -27,6 +27,7 @@ from typing import List, Dict, Tuple, Any
 
 DEFAULT_LAYERS = [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50]},
+    {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.3},
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [100, 255, 80]},
     {"name": "basemap", "geometry_type": "raster"},
@@ -34,9 +35,15 @@ DEFAULT_LAYERS = [
     {"name": "internal_roads", "geometry_type": "linestring", "color": [100, 155, 50], "add_labels": True, "access": [ "admin"]},
     {"name": "turnouts", "geometry_type": "point", "color": [50, 255, 100], "add_labels": False, "access": [ "admin"]},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200], "interaction": "interface"},
-    {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True, "symbol": "milemarker.png", "icon-size": 0.1},
-    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True, "symbol": "helipad.png", 'icon-size': 0.1, "access": [ "internal", "admin"], "interaction": "interface"},
-    {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True, "symbol": "hydrant.png", "icon-size": 0.05, "interaction": "interface"},
+    {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": True,
+     "symbol" : {"png": "milemarker.png"},
+     "icon-size": 0.12, "icon-anchor": "bottom"},
+    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": True,
+     "symbol": {"png": "helipad.png"}, 'icon-size': 0.15, "access": [ "internal", "admin"], "interaction": "interface"},
+    {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": True,
+     "symbol": {"png": "hydrant.png"},
+     "icon-size": 0.05,
+     "interaction": "interface"},
     {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": True, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
@@ -89,6 +96,12 @@ DEFAULT_ASSETS = {
         "out_layer": "parcels",
         "config_def": "local_parcels"
     },
+    "local_tsunami" : {
+        "type": "inlet",
+        "out_layer": "tsunami",
+        "config_def": "local_tsunami"
+    },
+
         "public_roads" : {
             "type": "inlet",
             "out_layer": "roads",
@@ -136,11 +149,12 @@ DEFAULT_ASSETS = {
         "config_def": "local_milemarkers"
     },
     "webmap" : {
-            "type": "outlet",
-            "in_layers": ["basemap", "parcels", "roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
-            "config_def": "webmap",
-            "access": ["internal", "admin"]
-        },
+        "type": "outlet",
+        "name": "webmap",
+        "in_layers": ["basemap", "tsunami", "parcels", "roads", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
+        "config_def": "webmap",
+        "access": ["internal", "admin"]
+    },
     "internal_webmap" : {
             "type": "outlet",
             "in_layers": ["basemap", "parcels", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],

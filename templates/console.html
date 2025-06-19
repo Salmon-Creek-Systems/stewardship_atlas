@@ -97,7 +97,7 @@
                 data.interfaces.forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
-                    a.href = `../${item.name}/`;
+                    a.href = `../../${item.name}/`;
                     a.textContent = item.name;
                     li.appendChild(a);
                     interfacesList.appendChild(li);
