@@ -273,8 +273,10 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
     """Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
 
-    basemap_dir = versioning.atlas_path(config, "layers") / "basemap"
+   #  basemap_name = config['assets']
+    basemap_dir = versioning.atlas_path(config, "layers") / layer
     if use_jpg:
+        logger.info("Using JPG")
         basemap_path = basemap_dir / "basemap.tiff.jpg"
         if basemap_path.exists():
             logger.info(f"Using extant basemap: {basemap_path}.")
@@ -324,12 +326,13 @@ def build_region_map_grass(config, outlet_name, region):
     
     gs.read_command('r.mapcalc.simple', expression="1", output='ones')
     gs.read_command('r.colors', map='ones', color='grey1.0')
-    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent='25', overwrite=True)
+    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent='55', overwrite=True)
     
     m.d_rast(map='blended')   
     # m.d_rast(map=raster_name)  
     # add layers to map
     for lc,lp in region['vectors']:
+        logger.info(f"adding region {lc} to map for region {region['name']}")
         if lc['name'] in region.get('config', {}):
             for update_key, update_value in region['config'].items():
                 lc[update_key] = update_value
@@ -338,16 +341,19 @@ def build_region_map_grass(config, outlet_name, region):
         # clunky but need to skip empty sets
         lame = json.load(open(lp))
         if len(lame['features']) < 1:
+            logger.info("layer is empty...")
             continue
-        if lc.get('feature_type', 'line') == 'point':
+        if lc.get('geometry_type', 'line') == 'point':
             c = lc.get('color', (100,100,100))
             if lc.get('add_labels', False):
+                logger.info("Adding Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc.get('symbol', 'basic/diamond'),size=10,
-                         label_size=15,
+                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=20,
+                         label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
             else:
+                logger.info("Adding NON-Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          icon=lc.get('symbol', 'basic/diamond'),size=10)
@@ -356,13 +362,20 @@ def build_region_map_grass(config, outlet_name, region):
             # m.d_vect(map=lc['name'], color=lc.get('color', 'gray'), width=lc.get('width_base',5))
             c = lc.get('color', (100,100,100))
             fc = lc.get('fill_color', c)
-            m.d_vect(map=lc['name'],
-                     color=f"{c[0]}:{c[1]}:{c[2]}",
-                     fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
-                     width_column='vector_width',
-                     attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
-                     label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=25)
-   
+            if 'vector_width' in lc:
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         width_column='vector_width',
+                         attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=35)
+            else:
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=25)
+                
     m.d_grid(size=0.5,color='black')
     m.d_legend_vect()
 
@@ -394,6 +407,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
             staging_path = versioning.atlas_path(config, "layers") / lc['name'] / f"{lc['name']}.{layer_format}"
             
             if layer_format in ['geojson']:
+
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
@@ -403,7 +417,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 for region in regions:
                     logger.debug(f"Processing raster region: {region['name']}")
                     region['raster'] = [lc,
-                                        extract_region_layer_raster_grass(config, outlet_name, lc['name'], region)]
+                                        extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False)]
                 
         # Build maps for each region
         for region in regions:
@@ -421,11 +435,17 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
     
     return regions
 
-def regions_from_geojson(path):
+def regions_from_geojson(path, start_at=2,limit=3):
     """Load regions from a GeoJSON file."""
     regions = []
     with open(path, 'r') as f:
         for i,region in  enumerate(json.load(f)['features']):
+            if i < start_at:
+                logger.info(f"skipping region {i}...")
+                continue
+            if (limit > 0) and (i >= limit):
+                logger.info(f"hit region limit of {limit}, truncating RunBook.")
+                break
             logger.info(f"Converting region {i} from GJ: {region}")
             bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
             default_name =  f"Region {i}"
@@ -439,7 +459,7 @@ def regions_from_geojson(path):
             })
     return regions
 
-def outlet_runbook( config, outlet_name, skips=[]):
+def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     """
     For a swale's "regions" layer, generate a runbook. This comprises a series of pages, one per region, linked by the "neighbor" array Property.
     The HTML runbook is a simple HTML page with a list of links to the region pages, and a link to the home page. 
@@ -452,7 +472,7 @@ def outlet_runbook( config, outlet_name, skips=[]):
     #regions = outlet_config['regions']
     # get regions layer
     regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
-    regions = regions_from_geojson(regions_path)
+    regions = regions_from_geojson(regions_path, start_at=start_at, limit=limit)
 
     swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
@@ -464,14 +484,14 @@ def outlet_runbook( config, outlet_name, skips=[]):
         f.write(index_html)
     
     html_template = """
-<html></body><table><tr><TD><A HREF="../runbook/"><img src='region_{name}_minimap.png' width=400/></A></TD></td>
+<html></body><table><tr><TD><A HREF="../runbook/"><img src='page_{name}_minimap.png' width=400/></A></TD></td>
 <td>
 <center><h1>{caption}</h1></center>
 <pre>{map_collar}</pre>
 <center><p>{text}</p><i>Click map to zoom, advance to previous/next page in RunBook, or "Home" to return to menu.</i><hr>
 {neighbor_links_html}
 <a href="..">HOME</a></center></td></tr></TABLE>
-<a href='region_{name}.png'><img src='region_{name}.png' width=1200/></a></center></body></html>"""
+<a href='region_{name}.png'><img src='page_{name}.png' width=1200/></a></center></body></html>"""
     # outpath_template = outlet_config['outpath_template'].format(**swale_config)
     #    (<a href='{swale_name}_page_{prev_region}.html'>prev</a>) (<a href='{swale_name}_page_{next_region}.html'>next</a>)
     # 
@@ -481,7 +501,7 @@ def outlet_runbook( config, outlet_name, skips=[]):
     for i,r in enumerate(regions):
         # r['next_region']=(i+1) % len(regions)
         # r['prev_region']=(i-1) % len(regions)
-        nbr_links = [f"<a href='{nbr_name}.html'>{nbr_dir}</a>" for nbr_dir, nbr_name in r['neighbors'].items()]
+        nbr_links = [f"<a href='{nbr_name}.html'>{nbr_dir}</a>" for nbr_dir, nbr_name in r.get('neighbors',{}).items()]
         nbr_links_html = " | ".join(nbr_links)
 
         map_collar = "None" #build_map_collar(config, swale_name, r['bbox'], layers = outlet_config['layers'])
@@ -489,13 +509,14 @@ def outlet_runbook( config, outlet_name, skips=[]):
             #(outlet_config['config']['outpath_template'].format(
             #    i=i,region_name=r['name'],**config).lower(),
             (outlet_dir / f"{r['name']}.html",
-            html_template.format(i=i, region_name=r['name'], 
+            html_template.format(i=i, region_name=r['name'], neighbor_links_html=nbr_links_html,
                                   swale_name=swale_name, map_collar=map_collar, **r)))
-        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/region_{r['name']}.png)\n{r['caption']}\n\n{r['text']}\n\n"
+        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/page_{r['name']}.png){{ width=90% }} \n{r['caption']}\n\n{r['text']}\n\n"
     with open(f"{outlet_dir}/dataswale.md", "w") as f:
         f.write(md)
     if 'region_content' not in skips:
         res =  outlet_regions_grass(config, outlet_name, regions, gaz_html, skips=skips)
+    if 'pdf' not in skips:
         print(subprocess.check_output(['pandoc', f"{outlet_dir}/dataswale.md", '-o', f"{outlet_dir}/runbook.pdf"]))
         
     return regions
