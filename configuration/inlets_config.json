@@ -400,8 +400,20 @@
 	    "citation": "https://portal.opentopography.org/api/terms"
 	}
     },
+    "webedit":  {
+	"asset_type": "outlet",
+	"name": "webedit",
+	"fetch_type": "webedit",
+	"interaction": "interface",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
     
-    "webedit": {
+    "webedit_wtf": {
 	"name": "webedit",
 	"asset_type": "outlet",
 	"fetch_type": "webedit",

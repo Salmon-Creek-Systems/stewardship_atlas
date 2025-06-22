@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Edit {edit_layer_name}</title>
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/terra-draw@1.0.0-beta.0/dist/terra-draw.umd.js"></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <link href='css/map.css' rel='stylesheet' />
+    <link href='css/edit_controls.css' rel='stylesheet' />
+</head>
+<body>
+    <center>
+        <h1>Edit Layer: {edit_layer_name}</h1>
+        <i>Click to draw, double click to end, click "Save" button when done.</i>
+        <A HREF="../html">cancel</a>
+    </center>
+    <div id="controls">
+        <div class="input-group">
+            <label>Basemap:</label><br/>
+            <select id="basemap-select" class="form-select">
+                <option value="hillshade">Hillshade</option>
+                <option value="satellite">Satellite (ESRI)</option>
+                <option value="usgs">USGS Topo</option>
+                <option value="terrain">OpenMapTiles Terrain</option>
+            </select>
+            <div id="loading-progress" class="progress-bar">
+                <div class="progress-fill"></div>
+                <div class="progress-text">Loading layers...</div>
+            </div>
+        </div>
+        {controls_html}
+        <div class="button-group">
+            <a href="../html/admin.html" class="button link-button">Home</a>
+            <button id="reset-button" class="warning-button">Reset Drawing</button>
+            <button id="upload-button" class="button">Upload GeoJSON</button>
+            <button id="save-button">Save Features</button>
+        </div>
+    </div>
+    <div id="map"></div>
+    <script>
+        const MAP_CONFIG = {map_config};
+        const EDIT_CONFIG = {{
+	    swalename: "{swale_name}",
+            layerName: "{edit_layer_name}",
+            mode: "{mode_string}",
+            controls: {controls_config}
+        }};
+        const SATELLITE_SOURCE = {{
+            'type': 'raster',
+            'tiles': [
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}'
+            ],
+            'tileSize': 256,
+            'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }};
+        const USGS_SOURCE = {{
+            'type': 'raster',
+            'tiles': [
+                'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{{z}}/{{y}}/{{x}}'
+            ],
+            'tileSize': 256,
+            'attribution': 'Tiles courtesy of the U.S. Geological Survey'
+        }};
+        const TERRAIN_SOURCE = {{
+            'type': 'raster',
+            'tiles': [
+                'https://tile.opentopomap.org/{{z}}/{{x}}/{{y}}.png'
+            ],
+            'tileSize': 256,
+            'attribution': 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)'
+        }};
+    </script>
+    <script src="js/edit_map.js"></script>
+</body>
+</html> 

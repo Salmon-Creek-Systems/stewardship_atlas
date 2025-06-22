@@ -27,8 +27,8 @@ from typing import List, Dict, Tuple, Any
 
 DEFAULT_LAYERS = [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
-    {"name": "tsunami", "geometry_type": "polygon", "color": [0,0,255], "fill_color": 'none', "fill_opacity": 0.3},
-    # {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.3},
+    # {"name": "tsunami", "geometry_type": "polygon", "color": [0,0,255], "fill_color": 'none', "fill_opacity": 0.3},
+    {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.3},
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50]},
     {"name": "basemap", "geometry_type": "raster"},
@@ -169,6 +169,12 @@ DEFAULT_ASSETS = {
         "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
         "config_def": "webmap"
     },
+    "webedit" : {
+        "type": "outlet",
+        "name": "webmap",
+        "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
+        "config_def": "webedit"
+    },
     "internal_webmap" : {
             "type": "outlet",
             "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
@@ -307,8 +313,8 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             # add htpasswrd to new directory
             add_htpasswds(config, p / 'staging' / 'layers' / layer['name'], layer['access'])
 
-         
-    logger.info(f"built a config: {config}")
+    logger.info(f"built a config for {config['name']}.")         
+    logger.debug(f"built a config: {config}")
     json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)
     return config
 

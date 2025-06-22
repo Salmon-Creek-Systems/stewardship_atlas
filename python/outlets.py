@@ -300,18 +300,18 @@ def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
     
     # Generate base map configuration
-    map_config = map_json(swale_config, outlet_config, atlas_config)
-    webedit_dir = versioning.atlas_path(atlas_config, "outlets") / outlet_config['name'] 
+    map_config = webmap_json(config, name)
+    webedit_dir = versioning.atlas_path(config, "outlets") / name 
 
   
     # subprocess.run(['cp', '../templates/css/map.css', f"{webedit_dir}/css/"])
-    subprocess.run(['cp', '../templates/css/edit_controls.css', f"{webedit_dir}/css/"])
+    # subprocess.run(['cp', '../templates/css/edit_controls.css', f"{webedit_dir}/css/"])
     
     # Copy the JS file
-    subprocess.run(['cp', '../templates/js/edit_map.js', f"{webedit_dir}/js/"])
+    # subprocess.run(['cp', '../templates/js/edit_map.js', f"{webedit_dir}/js/"])
     
     # Generate edit pages for each editable asset
-    for ea in atlas_config['assets'].values():
+    for ea in config['dataswale']['layers']:
         if ea.get('editable', False):
 
             html_content = generate_edit_page(ea, map_config, swale_config)
