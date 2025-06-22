@@ -292,7 +292,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
         swalename=config['name'],
         edit_layer_name=ea['name'],
         controls_html=controls_html,
-        map_config=json.dumps(map_config, indent=2),
+        map_config=json.dumps(map_config['map_config'], indent=2),
         mode_string=mode_string,
         controls_config=json.dumps(controls_config))
 
