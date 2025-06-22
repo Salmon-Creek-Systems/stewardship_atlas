@@ -262,14 +262,14 @@ def generate_edit_controls_html(editable_attributes):
             
     return select_html + string_html
 
-def generate_edit_page(ea: dict, config: dict, name: str):
+def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
     # Read template files
     with open('../templates/edit_map.html', 'r') as f:
         template = f.read()
         
     # Generate controls HTML
-    controls_html = generate_edit_controls_html(ea.get('editable', []))
+    controls_html = generate_edit_controls_html(ea.get('editable_columns', []))
     
     # Prepare mode string
     mode_string = {
@@ -288,8 +288,8 @@ def generate_edit_page(ea: dict, config: dict, name: str):
     
     # Format template
     return template.format(
-        swale_name=swale_config['name'],
-        swalename=swale_config['name'],
+        swale_name=config['name'],
+        swalename=config['name'],
         edit_layer_name=ea['name'],
         controls_html=controls_html,
         map_config=json.dumps(map_config, indent=2),
@@ -312,10 +312,9 @@ def outlet_webmap_edit(config: dict, name: str):
     
     # Generate edit pages for each editable asset
     for ea in config['dataswale']['layers']:
-        if ea.get('editable', False):
-
-            html_content = generate_edit_page(ea, map_config, swale_config)
-            output_path = f"{webedit_dir}/{ea['name']}.html"
+        if ea.get('editable_columns'):
+            html_content = generate_edit_page(config, ea, name, map_config)
+            output_path = webedit_dir /   f"{ea['name']}.html"
             logger.debug(f"Generated WEBEDIT for {ea} into {output_path}")            
             with open(output_path, 'w') as f:
                 f.write(html_content)
