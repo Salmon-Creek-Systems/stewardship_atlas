@@ -251,16 +251,16 @@ def add_htpasswds(config, path, access):
   
     # Add users based on access levels
     for role, role_passwd in roles.items():
-        logger.info(f"checking for {role} in {access}")
+        logger.debug(f"checking for {role} in {access}")
         if role in access:
             if not htpasswd_file.exists():
                 cli_str = f"htpasswd -bc {htpasswd_file} {role} {role_passwd}"
             else:
                 cli_str = f"htpasswd -b {htpasswd_file} {role} {role_passwd}"
 
-            logger.info(cli_str)
+            logger.debug(cli_str)
             os.system(cli_str)
-            logger.info(f"Added {role} user  to {htpasswd_file}")
+            logger.debug(f"Added {role} user  to {htpasswd_file}")
 
 
 def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
