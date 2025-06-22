@@ -234,6 +234,96 @@ def outlet_webmap(config, name):
   
     return output_path
 
+def generate_edit_controls_html(editable_attributes):
+    """Generate HTML for edit controls based on attribute configuration"""
+    select_html = ""
+    string_html = ""
+    
+    for edit_att in editable_attributes:
+        if edit_att['type'] == 'string':
+            string_html += f"""
+                <div class="input-group">
+                    <label>{edit_att['name']}:</label><br/>
+                    <input type="text" name="{edit_att['name']}" id="{edit_att['name']}" class="input-field">
+                </div>"""
+        elif edit_att['type'] == 'radio':
+            select_html += f"""
+                <div class="input-group">
+                    <label>{edit_att['name']}:</label><br/>
+                    <select name="{edit_att['name']}" id="{edit_att['name']}" class="input-field">"""
+            
+            for value in edit_att['values']:
+                select_html += f"""
+                    <option value="{value}" {('selected' if value == edit_att.get('default', '') else '')}>
+                        {value}
+                    </option>"""
+            
+            select_html += "</select></div>"
+            
+    return select_html + string_html
+
+def generate_edit_page(ea: dict, config: dict, name: str):
+    """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
+    # Read template files
+    with open('../templates/edit_map.html', 'r') as f:
+        template = f.read()
+        
+    # Generate controls HTML
+    controls_html = generate_edit_controls_html(ea.get('editable', []))
+    
+    # Prepare mode string
+    mode_string = {
+        'note': 'point',
+        'linestring': 'linestring',
+        'fill': 'polygon',
+        'point': 'point',
+        'polygon': 'polygon'
+    }[ea.get('feature_type', 'note')]
+    
+    # Prepare controls config for JavaScript
+    controls_config = [
+        {'name': att['name'], 'type': att['type']}
+        for att in ea.get('editable', [])
+    ]
+    
+    # Format template
+    return template.format(
+        swale_name=swale_config['name'],
+        swalename=swale_config['name'],
+        edit_layer_name=ea['name'],
+        controls_html=controls_html,
+        map_config=json.dumps(map_config, indent=2),
+        mode_string=mode_string,
+        controls_config=json.dumps(controls_config))
+
+def outlet_webmap_edit(config: dict, name: str):
+    """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
+    
+    # Generate base map configuration
+    map_config = map_json(swale_config, outlet_config, atlas_config)
+    webedit_dir = versioning.atlas_path(atlas_config, "outlets") / outlet_config['name'] 
+
+  
+    # subprocess.run(['cp', '../templates/css/map.css', f"{webedit_dir}/css/"])
+    subprocess.run(['cp', '../templates/css/edit_controls.css', f"{webedit_dir}/css/"])
+    
+    # Copy the JS file
+    subprocess.run(['cp', '../templates/js/edit_map.js', f"{webedit_dir}/js/"])
+    
+    # Generate edit pages for each editable asset
+    for ea in atlas_config['assets'].values():
+        if ea.get('editable', False):
+
+            html_content = generate_edit_page(ea, map_config, swale_config)
+            output_path = f"{webedit_dir}/{ea['name']}.html"
+            logger.debug(f"Generated WEBEDIT for {ea} into {output_path}")            
+            with open(output_path, 'w') as f:
+                f.write(html_content)
+    
+    return webedit_dir
+
+
+
 def grass_init(swale_name):
     grass = '/usr/bin/grass'
     sys.path.insert(
