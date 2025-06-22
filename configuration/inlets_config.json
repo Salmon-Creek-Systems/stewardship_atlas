@@ -90,8 +90,9 @@
     
     "internal_roads": {
         "name": "internal_roads",
-        "asset_type": "inlet", 
-        "interaction": "download",
+        "asset_type": "inlet",
+	"access": ["internal", "admin"],
+        "interaction": "interface",
         "fetch_type": "local_ogr",
 		"geometry": "dataswale",
         "data_type": "geojson",
@@ -285,7 +286,8 @@
         "add_labels": false,
         "alterations": {
 	    "vector_width": {"default": 2},
-	    "label_attribute": "elevation"
+	    "label_attribute": "elevation",
+	    "canonicalize": {"to": "name", "from": "elevation", "default": ""}
         },
         "attribution": {
             "url": "https://www.scvfd.fireatlas.org",

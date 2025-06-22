@@ -97,7 +97,7 @@
                 data.interfaces.forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
-                    a.href = `../../${item.name}/`;
+                    a.href = `../..//${item.name}/`;
                     a.textContent = item.name;
                     li.appendChild(a);
                     interfacesList.appendChild(li);
@@ -163,7 +163,7 @@
 		    // Link to outlet directory
 		    const li = document.createElement('li');
                     const a1 = document.createElement('a');
-                    a1.href = `../${item.name}/`;
+                    a1.href = `../../../layers/${item.name}/`;
                     a1.textContent = item.name;
                     li.appendChild(a1);
 

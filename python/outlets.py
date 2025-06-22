@@ -450,8 +450,8 @@ def regions_from_geojson(path, start_at=2,limit=3):
             bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
             default_name =  f"Region {i}"
             regions.append({
-                'name': utils.canonicalize_name(region['properties'].get('name', default_name)),
-                'caption': region['properties'].get('caption', default_name),
+                'name': utils.canonicalize_name(region['properties'].get('Description', default_name)),
+                'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
                 'bbox': bbox,
                 "vectors": [],
@@ -478,13 +478,13 @@ def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
     index_html = "<html><body><h1>Run Book</h1><ul>"
     for i,r in enumerate(regions):
-        index_html += f"<li><a href='{r['name'].lower()}.html'>{r['caption']}</a></li>"
+        index_html += f"<li><a href='{r['name']}.html'>{r['caption']}</a></li>"
     index_html += "</ul></body></html>"
     with open(f"{outlet_dir}/index.html", "w") as f:
         f.write(index_html)
     
     html_template = """
-<html></body><table><tr><TD><A HREF="../runbook/"><img src='page_{name}_minimap.png' width=400/></A></TD></td>
+<html></body><table><tr><TD><!--<A HREF="../runbook/"><img src='page_{name}_minimap.png' width=400/></A>--></TD></td>
 <td>
 <center><h1>{caption}</h1></center>
 <pre>{map_collar}</pre>
@@ -496,8 +496,12 @@ def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     #    (<a href='{swale_name}_page_{prev_region}.html'>prev</a>) (<a href='{swale_name}_page_{next_region}.html'>next</a>)
     # 
     gaz_html = []
-    md = f"# {swale_name} RunBook\n\n"
+    md = f"""---
+geometry: margin=1cm
+---
 
+# {swale_name} RunBook
+"""
     for i,r in enumerate(regions):
         # r['next_region']=(i+1) % len(regions)
         # r['prev_region']=(i-1) % len(regions)
@@ -511,7 +515,7 @@ def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
             (outlet_dir / f"{r['name']}.html",
             html_template.format(i=i, region_name=r['name'], neighbor_links_html=nbr_links_html,
                                   swale_name=swale_name, map_collar=map_collar, **r)))
-        md += f"## {r['name']}\n![{r['name']}]({outlet_dir}/page_{r['name']}.png){{ width=90% }} \n{r['caption']}\n\n{r['text']}\n\n"
+        md += f"![{r['name']}]({outlet_dir}/page_{r['name']}.png){{ width=800px }}\n\n"
     with open(f"{outlet_dir}/dataswale.md", "w") as f:
         f.write(md)
     if 'region_content' not in skips:
