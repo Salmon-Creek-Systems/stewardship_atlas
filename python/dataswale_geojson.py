@@ -3,7 +3,9 @@ import logging
 import shutil
 from typing import Iterator, Dict, Any, List, Tuple
 import eddies
+import deltas_geojson as deltas
 
+DQB=deltas.apply_deltas
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,7 +30,7 @@ def new_version():
 def asset():
     pass
 
-def refresh_vector_layer(config, name, delta_queue_builder):
+def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     """
     Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.
     """
@@ -36,14 +38,15 @@ def refresh_vector_layer(config, name, delta_queue_builder):
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
 
     fc = delta_queue_builder(config, name)
-    logger.info(f"Writing to {layer_path} FC: {fc}")
+    logger.debug(f"Writing to {layer_path} FC: {fc}")
+    logger.info(f"Writing to {layer_path}")
     
     with versioning.atlas_file(layer_path, 'wt') as outfile:
         geojson.dump(fc, outfile)
     return layer_path
 
 
-def refresh_raster_layer(config, name, delta_queue_builder):
+def refresh_raster_layer(config, name, delta_queue_builder=DQB):
     """
     Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.
     """

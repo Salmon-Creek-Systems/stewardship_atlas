@@ -4,6 +4,9 @@ import geojson
 
 import versioning
 import utils
+import deltas_geojson as deltas
+
+DELTA_QUEUE = deltas
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,7 +16,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-def overture_duckdb(config=None, name=None, delta_queue=None, quick=False):
+def overture_duckdb(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
     """Fetch Overture data and return a Delta to push into queue"""
     version_string = 'staging'
     inlet_config = config['assets'][name]['config']
@@ -45,7 +48,7 @@ LOAD spatial;
     return len(feature_collection['features'])
 
 
-def local_ogr(config, name, delta_queue):
+def local_ogr(config, name, delta_queue=DELTA_QUEUE):
     """Load OGR datafile and store in versioned directory"""
    
     # Get input path from template
@@ -76,6 +79,6 @@ def local_ogr(config, name, delta_queue):
 
 
 asset_methods = {
-    "overture": overture_duckdb,
+    "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr
     }

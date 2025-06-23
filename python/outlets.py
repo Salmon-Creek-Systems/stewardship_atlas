@@ -165,7 +165,7 @@ def generate_map_page(title, map_config_data, output_path):
     # Read template files
     with open('../templates/map.html', 'r') as f:
         template = f.read()
-    logger.info(f"About to generate HTML to {output_path}: {template}.")
+    logger.debug(f"About to generate HTML to {output_path}: {template}.")
     # TODO there is a much better way to do this, just handlign it dynamically in JS.
     # For now though, let's just generate the JS as a string. Ugh.
     js_bit = ""
@@ -422,7 +422,7 @@ def build_region_map_grass(config, outlet_name, region):
     # m.d_rast(map=raster_name)  
     # add layers to map
     for lc,lp in region['vectors']:
-        logger.info(f"adding region {lc} to map for region {region['name']}")
+        logger.debug(f"adding region {lc} to map for region {region['name']}")
         if lc['name'] in region.get('config', {}):
             for update_key, update_value in region['config'].items():
                 lc[update_key] = update_value
@@ -436,14 +436,14 @@ def build_region_map_grass(config, outlet_name, region):
         if lc.get('geometry_type', 'line') == 'point':
             c = lc.get('color', (100,100,100))
             if lc.get('add_labels', False):
-                logger.info("Adding Points")
+                logger.debug("Adding Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=20,
                          label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
             else:
-                logger.info("Adding NON-Points")
+                logger.debug("Adding NON-Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          icon=lc.get('symbol', 'basic/diamond'),size=10)
@@ -536,7 +536,7 @@ def regions_from_geojson(path, start_at=2,limit=3):
             if (limit > 0) and (i >= limit):
                 logger.info(f"hit region limit of {limit}, truncating RunBook.")
                 break
-            logger.info(f"Converting region {i} from GJ: {region}")
+            logger.debug(f"Converting region {i} from GJ: {region}")
             bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
             default_name =  f"Region {i}"
             regions.append({
@@ -746,7 +746,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     
     # Copy CSS
     css_dir =  versioning.atlas_path(config, "local") / 'css'
-    logger.info(f"Creating CSS dir: {css_dir}")
+    logger.debug(f"Creating CSS dir: {css_dir}")
     css_dir.mkdir(exist_ok=True)
     subprocess.run(['cp', '../templates/css/console.css', str(css_dir)])
     
