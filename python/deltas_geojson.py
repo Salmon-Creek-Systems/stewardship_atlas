@@ -100,6 +100,14 @@ def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> st
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
+def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action: str) -> str:
+    """
+    Return the path to the delta file for a given layer and delta action.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    p =  versioning.atlas_path(config,"deltas") / layer_name / f"assetless__{timestamp}__{delta_action}.geojson"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
 
 def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_collection: FeatureCollection, delta_action: str) -> Tuple[int, str]:
     """

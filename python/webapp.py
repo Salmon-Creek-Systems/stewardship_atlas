@@ -27,7 +27,7 @@ import atlas
 import dataswale_gpkg
 import atlas_outlets
 import versioning   
-
+import deltas_geojson
 app = FastAPI()
 logger.logger.setLevel(0)
 
@@ -144,34 +144,39 @@ async def store_json(swalename: str, payload: JSONPayload):
         logger.logger.info("Storing JSON payload")
         # Get layer and version from payload
         layer = payload.data.get('layer', 'unknown')
-        version = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # version = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Create versioned path
-        outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
-        outpath = outpath_template.format(layer=layer, version=version)
-        
+
+        #outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
+        #outpath = outpath_template.format(layer=layer, version=version)
+        outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create")
+        #outpath = versioning.atlas_path(swalename, "deltas") / layer / f"data_{version}.json"
         # Ensure directory exists
-        os.makedirs(os.path.dirname(outpath), exist_ok=True)
-        logger.logger.debug(f"Created directory: {os.path.dirname(outpath)}")
+        #os.makedirs(os.path.dirname(outpath), exist_ok=True)
+        #logger.logger.debug(f"Created directory: {os.path.dirname(outpath)}")
         
         # Store the JSON data
         with open(outpath, 'w') as f:
             json.dump(payload.data, f, indent=2)
         logger.logger.info(f"Successfully stored JSON data at: {outpath}")
-
+        
         ac = json.load(open(versioning.atlas_path(swalename, "atlas_config.json")))
         #dc = json.load(open(versioning.atlas_path(swalename, "dataswale_config.json")))
-        res = atlas.asset_materialize(ac,  ac['assets'][layer])
-        res2 = "No Res2"
-        if layer.endswith("_deltas"):
-            print(f"refreshing {layer}")
-            parent = layer.split("_deltas")[0]
-            print(f"Also refershing parent: {parent}")
-            res2 = atlas.asset_materialize(ac, dc, ac['assets'][parent])
+        #res = atlas.asset_materialize(ac,  ac['assets'][layer])
+        res = dataswale_geojson.refresh_vector_layer(ac, layer)
+
+        # Refresh parent layer if it exists
+        #res2 = "No Res2"
+        #if layer.endswith("_deltas"):
+        #    print(f"refreshing {layer}")
+       #     parent = layer.split("_deltas")[0]
+       #     print(f"Also refershing parent: {parent}")
+       #     res2 = atlas.asset_materialize(ac, dc, ac['assets'][parent])
         
         return {
             "status": "success",
-            "message": f"Data stored successfully, refreshed: {res} -> {res2}",
+            "message": f"Data stored successfully, refreshed: {res}",
             "filename": os.path.basename(outpath),
             "path": outpath
         }
