@@ -923,17 +923,17 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     
     return outpath / 'index.html'
    
-blah = """
-OUTLET_MATERIALIZER = {
-    'outlet_gpkg': outlet_gpkg,
-    'tiff': outlet_tiff,
-    'pdf': outlet_geopdf,
+#blah = """
+MATERIALIZERS = {
+    #'outlet_gpkg': outlet_gpkg,
+    #'tiff': outlet_tiff,
+    #'pdf': outlet_geopdf,
     'html': outlet_html,
-    'gazetteer': outlet_gazetteer,
+    #'gazetteer': outlet_gazetteer,
     'runbook': outlet_runbook,
     'webmap': outlet_webmap,
-    'webmap_public': outlet_webmap,
+    #'webmap_public': outlet_webmap,
     'webedit': outlet_webmap_edit,
     'sqlquery': outlet_sqlquery
 }
-"""
+#"""

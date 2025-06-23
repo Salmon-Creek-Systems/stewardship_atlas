@@ -329,3 +329,7 @@ def delete():
 def new_version():
     pass
 
+def materialize(materializers, config, asset_name):
+    materializer_name = config['assets'][asset_name]['config']['fetch_type']
+    return materializers[materializer_name](config, asset_name)
+
