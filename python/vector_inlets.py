@@ -73,3 +73,9 @@ def local_ogr(config, name, delta_queue):
     if 'alterations' in inlet_config:
         utils.alter_geojson(outpath, inlet_config['alterations'])
     return outpath
+
+
+asset_methods = {
+    "overture": overture_duckdb,
+    "local_ogr": local_ogr
+    }

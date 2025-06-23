@@ -237,4 +237,5 @@ ON ST_Intersects(anno_geom, feat_geom);
 
 asset_methods = {
     "gdal_contours": contours_gdal,
-    'derived_hillshade': hillshade_gdal}
+    'derived_hillshade': hillshade_gdal,
+    'annotate_spatial': delta_annotate_spatial_duckdb}

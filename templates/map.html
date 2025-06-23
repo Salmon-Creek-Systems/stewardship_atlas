@@ -29,7 +29,8 @@
     </div>
     <div id="map"></div>
     <script>
-        
+      import { Map, ScaleControl } from 'maplibre-gl';
+  
       const SATELLITE_SOURCE = {{
             'type': 'raster',
             'tiles': [
@@ -58,6 +59,13 @@
 // Initialize the map
 const MAP_CONFIG = {map_config};
 const map = new maplibregl.Map(MAP_CONFIG);
+
+
+map.addControl(new ScaleControl({
+    maxWidth: 80,
+    unit: 'metric'
+}));
+
 
 // Add satellite source and layer
       map.on('load', async () => {{

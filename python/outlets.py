@@ -924,7 +924,7 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     return outpath / 'index.html'
    
 #blah = """
-MATERIALIZERS = {
+asset_methods = {
     #'outlet_gpkg': outlet_gpkg,
     #'tiff': outlet_tiff,
     #'pdf': outlet_geopdf,
