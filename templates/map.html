@@ -29,7 +29,7 @@
     </div>
     <div id="map"></div>
     <script>
-      import { Map, ScaleControl } from 'maplibre-gl';
+      import {{ Map, ScaleControl }} from 'maplibre-gl';
   
       const SATELLITE_SOURCE = {{
             'type': 'raster',
@@ -56,17 +56,18 @@
             'attribution': 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)'
       }};
 
-// Initialize the map
-const MAP_CONFIG = {map_config};
-const map = new maplibregl.Map(MAP_CONFIG);
-
-
-map.addControl(new ScaleControl({
-    maxWidth: 80,
-    unit: 'metric'
-}));
-
-
+      // Initialize the map
+      const MAP_CONFIG = {map_config};
+      const map = new maplibregl.Map(MAP_CONFIG);
+      
+      
+      map.addControl(new ScaleControl({{
+	  maxWidth: 80,
+	  unit: 'metric'
+      }}
+				     ));
+      
+      
 // Add satellite source and layer
       map.on('load', async () => {{
  
