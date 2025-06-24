@@ -11,6 +11,7 @@ import traceback
 import requests
 import re
 from urllib.parse import urlparse, parse_qs
+from pathlib import Path
 
 import sys
 sys.path.insert(0, "/root/internal/python")
@@ -19,12 +20,12 @@ sys.path.insert(0, "/root/internal/python")
 import sys, os, subprocess, time, json, string, random, math
 
 
-
+SWALES_ROOT = "/root/swales"
 
 
 # our Imports|
 import atlas
-import dataswale_gpkg
+import dataswale_geojson
 import atlas_outlets
 import versioning   
 import deltas_geojson
@@ -144,13 +145,20 @@ async def store_json(swalename: str, payload: JSONPayload):
         logger.logger.info("Storing JSON payload")
         # Get layer and version from payload
         layer = payload.data.get('layer', 'unknown')
+        print(f"storing delta for  {layer} in {swalename}")
         # version = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Create versioned path
 
         #outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
         #outpath = outpath_template.format(layer=layer, version=version)
+
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        print(f"loading config from {config_path}")
+        ac = json.load(open(config_path))
         outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create")
+        print(f"writing delta to  {outpath}")
+        
         #outpath = versioning.atlas_path(swalename, "deltas") / layer / f"data_{version}.json"
         # Ensure directory exists
         #os.makedirs(os.path.dirname(outpath), exist_ok=True)
@@ -160,8 +168,9 @@ async def store_json(swalename: str, payload: JSONPayload):
         with open(outpath, 'w') as f:
             json.dump(payload.data, f, indent=2)
         logger.logger.info(f"Successfully stored JSON data at: {outpath}")
+        print(f"Successfully stored JSON data at: {outpath}")
         
-        ac = json.load(open(versioning.atlas_path(swalename, "atlas_config.json")))
+
         #dc = json.load(open(versioning.atlas_path(swalename, "dataswale_config.json")))
         #res = atlas.asset_materialize(ac,  ac['assets'][layer])
         res = dataswale_geojson.refresh_vector_layer(ac, layer)
