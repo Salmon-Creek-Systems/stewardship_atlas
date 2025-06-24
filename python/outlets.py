@@ -283,7 +283,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
     # Prepare controls config for JavaScript
     controls_config = [
         {'name': att['name'], 'type': att['type']}
-        for att in ea.get('editable', [])
+        for att in ea.get('editable_columns', [])
     ]
     
     # Format template
