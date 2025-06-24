@@ -278,7 +278,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
         'fill': 'polygon',
         'point': 'point',
         'polygon': 'polygon'
-    }[ea.get('feature_type', 'note')]
+    }[ea.get('geometry_type', 'note')]
     
     # Prepare controls config for JavaScript
     controls_config = [
