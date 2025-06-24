@@ -29,7 +29,7 @@
     </div>
     <div id="map"></div>
     <script type="module">
-      import {{ Map, ScaleControl }} from 'maplibre-gl';
+      // maplibre-gl is already loaded globally via script tag, no import needed
   
       const SATELLITE_SOURCE = {{
             'type': 'raster',
