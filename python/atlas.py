@@ -35,7 +35,18 @@ DEFAULT_LAYERS = [
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": True, "interaction": "interface", "vector_width":True,
-        "editable_columns": [{"name": "name", "type": "string", "default": "Road" }]},
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" },
+            {
+              "name": "STREETTYPE",
+              "type": "radio",
+              "values": [
+                '{"STREETTYPE": "RD", "vector_width": 15}',
+                '{"STREETTYPE": "ST", "vector_width": 13}',
+                '{"STREETTYPE": "Other", "vector_width": 10}'
+              ],
+              "default": '{"STREETTYPE": "RD", "vector_width": 9}'
+            }]},
     {"name": "internal_roads", "geometry_type": "linestring", "color": [255, 155, 50], "add_labels": True, "access": [ "admin"], "vector_width":True},
     {"name": "turnouts", "geometry_type": "point", "color": [50, 255, 100], "add_labels": False, "access": [ "admin"]},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": True, "color": [50, 50, 200], "interaction": "interface", "vector_width":True},

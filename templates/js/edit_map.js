@@ -145,7 +145,13 @@ document.getElementById('save-button').addEventListener('click', function() {
         
         EDIT_CONFIG.controls.forEach(control => {
             const value = document.getElementById(control.name).value;
-            feature.properties[control.name] = value;
+            if (control.type === 'radio') {
+                for (const key in JSON.parse(value)) {
+                    feature.properties[key] = JSON.parse(value)[key];
+                }
+            } else {
+                feature.properties[control.name] = value;
+            }
         });
     });
 

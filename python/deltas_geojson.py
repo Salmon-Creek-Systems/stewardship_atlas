@@ -132,7 +132,7 @@ def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_co
     logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
     return [ str(outpath) ]
 
-def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
+def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = False) -> FeatureCollection:
     """
    Apply all delta file sin order.
 
@@ -147,6 +147,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str) -> FeatureCollection:
     
     # start an empypty layer file
     layer_filepath = work_dir / f"{layer_name}.geojson"
+    if not layer_filepath.exists() or overwrite:
     with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
         geojson.dump(FeatureCollection(features=[]), outfile)
     logger.info(f"Starting Apply Deltas: {deltas_dir}: {delta_files} -> {work_dir}")
