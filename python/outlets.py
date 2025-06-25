@@ -253,11 +253,13 @@ def generate_edit_controls_html(editable_attributes):
                     <select name="{edit_att['name']}" id="{edit_att['name']}" class="input-field">"""
             
             for value in edit_att['values']:
+                #parsed_value = json.loads(value)
+                str_value =  json.dumps(value)
                 select_html += f"""
-                    <option value="{value}" {('selected' if value == edit_att.get('default', '') else '')}>
-                        {value}
+                    <option value='{str_value}' {('selected' if value == edit_att.get('default', '') else '')}>
+                        {value[ edit_att['name'] ] }   
                     </option>"""
-            
+                # {str_value} {value[ edit_att['name'] ] }
             select_html += "</select></div>"
             
     return select_html + string_html

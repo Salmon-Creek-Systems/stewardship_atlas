@@ -146,10 +146,15 @@ document.getElementById('save-button').addEventListener('click', function() {
         EDIT_CONFIG.controls.forEach(control => {
             const value = document.getElementById(control.name).value;
             if (control.type === 'radio') {
-                for (const key in JSON.parse(value)) {
-                    feature.properties[key] = JSON.parse(value)[key];
+		alert("Radio control detected! " + value);
+		// feature.properties[control.name] = value;
+		const values = JSON.parse(value)
+		alert("Parsed: " + values);
+                for (const key in values) {
+                    feature.properties[key] = values[key];
                 }
             } else {
+		alert("NON-Radio control detected! " + value); 
                 feature.properties[control.name] = value;
             }
         });
@@ -164,7 +169,7 @@ document.getElementById('save-button').addEventListener('click', function() {
     // Send features to server
     for(let i = 0; i < features.length; i++) {
         var xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("POST", 'https://fireatlas.org:9998/store/' + EDIT_CONFIG.swalename);
+        xmlhttp.open("POST", 'https://internal.fireatlas.org:9998/store/' + EDIT_CONFIG.swalename);
         xmlhttp.setRequestHeader("Content-Type", "application/json");
         var geojson_data = JSON.stringify({"data":geojson});
         alert(geojson_data);

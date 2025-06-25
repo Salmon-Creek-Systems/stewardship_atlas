@@ -137,6 +137,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
    Apply all delta file sin order.
 
     """
+    layer_dir = versioning.atlas_path(config, "layers") / layer_name
     deltas_dir = versioning.atlas_path(config, "deltas") / layer_name
     processed_dir = deltas_dir / "processed"
     work_dir = deltas_dir / "work"
@@ -146,10 +147,10 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
 
     
     # start an empypty layer file
-    layer_filepath = work_dir / f"{layer_name}.geojson"
-    if not layer_filepath.exists() or overwrite:
-    with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
-        geojson.dump(FeatureCollection(features=[]), outfile)
+    layer_filepath = layer_dir / f"{layer_name}.geojson"
+    if (not layer_filepath.exists()) or overwrite:
+        with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
+            geojson.dump(FeatureCollection(features=[]), outfile)
     logger.info(f"Starting Apply Deltas: {deltas_dir}: {delta_files} -> {work_dir}")
     for i,filepath in enumerate(delta_files):
         logger.info(f"delta file {filepath}")
@@ -158,7 +159,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
         if action == "create":
             logger.info(f"delta file {filepath}: {asset_name} @ {ts} -> {action}")
             # read the layer file
-            with versioning.atlas_file(layer_filepath, mode="rt") as infile:
+            with open(layer_filepath, mode="rt") as infile:
                 layer = geojson.load(infile)
 
             with versioning.atlas_file(filepath, mode="rt") as infile:
