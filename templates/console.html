@@ -10,7 +10,7 @@
             <td style="width:20%" align="right"><img id="logo" height=100 width=100 /></td>
             <td><h1><span id="swale-name"></span> Fire Atlas <BR>
 		<span id="console-type"></span>
-    </h1>(version: <span id="version-string"></span>)</td>
+    </h1></td>
         </tr>
         <tr valign='top'>
             <td bgcolor="#cccccc">
@@ -68,6 +68,7 @@
 
             </div>
                 <h2>VERSIONS</h2>
+                (version: <span id="version-string"></span>)
                 <div id="versions-section" style="margin: 20px;">
              
                     <button id="publish-button" onclick="startPublish()">Publish Atlas</button>
@@ -97,7 +98,7 @@
                 data.interfaces.forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
-                    a.href = `../..//${item.name}/`;
+                    a.href = `../../${item.name}/`;
                     a.textContent = item.name;
                     li.appendChild(a);
                     interfacesList.appendChild(li);
@@ -169,7 +170,7 @@
 
 		    // Link to web edit for layer
                     const a2 = document.createElement('a');
-                    a2.href = `../webedit/${item.name}_delta.html`;
+                    a2.href = `../webedit/${item.name}.html`;
                     a2.textContent = ' (draw) ';
                     li.appendChild(document.createTextNode(' '));
                     li.appendChild(a2);
@@ -177,7 +178,7 @@
 
 		    // Link to web anno for layer
                     const al = document.createElement('a');
-                    al.href = `../webedit/${item.name}_annos.html`;
+                    al.href = `../webedit/${item.name}_annotation.html`;
                     al.textContent = ' (annotate) ';
                     li.appendChild(document.createTextNode(' '));
                     li.appendChild(al);

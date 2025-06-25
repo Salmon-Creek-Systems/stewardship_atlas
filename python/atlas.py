@@ -190,6 +190,7 @@ DEFAULT_ASSETS = {
     },
     "internal_webmap" : {
             "type": "outlet",
+            "name": "internal_webmap",
             "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap",
             "access": ["internal", "admin"]

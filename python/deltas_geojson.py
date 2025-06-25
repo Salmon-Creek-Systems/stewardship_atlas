@@ -156,6 +156,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
         logger.info(f"delta file {filepath}")
         asset_name, ts, action = filepath.stem.split("__")
         logger.info(f"delta file {filepath}: {asset_name} @ {ts} -> {action}")
+        # This is a Delta of new features
         if action == "create":
             logger.info(f"delta file {filepath}: {asset_name} @ {ts} -> {action}")
             # read the layer file
@@ -169,7 +170,8 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
 
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
                 geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
-
+                
+        # This is a Delta of anotation features which update properties for existing features
         elif action == "update":
             con = duckdb.connect(":memory:")    
             # Load the delta file into a table called delta

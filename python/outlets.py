@@ -778,6 +778,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         #and ac.get('interaction') == 'interface' 
         # and ac.get('access') in ('internal', 'public')
     ]
+    logger.info(f"Generated Internal interfaces: {internal_interfaces}")
     
     internal_downloads = [
         ac for ac in config['assets'].values()
