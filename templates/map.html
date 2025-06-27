@@ -32,8 +32,7 @@
     <div id="map"></div>
     <script type="module">
       // maplibre-gl is already loaded globally via script tag, no import needed
-    //import { MaplibreLegendControl } from "@watergis/maplibre-gl-legend";
-    //import '@watergis/maplibre-gl-legend/dist/maplibre-gl-legend.css';
+
   
       const SATELLITE_SOURCE = {{
             'type': 'raster',
@@ -71,7 +70,7 @@
       }}
 				     ));
       
-    map.addControl(new MaplibreLegendControl({{}}, {{reverseOrder: false}}), 'bottom-left');
+    map.addControl(new MaplibreLegendControl.MaplibreLegendControl({{}}, {{reverseOrder: false}}), 'bottom-left');
 // Add satellite source and layer
       map.on('load', async () => {{
  

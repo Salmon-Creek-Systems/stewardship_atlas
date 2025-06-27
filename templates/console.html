@@ -32,7 +32,7 @@
 
             
             <td ROWSPAN=2 id="layers-section" style="display: none;">
-                <center><h2>LAYERS</h2></center>
+                <center><h2><span id="panel-header">...</span></h2></center>
                 <ul id="layers-list"></ul>
 		<ul id="usecases-list"></ul>
 		
@@ -40,26 +40,24 @@
         </tr>
         <tr>
             <td>
-                <h2>HELP</h2>
+                <h2>HELP and LINKS</h2>
                 <div id="help-section" style="margin: 20px;">
                 <ul id="help-list">
                     <li>
-                        <a href="https://fireatlas.org/help">About</a>
+                        <a href="https://westportvfd.fireatlas.org/help">About</a>
                     </li>
                     <li>
-                        <a href="https://fireatlas.org/help">Help</a>
+                        <a href="https://westportvfd.fireatlas.org/help">Help</a>
                     </li>
                     <li>
-                        <a href="https://fireatlas.org/help">How To: Add Roads</a>
+                        <a href="https://westportvfd.fireatlas.org/staging/outlets/html/internal">Internal</a>
+                    </li>		    
+                    <li>
+                        <a href="https://westportvfd.fireatlas.org/staging/outlets/html/admin">Admin</a>
                     </li>
                     <li>
-                        <a href="https://fireatlas.org/help">How To: Add Buildings</a>
+                        <a href="https://www.westportvfd.org">VFD</a>
                     </li>
-                    <li>
-                        <a href="https://fireatlas.org/help">How To: Change Attributes</a>
-                    </li>
-                    
-
                     <li>
                         <a href="https://fireatlas.org/help">Contact</a>
                     </li>
@@ -91,6 +89,7 @@
             document.getElementById('version-string').textContent = data.version_string;
             document.getElementById('swale-name').textContent = data.swaleName;
             document.getElementById('console-type').textContent = data.consoleType;
+	    document.getElementById('panel-header').textContent = data.panelHeader;
 
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
@@ -137,18 +136,21 @@
             // Setup use cases
             if (data.useCases && data.useCases.length > 0) {
                 const useCasesList = document.getElementById('usecases-list');
-                data.useCases.forEach(item => {
+                data.useCases.forEach(usr => {
                     const li = document.createElement('li');
-                    //const a = document.createElement('a');
-                    //a.href = `../${item.name}/`;
-                    li.textContent = item.name;
-		    //const casesList = document.createElement('ul');
-		    //item.cases.forEach(ic => {
-		//	const icli = document.createElement('li');
-		//	icli.textContent = ic.name;
-		//	li.appendChild(icli);
-		  //  });
-		    //li.appendChild(casesList);
+
+                    li.textContent = usr.name;
+		    const casesList = document.createElement('ul');
+		    usr.cases.forEach(ucase => {
+			const icli = document.createElement('li');
+			const ica = document.createElement('a');
+			ica.href = ucase.uri;
+			ica.textContent = ucase.name;
+			icli.appendChild(ica);
+			casesList.appendChild(icli);
+			
+		    });
+		    li.appendChild(casesList);
                     useCasesList.appendChild(li);
                 });
                 document.getElementById('layers-section').style.display = 'block';

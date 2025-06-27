@@ -180,7 +180,8 @@ DEFAULT_ASSETS = {
         "type": "outlet",
         "name": "webmap",
         "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
-        "config_def": "webmap"
+        "config_def": "webmap",
+        "access": ["internal", "admin"]
     },
     "webedit" : {
         "type": "outlet",
@@ -193,7 +194,7 @@ DEFAULT_ASSETS = {
             "name": "internal_webmap",
             "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
             "config_def": "webmap",
-            "access": ["internal", "admin"]
+            "access": ["admin"]
         },
     "runbook": {
             "type": "outlet",
@@ -291,7 +292,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
-
+        config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
     
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)

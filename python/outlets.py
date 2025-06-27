@@ -707,7 +707,7 @@ def make_root_html(atlas_config):
 
 def make_console_html(config,
                      displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[],
-                      admin_controls=[], console_type='ADMINISTRATION', use_cases=[]):
+                      admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[]):
     """Generate HTML for the console interface."""
     logger.info(f"Making Console for {console_type}...")
     
@@ -723,6 +723,7 @@ def make_console_html(config,
         'logo': config.get('logo', ''),
         'swaleName': config['name'],
         'consoleType': console_type,
+        'panelHeader': panel_header,
         'interfaces': displayed_interfaces,
         'downloads': displayed_downloads,
         'useCases': use_cases,
@@ -815,16 +816,41 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     ]
     logger.info(f"Generated Admin Layers: {admin_layers}")
     # Define use cases
-    internal_usecases = [
-        {"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
-        {"name": "GIS Practitioner", "cases": ["Download Layer GeoJSON", "Download GeoPKG", "Add a layer as GeoJSON"]},
-        {"name": "Administrator", "cases": ["Go to Admin interface", "Switch Version"]}
-    ]
-    
+    use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
+                 "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
+                 "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
+                 "download_gpkg": ["Howto: Download atlas as GeoPKG", "https://internal.fireatlas.org/documentation/"],
+                 "download_runbook": ["Howto: download Run Book","https://internal.fireatlas.org/documentation/"],
+                 "download_runbook": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
+                 "hide_layers": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
+                 "upload_geojson": ["Howto: Add a GeoJSON file to an existing vector layer.","https://internal.fireatlas.org/documentation/"],
+                 "platform_overview": ["Overview of Stewardship Atlas Platform","https://internal.fireatlas.org/documentation/"],
+                 "python_overview": ["Python Documentation","https://internal.fireatlas.org/documentation/"],
+                 "schema_overview": ["Schema Documentation","https://internal.fireatlas.org/documentation/"]
+                 
+                 }
+                                   
+    user_cases_config = [
+        #{"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
+        #{"name": "GIS Practitioner", "cases": ["Download Layer GeoJSON", "Download GeoPKG", "Add a layer as GeoJSON"]},
+        #{"name": "Administrator", "cases": ["Go to Admin interface", "Switch Version"]},
+        {"name": "VFD Member", "cases": ["download_runbook", "download_gpkg", "hide_layers"]},
+        {"name": "VFD Administrator", "cases": ['add_road', 'add_building', 'download_gpkg']},
+        {"name": "GIS Practitioner", "cases": ["platform_overview",'download_geojson', 'download_gpkg', 'add_road', 'add_building', "upload_geojson", "schema_overview"]},
+        {"name": "Developer", "cases": ["platform_overview", "python_overview", "schema_overview", "download_gpkg"]}
+        ]
+    user_cases = []
+    for u in user_cases_config:
+        uc = [{'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in u['cases']]
+        user_cases.append( {'name': u['name'], 'cases': uc} )
+
+         
+         
     # Generate admin view
     admin_html = make_console_html(
         config,
         console_type='ADMINISTRATION',
+        panel_header = 'Layer operations and Access',        
         displayed_interfaces=admin_interfaces, 
         displayed_downloads=admin_downloads, 
         displayed_inlets=admin_layers, 
@@ -843,12 +869,13 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     internal_html = make_console_html(
         config,
         console_type='INTERNAL',
+        panel_header = 'Help and How-To',
         displayed_interfaces=internal_interfaces, 
         displayed_downloads=internal_downloads, 
         displayed_inlets=[], 
         displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
         admin_controls=[],
-        use_cases=internal_usecases
+        use_cases=user_cases
     )
     
     internal_path = outpath / "internal" 
@@ -861,11 +888,12 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     public_html = make_console_html(
         config,
         console_type='PUBLIC',
+        panel_header = 'Help and How-to',
         displayed_interfaces=public_interfaces, 
         displayed_downloads=public_downloads, 
         displayed_inlets=[], 
         displayed_versions=[],
-        use_cases=internal_usecases,
+        use_cases=[],
         admin_controls=[("Internal", "internal.html")]
     )
     
