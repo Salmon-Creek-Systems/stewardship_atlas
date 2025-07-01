@@ -551,6 +551,56 @@ def regions_from_geojson(path, start_at=2,limit=3):
             })
     return regions
 
+
+# Create the grid of regions for Gazetteer geometrically and prep them for populating from layers
+def generate_gazetteerregions(config, outlet_name):
+    outlet_config = config['assets'][outlet_name]
+    bbox = config['dataswale']['bbox']
+    # num_rows = swale_config['geometry']['num_rows']
+    num_cols = outlet_config['num_cols']
+    cell_size = float(abs(bbox['east'] - bbox['west']))/float(num_cols)
+    num_rows = math.ceil( float(abs(bbox['north'] - bbox['south'])) / cell_size )
+    
+    regions = []
+    everything_region = {'name': 'all', 
+                            'bbox': bbox,
+                            'vectors': [],
+                            'raster': ''}
+    regions.append(everything_region)
+    cell_width=300
+    hdr = f"<HTML><BODY><table border=3 bgcolor='#FFFFFF' cellpadding=0 cellspacing=1>\n<TR><td>{config['name']}</td>"
+    bdy = ''
+    #vd = float(abs(bbox['north'] - bbox['south']))/float(num_rows)
+    
+    row_index =  list(string.ascii_uppercase)[:num_rows]
+    col_index =  [str(x) for x in range(1, 1+num_cols)]
+    
+    for row, rowname in enumerate(row_index):
+        for col, colname in enumerate(col_index):
+            s = bbox['north']- (1+row)*cell_size
+            n = bbox['north']- row*cell_size
+            e = bbox['west'] + (1+col)*cell_size
+            w = bbox['west'] + col*cell_size
+            cell_name = f"{colname}_{rowname}"
+            regions.append({'name': cell_name, 
+                            'bbox': {'south': s,'west':w,'north': n,'east': e},
+                            'vectors': [],
+                            'raster': ''})
+            if col == 0:
+                bdy += f"<TR><TD>{rowname}<br>{n:.2f}<br>{s:.2f}</TD>"
+            if row == 0:
+                hdr += f"<TD>{colname}<br>{w:.2f}</TD>"
+            bdy += f"<TD><A HREF='page_{colname}_{rowname}.png'><img src='page_{colname}_{rowname}.png' alt='Avatar' class='image'style='width:{cell_width}'></A>\n"
+        bdy += "</TR>\n"
+    hdr += "</TR>\n"
+    bdy += "</TABLE></BODY></HTML>"
+    return regions, hdr + bdy
+
+def outlet_gazetteer(config, outlet_name):
+    gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name) 
+    return gaz_regions, gaz_html
+
+
 def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     """
     For a swale's "regions" layer, generate a runbook. This comprises a series of pages, one per region, linked by the "neighbor" array Property.

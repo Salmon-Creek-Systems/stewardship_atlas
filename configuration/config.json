@@ -1,0 +1,12 @@
+{
+    "data_root": "/root/swales",
+    "name": "Nameless",
+    "description": "Underscripted",
+    "logo": "/local/scs-smallgrass1.png",
+    "dataswale": {
+        "crs": "EPSG:4269",     
+        "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
+        "versions": ["staging"],
+        "layers": []   
+    }
+}
