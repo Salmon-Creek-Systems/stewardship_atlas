@@ -1,0 +1,113 @@
+{
+    "dem": {
+        "type": "inlet",
+        "out_layer": "elevation",
+        "config_def": "opentopo_dem"
+    },
+    "gdal_contours": {
+        "type": "eddy",            
+        "in_layer": "elevation",
+        "out_layer": "contours",
+        "config_def": "gdal_contours"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "elevation",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+"public_buildings" : {
+    "type": "inlet",
+    "out_layer": "buildings",
+    "config_def": "overture_buildings"
+    },
+"public_addresses" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "overture_addresses"
+},
+"oa_parcels" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "local_parcels"
+},
+    "public_roads" : {
+        "type": "inlet",
+        "out_layer": "roads",
+        "config_def": "overture_roads"
+    },
+    "internal_roads" : {
+        "type": "inlet",
+        "out_layer": "internal_roads",
+        "config_def": "internal_roads"
+    },
+
+"public_creeks" : {
+        "type": "inlet",
+        "out_layer": "creeks",
+        "config_def": "nhd_creeks"
+    },
+
+    "local_hydrants" : {
+        "type": "inlet",
+        "out_layer": "hydrants",
+        "config_def": "local_hydrants"
+    },
+
+    "local_turnouts" : {
+        "type": "inlet",
+        "out_layer": "turnouts",
+        "config_def": "local_turnouts"
+    },
+
+"webmap" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+    "config_def": "webmap",
+    "access": ["internal", "admin"]
+},
+"webedit" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+    "config_def": "webedit"
+},
+"internal_webmap" : {
+        "type": "outlet",
+        "name": "internal_webmap",
+        "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+        "config_def": "webmap",
+        "access": ["admin"]
+    },
+"runbook": {
+        "type": "outlet",
+        "name": "runbook",
+        "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+        "access": ["internal", "admin"],
+         "config_def": "runbook",
+         "regions" : [],
+
+},
+"html": {
+        "type": "outlet",
+        "name": "html",
+         "config_def": "static_html"},
+"sqldb": {
+    "type": "outlet",
+    "name": "sqldb",
+    "layers": ["basemap", "roads", "creeks"]
+},
+"sqlquery": {
+    "type": "outlet",
+    "name": "sqlquery",
+    "config_def": "sqlquery",
+    "access": ["admin"]
+},
+"gazetteer": {
+    "type": "outlet",
+    "name": "gazetteer",
+    "config_def": "gazetteer",
+    "in_layers":  ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"]
+}
+}
