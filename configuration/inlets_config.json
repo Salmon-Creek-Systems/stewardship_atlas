@@ -467,7 +467,23 @@
         }               
     },
     
-    
+	"gazetteer": {
+		"name": "gazetteer",
+		"asset_type": "outlet",]
+		"interaction": "interface",
+		"num_rows": 5,
+		"num_cols": 6,
+		"outlet_type": "gazetteer",
+		"fetch_type": "gazetteer",
+		"data_type": "html",
+		"outpath_template": "/gazetteer/index.html",
+		"attribution": {
+		  "url": "https://www.scvfd.fireatlas.org",
+		  "description": "Printable 'Map Book' grid of pages.",
+		  "license": "https://www.scvfd.fireatlas.org",
+		  "citation": "https://www.scvfd.fireatlas.org"
+		}
+	  },
     "sqlquery": {
 	"asset_type": "outlet",
 	"name": "sqlquery",

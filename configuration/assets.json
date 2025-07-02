@@ -152,5 +152,10 @@
     "name": "sqlquery",
     "config_def": "sqlquery",
     "access": ["admin"]
+},
+"gazetteer": {
+    "type": "outlet",
+    "name": "gazetteer",
+    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"]
 }
 }
