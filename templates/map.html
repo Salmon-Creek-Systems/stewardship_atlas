@@ -9,6 +9,88 @@
     <link href='css/edit_controls.css' rel='stylesheet' />
     <link href='https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.css' rel='stylesheet' />
     <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
+    <style>
+        .help-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .help-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .help-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 20px 0 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .help-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+        
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close-button:hover {
+            color: #333;
+        }
+        
+        .help-body {
+            padding: 20px;
+        }
+        
+        .help-body ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .help-body li {
+            margin-bottom: 10px;
+            line-height: 1.4;
+            color: #555;
+        }
+        
+        #help-link {
+            font-weight: bold;
+            font-size: 1.2em;
+            text-decoration: none;
+            color: #007bff;
+        }
+        
+        #help-link:hover {
+            color: #0056b3;
+        }
+    </style>
 </head>
 <body>
     <div id="controls">
@@ -27,9 +109,29 @@
         </div>
         <div class="button-group">
             <a href="../html/admin.html" class="button link-button">Home</a>
+            <a href="#" class="button link-button" id="help-link">?</a>
         </div>
     </div>
     <div id="map"></div>
+    
+    <!-- Help popup -->
+    <div id="help-popup" class="help-popup" style="display: none;">
+        <div class="help-content">
+            <div class="help-header">
+                <h2>Interactive Web Map Help</h2>
+                <button id="close-help" class="close-button">&times;</button>
+            </div>
+            <div class="help-body">
+                <ul>
+                    <li>click/drag to move map</li>
+                    <li>scroll to zoom</li>
+                    <li>double-click to copy lat/long</li>
+                    <li>control layer visibility in legend box</li>
+                    <li>select basemap with dropdown</li>
+                </ul>
+            </div>
+        </div>
+    </div>
     <script type="module">
       // maplibre-gl is already loaded globally via script tag, no import needed
 
@@ -185,6 +287,66 @@
     // layers we need to load dynamically follow:
     {dynamic_layers}
 
+    // Add double-click handler to copy coordinates to clipboard
+    map.on('dblclick', (e) => {{
+        const lngLat = e.lngLat;
+        const coords = {{
+            latitude: lngLat.lat,
+            longitude: lngLat.lng
+        }};
+        
+        const jsonString = JSON.stringify(coords, null, 2);
+        
+        navigator.clipboard.writeText(jsonString).then(() => {{
+            // Show a brief notification
+            const notification = document.createElement('div');
+            notification.textContent = 'Coordinates copied to clipboard!';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 5px;
+                z-index: 1000;
+                font-family: Arial, sans-serif;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            `;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 2 seconds
+            setTimeout(() => {{
+                notification.remove();
+            }}, 2000);
+        }}).catch(err => {{
+            console.error('Failed to copy coordinates:', err);
+        }});
+    }});
+
+    // Help popup functionality
+    document.getElementById('help-link').addEventListener('click', (e) => {{
+        e.preventDefault();
+        document.getElementById('help-popup').style.display = 'flex';
+    }});
+
+    document.getElementById('close-help').addEventListener('click', () => {{
+        document.getElementById('help-popup').style.display = 'none';
+    }});
+
+    // Close popup when clicking outside
+    document.getElementById('help-popup').addEventListener('click', (e) => {{
+        if (e.target.id === 'help-popup') {{
+            document.getElementById('help-popup').style.display = 'none';
+        }}
+    }});
+
+    // Close popup with Escape key
+    document.addEventListener('keydown', (e) => {{
+        if (e.key === 'Escape') {{
+            document.getElementById('help-popup').style.display = 'none';
+        }}
+    }});
 
 }}); 
 
