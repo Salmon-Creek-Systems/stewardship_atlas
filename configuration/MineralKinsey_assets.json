@@ -74,7 +74,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap","ponds",  "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+    "in_layers": ["lidar_basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },

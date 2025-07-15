@@ -35,6 +35,9 @@ DEFAULT_DATA_ROOT = "/root/swales"
 
 DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
 
+DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
+
+DEFAULT_SHARED_DIR = Path('/root/data')
 
 def add_htpasswds(config, path, access):
     """Add htpasswd entries for users with access to a directory.
@@ -46,6 +49,10 @@ def add_htpasswds(config, path, access):
     htpasswd_file = path / '.htpasswd'
     roles_path = Path(config['data_root']) / "roles" / f"{config['name']}_roles.json"
 
+    if not roles_path.exists():
+        logger.info(f"Creating new roles file in {roles_path}...")
+        with open(roles_path, 'w') as fo:
+            json.dump(DEFAULT_ROLES, fo)
     
     # Read roles from roles.json file
     with open(roles_path, 'r') as f:
@@ -68,7 +75,8 @@ def add_htpasswds(config, path, access):
 def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
            layers: List[Dict[str, Any]] = DEFAULT_LAYERS, 
            assets: Dict[str, Any] = DEFAULT_ASSETS, 
-           data_root: str = DEFAULT_DATA_ROOT, 
+           data_root: str = DEFAULT_DATA_ROOT,
+           shared_dir: Path = DEFAULT_SHARED_DIR,
            name: str = "Nameless",
            bbox: Dict[str, Any] = DEFAULT_BBOX,
            feature_collection: Dict[str, Any] = None) -> None:
@@ -85,12 +93,16 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)
+
+    if not ( p / 'local').is_symlink():
+        (p / 'local').symlink_to(shared_dir, target_is_directory=True)
     
     (p / 'staging').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'layers' ).mkdir(parents=True, exist_ok=True)
-
-
+    # (p / 'staging').symlink_to(shared_dir)
+    if not ( p / 'staging' / 'local').is_symlink():
+        (p / 'staging' / 'local').symlink_to(shared_dir, target_is_directory=True)
     config['data_root'] = data_root
     config['name'] = name
     config['dataswale']['bbox'] = bbox

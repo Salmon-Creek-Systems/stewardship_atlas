@@ -54,9 +54,14 @@ def refresh_raster_layer(config, name, delta_queue_builder=DQB):
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.tiff'
     layer_path.parent.mkdir(parents=True, exist_ok=True)
     deltas_dir = versioning.atlas_path(config, "deltas") / name
+    work_dir = deltas_dir / 'work'
+    work_path = work_dir / f'{name}.tiff'
     
     for inpath in deltas_dir.glob("*.tiff"):
+        logger.info(f"refreshing raster layer [{name}]: {inpath} -> {layer_path} -> {work_path}")
         shutil.copy(inpath, layer_path)
+        inpath.replace(work_path)
+        
     return layer_path
 
 def eddy(config:Dict[str, Any], eddy_name:str):

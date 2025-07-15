@@ -133,7 +133,8 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
             for canon in alt_conf['canonicalize']:
                 value = None
                 if canon.get('concat') is not None:
-                    value = canon['concat'].join( [feature['properties'].get(src,'') for src in canon['from'] ] )
+                    
+                    value = canon['concat'].join( [x if x is not None else "NA" for x in [feature['properties'].get(src,'') for src in canon['from'] ]] )
                 else:
                     for src in canon['from']:
                         if src in feature['properties']:

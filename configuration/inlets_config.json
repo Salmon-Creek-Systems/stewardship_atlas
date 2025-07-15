@@ -49,6 +49,51 @@
             "citation": "https://portal.opentopography.org/api/terms"
 	}
     },
+    "local_ponds": {
+        "name": "ponds",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+	"inpath_template": "ponds_sc.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+        },
+	"alterations": {
+            "canonicalize": [
+		{
+                    "to": "name",
+                    "from": [],
+		    "default": ""
+		}
+            ],
+	    "vector_width": {
+		"default": 5
+            }
+	}
+    },    
+    
+    "local_humboldt_parcels": {
+        "name": "parcels",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+		"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+		"inpath_template": "humboldt_parcels.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },    
     "local_parcels": {
         "name": "parcels",
         "asset_type": "inlet", 
@@ -277,7 +322,7 @@
     "gdal_contours": {
         "name": "gdal_contours",
 	"color": [2, 219, 9],
-	"interval": 20,
+	"interval": 50,
         "vector_width": 2,
         "asset_type": "eddy",
         "interaction": "backend",
@@ -285,9 +330,9 @@
         "data_type": "geojson",
         "add_labels": false,
         "alterations": {
-	    "vector_width": {"default": 2},
+	    "vector_width": {"default": 5},
 	    "label_attribute": "elevation",
-	    "canonicalize": {"to": "name", "from": "elevation", "default": ""}
+	    "canonicalize": [{"to": "name", "from": "elevation", "default": ""}]
         },
         "attribution": {
             "url": "https://www.scvfd.fireatlas.org",
@@ -325,11 +370,11 @@
 	    "vector_width": {
 		"attribute": "class",
 		"map": {
-		    "primary": 9,
-		    "secondary": 7,
-		    "tertiary": 5
+		    "primary": 15,
+		    "secondary": 11,
+		    "tertiary": 9
 		},
-		"default": 4
+		"default": 11
 	    }
 	}
     },			
@@ -340,7 +385,8 @@
 	"data_type": "tiff",
 	"resample_width": 5000,
 	"out_layer": "lidar_basemap",
-	"inpath_template": "westport_dem_2m_hillshade.tiff",
+	"lame_inpath_template": "westport_dem_2m_hillshade.tiff",
+	"inpath_template": "hillshade.tiff",
 	"attribution": {
 	    "url": "https://portal.opentopography.org/api/terms",
 	    "description": "Open Topography's Global DEM",
@@ -467,23 +513,21 @@
         }               
     },
     
-	"gazetteer": {
-		"name": "gazetteer",
-		"asset_type": "outlet",]
-		"interaction": "interface",
-		"num_rows": 5,
-		"num_cols": 6,
-		"outlet_type": "gazetteer",
-		"fetch_type": "gazetteer",
-		"data_type": "html",
-		"outpath_template": "/gazetteer/index.html",
-		"attribution": {
-		  "url": "https://www.scvfd.fireatlas.org",
-		  "description": "Printable 'Map Book' grid of pages.",
-		  "license": "https://www.scvfd.fireatlas.org",
-		  "citation": "https://www.scvfd.fireatlas.org"
-		}
-	  },
+    "gazetteer": {
+	"name": "gazetteer",
+	"asset_type": "outlet",
+	"interaction": "interface",
+	"outlet_type": "gazetteer",
+	"fetch_type": "gazetteer",
+	"data_type": "html",
+	"outpath_template": "/gazetteer/index.html",
+	"attribution": {
+	    "url": "https://www.scvfd.fireatlas.org",
+	    "description": "Printable 'Map Book' grid of pages.",
+	    "license": "https://www.scvfd.fireatlas.org",
+	    "citation": "https://www.scvfd.fireatlas.org"
+	}
+    },
     "sqlquery": {
 	"asset_type": "outlet",
 	"name": "sqlquery",

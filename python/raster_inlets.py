@@ -44,7 +44,7 @@ def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
         east=bbox['east'],
         west=bbox['west'],
         **config)
-    logger.debug(f"Fetching data from URL: {url}")
+    logger.info(f"Fetching data from URL: {url}")
     try:
         response = requests.get(url)
         response.raise_for_status()

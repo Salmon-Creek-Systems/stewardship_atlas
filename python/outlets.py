@@ -1,4 +1,4 @@
-import subprocess
+import subprocess, math, string
 import json, csv
 import sys,os
 from io import StringIO
@@ -212,18 +212,19 @@ def outlet_webmap(config, name):
     map_config = webmap_json(config, name)
     webmap_dir = versioning.atlas_path(config, "outlets") / name
     webmap_dir.mkdir(parents=True, exist_ok=True)
-    basemap_dir = versioning.atlas_path(config, "layers") / "basemap"
+    basemap_name = config['assets'][name]['in_layers'][0]
+    basemap_dir = versioning.atlas_path(config, "layers") / basemap_name 
     
     # make a JPG of basemap tiff..
     # TODO this should be a tiling URL instead of a local file..
     # TODO maybe resampling happens here?
     # TODO here is where we should be using Dagster and actual asset mgmt
-    basemap_path = basemap_dir / "basemap.jpg"
+    basemap_path = basemap_dir / f"{basemap_name}.jpg"
     if basemap_path.exists():
         logger.info(f"Using extant basemap: {basemap_path}.")
     else:
         logger.info(f"Generating basemap: {basemap_path}.")
-        utils.tiff2jpg(f"{basemap_dir}/basemap.tiff", basemap_path)
+        utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
     
     subprocess.run(['cp', '-r', '../templates/css/', webmap_dir / "css"])
     #subprocess.run(['cp', '../templates/js/map.js', f"{webmap_dir}/js/"])
@@ -346,10 +347,16 @@ def grass_init(swale_name):
     
 
 
-def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
+def extract_region_layer_ogr_grass(config, outlet_name, layer, region, reuse=True):
     """Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
     outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.geojson"
+
+    if reuse and outpath.exists():
+        logger.info(f"Reusing vector file at: {outpath}")
+        return outpath
+
+
     logger.info(f"Extracting region {region['name']} of vector layer {layer} to {outpath}.")
 
     grass_init(swale_name)  
@@ -361,7 +368,7 @@ def extract_region_layer_ogr_grass(config, outlet_name, layer, region):
     gs.read_command('v.out.ogr', input=f'{layer}_clip', output=outpath, format='GeoJSON')
     return outpath
 
-def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jpg=False):
+def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jpg=False, reuse=True):
     """Grab a region of a rasterlayer and export it. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
 
@@ -380,6 +387,10 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
     else:
         inpath = basemap_dir / f"{layer}.tiff"
     outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.tiff"
+
+    if reuse and outpath.exists():
+        logger.info(f"Reusing raster file at: {outpath}")
+        return outpath
     
     logger.info(f"Extracting region {region['name']} of raster layer {layer} to {outpath}.")
     #import grass.script as gs
@@ -460,13 +471,13 @@ def build_region_map_grass(config, outlet_name, region):
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
                          width_column='vector_width',
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
-                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=35)
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
             else:
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
-                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=25)
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
                 
     m.d_grid(size=0.5,color='black')
     m.d_legend_vect()
@@ -594,11 +605,13 @@ def generate_gazetteerregions(config, outlet_name):
         bdy += "</TR>\n"
     hdr += "</TR>\n"
     bdy += "</TABLE></BODY></HTML>"
-    return regions, hdr + bdy
+    html_path = versioning.atlas_path(config, "outlets") / outlet_name / "index.html"
+    return regions, [(html_path, hdr + bdy)]
 
-def outlet_gazetteer(config, outlet_name):
-    gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name) 
-    return gaz_regions, gaz_html
+def outlet_gazetteer(config, outlet_name, skips=[]):
+    gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name)
+    res =  outlet_regions_grass(config, outlet_name, gaz_regions, gaz_html, skips=skips)
+    return res
 
 
 def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
@@ -960,10 +973,7 @@ def outlet_html(config, outlet_name):
     outlet_config = config['assets'][outlet_name]
     # Create HTML for each swale
     #for swale in config.get('dataswales', []):
-    make_swale_html(config, outlet_config)
-        
-    return versioning.atlas_path(config, "html")
-   
+    return make_swale_html(config, outlet_config)
 
 def outlet_sqlquery(config: dict, outlet_name: str):
     """Generate HTML interface for SQL queries."""

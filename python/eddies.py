@@ -91,6 +91,8 @@ def contours_gdal(config:Dict[str, Any],eddy_name:str):
     # Clean up
     geojson_ds = None
     contour_ds = None
+
+    utils.alter_geojson(output_path, eddy['config']['alterations'])
     dem_ds = None
 
     return output_path
