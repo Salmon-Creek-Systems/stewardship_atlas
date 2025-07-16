@@ -132,6 +132,7 @@ def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_co
     logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
     return [ str(outpath) ]
 
+
 def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = False) -> FeatureCollection:
     """
    Apply all delta file sin order.
@@ -200,5 +201,6 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
     return geojson.load(open(layer_filepath))
     
     
-
+def apply_deltas_overwrite(config: Dict[str, Any], layer_name: str, overwrite: bool = False) -> FeatureCollection:
+    return apply_deltas(config=config, layer_name=layer_name, overwrite=True)
      
