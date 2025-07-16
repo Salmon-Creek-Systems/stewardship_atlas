@@ -34,5 +34,6 @@
     {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100],
      "add_labels": true, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
-    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
+    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
+    {"name": "burns", "geometry_type": "polygon", "color": [255, 55, 55], "add_labels": true, "access": [ "admin"]}
 ]

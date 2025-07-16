@@ -57,7 +57,7 @@
 	"geometry": "dataswale",
         "data_type": "geojson",
         "feature_type": "polygon",
-	"inpath_template": "ponds_sc.geojson",
+	"inpath_template": "ponds_scvfd.geojson",
         "attribution": {
             "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
             "description": "Open Addresses",
@@ -110,6 +110,38 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
+	"local_burns": {
+		"name": "burns",
+		"asset_type": "inlet",
+		"interaction": "download",
+		"fetch_type": "local_ogr",
+		"geometry": "dataswale",
+		"data_type": "geojson",
+		"feature_type": "polygon",
+		"inpath_template": "mineralkinsey_burns.geojson",
+		"attribution": {
+			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+			"description": "Open Addresses",
+			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+		}
+	},
+	"local_lpss": {
+		"name": "lpss",
+		"asset_type": "inlet",
+		"interaction": "download",
+		"fetch_type": "local_ogr",
+		"geometry": "dataswale",
+		"data_type": "geojson",
+		"feature_type": "point",
+		"inpath_template": "lpss.geojson",
+		"attribution": {
+			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+			"description": "Open Addresses",
+			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+		}
+	},
     "local_tsunami": {
         "name": "tsunami",
         "asset_type": "inlet", 

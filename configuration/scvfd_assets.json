@@ -64,7 +64,11 @@
         "out_layer": "ponds",
         "config_def": "local_ponds"
     },
-
+    "local_lpss" : {
+        "type": "inlet",
+        "out_layer": "lpss",
+        "config_def": "local_lpss"
+    },
     "local_turnouts" : {
         "type": "inlet",
         "out_layer": "turnouts",
