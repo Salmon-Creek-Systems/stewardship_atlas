@@ -127,20 +127,25 @@
 		}
 	},
 	"local_lpss": {
-		"name": "lpss",
-		"asset_type": "inlet",
-		"interaction": "download",
-		"fetch_type": "local_ogr",
-		"geometry": "dataswale",
-		"data_type": "geojson",
-		"feature_type": "point",
-		"inpath_template": "lpss.geojson",
-		"attribution": {
-			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
-			"description": "Open Addresses",
-			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
-			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
-		}
+	    "name": "lpss",
+	    "asset_type": "inlet",
+	    "interaction": "download",
+	    "fetch_type": "local_ogr",
+	    "geometry": "dataswale",
+	    "data_type": "geojson",
+	    "feature_type": "point",
+	    "inpath_template": "lpss.geojson",
+	    
+	    "alterations": {
+		"canonicalize":  [{"to": "name", "from":["TownshipRange"], "default": "Township/Range"}]
+            },
+	    
+	    "attribution": {
+		"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+		"description": "Open Addresses",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+	    }
 	},
     "local_tsunami": {
         "name": "tsunami",
@@ -406,7 +411,7 @@
 		    "secondary": 11,
 		    "tertiary": 9
 		},
-		"default": 11
+		"default": 7
 	    }
 	}
     },			

@@ -28,7 +28,7 @@
      "symbol": {"png": "hydrant.png", "icon": "extra/half-circle"},
      "icon-size": 0.05,
      "interaction": "interface"},
-    {"name": "ponds", "geometry_type": "polygon", "fill_color": [50, 50, 250]},
+    {"name": "ponds", "geometry_type": "polygon", "color": [50, 50, 250],"fill_color": [0, 0, 250]},
     {"name": "natural", "geometry_type": "point", "color": [0, 200, 55], "add_labels": true,
      "icon-size": 0.05,
      "interaction": "interface"},    

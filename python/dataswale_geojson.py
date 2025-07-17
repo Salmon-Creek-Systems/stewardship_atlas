@@ -64,6 +64,14 @@ def refresh_raster_layer(config, name, delta_queue_builder=DQB):
         
     return layer_path
 
+
+def layer_as_featurecollection(config:Dict[str, Any], name:str):    
+    layer_path = layer_as_path(config, name)
+    return geojson.load(open(layer_path))
+
+def layer_as_path(config:Dict[str, Any], name:str):    
+    return versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
+    
 def eddy(config:Dict[str, Any], eddy_name:str):
     """Apply Eddy to transform a dataswale layer into a new layer."
     """
