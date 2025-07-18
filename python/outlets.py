@@ -4,6 +4,7 @@ import sys,os
 from io import StringIO
 from pathlib import Path
 import duckdb
+import geopandas as gpd
 
 import utils
 import versioning
@@ -347,6 +348,7 @@ def grass_init(swale_name):
     
 
 
+
 def extract_region_layer_ogr_grass(config, outlet_name, layer, region, reuse=False):
     """Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
@@ -410,6 +412,13 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
 
 
 def build_region_map_grass(config, outlet_name, region):
+    """Build a map image for a region using GRASS GIS.
+    
+    Args:
+        config (dict): The configuration dictionary for the atlas.
+        outlet_name (str): The name of the outlet.
+        region (dict): The region to build the map for.
+"""
 
     grass_init(config['name'])
     import grass.script as gs
@@ -422,6 +431,8 @@ def build_region_map_grass(config, outlet_name, region):
     clip_bbox = region['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
     # load region layers
+    # First the raster basemap. Note we blend it with a greyscale overlay 
+    blend_percent = config['assets'][outlet_name].get('blend_percent', 25)
     raster_name = 'hillshadered_' + region['name']
     print(f"making map image for {region}.")
     gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
@@ -429,7 +440,7 @@ def build_region_map_grass(config, outlet_name, region):
     
     gs.read_command('r.mapcalc.simple', expression="1", output='ones')
     gs.read_command('r.colors', map='ones', color='grey1.0')
-    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent='55', overwrite=True)
+    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent=blend_percent, overwrite=True)
     
     m.d_rast(map='blended')   
     # m.d_rast(map=raster_name)  
@@ -480,14 +491,43 @@ def build_region_map_grass(config, outlet_name, region):
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
                 
     m.d_grid(size=0.5,color='black')
-    m.d_legend_vect()
+    m.d_legend_vect(fontsize=25, bgcolor="255:255:255", border_color="255:0:0", border_width=10)
 
     # export map
     outpath = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.png"
     m.save(outpath)
     # return path to map
     return outpath
+
+def process_region(layer_config: dict, region_extract_path: str):
+    """Process a region extract for a layer.
+    Current this means only show each name value once.
+    Args:
+        layer_config (dict): The configuration dictionary for the layer.
+        region_extract_path (str): The path to the region extract.
+    """
+    # load region layer as geopandas
+    gdf = gpd.read_file(region_extract_path)
     
+    # For each name group, randomly select one feature to keep its name, 
+    # and set name to empty string for all others
+    def process_name_group(group):
+        if len(group) > 1:
+            # Randomly select one row to keep its name
+            keep_name_idx = group.sample(1).index[0]
+            # Set name to empty string for all rows except the selected one
+            group.loc[group.index != keep_name_idx, 'name'] = ''
+        return group
+    
+    # Apply the processing to each name group
+    gdf = gdf.groupby('name', group_keys=False).apply(process_name_group)
+    
+    # Fill any NaN values with empty string
+    gdf['name'] = gdf['name'].fillna('')
+    
+    # save to new file
+    gdf.to_file(region_extract_path, driver='GeoJSON')
+    return region_extract_path
 
 def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
@@ -514,7 +554,9 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
-                    region['vectors'].append([lc, extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region)])
+                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region)
+                    processed_region_extract_path = process_region(lc, region_extract_path)
+                    region['vectors'].append([lc, processed_region_extract_path])
             else:
                 gs.read_command('r.in.gdal', input=staging_path, output=lc['name'])
                 for region in regions:
@@ -527,8 +569,14 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
             logger.debug(f"Building map for region: {region['name']}")
             # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
             build_region_map_grass(config, outlet_name, region)
-    
+
+        # save regions config as JSON for later use
+        regions_json_path = versioning.atlas_path(config, "outlets") / outlet_name / f"regions_config.json"
+        with open(regions_json_path, "w") as f:
+            json.dump(regions, f)
+    # Post-process to overlay PNG symbols if any were configured
     # Write output files
+
     for outfile_path, outfile_content in regions_html:
         versioned_path = versioning.atlas_path(config, "outlets") / outlet_name / outfile_path
         # os.makedirs(os.path.dirname(versioned_path), exist_ok=True)
@@ -1028,3 +1076,224 @@ asset_methods = {
     'sqlquery': outlet_sqlquery
 }
 #"""
+
+def _overlay_png_symbols_on_map(map_image_path, region, config):
+    """
+    Post-process a map image to overlay PNG symbols at point coordinates.
+    
+    Args:
+        map_image_path: Path to the generated map image
+        region: Region configuration dictionary
+        config: Atlas configuration dictionary
+    """
+    try:
+        from PIL import Image, ImageDraw
+        import json
+        from pathlib import Path
+        
+        # Load the map image
+        map_img = Image.open(map_image_path)
+        map_width, map_height = map_img.size
+        
+        # Get region bounds for coordinate transformation
+        bbox = region['bbox']
+        region_width = bbox['east'] - bbox['west']
+        region_height = bbox['north'] - bbox['south']
+        
+        # Process each vector layer for PNG symbols
+        for lc, lp in region['vectors']:
+            if lc.get('geometry_type') != 'point':
+                continue
+                
+            png_config = lc.get('png_symbol', {})
+            if not png_config or not png_config.get('path'):
+                continue
+                
+            png_path = png_config['path']
+            png_size = png_config.get('size', 20)
+            
+            # Check if PNG file exists
+            if not Path(png_path).exists():
+                logger.warning(f"PNG symbol file not found: {png_path}")
+                continue
+                
+            # Load PNG symbol
+            try:
+                png_symbol = Image.open(png_path)
+                # Resize PNG to specified size
+                png_symbol = png_symbol.resize((png_size, png_size), Image.Resampling.LANCZOS)
+            except Exception as e:
+                logger.warning(f"Failed to load PNG symbol {png_path}: {e}")
+                continue
+            
+            # Load point coordinates from GeoJSON
+            try:
+                with open(lp, 'r') as f:
+                    geojson_data = json.load(f)
+                    
+                for feature in geojson_data.get('features', []):
+                    if feature['geometry']['type'] == 'Point':
+                        coords = feature['geometry']['coordinates']
+                        lon, lat = coords[0], coords[1]
+                        
+                        # Convert geographic coordinates to image coordinates
+                        # Note: This assumes the map image covers the exact region bounds
+                        x = int((lon - bbox['west']) / region_width * map_width)
+                        y = int((bbox['north'] - lat) / region_height * map_height)
+                        
+                        # Calculate position for centered placement
+                        x_offset = x - png_size // 2
+                        y_offset = y - png_size // 2
+                        
+                        # Paste PNG symbol onto map
+                        if (x_offset >= 0 and y_offset >= 0 and 
+                            x_offset + png_size <= map_width and 
+                            y_offset + png_size <= map_height):
+                            map_img.paste(png_symbol, (x_offset, y_offset), png_symbol)
+                            
+            except Exception as e:
+                logger.warning(f"Failed to process points for layer {lc['name']}: {e}")
+                continue
+        
+        # Save the modified map image
+        map_img.save(map_image_path)
+        logger.info(f"PNG symbols overlaid on map: {map_image_path}")
+        
+    except ImportError:
+        logger.warning("PIL/Pillow not available. PNG symbols will not be overlaid.")
+    except Exception as e:
+        logger.error(f"Failed to overlay PNG symbols: {e}")
+
+
+def build_region_map_grass_png(config, outlet_name, region):
+    """
+    Build a region map using GRASS GIS with PNG images for point features instead of icons.
+    
+    Args:
+        config: Atlas configuration dictionary
+        outlet_name: Name of the outlet
+        region: Region configuration dictionary
+        
+    Returns:
+        Path to the generated map image
+    """
+    
+    grass_init(config['name'])
+    import grass.script as gs
+    import grass.jupyter as gj
+    
+    if region['name'] == 'all':
+        size = 9000
+    else:
+        size = 2400
+    
+    m = gj.Map(height=size, width=size)
+    clip_bbox = region['bbox']
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
+    
+    # load region layers
+    raster_name = 'hillshadered_' + region['name']
+    logger.info(f"making map image for {region}.")
+    gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
+    gs.read_command('r.colors', map=raster_name, color='grey')
+    
+    gs.read_command('r.mapcalc.simple', expression="1", output='ones')
+    gs.read_command('r.colors', map='ones', color='grey1.0')
+    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent='55', overwrite=True)
+    
+    m.d_rast(map='blended')
+    
+    # Track which layers have PNG symbols for post-processing
+    png_layers = []
+    
+    # add layers to map
+    for lc,lp in region['vectors']:
+        logger.debug(f"adding region {lc} to map for region {region['name']}")
+        if lc['name'] in region.get('config', {}):
+            for update_key, update_value in region['config'].items():
+                lc[update_key] = update_value
+                logger.info(f"region config override: {region['name']} | {lc['name']}: {region['config']} -> {lc}")
+        
+        gs.read_command('v.import', input=lp, output=lc['name'])
+        
+        # clunky but need to skip empty sets
+        lame = json.load(open(lp))
+        if len(lame['features']) < 1:
+            logger.info("layer is empty...")
+            continue
+            
+        if lc.get('geometry_type', 'line') == 'point':
+            c = lc.get('color', (100,100,100))
+            
+            # Check if PNG configuration exists
+            png_config = lc.get('png_symbol', {})
+            if png_config and png_config.get('path'):
+                png_path = png_config['path']
+                png_size = png_config.get('size', 20)
+                
+                logger.info(f"PNG symbol configured for {lc['name']}: {png_path} (size: {png_size})")
+                
+                # For PNG symbols, use minimal/invisible icons so we can overlay PNGs later
+                if lc.get('add_labels', False):
+                    logger.debug("Adding Points with PNG symbols and labels")
+                    m.d_vect(map=lc['name'],
+                             color=f"{c[0]}:{c[1]}:{c[2]}",
+                             icon='basic/circle',  # Minimal icon
+                             size=1,  # Very small to be nearly invisible
+                             label_size=25,
+                             attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
+                else:
+                    logger.debug("Adding Points with PNG symbols (no labels)")
+                    m.d_vect(map=lc['name'],
+                             color=f"{c[0]}:{c[1]}:{c[2]}",
+                             icon='basic/circle',  # Minimal icon
+                             size=1)  # Very small to be nearly invisible
+                
+                # Track this layer for PNG overlay
+                png_layers.append((lc, lp, png_config))
+                
+            else:
+                # No PNG config, use default icon behavior
+                if lc.get('add_labels', False):
+                    logger.debug("Adding Points with default symbol and labels")
+                    m.d_vect(map=lc['name'],
+                             color=f"{c[0]}:{c[1]}:{c[2]}",
+                             icon=lc.get('symbol', 'basic/diamond'),size=20,
+                             label_size=25,
+                             attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
+                else:
+                    logger.debug("Adding Points with default symbol")
+                    m.d_vect(map=lc['name'],
+                             color=f"{c[0]}:{c[1]}:{c[2]}",
+                             icon=lc.get('symbol', 'basic/diamond'),size=10)
+        else:
+            # Handle non-point geometries (lines, polygons) the same as original
+            c = lc.get('color', (100,100,100))
+            fc = lc.get('fill_color', c)
+            if 'vector_width' in lc:
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         width_column='vector_width',
+                         attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
+            else:
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
+                         label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
+                
+    m.d_grid(size=0.5,color='black')
+    m.d_legend_vect()
+
+    # export map
+    outpath = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.png"
+    m.save(outpath)
+    
+    # Post-process to overlay PNG symbols if any were configured
+    if png_layers:
+        _overlay_png_symbols_on_map(outpath, region, config)
+    
+    # return path to map
+    return outpath
