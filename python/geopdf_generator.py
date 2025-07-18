@@ -161,7 +161,8 @@ class GeoPDFGenerator:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             logger.info("GeoPDF generated using gdal2tiles")
             
-        except subprocess.CalledProcessError as e:
+            # except subprocess.CalledProcessError as e:
+        except Exception as e:
             logger.warning(f"gdal2tiles failed: {e}")
             logger.info("Falling back to gdal_translate method")
             

@@ -347,7 +347,7 @@ def grass_init(swale_name):
     
 
 
-def extract_region_layer_ogr_grass(config, outlet_name, layer, region, reuse=True):
+def extract_region_layer_ogr_grass(config, outlet_name, layer, region, reuse=False):
     """Grab a region of a layer and export it as a GeoJSON file using GRASS GIS. Note this assumes the entire layer is already in GRASS. Which is awful."""
     swale_name = config['name']
     outpath = versioning.atlas_path(config,  "outlets") / outlet_name / f"{layer}_{region['name']}.geojson"
