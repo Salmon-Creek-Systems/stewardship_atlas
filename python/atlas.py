@@ -8,13 +8,19 @@ The module includes the following main functions:
 - asset: Create an asset for a stewart atlas and a config file.
 
 """
-
+# Boring Imports
 import json
 import os
 import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+
+# Interesting imports
+import geojson
+
+# Our imports
 import utils
 
 # Configure logging
@@ -90,7 +96,8 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         name = feature['properties']['name']
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
-    
+        
+        
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)
 
@@ -108,6 +115,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['dataswale']['bbox'] = bbox
     config['dataswale']['layers'] = layers
     config['assets'] = assets
+
     
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
@@ -129,6 +137,12 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             # add htpasswrd to new directory
             add_htpasswds(config, p / 'staging' / 'layers' / layer['name'], layer['access'])
 
+    if (p /'staging' / 'layers' / 'regions').exists():
+        if feature_collection:
+            logger.info("Storing initial feature collection in {p /'layers' / 'regions'}...")
+            geojson.dump(feature_collection, open(p /'staging' / 'layers' / 'regions' / 'regions.geojson', "w"))
+
+            
     logger.info(f"built a config for {config['name']}.")         
     logger.debug(f"built a config: {config}")
     json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)

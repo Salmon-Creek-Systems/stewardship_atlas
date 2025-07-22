@@ -1,0 +1,66 @@
+{
+    "dem": {
+        "type": "inlet",
+        "out_layer": "elevation",
+        "config_def": "opentopo_dem"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "elevation",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+    "public_roads" : {
+        "type": "inlet",
+        "out_layer": "roads",
+        "config_def": "overture_roads"
+    },
+    "local_hydrants" : {
+        "type": "inlet",
+        "out_layer": "hydrants",
+        "config_def": "local_kennedy_hydrants"
+    },
+"webmap" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "roads", "hydrants"],
+    "config_def": "webmap",
+    "access": ["internal", "admin"]
+},
+"webedit" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap","roads", "hydrants"],
+    "config_def": "webedit"
+},
+    "runbook": {
+        "type": "outlet",
+        "name": "runbook",
+        "in_layers": ["basemap", "roads", "hydrants"],
+        "access": ["internal", "admin"],
+        "config_def": "runbook",
+        "regions" : []},
+    "html": {
+        "type": "outlet",
+        "name": "html",
+        "config_def": "static_html"},
+    "sqldb": {
+	"type": "outlet",
+	"name": "sqldb",
+	"layers": ["basemap", "roads", "creeks"]
+    },
+    "sqlquery": {
+	"type": "outlet",
+	"name": "sqlquery",
+	"config_def": "sqlquery",
+	"access": ["admin"]
+    },
+    "gazetteer": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"num_rows": 5,
+	"num_cols": 6,
+	"config_def": "gazetteer",
+	"in_layers":  ["lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings"]
+    }
+}

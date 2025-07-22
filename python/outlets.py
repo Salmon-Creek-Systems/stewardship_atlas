@@ -481,6 +481,7 @@ def build_region_map_grass(config, outlet_name, region):
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
                          width_column='vector_width',
+                         width_scale=2.0,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
             else:
@@ -526,7 +527,10 @@ def process_region(layer_config: dict, region_extract_path: str):
     gdf['name'] = gdf['name'].fillna('')
     
     # save to new file
-    gdf.to_file(region_extract_path, driver='GeoJSON')
+    parent_dir = region_extract_path.parent
+    file_stem = region_extract_path.stem
+    file_suffix = region_extract_path.suffix
+    gdf.to_file(parent_dir / f"{file_stem}_processed.{file_suffix}", driver='GeoJSON')
     return region_extract_path
 
 def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
@@ -556,13 +560,13 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                     logger.debug(f"Processing vector region: {region['name']}")
                     region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region)
                     processed_region_extract_path = process_region(lc, region_extract_path)
-                    region['vectors'].append([lc, processed_region_extract_path])
+                    region['vectors'].append([lc, str(processed_region_extract_path)])
             else:
                 gs.read_command('r.in.gdal', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing raster region: {region['name']}")
                     region['raster'] = [lc,
-                                        extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False)]
+                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False))]
                 
         # Build maps for each region
         for region in regions:
