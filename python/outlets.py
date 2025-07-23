@@ -492,6 +492,20 @@ def build_region_map_grass(config, outlet_name, region):
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
                 
     m.d_grid(size=0.5,color='black')
+
+    # add neighboring gazeteer text                                                                                                                                              
+    nbr = region.get('gazetteer_neighbors', {})
+    if nbr['north']:
+        m.d_text(text=nbr['north'], flags="p", at="800,30", size=4)
+    if nbr['south']:
+        m.d_text(text=nbr['south'], rotation=180, flags="p", at="800,1570", size=4)
+    if nbr['west']:
+        m.d_text(text=nbr['west'], rotation=90, flags="p", at="30, 800", size=4)
+    if nbr['east']:
+        m.d_text(text=nbr['right'], rotation=270, flags="p", at="1570, 800", size=4)
+
+
+    # Add legend
     m.d_legend_vect(fontsize=25, bgcolor="255:255:255", border_color="255:0:0", border_width=10)
 
     # export map
@@ -645,8 +659,30 @@ def generate_gazetteerregions(config, outlet_name):
             e = bbox['west'] + (1+col)*cell_size
             w = bbox['west'] + col*cell_size
             cell_name = f"{colname}_{rowname}"
+            # Add neighbors to the region
+
+            up_row = row - 1 
+            down_row = row + 1
+            left_col = col - 1
+            right_col = col + 1
+         
+            up_rowname =  row_index[up_row] if up_row >= 0 else None
+            down_rowname = row_index[down_row] if down_row < len(row_index) else None
+            right_colname = right_col if right_col < len(col_index) else None
+            left_colname = left_col if left_col >=0 else None
+
+            neighbors = {
+                    "north" : f"{colname}_{up_rowname}" if up_rowname is not None else None,
+                    "south" : f"{colname}_{down_rowname}" if down_rowname is not None else None,
+                    "west" : f"{left_colname}_{rowname}" if left_colname is not None else None,
+                    "east" : f"{right_colname}_{rowname}" if right_colname is not None else None
+            }
+
+          
+            
             regions.append({'name': cell_name, 
                             'bbox': {'south': s,'west':w,'north': n,'east': e},
+                            'gazetteer_neighbors': neighbors,
                             'vectors': [],
                             'raster': ''})
             if col == 0:
