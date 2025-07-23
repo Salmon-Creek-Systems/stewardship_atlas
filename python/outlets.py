@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 import duckdb
 import geopandas as gpd
+import pandas as pd
 
 import utils
 import versioning
@@ -528,18 +529,23 @@ def process_region(layer_config: dict, region_extract_path: str):
     # load region layer as geopandas
     gdf = gpd.read_file(region_extract_path)
     
-    # For each name group, randomly select one feature to keep its name, 
-    # and set name to empty string for all others
-    def process_name_group(group):
-        if len(group) > 1:
-            # Randomly select one row to keep its name
-            keep_name_idx = group.sample(1).index[0]
-            # Set name to empty string for all rows except the selected one
-            group.loc[group.index != keep_name_idx, 'name'] = ''
-        return group
+    # Alternative approach: iterate through unique names to avoid groupby conflicts
+    unique_names = gdf['name'].dropna().unique()
     
-    # Apply the processing to each name group
-    gdf = gdf.groupby('name', group_keys=False).apply(process_name_group)
+    for name in unique_names:
+        if pd.isna(name) or name == '':
+            continue
+            
+        # Get all rows with this name
+        name_mask = gdf['name'] == name
+        name_indices = gdf[name_mask].index
+        
+        if len(name_indices) > 1:
+            # Randomly select one row to keep its name
+            keep_idx = gdf.loc[name_mask].sample(1).index[0]
+            # Set name to empty string for all other rows with this name
+            other_indices = name_indices[name_indices != keep_idx]
+            gdf.loc[other_indices, 'name'] = ''
     
     # Fill any NaN values with empty string
     gdf['name'] = gdf['name'].fillna('')
