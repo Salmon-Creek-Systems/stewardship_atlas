@@ -169,7 +169,59 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
-    
+    "humtrans_roads" : {
+	"name": "roads",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+	"feature_type": "line",
+	"alterations": {
+            "canonicalize": [
+		{
+		    "to": "REMOVE",
+		    "from": [
+			"ID"
+		    ],
+		    "remove_prefix": []
+		},
+		{
+		    "to": "name",
+		    "from": [
+			"FULLRDNAME"
+		    ],
+		    "remove_prefix": [
+			"PRIVATE",
+			"UNN",
+			"GATED"
+		    ]
+		},
+		{
+		    "to": "STREETTYPE",
+		    "from": [
+			"STREETTYPE"
+		    ],
+		    "remove_prefix": []
+		}
+            ],
+            "vector_width": {
+		"attribute": "STREETTYPE",
+		"map": {
+		    "RD": 5,
+		    "ST": 3
+		},
+		"default": 1
+            }
+	},
+	"inpath_template": "humtranssp27.shp",
+	"attribution": {
+            "url": "https://www.humantrans.com/humantrans-data-downloads",
+            "description": "Human Transporation Systems's public road vector data",
+            "license": "https://www.humantrans.com/humantrans-data-downloads",
+            "citation": "https://www.humantrans.com/humantrans-data-downloads"
+	}
+    },
     "internal_roads": {
         "name": "internal_roads",
         "asset_type": "inlet",
@@ -303,6 +355,32 @@
 		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
             }
 	},
+
+        "local_watertanks": {
+            "name": "watertanks",
+            "asset_type": "inlet", 
+	    "symbol": "custom/octy",
+            "interaction": "interface",
+            "fetch_type": "local_ogr",
+            "data_type": "geojson",
+            "feature_type": "point",
+	    "inpath_template": "scvfd_watertanks.geojson",
+            "alterations": {
+		"canonicalize": [{"to": "name", "from":["CampNumber"], "default": "water tank"}],
+		"vector_width": {
+		    "default": 5
+		}
+            },
+	    
+            "attribution": {
+		"url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+		"description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+            }
+	},
+
+
     
     "local_campgrounds": {
         "name": "campgrounds",

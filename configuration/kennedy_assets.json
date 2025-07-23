@@ -13,7 +13,7 @@
     "public_roads" : {
         "type": "inlet",
         "out_layer": "roads",
-        "config_def": "overture_roads"
+        "config_def": "humtrans_roads"
     },
     "local_hydrants" : {
         "type": "inlet",

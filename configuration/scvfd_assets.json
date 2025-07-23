@@ -42,10 +42,10 @@
         "out_layer": "roads",
         "config_def": "overture_roads"
     },
-    "internal_roads" : {
+    "humtrans_roads" : {
         "type": "inlet",
-        "out_layer": "internal_roads",
-        "config_def": "internal_roads"
+        "out_layer": "roads",
+        "config_def": "humtrans_roads"
     },
 
     "public_creeks" : {
@@ -54,10 +54,10 @@
         "config_def": "nhd_creeks"
     },
 
-    "local_hydrants" : {
+    "local_watertanks" : {
         "type": "inlet",
-        "out_layer": "hydrants",
-        "config_def": "local_hydrants"
+        "out_layer": "watertanks",
+        "config_def": "local_watertanks"
     },
     "local_ponds" : {
         "type": "inlet",
@@ -78,7 +78,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap","ponds",  "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+    "in_layers": ["basemap","ponds",  "parcels", "contours", "roads", "creeks", "buildings", "watertanks"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
@@ -98,7 +98,7 @@
     "runbook": {
         "type": "outlet",
         "name": "runbook",
-        "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
+        "in_layers": ["basemap", "roads", "creeks", "buildings"],
         "access": ["internal", "admin"],
         "config_def": "runbook",
         "regions" : []},
@@ -123,6 +123,6 @@
 	"num_rows": 5,
 	"num_cols": 6,
 	"config_def": "gazetteer",
-	"in_layers":  ["lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings"]
+	"in_layers":  ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "watertanks"]
     }
 }

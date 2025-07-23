@@ -9,7 +9,7 @@ import geopandas as gpd
 import utils
 import versioning
 import logging
-
+import geojson
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -365,9 +365,13 @@ def extract_region_layer_ogr_grass(config, outlet_name, layer, region, reuse=Fal
     import grass.script as gs
     clip_bbox = region['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
-    gs.read_command('v.clip', flags='r', input=layer, output=f'{layer}_clip')
-    
-    gs.read_command('v.out.ogr', input=f'{layer}_clip', output=outpath, format='GeoJSON')
+    try:
+        gs.read_command('v.clip', flags='r', input=layer, output=f'{layer}_clip')
+        gs.read_command('v.out.ogr', input=f'{layer}_clip', output=outpath, format='GeoJSON')
+    except gs.CalledModuleError as e:
+        logger.info(f"Clip was empty for {layer} in {region['name']}. Writing empty file.")
+        geojson.dump(geojson.FeatureCollection([]), open(outpath,"w"))
+
     return outpath
 
 def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jpg=False, reuse=True):
@@ -495,14 +499,14 @@ def build_region_map_grass(config, outlet_name, region):
 
     # add neighboring gazeteer text                                                                                                                                              
     nbr = region.get('gazetteer_neighbors', {})
-    if nbr['north']:
+    if nbr.get('north'):
         m.d_text(text=nbr['north'], flags="p", at="800,30", size=4)
-    if nbr['south']:
+    if nbr.get('south'):
         m.d_text(text=nbr['south'], rotation=180, flags="p", at="800,1570", size=4)
-    if nbr['west']:
+    if nbr.get('west'):
         m.d_text(text=nbr['west'], rotation=90, flags="p", at="30, 800", size=4)
-    if nbr['east']:
-        m.d_text(text=nbr['right'], rotation=270, flags="p", at="1570, 800", size=4)
+    if nbr.get('east'):
+        m.d_text(text=nbr['east'], rotation=270, flags="p", at="1570, 800", size=4)
 
 
     # Add legend
@@ -544,8 +548,10 @@ def process_region(layer_config: dict, region_extract_path: str):
     parent_dir = region_extract_path.parent
     file_stem = region_extract_path.stem
     file_suffix = region_extract_path.suffix
-    gdf.to_file(parent_dir / f"{file_stem}_processed.{file_suffix}", driver='GeoJSON')
-    return region_extract_path
+    processed_path = parent_dir / f"{file_stem}_processed{file_suffix}"
+    gdf.to_file(processed_path, driver='GeoJSON') 
+    logger.info(f"Processed {region_extract_path} -> {processed_path}")
+    return processed_path
 
 def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
@@ -572,7 +578,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
-                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region)
+                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=True)
                     processed_region_extract_path = process_region(lc, region_extract_path)
                     region['vectors'].append([lc, str(processed_region_extract_path)])
             else:
@@ -643,7 +649,7 @@ def generate_gazetteerregions(config, outlet_name):
                             'bbox': bbox,
                             'vectors': [],
                             'raster': ''}
-    regions.append(everything_region)
+    # regions.append(everything_region)
     cell_width=300
     hdr = f"<HTML><BODY><table border=3 bgcolor='#FFFFFF' cellpadding=0 cellspacing=1>\n<TR><td>{config['name']}</td>"
     bdy = ''
