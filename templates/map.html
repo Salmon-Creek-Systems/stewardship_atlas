@@ -172,6 +172,61 @@
       const MAP_CONFIG = {map_config};
       const map = new maplibregl.Map(MAP_CONFIG);
       
+      // Function to get URL parameters
+      function getUrlParameter(name) {{
+          const urlParams = new URLSearchParams(window.location.search);
+          return urlParams.get(name);
+      }}
+      
+      // Function to add a marker at specified coordinates
+      function addLocationMarker(lat, lng) {{
+          // Create a marker element
+          const markerEl = document.createElement('div');
+          markerEl.className = 'location-marker';
+          markerEl.style.cssText = `
+              width: 20px;
+              height: 20px;
+              background-color: #ff0000;
+              border: 2px solid #ffffff;
+              border-radius: 50%;
+              cursor: pointer;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          `;
+          
+          // Add the marker to the map
+          new maplibregl.Marker(markerEl)
+              .setLngLat([lng, lat])
+              .addTo(map);
+      }}
+      
+      // Check for lat/lng in URL parameters
+      const urlLat = getUrlParameter('lat');
+      const urlLng = getUrlParameter('lng');
+      const urlZoom = getUrlParameter('zoom');
+      
+      if (urlLat && urlLng) {{
+          const lat = parseFloat(urlLat);
+          const lng = parseFloat(urlLng);
+          const zoom = urlZoom ? parseFloat(urlZoom) : 15; // Default zoom if not specified
+          
+          // Validate coordinates
+          if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {{
+              // Validate zoom level (0-22)
+              const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 15;
+              
+              // Center map on the specified location
+              map.setCenter([lng, lat]);
+              map.setZoom(validZoom); // Use the specified or validated zoom level
+              
+              // Add a marker at the location
+              addLocationMarker(lat, lng);
+              
+              console.log(`Map centered at: ${{lat}}, ${{lng}} with zoom: ${{validZoom}}`);
+          }} else {{
+              console.warn('Invalid coordinates in URL parameters');
+          }}
+      }}
+      
       
       map.addControl(new maplibregl.ScaleControl({{
 	  maxWidth: 80,
