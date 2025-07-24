@@ -437,7 +437,7 @@ def build_region_map_grass(config, outlet_name, region):
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
     # load region layers
     # First the raster basemap. Note we blend it with a greyscale overlay 
-    blend_percent = config['assets'][outlet_name].get('blend_percent', 25)
+    blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
     raster_name = 'hillshadered_' + region['name']
     print(f"making map image for {region}.")
     gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
@@ -486,7 +486,7 @@ def build_region_map_grass(config, outlet_name, region):
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
                          width_column='vector_width',
-                         width_scale=2.0,
+                         width_scale=4.0,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
             else:
@@ -501,17 +501,17 @@ def build_region_map_grass(config, outlet_name, region):
     # add neighboring gazeteer text                                                                                                                                              
     nbr = region.get('gazetteer_neighbors', {})
     if nbr.get('north'):
-        m.d_text(text=nbr['north'], flags="p", at="800,30", size=4)
+        m.d_text(text=nbr['north'],  at="0.5,0.9", size=4)
     if nbr.get('south'):
-        m.d_text(text=nbr['south'], rotation=180, flags="p", at="800,1570", size=4)
+        m.d_text(text=nbr['south'], rotation=180,  at="0.5, 0.1", size=4)
     if nbr.get('west'):
-        m.d_text(text=nbr['west'], rotation=90, flags="p", at="30, 800", size=4)
+        m.d_text(text=nbr['west'], rotation=90, at="0.1, 0.5", size=4)
     if nbr.get('east'):
-        m.d_text(text=nbr['east'], rotation=270, flags="p", at="1570, 800", size=4)
+        m.d_text(text=nbr['east'], rotation=270, at="0.9,0.5", size=4)
 
 
     # Add legend
-    m.d_legend_vect(fontsize=25, bgcolor="255:255:255", border_color="255:0:0", border_width=10)
+    m.d_legend_vect(fontsize=25, overwrite=True,bgcolor="155:155:155", border_color="255:0:0", border_width=10)
 
     # export map
     outpath = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.png"
@@ -528,37 +528,39 @@ def process_region(layer_config: dict, region_extract_path: str):
     """
     # load region layer as geopandas
     gdf = gpd.read_file(region_extract_path)
+    if len(gdf) > 0:
+        # Alternative approach: iterate through unique names to avoid groupby conflicts
+        unique_names = gdf['name'].dropna().unique()
     
-    # Alternative approach: iterate through unique names to avoid groupby conflicts
-    unique_names = gdf['name'].dropna().unique()
-    
-    for name in unique_names:
-        if pd.isna(name) or name == '':
-            continue
+        for name in unique_names:
+            if pd.isna(name) or name == '':
+                continue
             
-        # Get all rows with this name
-        name_mask = gdf['name'] == name
-        name_indices = gdf[name_mask].index
+            # Get all rows with this name
+            name_mask = gdf['name'] == name
+            name_indices = gdf[name_mask].index
         
-        if len(name_indices) > 1:
-            # Randomly select one row to keep its name
-            keep_idx = gdf.loc[name_mask].sample(1).index[0]
-            # Set name to empty string for all other rows with this name
-            other_indices = name_indices[name_indices != keep_idx]
-            gdf.loc[other_indices, 'name'] = ''
+            if len(name_indices) > 1:
+                # Randomly select one row to keep its name
+                keep_idx = gdf.loc[name_mask].sample(1).index[0]
+                # Set name to empty string for all other rows with this name
+                other_indices = name_indices[name_indices != keep_idx]
+                gdf.loc[other_indices, 'name'] = None
+                
+                # Fill any NaN values with empty string
+        #gdf['name'] = gdf['name'].fillna(None)
     
-    # Fill any NaN values with empty string
-    gdf['name'] = gdf['name'].fillna('')
+        # save to new file
+        parent_dir = region_extract_path.parent
+        file_stem = region_extract_path.stem
+        file_suffix = region_extract_path.suffix
+        processed_path = parent_dir / f"{file_stem}_processed{file_suffix}"
+        gdf.to_file(processed_path, driver='GeoJSON') 
+        logger.info(f"Processed {region_extract_path} -> {processed_path}")
+        return processed_path
+    else:
+        return region_extract_path
     
-    # save to new file
-    parent_dir = region_extract_path.parent
-    file_stem = region_extract_path.stem
-    file_suffix = region_extract_path.suffix
-    processed_path = parent_dir / f"{file_stem}_processed{file_suffix}"
-    gdf.to_file(processed_path, driver='GeoJSON') 
-    logger.info(f"Processed {region_extract_path} -> {processed_path}")
-    return processed_path
-
 def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
     swale_name = config['name']
@@ -592,7 +594,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 for region in regions:
                     logger.debug(f"Processing raster region: {region['name']}")
                     region['raster'] = [lc,
-                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False))]
+                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=True))]
                 
         # Build maps for each region
         for region in regions:

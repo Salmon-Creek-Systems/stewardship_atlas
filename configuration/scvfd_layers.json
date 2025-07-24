@@ -1,7 +1,7 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
-    {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50]},
+    {"name": "contours", "geometry_type": "linestring", "color": [30, 150, 30]},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", 

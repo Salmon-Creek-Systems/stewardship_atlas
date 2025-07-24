@@ -98,7 +98,7 @@
     "runbook": {
         "type": "outlet",
         "name": "runbook",
-        "in_layers": ["basemap", "roads", "creeks", "buildings"],
+        "in_layers": ["basemap", "roads", "ponds", "creeks", "buildings"],
         "access": ["internal", "admin"],
         "config_def": "runbook",
         "regions" : []},
@@ -123,6 +123,6 @@
 	"num_rows": 5,
 	"num_cols": 6,
 	"config_def": "gazetteer",
-	"in_layers":  ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "watertanks"]
+	"in_layers":  ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "watertanks", "lpss"]
     }
 }
