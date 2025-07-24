@@ -21,7 +21,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-			}}
+        }}
         
         .help-content {{
             background: white;
@@ -31,7 +31,7 @@
             max-height: 80%;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-			  }}
+        }}
         
         .help-header {{
             display: flex;
@@ -39,13 +39,13 @@
             align-items: center;
             padding: 20px 20px 0 20px;
             border-bottom: 1px solid #eee;
-			 }}
+        }}
         
         .help-header h2 {{
             margin: 0;
             color: #333;
             font-size: 1.5em;
-			    }}
+        }}
         
         .close-button {{
             background: none;
@@ -59,37 +59,37 @@
             display: flex;
             align-items: center;
             justify-content: center;
-			  }}
+        }}
         
         .close-button:hover {{
             color: #333;
-				}}
+        }}
         
         .help-body {{
             padding: 20px;
-		       }}
+        }}
         
         .help-body ul {{
             margin: 0;
             padding-left: 20px;
-			  }}
+        }}
         
         .help-body li {{
             margin-bottom: 10px;
             line-height: 1.4;
             color: #555;
-			  }}
+        }}
         
         #help-link {{
             font-weight: bold;
             font-size: 1.2em;
             text-decoration: none;
             color: #007bff;
-		       }}
+        }}
         
         #help-link:hover {{
             color: #0056b3;
-			     }}
+        }}
     </style>
 </head>
 <body>
@@ -102,14 +102,21 @@
                 <option value="usgs">USGS Topo</option>
                 <option value="terrain">OpenMapTiles Terrain</option>
             </select>
-            <div id="loading-progress" class="progress-bar">
-                <div class="progress-fill"></div>
-                <div class="progress-text">Loading layers...</div>
-            </div>
+        </div>
+        <div class="input-group">
+            <label>Double-click format:</label><br/>
+            <select id="coords-format-select" class="input-field">
+                <option value="json">JSON coordinates</option>
+                <option value="google">Google Maps link</option>
+            </select>
         </div>
         <div class="button-group">
             <a href="../html/admin" class="button link-button">Home</a>
             <a href="#" class="button link-button" id="help-link">?</a>
+        </div>
+        <div id="loading-progress" class="progress-bar">
+            <div class="progress-fill"></div>
+            <div class="progress-text">Loading layers...</div>
         </div>
     </div>
     <div id="map"></div>
@@ -295,9 +302,16 @@
             longitude: lngLat.lng
         }};
         
-        const jsonString = JSON.stringify(coords, null, 2);
+        const format = document.getElementById('coords-format-select').value;
+        let textToCopy;
+
+        if (format === 'json') {{
+            textToCopy = JSON.stringify(coords, null, 2);
+        }} else {{ // Google Maps link
+            textToCopy = `https://www.google.com/maps/@${{lngLat.lat}},${{lngLat.lng}},15z`;
+        }}
         
-        navigator.clipboard.writeText(jsonString).then(() => {{
+        navigator.clipboard.writeText(textToCopy).then(() => {{
             // Show a brief notification
             const notification = document.createElement('div');
             notification.textContent = 'Coordinates copied to clipboard!';
