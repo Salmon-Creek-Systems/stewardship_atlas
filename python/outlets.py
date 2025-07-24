@@ -48,7 +48,7 @@ def webmap_json(config, name):
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
     
-    
+    logger.info(f"In webedit, got Outlet Conf: {outlet_conf}")
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
