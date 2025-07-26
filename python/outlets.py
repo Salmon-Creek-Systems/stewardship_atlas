@@ -383,13 +383,13 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
     basemap_dir = versioning.atlas_path(config, "layers") / layer
     if use_jpg:
         logger.info("Using JPG")
-        basemap_path = basemap_dir / "basemap.tiff.jpg"
+        basemap_path = basemap_dir / f"{layer}.tiff.jpg"
         if basemap_path.exists():
             logger.info(f"Using extant basemap: {basemap_path}.")
             inpath = basemap_path
         else:
-            logger.info(f"Generating basemap: {basemap_path}.")
-            utils.tiff2jpg(f"{basemap_dir}/basemap.tiff", basemap_path)
+            logger.info(f"Generating basemap: {basemap_path} for layer {layer}.")
+            utils.tiff2jpg(f"{basemap_dir}/{layer}.tiff", basemap_path)
             inpath = basemap_path
     else:
         inpath = basemap_dir / f"{layer}.tiff"
@@ -439,6 +439,7 @@ def build_region_map_grass(config, outlet_name, region):
     # First the raster basemap. Note we blend it with a greyscale overlay 
     blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
     raster_name = 'hillshadered_' + region['name']
+
     print(f"making map image for {region}.")
     gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
     gs.read_command('r.colors', map=raster_name, color='grey')
@@ -499,16 +500,17 @@ def build_region_map_grass(config, outlet_name, region):
     m.d_grid(size=0.5,color='black')
 
     # add neighboring gazeteer text                                                                                                                                              
-    nbr = region.get('gazetteer_neighbors', {})
-    if nbr.get('north'):
-        m.d_text(text=nbr['north'],  at="0.5,0.9", size=4)
-    if nbr.get('south'):
-        m.d_text(text=nbr['south'], rotation=180,  at="0.5, 0.1", size=4)
-    if nbr.get('west'):
-        m.d_text(text=nbr['west'], rotation=90, at="0.1, 0.5", size=4)
-    if nbr.get('east'):
-        m.d_text(text=nbr['east'], rotation=270, at="0.9,0.5", size=4)
-
+    nbr = region.get('gazetteer_neighbors')
+    if nbr is not None:
+        if nbr.get('north'):
+            m.d_text(text=nbr['north'],  at="50,95", size=4)
+        if nbr.get('south'):
+            m.d_text(text=nbr['south'], rotation=180,  at="50,5", size=4)
+        if nbr.get('west'):
+            m.d_text(text=nbr['west'], rotation=90, at="5,50", size=4)
+        if nbr.get('east'):
+            m.d_text(text=nbr['east'], rotation=270, at="95,50", size=4)
+        m.d_text(text=region['name'], at="50,50", size=6)
 
     # Add legend
     m.d_legend_vect(fontsize=25, overwrite=True,bgcolor="155:155:155", border_color="255:0:0", border_width=10)
@@ -586,19 +588,19 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
-                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=True)
+                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=False)
                     processed_region_extract_path = process_region(lc, region_extract_path)
                     region['vectors'].append([lc, str(processed_region_extract_path)])
             else:
                 gs.read_command('r.in.gdal', input=staging_path, output=lc['name'])
                 for region in regions:
-                    logger.debug(f"Processing raster region: {region['name']}")
+
                     region['raster'] = [lc,
-                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=True))]
-                
+                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False, reuse=False))]
+                    logger.info(f"Processing raster region: {region['name']}: {region}")                
         # Build maps for each region
         for region in regions:
-            logger.debug(f"Building map for region: {region['name']}")
+            logger.info(f"Building map for region: {region['name']} with wtf config: {region}")
             # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
             build_region_map_grass(config, outlet_name, region)
 
@@ -621,6 +623,8 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
 def regions_from_geojson(path, start_at=2,limit=3):
     """Load regions from a GeoJSON file."""
     regions = []
+    last_region = None
+    
     with open(path, 'r') as f:
         for i,region in  enumerate(json.load(f)['features']):
             if i < start_at:
@@ -637,9 +641,18 @@ def regions_from_geojson(path, start_at=2,limit=3):
                 'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
                 'bbox': bbox,
+                "neighbors": region.get('neighbors'),
                 "vectors": [],
                 "raster": ""
             })
+    for i,r in enumerate(regions):
+        if r['neighbors'] is None:
+            next_idx = (i + 1) % len(regions)
+            prev_idx = (i - 1) % len(regions)
+            r['neighbors'] = {
+                "prev": regions[prev_idx]['name'],
+                "next": regions[next_idx]['name']}                 
+            
     return regions
 
 

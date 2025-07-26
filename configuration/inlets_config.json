@@ -208,8 +208,8 @@
             "vector_width": {
 		"attribute": "STREETTYPE",
 		"map": {
-		    "RD": 5,
-		    "ST": 3
+		    "RD": 6,
+		    "DR": 3
 		},
 		"default": 1
             }
@@ -567,9 +567,9 @@
 	    "vector_width": {
 		"attribute": "fcode_description",
 		"map": {
-		    "Stream/River: Hydrographic Category = Ephemeral": 3,
-		    "Stream/River: Hydrographic Category = Perennial": 4,
-		    "Stream/River: Hydrographic Category = Intermittent": 2,
+		    "Stream/River: Hydrographic Category = Ephemeral": 2,
+		    "Stream/River: Hydrographic Category = Perennial": 3,
+		    "Stream/River: Hydrographic Category = Intermittent": 1,
 		    "Artificial Path": 1
 		},
 		"default": 1

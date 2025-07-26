@@ -1,0 +1,162 @@
+{
+    "dem": {
+        "type": "inlet",
+        "out_layer": "elevation",
+        "config_def": "opentopo_dem"
+    },
+    "gdal_contours": {
+        "type": "eddy",            
+        "in_layer": "elevation",
+        "out_layer": "contours",
+        "config_def": "gdal_contours"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "elevation",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+"public_buildings" : {
+    "type": "inlet",
+    "out_layer": "buildings",
+    "config_def": "overture_buildings"
+    },
+"public_addresses" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "overture_addresses"
+},
+"oa_parcels" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "local_parcels"
+},
+"local_tsunami" : {
+    "type": "inlet",
+    "out_layer": "tsunami",
+    "config_def": "local_tsunami"
+},
+
+    "public_roads" : {
+        "type": "inlet",
+        "out_layer": "roads",
+        "config_def": "overture_roads"
+    },
+    "internal_roads" : {
+        "type": "inlet",
+        "out_layer": "internal_roads",
+        "config_def": "internal_roads"
+    },
+
+"public_creeks" : {
+        "type": "inlet",
+        "out_layer": "creeks",
+        "config_def": "nhd_creeks"
+    },
+    "local_hillshade" : {
+        "type": "inlet",
+        "out_layer": "lidar_basemap",
+        "config_def": "local_hillshade"
+    },
+    "opentopo_dem" : {
+        "type": "inlet",
+        "out_layer": "basemap",
+        "config_def": "opentopo_dem"
+    },
+"local_helilandings" : {
+    "type": "inlet",
+    "out_layer": "helilandings",
+    "config_def": "local_helilandings"
+},
+    "local_hydrants" : {
+        "type": "inlet",
+        "out_layer": "hydrants",
+        "config_def": "local_hydrants"
+    },
+"local_campgrounds" : {
+    "type": "inlet",
+    "out_layer": "campgrounds",
+    "config_def": "local_campgrounds"
+    },
+
+    "local_turnouts" : {
+        "type": "inlet",
+        "out_layer": "turnouts",
+        "config_def": "local_turnouts"
+    },
+"local_milemarkers" : {
+    "type": "inlet",
+    "out_layer": "milemarkers",
+    "config_def": "local_milemarkers"
+},
+"webmap" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
+    "config_def": "webmap",
+    "access": ["internal", "admin"]
+},
+"webedit" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
+    "config_def": "webedit"
+},
+"internal_webmap" : {
+        "type": "outlet",
+        "name": "internal_webmap",
+        "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
+        "config_def": "webmap",
+        "access": ["admin"]
+    },
+"runbook": {
+        "type": "outlet",
+        "name": "runbook",
+        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads", "creeks", "buildings",  "campgrounds", "helilandings", "milemarkers", "hydrants"],
+        "access": ["internal", "admin"],
+    "config_def": "runbook",
+    "blend_percent": 50,
+         "regions" : [
+            {"bbox": {
+                "east": -121.19978063408502,
+                "west": -121.20391109005016,
+                "south": 39.23863749098538,
+                "north": 39.24416744687048},
+            "name": "RockLoop",
+            "caption": "Double loop with Ginger and big rocks.",
+            "vectors": [],
+            "raster": "",
+            "text": "Hwy20 to the County Lnie"},
+            {"bbox": {
+                "east": -121.19978063408502,
+                "west": -121.20391109005016,
+                "south": 39.23863749098538,
+                "north": 39.24416744687048},
+            "name": "GolfCourses",
+            "caption": "Golf Courses",
+            "vectors": [],
+            "raster": "",
+            "text": "Golf Courses"}]
+
+},
+"html": {
+        "type": "outlet",
+        "name": "html",
+         "config_def": "static_html"},
+"sqldb": {
+    "type": "outlet",
+    "name": "sqldb",
+    "layers": ["basemap", "roads", "creeks"]
+},
+"sqlquery": {
+    "type": "outlet",
+    "name": "sqlquery",
+    "config_def": "sqlquery",
+    "access": ["admin"]
+},
+"gazetteer": {
+    "type": "outlet",
+    "name": "gazetteer",
+    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"]
+}
+}

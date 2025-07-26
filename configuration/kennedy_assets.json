@@ -58,9 +58,10 @@
     "gazetteer": {
 	"type": "outlet",
 	"name": "gazetteer",
-	"num_rows": 5,
-	"num_cols": 6,
+	"blend_precent": 50,
+	"num_rows": 1,
+	"num_cols": 2,
 	"config_def": "gazetteer",
-	"in_layers":  ["lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings"]
+	"in_layers":  ["basemap", "ponds", "roads", "creeks"]
     }
 }
