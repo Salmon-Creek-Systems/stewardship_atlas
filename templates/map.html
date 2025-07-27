@@ -352,10 +352,15 @@
 
     // Add control-click handler to copy coordinates to clipboard
     map.on('click', (e) => {{
+        console.log('Map click event fired', e.originalEvent.ctrlKey);
+        
         // Check if control key is pressed
         if (!e.originalEvent.ctrlKey) {{
+            console.log('Control key not pressed, ignoring click');
             return; // Only proceed if control key is pressed
         }}
+        
+        console.log('Control key pressed, processing click');
         
         const lngLat = e.lngLat;
         const coords = {{
@@ -374,31 +379,43 @@
             textToCopy = `https://${{window.location.hostname}}/map?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
         }}
         
-        navigator.clipboard.writeText(textToCopy).then(() => {{
-            // Show a brief notification
-            const notification = document.createElement('div');
-            notification.textContent = 'Location copied to clipboard!';
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #4CAF50;
-                color: white;
-                padding: 10px 15px;
-                border-radius: 5px;
-                z-index: 1000;
-                font-family: Arial, sans-serif;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            `;
-            document.body.appendChild(notification);
-            
-            // Remove notification after 2 seconds
-            setTimeout(() => {{
-                notification.remove();
-            }}, 2000);
-        }}).catch(err => {{
-            console.error('Failed to copy coordinates:', err);
-        }});
+        console.log('Text to copy:', textToCopy);
+        
+        // Try to copy to clipboard
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+            navigator.clipboard.writeText(textToCopy).then(() => {{
+                console.log('Successfully copied to clipboard');
+                // Show a brief notification
+                const notification = document.createElement('div');
+                notification.textContent = 'Location copied to clipboard!';
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #4CAF50;
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    z-index: 1000;
+                    font-family: Arial, sans-serif;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                `;
+                document.body.appendChild(notification);
+                
+                // Remove notification after 2 seconds
+                setTimeout(() => {{
+                    notification.remove();
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy coordinates:', err);
+                // Fallback: show the text in an alert
+                alert(`Location: ${{textToCopy}}`);
+            }});
+        }} else {{
+            // Fallback for browsers that don't support clipboard API
+            console.log('Clipboard API not supported, showing alert');
+            alert(`Location: ${{textToCopy}}`);
+        }}
     }});
 
     // Help popup functionality
