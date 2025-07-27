@@ -181,7 +181,7 @@ def generate_map_page(title, map_config_data, output_path):
         im_name = dynamic_layer['name']
         layer_json = dynamic_layer
         js_bit += """
-unused_image_{im_name} = await map.loadImage('{im_uri}',
+void await map.loadImage('{im_uri}',
     (error, image) => {{
         if (error) throw error;
         // Add the image to the map style.                                                              
