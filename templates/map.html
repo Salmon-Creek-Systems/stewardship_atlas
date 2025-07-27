@@ -352,7 +352,14 @@
 
     // Add control-click handler to copy coordinates to clipboard
     map.on('click', (e) => {{
-        console.log('Map click event fired', e.originalEvent.ctrlKey);
+        console.log('Map click event fired', {{
+            ctrlKey: e.originalEvent.ctrlKey,
+            metaKey: e.originalEvent.metaKey,
+            shiftKey: e.originalEvent.shiftKey,
+            altKey: e.originalEvent.altKey,
+            type: e.originalEvent.type,
+            target: e.originalEvent.target.tagName
+        }});
         
         // Check if control key is pressed
         if (!e.originalEvent.ctrlKey) {{
@@ -415,6 +422,13 @@
             // Fallback for browsers that don't support clipboard API
             console.log('Clipboard API not supported, showing alert');
             alert(`Location: ${{textToCopy}}`);
+        }}
+    }});
+    
+    // Add a global click listener to see if control-clicks are being captured elsewhere
+    document.addEventListener('click', (e) => {{
+        if (e.ctrlKey) {{
+            console.log('Global click listener detected control-click on:', e.target.tagName, e.target.className);
         }}
     }});
 
