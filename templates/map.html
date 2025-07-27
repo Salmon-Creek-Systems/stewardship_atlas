@@ -205,28 +205,7 @@
       const urlLng = getUrlParameter('lng');
       const urlZoom = getUrlParameter('zoom');
       
-      if (urlLat && urlLng) {{
-          const lat = parseFloat(urlLat);
-          const lng = parseFloat(urlLng);
-          const zoom = urlZoom ? parseFloat(urlZoom) : 15; // Default zoom if not specified
-          
-          // Validate coordinates
-          if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {{
-              // Validate zoom level (0-22)
-              const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 15;
-              
-              // Center map on the specified location
-              map.setCenter([lng, lat]);
-              map.setZoom(validZoom); // Use the specified or validated zoom level
-              
-              // Add a marker at the location
-              addLocationMarker(lat, lng);
-              
-              console.log(`Map centered at: ${{lat}}, ${{lng}} with zoom: ${{validZoom}}`);
-          }} else {{
-              console.warn('Invalid coordinates in URL parameters');
-          }}
-      }}
+      console.log('URL parameters found:', {{ lat: urlLat, lng: urlLng, zoom: urlZoom }});
       
       
       map.addControl(new maplibregl.ScaleControl({{
@@ -245,6 +224,34 @@
     // Get the first layer ID from the style to ensure basemaps are at the bottom
     const style = map.getStyle();
     const firstLayerId = style.layers[0].id;
+
+    // Handle URL parameters after map is loaded
+    if (urlLat && urlLng) {{
+        const lat = parseFloat(urlLat);
+        const lng = parseFloat(urlLng);
+        const zoom = urlZoom ? parseFloat(urlZoom) : 15; // Default zoom if not specified
+        
+        console.log('Processing URL parameters:', {{ lat, lng, zoom }});
+        
+        // Validate coordinates
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {{
+            // Validate zoom level (0-22)
+            const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 15;
+            
+            console.log('Valid coordinates, centering map...');
+            
+            // Center map on the specified location
+            map.setCenter([lng, lat]);
+            map.setZoom(validZoom); // Use the specified or validated zoom level
+            
+            // Add a marker at the location
+            addLocationMarker(lat, lng);
+            
+            console.log(`Map centered at: ${{lat}}, ${{lng}} with zoom: ${{validZoom}}`);
+        }} else {{
+            console.warn('Invalid coordinates in URL parameters');
+        }}
+    }}
 
     // Initialize progress tracking
     const progressBar = document.getElementById('loading-progress');
