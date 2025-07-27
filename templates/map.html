@@ -378,7 +378,7 @@
         }} else if (format === 'google') {{ // Google Maps link
             textToCopy = `https://www.google.com/maps/@${{lngLat.lat}},${{lngLat.lng}},15z`;
         }} else if (format === 'internal') {{ // Internal map link
-            textToCopy = `https://${{window.location.hostname}}/map?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
+            textToCopy = `https://${{window.location.pathname}?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
         }}
         
         console.log('Text to copy:', textToCopy);
