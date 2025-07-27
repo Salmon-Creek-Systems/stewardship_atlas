@@ -2,6 +2,9 @@
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "basemap", "geometry_type": "raster"},
+    {"name": "contours", "geometry_type": "linestring", "color": [0, 200, 0], "constant_width": 4},
+    {"name": "lidar_basemap", "geometry_type": "raster"},
+    {"name": "poi", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true, "access": [ "admin"]},
     {"name": "roads", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
@@ -16,7 +19,10 @@
                 ],
               "default": {"STREETTYPE": "DR", "vector_width": 10}
             }]},
+    {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
+     "add_labels": true, "interaction": "interface"},    
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,
+     "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"},
      "symbol": {"png": "hydrant.png", "icon": "custom/helipad"},
      "icon-size": 1.5,
      "interaction": "interface"}

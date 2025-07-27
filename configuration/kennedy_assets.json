@@ -10,11 +10,32 @@
         "out_layer": "basemap",
         "config_def": "derived_hillshade"
     },
+    "local_hillshade": {
+        "type": "inlet",
+        "out_layer": "lidar_basemap",
+        "config_def": "local_hillshade"
+    },
+    "gdal_contours": {
+        "type": "eddy",            
+        "in_layer": "elevation",
+        "out_layer": "contours",
+        "config_def": "gdal_contours"
+    },
+    "public_poi" : {
+	"type": "inlet",
+	"out_layer": "poi",
+	"config_def": "osm_poi"
+    },
     "public_roads" : {
         "type": "inlet",
         "out_layer": "roads",
         "config_def": "humtrans_roads"
     },
+    "public_buildings" : {
+    "type": "inlet",
+    "out_layer": "buildings",
+    "config_def": "overture_buildings"
+    },    
     "local_hydrants" : {
         "type": "inlet",
         "out_layer": "hydrants",
@@ -23,7 +44,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "roads", "hydrants"],
+    "in_layers":  ["basemap", "contours", "ponds", "roads", "creeks", "buildings", "poi", "hydrants"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
@@ -58,10 +79,10 @@
     "gazetteer": {
 	"type": "outlet",
 	"name": "gazetteer",
-	"blend_precent": 50,
+	"blend_percent": 25,
 	"num_rows": 1,
 	"num_cols": 2,
 	"config_def": "gazetteer",
-	"in_layers":  ["basemap", "ponds", "roads", "creeks"]
+	"in_layers":  ["lidar_basemap", "contours", "ponds", "roads", "creeks", "buildings", "poi", "hydrants"]
     }
 }

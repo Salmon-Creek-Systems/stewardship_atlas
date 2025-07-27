@@ -1,10 +1,12 @@
-import logging, subprocess
+import logging, subprocess, os
 import duckdb
 import geojson
 
 import versioning
 import utils
 import deltas_geojson as deltas
+
+import overpass
 
 DELTA_QUEUE = deltas
 
@@ -46,6 +48,30 @@ LOAD spatial;
         for outpath in delta_paths:
             utils.alter_geojson(outpath, inlet_config['alterations'])
     return len(feature_collection['features'])
+
+def fetch_osm(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
+    """Fetch OpenStreetMap data and store in versioned directory"""
+    
+    # Initialize Overpass API
+    api = overpass.API()
+    
+    # Get query from template
+    query = config['assets'][name]['config']['template'].format(**config['dataswale']['bbox'])
+    logger.info(f"Fetching OSM data with query: {query}")
+    
+    # Execute query
+    response = api.get(query, responseformat="geojson")
+
+    outpath = delta_queue.delta_path(config, name, 'create')
+
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+    
+    # Write response
+    with open(outpath, 'w') as f:
+        geojson.dump(response, f)
+    
+    return outpath
 
 
 def local_ogr(config, name, delta_queue=DELTA_QUEUE):

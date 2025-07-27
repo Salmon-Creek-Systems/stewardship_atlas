@@ -21,22 +21,26 @@
         "out_layer": "lidar_basemap",
         "config_def": "local_hillshade"
     },
-
-    "public_buildings" : {
-    "type": "inlet",
-    "out_layer": "buildings",
-    "config_def": "overture_buildings"
+    "public_poi" : {
+	"type": "inlet",
+	"out_layer": "poi",
+	"config_def": "osm_poi"
     },
-"public_addresses" : {
-    "type": "inlet",
-    "out_layer": "parcels",
-    "config_def": "overture_addresses"
-},
-"oa_parcels" : {
-    "type": "inlet",
-    "out_layer": "parcels",
-    "config_def": "local_humboldt_parcels"
-},
+    "public_buildings" : {
+	"type": "inlet",
+	"out_layer": "buildings",
+	"config_def": "overture_buildings"
+    },
+    "public_addresses" : {
+	"type": "inlet",
+	"out_layer": "parcels",
+	"config_def": "overture_addresses"
+    },
+    "oa_parcels" : {
+	"type": "inlet",
+	"out_layer": "parcels",
+	"config_def": "local_humboldt_parcels"
+    },
     "public_roads" : {
         "type": "inlet",
         "out_layer": "roads",
@@ -75,20 +79,20 @@
         "config_def": "local_turnouts"
     },
 
-"webmap" : {
-    "type": "outlet",
-    "name": "webmap",
-    "in_layers": ["basemap","ponds",  "parcels", "contours", "roads", "creeks", "buildings", "watertanks"],
-    "config_def": "webmap",
-    "access": ["internal", "admin"]
-},
-"webedit" : {
-    "type": "outlet",
-    "name": "webmap",
-    "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
-    "config_def": "webedit"
-},
-"internal_webmap" : {
+    "webmap" : {
+	"type": "outlet",
+	"name": "webmap",
+	"in_layers": ["basemap","ponds",  "contours", "roads", "creeks", "buildings", "watertanks", "poi"],
+	"config_def": "webmap",
+	"access": ["internal", "admin"]
+    },
+    "webedit" : {
+	"type": "outlet",
+	"name": "webmap",
+	"in_layers": ["basemap","roads", "creeks", "buildings", "poi", "ponds", "watertanks"],
+	"config_def": "webedit"
+    },
+    "internal_webmap" : {
         "type": "outlet",
         "name": "internal_webmap",
         "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
@@ -121,9 +125,10 @@
     "gazetteer": {
 	"type": "outlet",
 	"name": "gazetteer",
-	"num_rows": 1,
-	"num_cols": 2,
+	"num_rows": 5,
+	"num_cols": 6,
 	"config_def": "gazetteer",
-	"in_layers":  ["basemap","roads", "creeks", "ponds"]
+	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
+	"blend_percent": 25
     }
 }

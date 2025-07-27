@@ -1,7 +1,7 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
-    {"name": "contours", "geometry_type": "linestring", "color": [0, 100, 00]},
+    {"name": "contours", "geometry_type": "linestring", "color": [0, 200, 0], "constant_width": 4},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", 
@@ -12,26 +12,38 @@
                 "name": "STREETTYPE",
                 "type": "radio",
                 "values": [ 
-                    {"STREETTYPE": "RD", "vector_width": 10},
-                    {"STREETTYPE": "ST", "vector_width": 7},
+                    {"STREETTYPE": "RD", "vector_width": 15},
+                    {"STREETTYPE": "ST", "vector_width": 10},
                     {"STREETTYPE": "Other", "vector_width": 5}
                 ],
-              "default": {"STREETTYPE": "RD", "vector_width": 10}
+              "default": {"STREETTYPE": "ST", "vector_width": 10}
             }]},
-    {"name": "internal_roads", "geometry_type": "linestring", "color": [255, 155, 50],
-     "add_labels": true, "access": [ "admin"], "vector_width":true},
     {"name": "lpss", "geometry_type": "point", "color": [0, 155, 50], "add_labels": true, "access": [ "admin"]},
+    {"name": "poi", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true, "access": [ "admin"],
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}],
+     "interaction": "interface"},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
      "interaction": "interface", "vector_width":true},
     {"name": "watertanks", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,
      "symbol": {"png": "hydrant.png", "icon": "custom/octy"},
      "icon-size": 0.05,
      "interaction": "interface"},
-    {"name": "ponds", "geometry_type": "polygon", "color": [50, 50, 250],"fill_color": [0, 0, 250]},
-    {"name": "natural", "geometry_type": "point", "color": [0, 200, 55], "add_labels": true,
-     "icon-size": 0.05,
-     "interaction": "interface"},    
-    {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [150,0,0],
+    {"name": "ponds", "geometry_type": "polygon", "color": [50, 50, 250],"fill_color": [0, 0, 250], "add_labels": true,
+     "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"}, "symbol": {"png": "waterdrop.png", "icon": "basic/pushpin"},
+     "interaction": "interface",
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "" },
+         {
+             "name": "accessible",
+             "type": "radio",
+             "values": [ 
+                 {"accessible": "yes"},
+		 {"accessible": "no"}
+             ],
+             "default":  {"accessible": "no"}
+         }]
+    },
+    {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
      "add_labels": true, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}

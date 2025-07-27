@@ -1,6 +1,6 @@
 import subprocess, math, string
 import json, csv
-import sys,os
+import sys,os,time
 from io import StringIO
 from pathlib import Path
 import duckdb
@@ -48,7 +48,7 @@ def webmap_json(config, name):
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
     
-    logger.info(f"In webedit, got Outlet Conf: {outlet_conf}")
+    logger.info(f"In webedit, got Outlet Conf: {outlet_config}")
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
@@ -139,6 +139,11 @@ def webmap_json(config, name):
             if "symbol" not in layer:
                 map_layers.append(label_layer)
             else:
+                if 'icon_if' in layer:
+                    label_layer['filter'] = ['==', layer['icon_if']['property'], layer['icon_if']['value']]
+                    logger.info(f"Generating a dynamic layer with filter: {label_layer['filter']}...")
+                #else:
+                #    logger.info(f"Dynamic but no filter: {layer}")
                 label_layer['symbol_source'] = layer['symbol']['png']
                 label_layer['name'] = layer['name']
                 label_layer['layout']['icon-image'] = layer['name']
@@ -424,7 +429,7 @@ def build_region_map_grass(config, outlet_name, region):
         outlet_name (str): The name of the outlet.
         region (dict): The region to build the map for.
 """
-
+    t = time.time()
     grass_init(config['name'])
     import grass.script as gs
     import grass.jupyter as gj
@@ -447,6 +452,7 @@ def build_region_map_grass(config, outlet_name, region):
     gs.read_command('r.mapcalc.simple', expression="1", output='ones')
     gs.read_command('r.colors', map='ones', color='grey1.0')
     gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent=blend_percent, overwrite=True)
+    logger.info(f"Blended raster using percent: {blend_percent} [{time.time() - t}]")
     
     m.d_rast(map='blended')   
     # m.d_rast(map=raster_name)  
@@ -472,14 +478,24 @@ def build_region_map_grass(config, outlet_name, region):
                          icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=20,
                          label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
+            if lc.get("icon_if"):
+                icon_sql = f"{lc['icon_if']['property']} == \'{lc['icon_if']['value']}\'"
+                logger.info(f"Conditional icon! {lc['icon_if']} -> [{icon_sql}]")
+                m.d_vect(map=lc['name'],
+                         color=f"{c[0]}:{c[1]}:{c[2]}",
+                         icon=lc['icon_if']['icon'], size=50,
+                         where=icon_sql)
+
+                
             else:
                 logger.debug("Adding NON-Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc.get('symbol', 'basic/diamond'),size=10)
+                         icon=lc.get('symbol', {"icon": 'basic/diamond', "png": "pin.png"})['icon'], size=10)
         else:
             # This is interesting: vector width comes from features or layer conf? Former, right?
             # m.d_vect(map=lc['name'], color=lc.get('color', 'gray'), width=lc.get('width_base',5))
+            # currently, setting bool vector_width IN LAYER means look for more (per-feature) detail in asset.
             c = lc.get('color', (100,100,100))
             fc = lc.get('fill_color', c)
             if 'vector_width' in lc:
@@ -494,26 +510,30 @@ def build_region_map_grass(config, outlet_name, region):
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         width = lc.get("constant_width", 2),
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
-                
+            logger.info(f"{region['name']} : {lc['name']} [{time.time() - t}]")
     m.d_grid(size=0.5,color='black')
 
     # add neighboring gazeteer text                                                                                                                                              
     nbr = region.get('gazetteer_neighbors')
     if nbr is not None:
         if nbr.get('north'):
-            m.d_text(text=nbr['north'],  at="50,95", size=4)
+            m.d_text(text=nbr['north'],  at="50,95", size=5)
         if nbr.get('south'):
-            m.d_text(text=nbr['south'], rotation=180,  at="50,5", size=4)
+            m.d_text(text=nbr['south'], rotation=180,  at="50,5", size=5)
         if nbr.get('west'):
-            m.d_text(text=nbr['west'], rotation=90, at="5,50", size=4)
+            m.d_text(text=nbr['west'], rotation=90, at="5,50", size=5)
         if nbr.get('east'):
-            m.d_text(text=nbr['east'], rotation=270, at="95,50", size=4)
-        m.d_text(text=region['name'], at="50,50", size=6)
+            m.d_text(text=nbr['east'], rotation=270, at="95,50", size=5)
+        m.d_text(text=region['name'], flags="b", at="50,50", size=9)
 
     # Add legend
-    m.d_legend_vect(fontsize=25, overwrite=True,bgcolor="155:155:155", border_color="255:0:0", border_width=10)
+    m.d_legend_vect(
+        fontsize=25, flags="b", overwrite=True,
+        bgcolor="220:220:220", border_color="20:20:20", border_width=3,
+        title="LEGEND", title_fontsize=22)
 
     # export map
     outpath = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.png"
@@ -563,12 +583,17 @@ def process_region(layer_config: dict, region_extract_path: str):
     else:
         return region_extract_path
     
-def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[]):
+def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=True, reuse_raster_extracts=True, first_n=0):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
+    t = time.time()
     swale_name = config['name']
     outlet_config = config['assets'][outlet_name]
     if 'region_maps' not in skips:
         # Set up Grass environment
+        if first_n > 0:
+            logger.info(f"Only using first {first_n} regions...")
+            regions = regions[:first_n]
+        
         grass_init(swale_name)
         import grass.script as gs
         
@@ -588,7 +613,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
                     logger.debug(f"Processing vector region: {region['name']}")
-                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=False)
+                    region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=reuse_vector_extracts)
                     processed_region_extract_path = process_region(lc, region_extract_path)
                     region['vectors'].append([lc, str(processed_region_extract_path)])
             else:
@@ -596,25 +621,27 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
                 for region in regions:
 
                     region['raster'] = [lc,
-                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False, reuse=False))]
-                    logger.info(f"Processing raster region: {region['name']}: {region}")                
+                                        str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False, reuse=reuse_raster_extracts))]
+                    logger.info(f"Processing raster region: {region['name']}: {region}")
+            logger.info(f"{lc['name']}  [{time.time() - t}]")
         # Build maps for each region
         for region in regions:
-            logger.info(f"Building map for region: {region['name']} with wtf config: {region}")
+            logger.info(f"Building map for region: {region['name']}  [{time.time() - t}] with wtf config: {region}")
             # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
             build_region_map_grass(config, outlet_name, region)
 
         # save regions config as JSON for later use
         regions_json_path = versioning.atlas_path(config, "outlets") / outlet_name / f"regions_config.json"
-        with open(regions_json_path, "w") as f:
-            json.dump(regions, f)
+        if first_n == 0:
+            with open(regions_json_path, "w") as f:
+                json.dump(regions, f)
     # Post-process to overlay PNG symbols if any were configured
     # Write output files
 
     for outfile_path, outfile_content in regions_html:
         versioned_path = versioning.atlas_path(config, "outlets") / outlet_name / outfile_path
         # os.makedirs(os.path.dirname(versioned_path), exist_ok=True)
-        logger.info(f"Writing region output to: {versioned_path}")
+        logger.info(f"Writing region output to: {versioned_path}  [{time.time() - t}]")
         with open(versioned_path, "w") as f:
             f.write(outfile_content)
     
@@ -695,8 +722,8 @@ def generate_gazetteerregions(config, outlet_name):
          
             up_rowname =  row_index[up_row] if up_row >= 0 else None
             down_rowname = row_index[down_row] if down_row < len(row_index) else None
-            right_colname = right_col if right_col < len(col_index) else None
-            left_colname = left_col if left_col >=0 else None
+            right_colname = right_col + 1 if right_col < len(col_index) else None
+            left_colname = left_col + 1 if left_col >=0 else None
 
             neighbors = {
                     "north" : f"{colname}_{up_rowname}" if up_rowname is not None else None,
@@ -723,9 +750,9 @@ def generate_gazetteerregions(config, outlet_name):
     html_path = versioning.atlas_path(config, "outlets") / outlet_name / "index.html"
     return regions, [(html_path, hdr + bdy)]
 
-def outlet_gazetteer(config, outlet_name, skips=[]):
+def outlet_gazetteer(config, outlet_name, skips=[], first_n=0):
     gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name)
-    res =  outlet_regions_grass(config, outlet_name, gaz_regions, gaz_html, skips=skips)
+    res =  outlet_regions_grass(config, outlet_name, gaz_regions, gaz_html, skips=skips, first_n=first_n)
     return res
 
 
