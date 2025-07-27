@@ -896,15 +896,20 @@ def make_attribution_html(atlas_config, swale_config, lc):
         """)
 
 
-def make_root_html(atlas_config):
-    atlas_html = f"<HTML><BODY><CENTER><h1>Dataswales</h1>"
-    atlas_html += "<HR width='40%'><UL>".join( [f"<LI><A HREF='{a['name']}/index.html'>{a['name']}</A></LI>" for a in atlas_config['dataswales'] ] ) + "</UL>"
-    atlas_html += "<h2>Curation</h2>"
-    atlas_html += "<HR width='40%'>".join( [x for x in ['Refresh', 'Publish Version'] ])
-    atlas_html += "<h2>Tools and Interfaces</h2>"
-    atlas_html += "<HR width='40%'>".join( [x for x in ['Notebook', 'Pipeline', 'Tools'] ])
+def make_root_html(root_path):
+    """Given a root directory path, make a root html file. 
+    This will be a list of the atlases available. We get that from looking for subdirectories with atlas_config.json file.
+    The root html file will have links to the atlases. The text of the link is just the name given in the atlas_config.json file.
+    """
+
+    atlas_config_path_list = root_path.glob('*/atlas_config.json')
+    atlas_path_list = [x.parent for x in atlas_config_path_list]
+    atlas_name_list = [json.load(open(x))['name'] for x in atlas_config_path_list]
+    atlas_html = f"<HTML><BODY><CENTER><h1>Fire Atlases</h1>"
+    atlas_html += "<HR width='40%'><UL>".join( [f"<LI><A HREF='{a}/index.html'>{b}</A></LI>" for a,b in zip(atlas_path_list, atlas_name_list) ] ) + "</UL>"
+    
     atlas_html += "</BODY></HTML>"
-    outpath = f"{atlas_config['data_root']}/index.html"
+    outpath = f"{root_path}/index.html"
     with open(outpath, "w") as f:
         f.write(atlas_html)
     return outpath
