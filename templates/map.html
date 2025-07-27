@@ -104,7 +104,7 @@
             </select>
         </div>
         <div class="input-group">
-            <label>Alt+Click format:</label><br/>
+            <label>Location sharing format:</label><br/>
             <select id="coords-format-select" class="input-field">
                 <option value="json">JSON coordinates</option>
                 <option value="google">Google Maps link</option>
@@ -133,7 +133,7 @@
                 <ul>
                     <li>click/drag to move map</li>
                     <li>scroll to zoom</li>
-                    <li>alt+click to copy location</li>
+                    <li>alt+click (desktop) or long press (mobile) to copy location</li>
                     <li>control layer visibility in legend box</li>
                     <li>select basemap with dropdown</li>
                 </ul>
@@ -357,26 +357,14 @@
     // layers we need to load dynamically follow:
     {dynamic_layers}
 
-    // Add control-click handler to copy coordinates to clipboard
-    map.on('click', (e) => {{
-        console.log('Map click event fired', {{
-            ctrlKey: e.originalEvent.ctrlKey,
-            metaKey: e.originalEvent.metaKey,
-            shiftKey: e.originalEvent.shiftKey,
-            altKey: e.originalEvent.altKey,
-            type: e.originalEvent.type,
-            target: e.originalEvent.target.tagName
-        }});
+    // Add Alt+Click and long press handler to copy coordinates to clipboard
+    let longPressTimer = null;
+    let longPressDelay = 500; // 500ms for long press
+    
+    // Function to handle location sharing
+    function handleLocationShare(lngLat) {{
+        console.log('Location sharing triggered at:', lngLat);
         
-        // Check if meta key is pressed (Alt+Click)
-        if (!e.originalEvent.metaKey) {{
-            console.log('Alt key not pressed, ignoring click');
-            return; // Only proceed if Alt key is pressed
-        }}
-        
-        console.log('Alt key pressed, processing click');
-        
-        const lngLat = e.lngLat;
         const coords = {{
             latitude: lngLat.lat,
             longitude: lngLat.lng
@@ -429,6 +417,68 @@
             // Fallback for browsers that don't support clipboard API
             console.log('Clipboard API not supported, showing alert');
             alert(`Location: ${{textToCopy}}`);
+        }}
+    }}
+    
+    // Alt+Click handler (desktop)
+    map.on('click', (e) => {{
+        console.log('Map click event fired', {{
+            ctrlKey: e.originalEvent.ctrlKey,
+            metaKey: e.originalEvent.metaKey,
+            shiftKey: e.originalEvent.shiftKey,
+            altKey: e.originalEvent.altKey,
+            type: e.originalEvent.type,
+            target: e.originalEvent.target.tagName
+        }});
+        
+        // Check if meta key is pressed (Alt+Click)
+        if (e.originalEvent.metaKey) {{
+            console.log('Alt key pressed, processing click');
+            handleLocationShare(e.lngLat);
+        }} else {{
+            console.log('Alt key not pressed, ignoring click');
+        }}
+    }});
+    
+    // Long press handlers (mobile)
+    map.on('mousedown', (e) => {{
+        // Start long press timer
+        longPressTimer = setTimeout(() => {{
+            console.log('Long press detected');
+            handleLocationShare(e.lngLat);
+        }}, longPressDelay);
+    }});
+    
+    map.on('mouseup', (e) => {{
+        // Clear long press timer on mouse up
+        if (longPressTimer) {{
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }}
+    }});
+    
+    map.on('mouseleave', (e) => {{
+        // Clear long press timer when mouse leaves map
+        if (longPressTimer) {{
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }}
+    }});
+    
+    // Touch events for mobile devices
+    map.on('touchstart', (e) => {{
+        // Start long press timer for touch
+        longPressTimer = setTimeout(() => {{
+            console.log('Touch long press detected');
+            handleLocationShare(e.lngLat);
+        }}, longPressDelay);
+    }});
+    
+    map.on('touchend', (e) => {{
+        // Clear long press timer on touch end
+        if (longPressTimer) {{
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
         }}
     }});
     
