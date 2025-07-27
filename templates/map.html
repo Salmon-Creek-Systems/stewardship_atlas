@@ -104,7 +104,7 @@
             </select>
         </div>
         <div class="input-group">
-            <label>Control-click format:</label><br/>
+            <label>Alt+Click format:</label><br/>
             <select id="coords-format-select" class="input-field">
                 <option value="json">JSON coordinates</option>
                 <option value="google">Google Maps link</option>
@@ -133,7 +133,7 @@
                 <ul>
                     <li>click/drag to move map</li>
                     <li>scroll to zoom</li>
-                    <li>control+click to copy location</li>
+                    <li>alt+click to copy location</li>
                     <li>control layer visibility in legend box</li>
                     <li>select basemap with dropdown</li>
                 </ul>
@@ -361,13 +361,13 @@
             target: e.originalEvent.target.tagName
         }});
         
-        // Check if control key is pressed
-        if (!e.originalEvent.ctrlKey) {{
-            console.log('Control key not pressed, ignoring click');
-            return; // Only proceed if control key is pressed
+        // Check if meta key is pressed (Alt+Click)
+        if (!e.originalEvent.metaKey) {{
+            console.log('Alt key not pressed, ignoring click');
+            return; // Only proceed if Alt key is pressed
         }}
         
-        console.log('Control key pressed, processing click');
+        console.log('Alt key pressed, processing click');
         
         const lngLat = e.lngLat;
         const coords = {{
@@ -425,10 +425,10 @@
         }}
     }});
     
-    // Add a global click listener to see if control-clicks are being captured elsewhere
+    // Add a global click listener to see if alt-clicks are being captured elsewhere
     document.addEventListener('click', (e) => {{
-        if (e.ctrlKey) {{
-            console.log('Global click listener detected control-click on:', e.target.tagName, e.target.className);
+        if (e.metaKey) {{
+            console.log('Global click listener detected alt-click on:', e.target.tagName, e.target.className);
         }}
     }});
 
