@@ -108,7 +108,7 @@
             <select id="coords-format-select" class="input-field">
                 <option value="json">JSON coordinates</option>
                 <option value="google">Google Maps link</option>
-                <option value="internal">Internal map link</option>
+                <option value="internal" selected>Fire Atlas link</option>
             </select>
         </div>
         <div class="button-group">
@@ -378,7 +378,7 @@
         }} else if (format === 'google') {{ // Google Maps link
             textToCopy = `https://www.google.com/maps/@${{lngLat.lat}},${{lngLat.lng}},15z`;
         }} else if (format === 'internal') {{ // Internal map link
-            textToCopy = `https://${{window.location.pathname}?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
+            textToCopy = `https://${{window.location.hostname}}/${{window.location.pathname}}?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
         }}
         
         console.log('Text to copy:', textToCopy);

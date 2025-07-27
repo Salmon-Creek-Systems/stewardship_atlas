@@ -238,7 +238,7 @@ def outlet_webmap(config, name):
     
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
-    html_path = generate_map_page("test Webmap", map_config, output_path)  
+    html_path = generate_map_page("Fire Atlas Webmap", map_config, output_path)  
   
     return output_path
 
