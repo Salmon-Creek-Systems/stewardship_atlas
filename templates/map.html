@@ -233,14 +233,14 @@
     if (urlLat && urlLng) {{
         const lat = parseFloat(urlLat);
         const lng = parseFloat(urlLng);
-        const zoom = urlZoom ? parseFloat(urlZoom) : 15; // Default zoom if not specified
+        const zoom = urlZoom ? parseFloat(urlZoom) : 14; // Default zoom if not specified
         
         console.log('Processing URL parameters:', {{ lat, lng, zoom }});
         
         // Validate coordinates
         if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {{
             // Validate zoom level (0-22)
-            const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 15;
+            const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 14;
             
             console.log('Valid coordinates, centering map...');
             
@@ -364,6 +364,8 @@
     // Add Alt+Click and long press handler to copy coordinates to clipboard
     let longPressTimer = null;
     let longPressDelay = 500; // 500ms for long press
+    let longPressStartPos = null;
+    let longPressMoveThreshold = 10; // pixels of movement to cancel long press
     
     // Function to handle location sharing
     function handleLocationShare(lngLat) {{
@@ -382,7 +384,7 @@
         }} else if (format === 'google') {{ // Google Maps link
             textToCopy = `https://www.google.com/maps/@${{lngLat.lat}},${{lngLat.lng}},15z`;
         }} else if (format === 'internal') {{ // Internal map link
-            textToCopy = `https://${{window.location.hostname}}/${{window.location.pathname}}?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
+            textToCopy = `https://${{window.location.hostname}}${{window.location.pathname}}?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
         }}
         
         console.log('Text to copy:', textToCopy);
@@ -424,6 +426,24 @@
         }}
     }}
     
+    // Function to clear long press timer and reset position
+    function clearLongPressTimer() {{
+        if (longPressTimer) {{
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }}
+        longPressStartPos = null;
+    }}
+    
+    // Function to check if movement exceeds threshold
+    function hasMovedTooMuch(currentPos) {{
+        if (!longPressStartPos) return false;
+        const dx = currentPos.x - longPressStartPos.x;
+        const dy = currentPos.y - longPressStartPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance > longPressMoveThreshold;
+    }}
+    
     // Alt+Click handler (desktop)
     map.on('click', (e) => {{
         console.log('Map click event fired', {{
@@ -446,44 +466,73 @@
     
     // Long press handlers (mobile)
     map.on('mousedown', (e) => {{
+        // Store the starting position
+        longPressStartPos = {{ x: e.originalEvent.clientX, y: e.originalEvent.clientY }};
+        
         // Start long press timer
         longPressTimer = setTimeout(() => {{
-            console.log('Long press detected');
-            handleLocationShare(e.lngLat);
+            // Check if we've moved too much before triggering
+            if (!hasMovedTooMuch({{ x: e.originalEvent.clientX, y: e.originalEvent.clientY }})) {{
+                console.log('Long press detected');
+                handleLocationShare(e.lngLat);
+            }} else {{
+                console.log('Long press cancelled due to movement');
+            }}
+            clearLongPressTimer();
         }}, longPressDelay);
+    }});
+    
+    map.on('mousemove', (e) => {{
+        // Cancel long press if mouse moves too much
+        if (longPressTimer && hasMovedTooMuch({{ x: e.originalEvent.clientX, y: e.originalEvent.clientY }})) {{
+            console.log('Long press cancelled due to movement');
+            clearLongPressTimer();
+        }}
     }});
     
     map.on('mouseup', (e) => {{
         // Clear long press timer on mouse up
-        if (longPressTimer) {{
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }}
+        clearLongPressTimer();
     }});
     
     map.on('mouseleave', (e) => {{
         // Clear long press timer when mouse leaves map
-        if (longPressTimer) {{
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }}
+        clearLongPressTimer();
     }});
     
     // Touch events for mobile devices
     map.on('touchstart', (e) => {{
+        // Store the starting position
+        if (e.originalEvent.touches && e.originalEvent.touches[0]) {{
+            longPressStartPos = {{ x: e.originalEvent.touches[0].clientX, y: e.originalEvent.touches[0].clientY }};
+        }}
+        
         // Start long press timer for touch
         longPressTimer = setTimeout(() => {{
-            console.log('Touch long press detected');
-            handleLocationShare(e.lngLat);
+            // Check if we've moved too much before triggering
+            if (e.originalEvent.touches && e.originalEvent.touches[0] && 
+                !hasMovedTooMuch({{ x: e.originalEvent.touches[0].clientX, y: e.originalEvent.touches[0].clientY }})) {{
+                console.log('Touch long press detected');
+                handleLocationShare(e.lngLat);
+            }} else {{
+                console.log('Touch long press cancelled due to movement');
+            }}
+            clearLongPressTimer();
         }}, longPressDelay);
+    }});
+    
+    map.on('touchmove', (e) => {{
+        // Cancel long press if touch moves too much
+        if (longPressTimer && e.originalEvent.touches && e.originalEvent.touches[0] && 
+            hasMovedTooMuch({{ x: e.originalEvent.touches[0].clientX, y: e.originalEvent.touches[0].clientY }})) {{
+            console.log('Touch long press cancelled due to movement');
+            clearLongPressTimer();
+        }}
     }});
     
     map.on('touchend', (e) => {{
         // Clear long press timer on touch end
-        if (longPressTimer) {{
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }}
+        clearLongPressTimer();
     }});
     
     // Add a global click listener to see if alt-clicks are being captured elsewhere
@@ -595,7 +644,7 @@
         }}
         
         // Redirect to internal map
-        const url = `https://${{window.location.hostname}}${{window.location.pathname}}?lat=${{coords.lat}}&lng=${{coords.lng}}&zoom=12`;
+        const url = `https://${{window.location.hostname}}${{window.location.pathname}}?lat=${{coords.lat}}&lng=${{coords.lng}}`;
         console.log('Redirecting to:', url);
         window.location.href = url;
     }}
