@@ -104,10 +104,11 @@
             </select>
         </div>
         <div class="input-group">
-            <label>Double-click format:</label><br/>
+            <label>Control-click format:</label><br/>
             <select id="coords-format-select" class="input-field">
                 <option value="json">JSON coordinates</option>
                 <option value="google">Google Maps link</option>
+                <option value="internal">Internal map link</option>
             </select>
         </div>
         <div class="button-group">
@@ -132,7 +133,7 @@
                 <ul>
                     <li>click/drag to move map</li>
                     <li>scroll to zoom</li>
-                    <li>double-click to copy lat/long</li>
+                    <li>control+click to copy location</li>
                     <li>control layer visibility in legend box</li>
                     <li>select basemap with dropdown</li>
                 </ul>
@@ -349,8 +350,13 @@
     // layers we need to load dynamically follow:
     {dynamic_layers}
 
-    // Add double-click handler to copy coordinates to clipboard
-    map.on('dblclick', (e) => {{
+    // Add control-click handler to copy coordinates to clipboard
+    map.on('click', (e) => {{
+        // Check if control key is pressed
+        if (!e.originalEvent.ctrlKey) {{
+            return; // Only proceed if control key is pressed
+        }}
+        
         const lngLat = e.lngLat;
         const coords = {{
             latitude: lngLat.lat,
@@ -362,14 +368,16 @@
 
         if (format === 'json') {{
             textToCopy = JSON.stringify(coords, null, 2);
-        }} else {{ // Google Maps link
+        }} else if (format === 'google') {{ // Google Maps link
             textToCopy = `https://www.google.com/maps/@${{lngLat.lat}},${{lngLat.lng}},15z`;
+        }} else if (format === 'internal') {{ // Internal map link
+            textToCopy = `https://${{window.location.hostname}}/map?lat=${{lngLat.lat}}&lng=${{lngLat.lng}}&zoom=${{map.getZoom()}}`;
         }}
         
         navigator.clipboard.writeText(textToCopy).then(() => {{
             // Show a brief notification
             const notification = document.createElement('div');
-            notification.textContent = 'Coordinates copied to clipboard!';
+            notification.textContent = 'Location copied to clipboard!';
             notification.style.cssText = `
                 position: fixed;
                 top: 20px;

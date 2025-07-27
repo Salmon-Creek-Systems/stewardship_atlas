@@ -117,7 +117,7 @@ def webmap_json(config, name):
                     "text-offset": map_layer.get('text_offset', [0,2]),
                     "text-font": ["Open Sans Regular"],
                     "text-field": ["get", "name"],
-                    "text-size": 10
+                    "text-size": 20
                 }
             }
             
@@ -503,7 +503,6 @@ def build_region_map_grass(config, outlet_name, region):
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
                          width_column='vector_width',
-                         width_scale=4.0,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
             else:
@@ -1375,6 +1374,7 @@ def build_region_map_grass_png(config, outlet_name, region):
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
                          fill_color=f"{fc[0]}:{fc[1]}:{fc[2]}" if fc != 'none' else 'none',
+                         width = lc.get("constant_width", 2),
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
                 
