@@ -313,8 +313,8 @@ def outlet_webmap_edit(config: dict, name: str):
     map_config = webmap_json(config, name)
     webedit_dir = versioning.atlas_path(config, "outlets") / name 
 
-    subprocess.run(['cp', '-r', '../templates/css/', webedit_dir / "css"])
-    subprocess.run(['cp', '-r', '../templates/js/', webedit_dir / "js"])
+    subprocess.run(['cp', '-r', '../templates/css/', webedit_dir ])
+    subprocess.run(['cp', '-r', '../templates/js/', webedit_dir ])
     # subprocess.run(['cp', '../templates/css/map.css', f"{webedit_dir}/css/"])
     # subprocess.run(['cp', '../templates/css/edit_controls.css', f"{webedit_dir}/css/"])
     

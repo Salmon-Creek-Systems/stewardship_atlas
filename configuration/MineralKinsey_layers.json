@@ -35,5 +35,18 @@
      "add_labels": true, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
-    {"name": "burns", "geometry_type": "polygon", "color": [255, 55, 55], "add_labels": true,  "interaction": "interface""access": [ "admin"]}
+    {"name": "burns", "geometry_type": "polygon", "color": [255, 55, 55],
+     "add_labels": true,  "interaction": "interface","access": [ "admin"],
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "Road" },
+         {"name": "readiness",
+          "type": "radio",
+          "values": [ 
+              {"readiness": "low", "fill_color": [200,100, 100]},
+	      {"readiness": "med", "fill_color": [100,200, 100]},
+              {"readiness": "high", "fill_color": [100,100, 200]}],
+          "default": {"readiness": "med", "fill_color": [100,200, 100]}
+	 }   
+     ]
+    }
 ]

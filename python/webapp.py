@@ -88,8 +88,8 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error extracting coordinates: {str(e)}")
 
-@app.post("/delta_upload")
-async def json_upload(payload: JSONPayload):
+@app.post("/delta_upload/{swalename}")
+async def json_upload(payload: JSONPayload, swalename: str):
     try:
         delta_package = payload.data
         fc = delta_package #['features']
@@ -104,13 +104,14 @@ async def json_upload(payload: JSONPayload):
             json.dump(fc, f)
 
         print(f"refreshing {layer} after {action}")
-        #res = dataswale_geojson.refresh_vector_layer(ac, layer)
-
+        res = dataswale_geojson.refresh_vector_layer(ac, layer)
+        
+        
         return {
             "status": "success",
             "message": f"Data stored successfully, refreshed: {res}",
             "filename": os.path.basename(delta_path),
-            "path": delta_path
+            "path": delta_path}
         return {"status": "success"}
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
