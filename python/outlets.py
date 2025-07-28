@@ -896,20 +896,44 @@ def make_attribution_html(atlas_config, swale_config, lc):
         """)
 
 
-def make_root_html(root_path):
+def make_root_html(root_path_str):
     """Given a root directory path, make a root html file. 
     This will be a list of the atlases available. We get that from looking for subdirectories with atlas_config.json file.
     The root html file will have links to the atlases. The text of the link is just the name given in the atlas_config.json file.
     """
-
-    atlas_config_path_list = root_path.glob('*/atlas_config.json')
-    atlas_path_list = [x.parent for x in atlas_config_path_list]
+    root_path = Path(root_path_str)
+    atlas_config_path_list = list(root_path.glob('*/staging/atlas_config.json'))
+    #logger.info(f"In root {root_path} found: {list(atlas_config_path_list)}...")
+    atlas_path_list = [x.parent.parent.relative_to(root_path) for x in atlas_config_path_list]
+    logger.info(f"In root {root_path} found: {list(atlas_path_list)}...")
     atlas_name_list = [json.load(open(x))['name'] for x in atlas_config_path_list]
-    atlas_html = f"<HTML><BODY><CENTER><h1>Fire Atlases</h1>"
-    atlas_html += "<HR width='40%'><UL>".join( [f"<LI><A HREF='{a}/index.html'>{b}</A></LI>" for a,b in zip(atlas_path_list, atlas_name_list) ] ) + "</UL>"
+    #logger.info(f"In root {root_path} found: {list(atlas_name_list)}...")
+    atlas_html = """<html>
+  <head>
+    <style>
+      body {
+	  background-image: url('http://fireatlas.org/bearbutte1.jpeg');
+	  background-repeat: no-repeat;
+	  background-attachment: fixed;
+	  background-size: 100% 100%;
+      }
+    </style>
+<link rel="stylesheet" href="/local/css/console.css">
+    </head>
+  <body>
+    <center><font size="+2">
+      f i r e a t l a s . o r g
+      </font>
+      <hr width="30%">
+      
+"""
+
+    atlas_html += "<HR width='40%'><UL>"
+    atlas_html += "\n".join( [f"<LI><A HREF='{a}/index.html'>{b}</A></LI>" for a,b in zip(atlas_path_list, atlas_name_list) ] )
     
-    atlas_html += "</BODY></HTML>"
+    atlas_html += "</UL></CENTER></BODY></HTML>"
     outpath = f"{root_path}/index.html"
+    logger.info(atlas_html)
     with open(outpath, "w") as f:
         f.write(atlas_html)
     return outpath
