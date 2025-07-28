@@ -203,7 +203,7 @@ document.getElementById('upload-button').addEventListener('click', function() {
                 
                 // Add layer name to the GeoJSON
                 geojson.layer = EDIT_CONFIG.layerName;
-                
+                geojson.action = EDIT_CONFIG.action;
                 // Send to server using the same API as store button
                 var xmlhttp = new XMLHttpRequest();
                 xmlhttp.open("POST", 'http://fireatlas.org:9998/store/' + EDIT_CONFIG.swalename);

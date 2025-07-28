@@ -88,50 +88,29 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error extracting coordinates: {str(e)}")
 
-@app.post("/json_upload")
+@app.post("/delta_upload")
 async def json_upload(payload: JSONPayload):
     try:
-        # Handle pin_to_poi case
-        if 'asset' in payload.data and payload.data['asset'] == 'pin_to_poi':
-            url = payload.data['url']
-            poi_type = payload.data['poi_type']
-            
-            # Extract coordinates
-            lat, lon = extract_coordinates_from_url(url)
-            
-            # Create GeoJSON feature
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            feature = {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [lon, lat]
-                },
-                "properties": {
-                    "name": timestamp,
-                    "poi_type": poi_type
-                }
-            }
-            
-            # Create feature collection
-            feature_collection = {
-                "type": "FeatureCollection",
-                "features": [feature]
-            }
-            
-            # Save to file
-            filename = f"{timestamp}.geojson"
-            outpath = os.path.join(STORAGE_DIR, "poi_deltas", filename)
-            os.makedirs(os.path.dirname(outpath), exist_ok=True)
-            
-            with open(outpath, 'w') as f:
-                json.dump(feature_collection, f)
-            
-            return {"status": "success", "message": f"POI saved to {outpath}"}
+        delta_package = payload.data
+        fc = delta_package #['features']
+        layer = delta_package['layer']
+        action = delta_package['action']
         
-        # Handle existing json_upload functionality
-        with open(f"{STORAGE_DIR}/roads_deltas/{datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w") as f:
-            json.dump(payload.data, f)
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        print(f"loading config from {config_path}")
+        ac = json.load(open(config_path))
+        delta_path = deltas_geojson.delta_path_from_layer(ac, layer, action)
+        with open(delta_path, "w") as f:
+            json.dump(fc, f)
+
+        print(f"refreshing {layer} after {action}")
+        #res = dataswale_geojson.refresh_vector_layer(ac, layer)
+
+        return {
+            "status": "success",
+            "message": f"Data stored successfully, refreshed: {res}",
+            "filename": os.path.basename(delta_path),
+            "path": delta_path
         return {"status": "success"}
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
