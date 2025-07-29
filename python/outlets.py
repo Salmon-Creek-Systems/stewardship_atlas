@@ -1445,3 +1445,18 @@ def build_region_map_grass_png(config, outlet_name, region):
     
     # return path to map
     return outpath
+
+def outlet_3dview(atlas_name, config):
+    """Generate a 3D terrain view using MapLibre GL JS."""
+    from pathlib import Path
+    import _3dview
+    
+    # Generate the 3D terrain HTML file
+    output_path = Path("outlets") / "3dview.html"
+    _3dview.create_3d_terrain_view(atlas_name, config, output_path)
+    
+    return {
+        'type': 'html',
+        'path': str(output_path),
+        'description': '3D terrain visualization using MapLibre GL JS'
+    }
