@@ -27,6 +27,7 @@ from geojson import Feature, FeatureCollection
 import duckdb
 
 import versioning
+import eddies
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -171,32 +172,25 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
 
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
                 geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
-                
-        # This is a Delta of anotation features which update properties for existing features
-        elif action == "update":
-            con = duckdb.connect(":memory:")    
-            # Load the delta file into a table called delta
-            con.sql(f"CREATE TABLE layer AS SELECT * FROM read_json('{layer_path}/layer.geojson')")
-            # Perform a spatial join between layer and delta
-            con.sql(f"CREATE TABLE delta AS SELECT * FROM read_json('{filepath}')")
-            # join the two tables on the geometry column    
-            con.sql("""
-            CREATE TABLE new_layer AS 
-            SELECT layer.*, delta.* 
-            FROM layer 
-            JOIN delta 
-            ON ST_Intersects(layer.geometry, delta.geometry)
-            """)
+
+                moved_path = filepath.parent / 'work' / filepath.name
+            logger.info(f"moving consumed delta: {filepath} -> {moved_path}")
+            filepath.rename(moved_path)
             
-            # write the new layer to the layer file
-            with versioning.atlas_file(layer_path / "layer.geojson", mode="wt") as outfile:
-                geojson.dump(FeatureCollection(features=new_layer['features']), outfile)
+        # This is a Delta of anotation features which update properties for existing features
+        elif action == "annotate":
+            # delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", updated_properties: List[str] = [])
+            output = eddies.delta_annotate_spatial_duckdb(
+                config=config,
+                layer_name = layer_name, 
+                delta_name=filepath,
+                anno_in_path=filepath,
+                anno_type= "deltas")
         else:
             raise InvalidDelta(f"Invalid action: {action}") 
-        delta_in_path = Path(filepath)
-        delta_out_path = delta_in_path.parent / "work" / delta_in_path.name
-        logger.info(f"moving consumed delta: {delta_in_path} -> {delta_out_path}")
-        delta_in_path.rename(delta_out_path)
+        #delta_in_path = Path(filepath)
+        #delta_out_path = delta_in_path.parent / "work" / delta_in_path.name
+
         
     return geojson.load(open(layer_filepath))
     

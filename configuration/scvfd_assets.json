@@ -127,8 +127,9 @@
 	"name": "gazetteer",
 	"num_rows": 5,
 	"num_cols": 6,
+	"access": ["public", "internal", "admin"],
 	"config_def": "gazetteer",
 	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
-	"blend_percent": 25
+	"blend_percent": 40
     }
 }

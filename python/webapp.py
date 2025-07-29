@@ -95,7 +95,7 @@ async def json_upload(payload: JSONPayload, swalename: str):
         fc = delta_package #['features']
         layer = delta_package['layer']
         action = delta_package['action']
-        
+        print(f"delta_upoad.=: {action} for {layer}: delta_package")
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))

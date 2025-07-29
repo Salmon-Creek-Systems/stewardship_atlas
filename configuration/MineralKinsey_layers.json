@@ -1,7 +1,8 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
-    {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50]},
+    {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50],
+     "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", 
@@ -35,8 +36,9 @@
      "add_labels": true, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
-    {"name": "burns", "geometry_type": "polygon", "color": [255, 55, 55],
+    {"name": "burns", "geometry_type": "polygon", "color": [155, 5, 5], "fill_color": [255, 50,50],
      "add_labels": true,  "interaction": "interface","access": [ "admin"],
+     "paint" : {"fill-opacity": 0.75},
      "editable_columns": [
          {"name": "name", "type": "string", "default": "Road" },
          {"name": "readiness",

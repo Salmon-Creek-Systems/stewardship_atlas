@@ -1,5 +1,6 @@
 from typing import Iterator, Dict, Any, List, Tuple
 import os, glob, json, sys
+from pathlib import Path
 import logging
 from matplotlib.colors import LightSource
 import matplotlib.pyplot as plt
@@ -157,16 +158,18 @@ def centroid_gdal(config:Dict[str, Any], eddy_name:str):
     
     return out_path
 
-def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", updated_properties: List[str] = []):
+def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", anno_in_path: Path = None, updated_properties: List[str] = []):
     #in_layer = eddy['in_layer']
     
-    #eddy = config['assets'][eddy_name]
-    if anno_type == "deltas":
-        anno_in_path = versioning.atlas_path(config, anno_type) / layer_name / f"{delta_name}.geojson"
-    elif anno_type == "layers":
-        anno_in_path = versioning.atlas_path(config, anno_type) / delta_name / f"{delta_name}.geojson"
-    else:
-        logger.error(f"Unknown annotation type: {anno_type}!")
+    # annotation data path
+    if not anno_in_path:
+        if anno_type == "deltas":
+            anno_in_path = versioning.atlas_path(config, anno_type) / layer_name / f"{delta_name}.geojson"
+        elif anno_type == "layers":
+            anno_in_path = versioning.atlas_path(config, anno_type) / delta_name / f"{delta_name}.geojson"
+        else:
+            logger.error(f"Unknown annotation type: {anno_type}!")
+    # target data path
     feat_in_path = versioning.atlas_path(config, 'layers') / layer_name / f"{layer_name}.geojson"
 
     anno_out_path = anno_in_path.parent / "work" /  anno_in_path.name
@@ -187,13 +190,15 @@ def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_n
     res = duckdb.sql(f"""
 SELECT * EXCLUDE (anno_geom, feat_geom), 
     ST_AsGeoJSON(feat_geom) AS geometry,
-    FROM anno LEFT JOIN feat 
+    anno_geom AS anno_geom
+    FROM anno RIGHT JOIN feat 
 ON ST_Intersects(anno_geom, feat_geom);
 """)
 
     # update layer features with delta feature properties
     matching_features = [dict(zip(res.columns, row)) for row in res.fetchall()] 
     logger.info(f"DID Anno join!  {len(matching_features)}")
+    # logger.info(f"Anno join RESULT!  {matching_features}")
     
     # rewrite featuers with new attributes added
     features = []
@@ -201,9 +206,10 @@ ON ST_Intersects(anno_geom, feat_geom);
 
     for mf in matching_features:
         logger.debug(f"about to assign geomtry from: {mf.get('geometry')}")
-        if not mf.get('geometry'):
-            logger.info(f"Skipping empty geometry for: {mf}")
-            continue
+        if mf.get('anno_geom'):
+            logger.info(f"NOT Skipping empty geometry for: {mf}")
+            
+            # continue
         f = geojson.Feature(geometry=geojson.loads(mf['geometry']))
         for k,v	in ( (k[feat_prefix_len:],v) for k,v in mf.items() if k.startswith(feat_prefix) and k not in ['feat_geom', 'anno_geom'] ):
             f['properties'][k] = v
@@ -212,7 +218,9 @@ ON ST_Intersects(anno_geom, feat_geom);
                 if v:
                     f['properties'][k] = v
         features.append(f)
+    logger.info(f"Post merge  RESULT!  {len(features)}")
 
+        
     feature_collection = geojson.FeatureCollection(features)
     geojson.dump(feature_collection, open(feat_in_path, 'w'))
     logger.info(f"moving consumed delta anno: {anno_in_path} -> {anno_out_path}")

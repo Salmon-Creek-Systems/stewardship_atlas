@@ -1,7 +1,8 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
-    {"name": "contours", "geometry_type": "linestring", "color": [0, 200, 0], "constant_width": 4},
+    {"name": "contours", "geometry_type": "linestring", "color": [0, 200, 0], "constant_width": 4,
+     "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads", "geometry_type": "linestring", 

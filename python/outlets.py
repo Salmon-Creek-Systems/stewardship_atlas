@@ -101,7 +101,16 @@ def webmap_json(config, name):
                 
             })
         
-        
+
+
+        if vis := layer.get('vis'):
+            map_layer |= vis
+        if paint := layer.get('paint'):
+            if not 'paint' in map_layer:
+                map_layer['paint'] = {}            
+            map_layer['paint'] |=  paint
+            
+                
         map_layers.append(map_layer)
         
         # Maybe add label/icon layer:
@@ -109,7 +118,7 @@ def webmap_json(config, name):
             label_layer = {
                 "id": f"{layer_name}-label-layer",
                 "type": "symbol",
-                "minzoom": 12,
+                "minzoom": 10,
                 "maxzoom": 24,
                 "source": layer_name,
                 "layout": {
@@ -135,8 +144,19 @@ def webmap_json(config, name):
                     'paint': {
                         'text-color': 'rgb(255,255,255)'
                     }
-                })                    
+                })
+
+            #label_layer['paint'] |=  layer.get('paint', {})                
+            #XSXSXblabel_layer |=  layer.get('vis', {})
+            if vis := layer.get('vis'):
+                label_layer |= vis
             if "symbol" not in layer:
+                #if paint := layer.get('paint'):
+                #    if not 'paint' in label_layer:
+                #        label_layer['paint'] = {}            
+                #    label_layer['paint'] |=  paint
+
+                #label_layer['paint'] = layer.get('paint', {})
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -152,12 +172,12 @@ def webmap_json(config, name):
                 label_layer['paint'] = {
                     'icon-color' : utils.rgb_to_css(layer.get('color', [150,150,150])),
                     'text-halo-color': 'rgba(200,200,200,0.5)',
-                    'text-halo-width': 5,
+                    'text-halo-width': 1,
                     'icon-halo-color': 'rgba(255,255,255,0.9)',
-                    'icon-halo-width': 10                    
-                    
+                    'icon-halo-blur': 10                    
                 }
-                
+
+                label_layer['paint'] |= layer.get('paint', {})
                 dynamic_layers.append(label_layer)
 
         #else:
@@ -272,7 +292,7 @@ def generate_edit_controls_html(editable_attributes):
             
     return select_html + string_html
 
-def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
+def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
     # Read template files
     with open('../templates/edit_map.html', 'r') as f:
@@ -289,7 +309,10 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
         'point': 'point',
         'polygon': 'polygon'
     }[ea.get('geometry_type', 'note')]
-    
+
+    if action == 'annotate':
+        mode_string = 'polygon'
+        
     # Prepare controls config for JavaScript
     controls_config = [
         {'name': att['name'], 'type': att['type']}
@@ -300,6 +323,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict):
     return template.format(
         swale_name=config['name'],
         swalename=config['name'],
+        action=action,
         edit_layer_name=ea['name'],
         controls_html=controls_html,
         map_config=json.dumps(map_config['map_config'], indent=2),
@@ -324,11 +348,12 @@ def outlet_webmap_edit(config: dict, name: str):
     # Generate edit pages for each editable asset
     for ea in config['dataswale']['layers']:
         if ea.get('editable_columns'):
-            html_content = generate_edit_page(config, ea, name, map_config)
-            output_path = webedit_dir /   f"{ea['name']}.html"
-            logger.debug(f"Generated WEBEDIT for {ea} into {output_path}")            
-            with open(output_path, 'w') as f:
-                f.write(html_content)
+            for action in ['create', 'annotate']:
+                html_content = generate_edit_page(config, ea, name, map_config, action)
+                output_path = webedit_dir /   f"{ea['name']}_{action}.html"
+                logger.debug(f"Generated WEBEDIT for {ea} | {action} into {output_path}")            
+                with open(output_path, 'w') as f:
+                    f.write(html_content)
     
     return webedit_dir
 
@@ -582,7 +607,7 @@ def process_region(layer_config: dict, region_extract_path: str):
     else:
         return region_extract_path
     
-def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=True, reuse_raster_extracts=True, first_n=0):
+def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=False, reuse_raster_extracts=True, first_n=0):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
     t = time.time()
     swale_name = config['name']
