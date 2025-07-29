@@ -464,7 +464,8 @@
         }}
     }});
     
-    // Long press handlers (mobile)
+    // Long press handlers (mobile) - DISABLED FOR NOW
+    /*
     map.on('mousedown', (e) => {{
         // Store the starting position
         longPressStartPos = {{ x: e.originalEvent.clientX, y: e.originalEvent.clientY }};
@@ -534,6 +535,7 @@
         // Clear long press timer on touch end
         clearLongPressTimer();
     }});
+    */
     
     // Add a global click listener to see if alt-clicks are being captured elsewhere
     document.addEventListener('click', (e) => {{
@@ -695,4 +697,4 @@
 
 </script>
 </body>
-</html> 
+</html>
