@@ -24,4 +24,43 @@ def atlas_file(p, mode='rt'):
     return open(p, mode=mode)
 
 
+
+
+
     
+def publish_new_version(config, version=None):
+    """
+    Publish a new version of the atlas
+    """
+    if not version:
+        version = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    staging_path = atlas_path(config, 'staging')
+    atlas_path = atlas_path(config, version)
+    # make sure not already published
+    if atlas_path.exists():
+        raise ValueError(f"Version {version} already exists")
+    # make sure parent exists
+    atlas_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # trigger materialization of all versioned assets in staging
+    # assume all inlsets and eddies are currently materialized (...safe?)
+    for outlet_name in config['versioned_outlets']:
+        logger.info(f"Materializing outlet: {outlet_name}")
+        outlets.materializers(config, outlet_name)
+ 
+   
+
+
+    # copy all files to new version
+    shutil.copytree(staging_path, atlas_path)
+
+    # empty /work dirs in staging to prepare for new changes
+    for work_dir in staging_path.glob('work/*'):
+        shutil.rmtree(work_dir)
+
+    # point "production" to new version
+    # repoint symbolic link in atlas root dir to new version
+    atlas_root = Path(config['data_root']) / config['name']
+    atlas_root.symlink_to(atlas_path)
+
+    return atlas_path

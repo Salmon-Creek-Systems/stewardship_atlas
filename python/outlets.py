@@ -465,7 +465,8 @@ def build_region_map_grass(config, outlet_name, region):
     m = gj.Map(height=size, width=size)
     clip_bbox = region['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
-    # load region layers
+    
+    # load region layers - if we have any
     if len(region['raster']) > 0:
         # First the raster basemap. Note we blend it with a greyscale overlay 
         blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
@@ -482,6 +483,9 @@ def build_region_map_grass(config, outlet_name, region):
         
         m.d_rast(map='blended')   
         # m.d_rast(map=raster_name)  
+    # if we don't, we need to set the page size and region directly to 2400x2400
+    gs.read_command('r.mapcalc.simple', expression="1", output='ones')
+    
     # add vector layers to map
     for lc,lp in region['vectors']:
         logger.debug(f"adding region {lc} to map for region {region['name']}")
