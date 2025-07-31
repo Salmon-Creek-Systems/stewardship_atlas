@@ -103,7 +103,7 @@
         "type": "outlet",
         "name": "runbook",
 	"blend_percent": 50,
-        "in_layers": ["basemap", "roads", "ponds", "creeks", "buildings"],
+        "in_layers": ["lidar_basemap", "roads", "ponds", "creeks", "buildings"],
         "access": ["internal", "admin"],
         "config_def": "runbook",
         "regions" : []},
@@ -130,6 +130,16 @@
 	"access": ["public", "internal", "admin"],
 	"config_def": "gazetteer",
 	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
+	"blend_percent": 40
+    },
+    "gazetteer-simple": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"num_rows": 5,
+	"num_cols": 6,
+	"access": ["public", "internal", "admin"],
+	"config_def": "gazetteer",
+	"in_layers":  ["roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
 	"blend_percent": 40
     }
 }

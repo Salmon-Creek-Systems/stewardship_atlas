@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 import versioning
 
 
-def generate_3d_terrain_html(atlas_name: str, config: Dict[str, Any]) -> str:
+def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     """
     Generate a 3D terrain HTML page using MapLibre GL JS.
     
@@ -24,7 +24,8 @@ def generate_3d_terrain_html(atlas_name: str, config: Dict[str, Any]) -> str:
     """
     
     # Get paths for existing data
-    atlas_path = versioning.atlas_path(atlas_name)
+    atlas_name = config['name']
+    atlas_path = versioning.atlas_path(config)
     elevation_dir = atlas_path / "layers" / "elevation"
     basemap_dir = atlas_path / "layers" / "basemap"
     
@@ -35,7 +36,7 @@ def generate_3d_terrain_html(atlas_name: str, config: Dict[str, Any]) -> str:
     
     # Use the first elevation file found
     elevation_file = elevation_files[0]
-    elevation_url = f"/atlas/{atlas_name}/layers/elevation/{elevation_file.name}"
+    elevation_url = f"/{atlas_name}/staging/layers/elevation/{elevation_file.name}"
     
     # Find satellite basemap files
     satellite_files = list(basemap_dir.glob("*satellite*")) + list(basemap_dir.glob("*sat*"))
@@ -272,7 +273,7 @@ def generate_3d_terrain_html(atlas_name: str, config: Dict[str, Any]) -> str:
     return html_content
 
 
-def create_3d_terrain_view(atlas_name: str, config: Dict[str, Any], output_path: Optional[Path] = None) -> Path:
+def create_3d_terrain_view(config: Dict[str, Any]) -> Path:
     """
     Create a 3D terrain HTML file for the given atlas.
     
@@ -285,14 +286,12 @@ def create_3d_terrain_view(atlas_name: str, config: Dict[str, Any], output_path:
         Path to the generated HTML file
     """
     
-    if output_path is None:
-        output_path = Path("outlets") / "3dview.html"
+    output_path = versioning.atlas_path(config)  / "outlets" / "3dview" /  "index.html"
+    #output_path = atlas_path / "outlets" / "3dview" /  "index.html"
     
-    # Ensure output directory exists
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Generate HTML content
-    html_content = generate_3d_terrain_html(atlas_name, config)
+    html_content = generate_3d_terrain_html(config)
     
     # Write to file
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -306,12 +305,8 @@ if __name__ == "__main__":
     # Test function - can be run directly for testing
     import sys
     if len(sys.argv) > 1:
-        atlas_name = sys.argv[1]
-        # Mock config for testing
-        config = {
-            'bounds': [-123.5, 39.5, -122.5, 40.5],
-            'name': atlas_name
-        }
-        create_3d_terrain_view(atlas_name, config)
+        config_path = sys.argv[1]
+        config = json.load(open(config_path))
+        create_3d_terrain_view(config)
     else:
         print("Usage: python 3dview.py <atlas_name>") 

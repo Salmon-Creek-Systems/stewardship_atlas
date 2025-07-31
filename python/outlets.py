@@ -466,22 +466,23 @@ def build_region_map_grass(config, outlet_name, region):
     clip_bbox = region['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
     # load region layers
-    # First the raster basemap. Note we blend it with a greyscale overlay 
-    blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
-    raster_name = 'hillshadered_' + region['name']
-
-    print(f"making map image for {region}.")
-    gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
-    gs.read_command('r.colors', map=raster_name, color='grey')
-    
-    gs.read_command('r.mapcalc.simple', expression="1", output='ones')
-    gs.read_command('r.colors', map='ones', color='grey1.0')
-    gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent=blend_percent, overwrite=True)
-    logger.info(f"Blended raster using percent: {blend_percent} [{time.time() - t}]")
-    
-    m.d_rast(map='blended')   
-    # m.d_rast(map=raster_name)  
-    # add layers to map
+    if len(region['raster']) > 0:
+        # First the raster basemap. Note we blend it with a greyscale overlay 
+        blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
+        raster_name = 'hillshadered_' + region['name']
+        
+        print(f"making map image for {region}.")
+        gs.read_command('r.in.gdal',  band=1,input=region['raster'][1], output=raster_name)
+        gs.read_command('r.colors', map=raster_name, color='grey')
+        
+        gs.read_command('r.mapcalc.simple', expression="1", output='ones')
+        gs.read_command('r.colors', map='ones', color='grey1.0')
+        gs.read_command('r.blend', flags="c", first=raster_name, second='ones', output='blended', percent=blend_percent, overwrite=True)
+        logger.info(f"Blended raster using percent: {blend_percent} [{time.time() - t}]")
+        
+        m.d_rast(map='blended')   
+        # m.d_rast(map=raster_name)  
+    # add vector layers to map
     for lc,lp in region['vectors']:
         logger.debug(f"adding region {lc} to map for region {region['name']}")
         if lc['name'] in region.get('config', {}):
@@ -505,10 +506,10 @@ def build_region_map_grass(config, outlet_name, region):
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
             if lc.get("icon_if"):
                 icon_sql = f"{lc['icon_if']['property']} == \'{lc['icon_if']['value']}\'"
-                logger.info(f"Conditional icon! {lc['icon_if']} -> [{icon_sql}]")
+                logger.info(f"Conditional POINT icon! {lc['icon_if']} -> [{icon_sql}]")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc['icon_if']['icon'], size=50,
+                         icon=lc['icon_if']['icon'], size=5,
                          where=icon_sql)
 
                 
@@ -538,6 +539,21 @@ def build_region_map_grass(config, outlet_name, region):
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'),
                          label_color=f"{c[0]}:{c[1]}:{c[2]}", label_size=50)
             logger.info(f"{region['name']} : {lc['name']} [{time.time() - t}]")
+
+            if lc.get("icon_if"):
+                icon_sql = f"{lc['icon_if']['property']} == \'{lc['icon_if']['value']}\'"
+                logger.info(f"Conditional icon! {lc['icon_if']} -> [{icon_sql}]")
+                gs.read_command('v.centroids', input=lc['name'], output=lc['name'] + "_centroids")
+                m.d_vect(map=lc['name'] + "_centroids",
+                         color="0:0:0", fill_color="0:0:0", #f"{c[0]}:{c[1]}:{c[2]}",
+                         icon=lc['icon_if']['icon'], size=30,
+                         where=icon_sql)
+
+
+
+
+
+            
     m.d_grid(size=0.5,color='black')
 
     # add neighboring gazeteer text                                                                                                                                              
@@ -607,7 +623,7 @@ def process_region(layer_config: dict, region_extract_path: str):
     else:
         return region_extract_path
     
-def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=False, reuse_raster_extracts=True, first_n=0):
+def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=True, reuse_raster_extracts=True, first_n=0):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
     t = time.time()
     swale_name = config['name']
@@ -773,6 +789,48 @@ def generate_gazetteerregions(config, outlet_name):
     bdy += "</TABLE></BODY></HTML>"
     html_path = versioning.atlas_path(config, "outlets") / outlet_name / "index.html"
     return regions, [(html_path, hdr + bdy)]
+
+def make_gazetteer_html(config, outlet_name):
+    outlet_config = config['assets'][outlet_name]
+    bbox = config['dataswale']['bbox']
+    # num_rows = swale_config['geometry']['num_rows']
+    num_cols = outlet_config['num_cols']
+    cell_size = float(abs(bbox['east'] - bbox['west']))/float(num_cols)
+    num_rows = math.ceil( float(abs(bbox['north'] - bbox['south'])) / cell_size )
+
+    cell_width=300
+    hdr = f"<HTML><BODY><table border=3 bgcolor='#FFFFFF' cellpadding=0 cellspacing=1>\n<TR><td>{config['name']}</td>"
+    bdy = ''
+    
+    row_index =  list(string.ascii_uppercase)[:num_rows]
+    col_index =  [str(x) for x in range(1, 1+num_cols)]
+    
+    for row, rowname in enumerate(row_index):
+        for col, colname in enumerate(col_index):
+            s = bbox['north']- (1+row)*cell_size
+            n = bbox['north']- row*cell_size
+            e = bbox['west'] + (1+col)*cell_size
+            w = bbox['west'] + col*cell_size
+            cell_name = f"{colname}_{rowname}"
+
+            if col == 0:
+                bdy += f"<TR><TD valign='center'>{n:.2f}<br><br><br><B><FONT SIZE='+3'>{rowname}</font></b><br><br><br>{s:.2f}</TD>"
+            if row == 0:
+                hdr += f"<TD align='center'>{w:.2f}&nbsp;&nbsp;&nbsp; <font size='+3'><b>{colname}</b></font>&nbsp;&nbsp;&nbsp; {e:.2f}</TD>"
+            bdy += f"<TD><A HREF='page_{colname}_{rowname}.html'><img src='page_{colname}_{rowname}.png' alt='Avatar' class='image'style='width:{cell_width}'></A>\n"
+            html_cell_path = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{colname}_{rowname}.html"
+            with open(html_cell_path, "w") as f:
+                f.write(f"<html><body><center><font size='+4'><b>{colname}_{rowname}</b></font><br><img src='page_{colname}_{rowname}.png' width='1000px'></center></body></html>")
+        bdy += "</TR>\n"
+    hdr += "</TR>\n"
+    bdy += "</TABLE></BODY></HTML>"
+    html_path = versioning.atlas_path(config, "outlets") / outlet_name / "index2.html"
+    with open(html_path, "w") as f:
+        f.write(hdr+bdy)
+
+
+    return html_path
+    
 
 def outlet_gazetteer(config, outlet_name, skips=[], first_n=0):
     gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name)
