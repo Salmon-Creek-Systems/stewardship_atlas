@@ -122,7 +122,7 @@
 	"config_def": "sqlquery",
 	"access": ["admin"]
     },
-    "gazetteer": {
+    "gazetteer-pretty": {
 	"type": "outlet",
 	"name": "gazetteer",
 	"num_rows": 5,
@@ -132,14 +132,14 @@
 	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
 	"blend_percent": 40
     },
-    "gazetteer-simple": {
+    "gazetteer": {
 	"type": "outlet",
 	"name": "gazetteer",
 	"num_rows": 5,
 	"num_cols": 6,
 	"access": ["public", "internal", "admin"],
 	"config_def": "gazetteer",
-	"in_layers":  ["roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
+	"in_layers":  ["contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
 	"blend_percent": 40
     }
 }
