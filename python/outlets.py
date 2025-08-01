@@ -485,7 +485,7 @@ def build_region_map_grass(config, outlet_name, region):
         # m.d_rast(map=raster_name)  
     # if we don't, we need to set the page size and region directly to 2400x2400
     gs.read_command('r.mapcalc.simple', expression="1", output='ones')
-    
+
     # add vector layers to map
     for lc,lp in region['vectors']:
         logger.debug(f"adding region {lc} to map for region {region['name']}")
@@ -1522,3 +1522,27 @@ def outlet_3dview(atlas_name, config):
         'path': str(output_path),
         'description': '3D terrain visualization using MapLibre GL JS'
     }
+
+
+
+def gsheet_layer(config: dict, outlet_name: str) -> str:
+    """Create a Google Sheet layer from an atlas layer."""
+ 
+    # set up spreadsheet
+    gsheet_name = f"{config['name']} Fire Atlas"
+    gc = gspread.service_account()
+    sh = gc.create(gsheet_name)
+    sh.share('gateless@gmail.com', perm_type='user', role='writer')
+
+    # get layers in outlet config
+    for layer_name in config['assets'][outlet_name]['in_layers']:
+        # get path to layer
+        layer = dataswale_geojson.layer_as_featurecollection(config, layer_name)
+        sh.add_worksheet(title=layer_name, rows=100, cols=20)
+        wks = sh.get_worksheet(0)
+        for i,f in enumerate(layer['features']):
+            for k,v in f['properties'].items():
+                wks.update_cell(i, k, v)
+            wks.update_cell(i+1, 0, f['geometry'])
+        #sh.close()                                                                                                                                                                      
+
