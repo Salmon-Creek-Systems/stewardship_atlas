@@ -11,6 +11,10 @@ import utils
 import versioning
 import logging
 import geojson
+import gspread
+
+import dataswale_geojson
+import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -627,7 +631,7 @@ def process_region(layer_config: dict, region_extract_path: str):
     else:
         return region_extract_path
     
-def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=True, reuse_raster_extracts=True, first_n=0):
+def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], skips=[], reuse_vector_extracts=True, reuse_raster_extracts=False, first_n=0):
     """Process regions for gazetteer and runbook outputs using versioned paths."""
     t = time.time()
     swale_name = config['name']
@@ -1525,24 +1529,36 @@ def outlet_3dview(atlas_name, config):
 
 
 
-def gsheet_layer(config: dict, outlet_name: str) -> str:
+def gsheet_export(config: dict, outlet_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""
  
     # set up spreadsheet
-    gsheet_name = f"{config['name']} Fire Atlas"
+
     gc = gspread.service_account()
-    sh = gc.create(gsheet_name)
-    sh.share('gateless@gmail.com', perm_type='user', role='writer')
 
     # get layers in outlet config
     for layer_name in config['assets'][outlet_name]['in_layers']:
         # get path to layer
         layer = dataswale_geojson.layer_as_featurecollection(config, layer_name)
+        gsheet_name = f"{config['name']} Fire Atlas: {layer_name}"
+        sh = gc.create(gsheet_name)
+        sh.share('gateless@gmail.com', perm_type='user', role='writer')
+
         sh.add_worksheet(title=layer_name, rows=100, cols=20)
         wks = sh.get_worksheet(0)
+        header = []
+        cells = []
         for i,f in enumerate(layer['features']):
-            for k,v in f['properties'].items():
-                wks.update_cell(i, k, v)
-            wks.update_cell(i+1, 0, f['geometry'])
+            #logger.info(f"Adding row for Prop [{type(f['properties'])}]: {f['properties']} and geom [{type(f['properties'])}]:: {f['geometry']}...")
+                
+            for j,p in enumerate(f['properties'].items()):
+                if i == 0:
+                    cells.append(gspread.Cell(row=i+1, col=j+1, value=p[0]))
+                    #wks.update_cell(i+1, j+1, p[0])
+                #wks.update_cell(i+2, j+1, p[1])
+                cells.append( gspread.Cell(row=i+2, col=j+1, value=p[1]))
+            cells.append( gspread.Cell(row=i+1, col=j+2, value=geojson.dumps(f['geometry'])) )
+        wks.update_cells(cells)
+                 
         #sh.close()                                                                                                                                                                      
 

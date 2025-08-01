@@ -26,7 +26,7 @@ SWALES_ROOT = "/root/swales"
 # our Imports|
 import atlas
 import dataswale_geojson
-import atlas_outlets
+import outlets
 import versioning   
 import deltas_geojson
 app = FastAPI()
@@ -301,14 +301,14 @@ async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
     try:
         print(f"SQL Query [{swalename}]: {payload.query}")
         # Load config
-        #ac = json.load(open(f"/root/data/{swalename}_atlas_config.json"))
-        config_path = versioning.atlas_path(swalename, "atlas_config.json")
-        ac = json.load(open(config_path))
+        ac = json.load(open(f"/root/swales/{swalename}/staging/atlas_config.json"))
+        #config_path = versioning.atlas_path(ac, "atlas_config.json")
+        #ac = json.load(open(config_path))
 
         # Execute query using outlets.sql_query
-        result = atlas_outlets.sql_query(
+        result = outlets.sql_query(
             config=ac,
-            outlet_name=swalename,
+            outlet_name='sqlquery',
             query=payload.query,
             return_format=payload.return_format
         )

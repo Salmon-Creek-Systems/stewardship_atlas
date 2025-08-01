@@ -86,6 +86,13 @@
 	"config_def": "webmap",
 	"access": ["internal", "admin"]
     },
+    "spreadsheet_export" : {
+	"type": "outlet",
+	"name": "spreadsheet_export",
+	"config_def": "gsheet_export",
+	"in_layers": ["ponds", "poi"]
+    },
+
     "webedit" : {
 	"type": "outlet",
 	"name": "webmap",

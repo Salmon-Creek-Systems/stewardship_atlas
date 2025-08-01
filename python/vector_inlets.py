@@ -122,12 +122,12 @@ def import_gsheet(config, name, delta_queue=DELTA_QUEUE):
         }
         geojson_features.append(geojson_feature)
 
-    geojson_layer = {
+    #geojson_layer = {
     
 
 
     # get path to layer
-    layer = dataswale_geojson.layer_as_featurecollection(config, name)
+    #layer = dataswale_geojson.layer_as_featurecollection(config, name)
 
 
 

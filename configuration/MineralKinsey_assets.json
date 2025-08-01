@@ -110,7 +110,7 @@
     "sqldb": {
 	"type": "outlet",
 	"name": "sqldb",
-	"layers": ["basemap", "roads", "creeks"]
+	"layers": ["roads", "creeks", "burns"]
     },
     "sqlquery": {
 	"type": "outlet",

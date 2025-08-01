@@ -58,6 +58,15 @@
         "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
         "fetch_type": "fetch_osm"
     },
+    "gsheet_export": {
+        "name": "sheet_export",
+        "asset_type": "outlet",
+        "data_type": "spreadsheet",
+        "feature_type": "spreadsheet",
+        "add_labels": true,
+        "template": "NONE",
+        "fetch_type": "export_gsheet"
+    },
     "local_ponds": {
         "name": "ponds",
         "asset_type": "inlet", 
