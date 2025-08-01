@@ -104,6 +104,36 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
     return outpath
 
 
+def import_gsheet(config, name, delta_queue=DELTA_QUEUE):
+    """Import a Google Sheet layer into a dataswale atlas"""
+
+    gsheet_name = f'{config["name"]} Fire Atlas'
+    gc = gspread.service_account()
+    wks = gc.open(gsheet_name).sheet1
+    features = wks.get_all_records()
+
+    # convert to geojson
+    geojson_features = []
+    for feature in features:
+        geojson_feature = {
+            "type": "Feature",
+            "geometry": json.loads(feature['geometry']),
+            "properties": feature
+        }
+        geojson_features.append(geojson_feature)
+
+    geojson_layer = {
+    
+
+
+    # get path to layer
+    layer = dataswale_geojson.layer_as_featurecollection(config, name)
+
+
+
+
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr
