@@ -88,6 +88,28 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error extracting coordinates: {str(e)}")
 
+@app.post("/import_gsheet/{swalename}/{layer_name}")
+async def import_gsheet(swalename: str, layer_name: str):
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        layer_fc = outlets.import_gsheet(ac, 'spreadsheet_import', layer_name)
+
+
+        # store the geojson
+        outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
+        with open(outpath, "w") as f:
+            json.dump(layer_fc, f)
+
+        res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
+        return {
+            "status": "success",
+            "message": f"Data stored successfully, refreshed: {res}",
+            "filename": os.path.basename(outpath),
+            "path": outpath}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     try:

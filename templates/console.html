@@ -194,6 +194,72 @@
                     li.appendChild(document.createTextNode(' '));
                     li.appendChild(a3);
 
+
+             // Link to gheet export
+             const a4 = document.createElement('a');
+                    a4.href = `http://fireatlas.org:9998/export_spreadsheet/${swalename}/${item.name}`;
+                    a4.textContent = ' (export sheet) ';
+                    li.appendChild(document.createTextNode(' '));
+                    li.appendChild(a4);       
+
+            // Link to gheet import
+            const a5 = document.createElement('a');
+                    a5.href = `http://fireatlas.org:9998/import_gsheet/${swalename}/${item.name}`;
+                    a5.textContent = ' (import sheet) ';
+                    li.appendChild(document.createTextNode(' '));
+                    li.appendChild(a5);       
+
+            // Link to delta upload
+            const a6 = document.createElement('a');
+            a6.href = '#';
+            a6.textContent = ' (upload) ';
+            a6.onclick = function(e) {
+                e.preventDefault();
+                
+                // Create a file input element
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.geojson,application/json';
+                
+                fileInput.onchange = function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const geojson = JSON.parse(e.target.result);
+                            
+                            // Add layer name to the GeoJSON
+                            geojson.layer = item.name;
+                            geojson.action = 'add'; // or whatever default action you want
+                            
+                            // Send to server using the same API as upload button
+                            var xmlhttp = new XMLHttpRequest();
+                            xmlhttp.open("POST", `http://fireatlas.org:9998/delta_upload/${swalename}/${item.name}`);
+                            xmlhttp.setRequestHeader("Content-Type", "application/json");
+                            var geojson_data = JSON.stringify({"data": geojson});
+                            xmlhttp.send(geojson_data);
+                            
+                            xmlhttp.onreadystatechange = function() {
+                                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                                    alert('Upload successful!');
+                                } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
+                                    alert('Error uploading file: ' + (xmlhttp.responseText || 'Unknown error'));
+                                }
+                            }
+                        } catch (error) {
+                            alert('Error reading file: ' + error.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                };
+                
+                fileInput.click();
+            };
+            li.appendChild(document.createTextNode(' '));
+            li.appendChild(a6);
+
 		    // Link to refresh/materialize
                     const refreshLink = document.createElement('a');
                     refreshLink.href = '#';
