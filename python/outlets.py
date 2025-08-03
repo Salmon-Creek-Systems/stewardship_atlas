@@ -1030,7 +1030,7 @@ def make_root_html(root_path_str):
     return outpath
 
 def make_console_html(config,
-                     displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[],
+                      displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
                       admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[]):
     """Generate HTML for the console interface."""
     logger.info(f"Making Console for {console_type}...")
@@ -1051,6 +1051,7 @@ def make_console_html(config,
         'interfaces': displayed_interfaces,
         'downloads': displayed_downloads,
         'useCases': use_cases,
+        'spreadsheets': spreadsheets,
         'layers': displayed_inlets
     }
     
@@ -1177,7 +1178,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         panel_header = 'Layer operations and Access',        
         displayed_interfaces=admin_interfaces, 
         displayed_downloads=admin_downloads, 
-        displayed_inlets=admin_layers, 
+        displayed_inlets=admin_layers,
+        spreadsheets = config['spreadsheets'],
         displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
         admin_controls=[],
         use_cases=[]
@@ -1533,9 +1535,9 @@ def gsheet_export(config: dict, outlet_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""
  
     # set up spreadsheet
-
+    statefile_path = versioning.atlas_path(config) / "state.json"
     gc = gspread.service_account()
-
+    links = {}
     # get layers in outlet config
     for layer_name in config['assets'][outlet_name]['in_layers']:
         # get path to layer
@@ -1559,6 +1561,16 @@ def gsheet_export(config: dict, outlet_name: str) -> str:
                 cells.append( gspread.Cell(row=i+2, col=j+1, value=p[1]))
             cells.append( gspread.Cell(row=i+1, col=j+2, value=geojson.dumps(f['geometry'])) )
         wks.update_cells(cells)
-                 
-        #sh.close()                                                                                                                                                                      
+        links[layer_name] =  sh.url
+        #sh.close()
+        
+        #state = json.load(open(statefile_path))
+
+        # Set and write state to reflect generated spreadsheets
+        config_path = versioning.atlas_path(config) / "atlas_config.json"
+        config['spreadsheets'] = links
+        #json.dump(state, open(statefile_path, "w"))
+        json.dump(config, open(config_path, "w"))
+                  
+        return statefile_path
 

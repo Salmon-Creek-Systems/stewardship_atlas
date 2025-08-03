@@ -194,21 +194,21 @@
                     li.appendChild(document.createTextNode(' '));
                     li.appendChild(a3);
 
-
-             // Link to gheet export
-             const a4 = document.createElement('a');
-                    a4.href = `http://fireatlas.org:9998/export_spreadsheet/${swalename}/${item.name}`;
-                    a4.textContent = ' (export sheet) ';
-                    li.appendChild(document.createTextNode(' '));
-                    li.appendChild(a4);       
-
-            // Link to gheet import
-            const a5 = document.createElement('a');
-                    a5.href = `http://fireatlas.org:9998/import_gsheet/${swalename}/${item.name}`;
-                    a5.textContent = ' (import sheet) ';
-                    li.appendChild(document.createTextNode(' '));
-                    li.appendChild(a5);       
-
+		    if (item.name in data.spreadsheets) {
+			// Link to gheet export
+			const a4 = document.createElement('a');
+			a4.href = data.spreadsheets[item.name];
+			a4.textContent = ' (export sheet) ';
+			li.appendChild(document.createTextNode(' '));
+			li.appendChild(a4);       
+			
+			// Link to gheet import
+			const a5 = document.createElement('a');
+			a5.href = data.spreadsheets[item.name];
+			a5.textContent = ' (import sheet) ';
+			li.appendChild(document.createTextNode(' '));
+			li.appendChild(a5);       
+		    };
             // Link to delta upload
             const a6 = document.createElement('a');
             a6.href = '#';

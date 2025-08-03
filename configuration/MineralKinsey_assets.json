@@ -21,6 +21,19 @@
         "out_layer": "lidar_basemap",
         "config_def": "local_hillshade"
     },
+    "spreadsheet_export" : {
+	"type": "outlet",
+	"name": "spreadsheet_export",
+	"config_def": "gsheet_export",
+	"in_layers": ["burns", "roads"]
+    },
+    "spreadsheet_import" : {
+	"type": "outlet",
+	"name": "spreadsheet_import",
+	"config_def": "gsheet_import",
+	"in_layers": ["ponds", "poi"]
+    },
+
 
     "public_buildings" : {
     "type": "inlet",

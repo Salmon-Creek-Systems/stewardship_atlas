@@ -67,6 +67,16 @@
         "template": "NONE",
         "fetch_type": "export_gsheet"
     },
+    "gsheet_import": {
+        "name": "sheet_import",
+        "asset_type": "outlet",
+        "data_type": "spreadsheet",
+        "feature_type": "spreadsheet",
+        "add_labels": true,
+        "template": "NONE",
+        "fetch_type": "import_gsheet"
+    },
+
     "local_ponds": {
         "name": "ponds",
         "asset_type": "inlet", 
