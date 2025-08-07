@@ -45,6 +45,9 @@ DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
 
 DEFAULT_SHARED_DIR = Path('/root/data')
 
+DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods
+
+
 def add_htpasswds(config, path, access):
     """Add htpasswd entries for users with access to a directory.
     
@@ -80,7 +83,9 @@ def add_htpasswds(config, path, access):
 
 def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
            layers: List[Dict[str, Any]] = DEFAULT_LAYERS, 
+           layers_path: str = None,
            assets: Dict[str, Any] = DEFAULT_ASSETS, 
+           assets_path: str = None,
            data_root: str = DEFAULT_DATA_ROOT,
            shared_dir: Path = DEFAULT_SHARED_DIR,
            name: str = "Nameless",
@@ -113,9 +118,15 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['data_root'] = data_root
     config['name'] = name
     config['dataswale']['bbox'] = bbox
+
+    if layers_path is not None:
+        layers = json.load(open(layers_path))
+    if assets_path is not None:
+        assets = json.load(open(assets_path))
     config['dataswale']['layers'] = layers
     config['assets'] = assets
 
+    config['spreadsheets'] = {}
     
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
@@ -157,7 +168,7 @@ def delete():
 def new_version():
     pass
 
-def materialize(materializers, config, asset_name):
+def materialize(config: Dict[str, Any], asset_name: str, materializers: Dict[str, Any]=DEFAULT_MATERIALIZERS):
     materializer_name = config['assets'][asset_name]['config']['fetch_type']
     return materializers[materializer_name](config, asset_name)
 
