@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime
 import logging
 
 # Configure logging
@@ -33,14 +34,14 @@ def publish_new_version(config, version=None):
     Publish a new version of the atlas
     """
     if not version:
-        version = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     staging_path = atlas_path(config, 'staging')
-    atlas_path = atlas_path(config, version)
+    version_path = atlas_path(config, version)
     # make sure not already published
-    if atlas_path.exists():
+    if version_path.exists():
         raise ValueError(f"Version {version} already exists")
     # make sure parent exists
-    atlas_path.parent.mkdir(parents=True, exist_ok=True)
+    version_path.parent.mkdir(parents=True, exist_ok=True)
     
     # trigger materialization of all versioned assets in staging
     # assume all inlsets and eddies are currently materialized (...safe?)
@@ -52,7 +53,7 @@ def publish_new_version(config, version=None):
 
 
     # copy all files to new version
-    shutil.copytree(staging_path, atlas_path)
+    shutil.copytree(staging_path, version_path)
 
     # empty /work dirs in staging to prepare for new changes
     for work_dir in staging_path.glob('work/*'):
@@ -63,4 +64,4 @@ def publish_new_version(config, version=None):
     atlas_root = Path(config['data_root']) / config['name']
     atlas_root.symlink_to(atlas_path)
 
-    return atlas_path
+    return version_path

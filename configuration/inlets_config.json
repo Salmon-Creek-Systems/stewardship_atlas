@@ -346,7 +346,7 @@
 		"inpath_template": "westport_hydrants.geojson",
         "alterations": {
 	    "canonicalize": [
-		{"out": "name", "in": ["label"], "default": "hydrant"}
+		{"to": "name", "from": ["label"], "default": "hydrant"}
 	    ],
             "vector_width": {
 		"default": 5
