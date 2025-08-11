@@ -1,0 +1,79 @@
+{
+    "dem": {
+        "type": "inlet",
+        "out_layer": "elevation",
+        "config_def": "opentopo_dem"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "elevation",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+    "gdal_contours": {
+        "type": "eddy",            
+        "in_layer": "elevation",
+        "out_layer": "contours",
+        "config_def": "gdal_contours"
+    },
+    "public_roads" : {
+        "type": "inlet",
+        "out_layer": "roads",
+        "config_def": "humtrans_roads"
+    },
+    "public_buildings" : {
+        "type": "inlet",
+        "out_layer": "buildings",
+        "config_def": "overture_buildings"
+    },    
+    "notebook" : {
+        "type": "outlet",
+        "name": "notebook",
+        "config_def": "jupyter_notebook",
+        "access": [ "admin"]
+},
+"webmap" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers":  ["basemap", "contours", "roads", "buildings"],
+    "config_def": "webmap",
+    "access": ["internal", "admin"]
+},
+"webedit" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap","roads"],
+    "config_def": "webedit"
+},
+    "runbook": {
+        "type": "outlet",
+        "name": "runbook",
+        "in_layers": ["basemap", "roads", "hydrants"],
+        "access": ["internal", "admin"],
+        "config_def": "runbook",
+        "regions" : []},
+    "html": {
+        "type": "outlet",
+        "name": "html",
+        "config_def": "static_html"},
+    "sqldb": {
+	"type": "outlet",
+	"name": "sqldb",
+	"layers": ["basemap", "roads", "creeks"]
+    },
+    "sqlquery": {
+	"type": "outlet",
+	"name": "sqlquery",
+	"config_def": "sqlquery",
+	"access": ["admin"]
+    },
+    "gazetteer": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"blend_percent": 25,
+	"num_rows": 1,
+	"num_cols": 2,
+	"config_def": "gazetteer",
+	"in_layers":  ["lidar_basemap", "contours", "ponds", "roads", "creeks", "buildings", "poi", "hydrants"]
+    }
+}

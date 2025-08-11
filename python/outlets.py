@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 import geopandas as gpd
 import pandas as pd
+import nbformat
 
 import utils
 import versioning
@@ -1529,7 +1530,41 @@ def outlet_3dview(atlas_name, config):
         'description': '3D terrain visualization using MapLibre GL JS'
     }
 
+def outlet_notebook_jupyter(config, outlet_name):
+    """Generate a Jupyter notebook for the outlet."""
+ 
 
+    # Create a new Jupyter notebook
+    notebook = nbformat.v4.new_notebook(name=f"{outlet_name}-{config['name']}")
+    notebook['metadata'] = {
+        'kernelspec': {
+            'name': 'python3',
+            'display_name': 'Python 3'
+        }
+    }
+    
+    # Add python cells directly - would be cool load them from outlet config
+    notebook['cells'] = [
+        {
+            'cell_type': 'markdown',
+            'execution_count': None,
+            'source': [
+                "# Hello World",
+                "Hurp Durp"
+            ]
+        },
+         {
+            'cell_type': 'code',
+            'execution_count': None,
+            'source': [
+                "outstr = 'Hello, world!'",
+                "print(outstr)"
+            ]
+        }
+    ]
+    
+    
+    
 
 def gsheet_export(config: dict, outlet_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""

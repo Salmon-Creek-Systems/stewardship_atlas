@@ -609,6 +609,18 @@
 	    "citation": "USGS NHD"
 	} 
     },
+	"jupyter_notebook":  {
+		"asset_type": "outlet",
+		"name": "notebook",
+		"fetch_type": "outlet_notebook_jupyter",
+		"interaction": "interface",
+		"attribution": {
+			"url": "https://portal.opentopography.org/api/terms",
+			"description": "Open Topography's Global DEM",
+			"license": "https://portal.opentopography.org/api/terms",
+			"citation": "https://portal.opentopography.org/api/terms"
+		}
+    },
     "webmap":  {
 	"asset_type": "outlet",
 	"name": "webmap",
