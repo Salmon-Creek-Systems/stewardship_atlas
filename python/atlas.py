@@ -22,6 +22,10 @@ import geojson
 
 # Our imports
 import utils
+import outlets
+import vector_inlets
+import raster_inlets
+import eddies
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -73,3 +73,7 @@ def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
                                     inlet_config.get('resample_width', None))
     
 
+asset_methods = {
+    'url_raster': url_raster,
+    'local_raster': local_raster
+    }

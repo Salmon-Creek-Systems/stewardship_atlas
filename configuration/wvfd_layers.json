@@ -27,7 +27,7 @@
      "interaction": "interface"},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": true,
      "symbol" : {"png": "milemarker.png", "icon": "basic/marker"},
-     "icon-size": 1.2, "icon-anchor": "bottom"},
+     "icon-size": 0.15, "icon-anchor": "bottom"},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
      "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 1.2, "access": [ "internal", "admin"], "interaction": "interface"},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,
