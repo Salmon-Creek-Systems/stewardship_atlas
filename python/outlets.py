@@ -1535,7 +1535,9 @@ def outlet_notebook_jupyter(config, outlet_name):
  
 
     # Create a new Jupyter notebook
-    notebook = nbformat.v4.new_notebook(name=f"{outlet_name}-{config['name']}")
+
+
+    notebook = nbformat.v4.new_notebook()
     notebook['metadata'] = {
         'kernelspec': {
             'name': 'python3',
@@ -1544,26 +1546,62 @@ def outlet_notebook_jupyter(config, outlet_name):
     }
     
     # Add python cells directly - would be cool load them from outlet config
-    notebook['cells'] = [
-        {
-            'cell_type': 'markdown',
-            'execution_count': None,
-            'source': [
-                "# Hello World",
-                "Hurp Durp"
-            ]
-        },
-         {
-            'cell_type': 'code',
-            'execution_count': None,
-            'source': [
-                "outstr = 'Hello, world!'",
-                "print(outstr)"
-            ]
-        }
-    ]
+    config_path = versioning.atlas_path(config, "atlas_config.json")
+
+    notebook.cells.append(nbformat.v4.new_markdown_cell("""
+![atlas](atlas4.png)
+
+A fire atlas is a configuration convention for geospatial assets related to community fire planning and response together with a configuration for ways to instantiate, edit, and manage those assets.
+
+A stewardship atlas is a data set, a confuration for storing, processing, and sharing that data set, and a set of implementions to do so.
+
+This is a minimal notebook intended as a starting point for working with a specific atlas. It comes prebuilt to get started with:
+* generate atlas - bootstrap configuration
+* populate atlas with data
+* materialize some core interfaces to the atlas
+  * web map
+  * web edit
+  * html console
+  * sql query
+"""))
     
+    notebook.cells.append(nbformat.v4.new_code_cell("""
+import sys, os, subprocess, time, json, string, datetime, random, math
+sys.path.insert(0, "/root/stewardship_atlas/python")
+import dataswale_geojson as dataswale
+import deltas_geojson as deltas
+import versioning
+import outlets
+import atlas
+"""))
+    notebook.cells.append(nbformat.v4.new_code_cell(f"c = json.load(open('{config_path}'))"))
+    notebook.cells.append(nbformat.v4.new_code_cell("""
+# Core elevation derived layers
+atlas.materialize(config=c, asset_name="dem", delta_queue=deltas)
+dataswale.refresh_raster_layer(c, 'elevation', deltas.apply_deltas)
+atlas.materialize(c, 'derived_hillshade')
+atlas.materialize(c, 'gdal_contours')
+
+#Core vector lyaers
+atlas.materialize(c, 'public_roads')
+dataswale.refresh_vector_layer(c, 'roads')
+atlas.materialize(materializers, c, 'public_creeks')
+dataswale.refresh_vector_layer(c, 'creeks', deltas.apply_deltas)
+
+atlas.materialize(config=c, name="public_buildings", delta_queue=deltas)
+dataswale.refresh_vector_layer(c, 'buildings', deltas.apply_deltas)
+
+# Outlets
+outlets.outlet_html(c, 'html')
+atlas.materialize(c, 'webmap')
+atlas.materialize(c, 'webedit')
+"""))
+
     
+    nb_name = f"{outlet_name}-{config['name']}"
+    with open(f'{nb_name}.ipynb', 'w', encoding='utf-8') as f:
+        nbformat.write(notebook, f)
+
     
 
 def gsheet_export(config: dict, outlet_name: str) -> str:
