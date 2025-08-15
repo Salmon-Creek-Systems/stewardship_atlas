@@ -1574,7 +1574,8 @@ import versioning
 import outlets
 import atlas
 """))
-    notebook.cells.append(nbformat.v4.new_code_cell(f"c = json.load(open('{config_path}'))"))
+    notebook.cells.append(
+        nbformat.v4.new_code_cell(f"c = json.load(open('{config_path}'))"))
     notebook.cells.append(nbformat.v4.new_code_cell("""
 # Core elevation derived layers
 atlas.materialize(config=c, asset_name="dem", delta_queue=deltas)

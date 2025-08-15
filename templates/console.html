@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<head>
+{<head>
     <link rel="stylesheet" href="/local/css/console.css">
 </head>
 <body>
@@ -84,7 +84,8 @@
     </center>
 
     <script>
-        // Initialize the page with data
+      // Initialize the page with data
+      
         function initializePage(data) {
             document.getElementById('logo').src = data.logo;
             document.getElementById('version-string').textContent = data.version_string;
@@ -92,6 +93,8 @@
             document.getElementById('console-type').textContent = data.consoleType;
 	    document.getElementById('panel-header').textContent = data.panelHeader;
 
+	    swalename=data.swaleName;
+	    
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
                 const interfacesList = document.getElementById('interfaces-list');
@@ -296,9 +299,9 @@
             
             // Disable button during processing
             publishButton.disabled = true;
-            statusDiv.innerHTML = 'Processing...';
+            statusDiv.innerHTML = `Processing... ${swalename}`;
             
-            fetch('http://fireatlas.org:9998/publish?swale=scvfd')
+            fetch(`https://internal.fireatlas.org:9998/publish?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -317,7 +320,7 @@
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
             
-            fetch('http://fireatlas.org:9998/publish-status?swale=scvfd')
+            fetch(`https://internal.fireatlas.org:9998/publish-status?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {

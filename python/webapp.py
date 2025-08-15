@@ -247,6 +247,11 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 "publishing": True,
                 "started_at": publish_status["started_at"]
             }
+
+        config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+        print(f"loading config from {config_path}")
+        ac = json.load(open(config_path))
+
         
         # Start new publishing task
         publish_status["publishing"] = True
@@ -280,16 +285,18 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
             
         async def finish_publishing():
             try:
-                ac = json.load(open(f"../atlases/{swale}_atlas_config.json"))
-                dc = json.load(open(f"/root/data/{swale}/dataswale_config.json"))
+                #ac = json.load(open(f"../atlases/{swale}_atlas_config.json"))
+                #dc = json.load(open(f"/root/data/{swale}/dataswale_config.json"))
                 # res = atlas.asset_materialize(ac, dc, ac['assets'][asset + "_delta"])
-
-                res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
+                print(f"Starting publish with ac: {ac}")
+                res = versioning.publish_new_version(ac)
+                print("Done with publish...")
+                # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
                 publish_status["log"] = []
                 print(res_json)
-                return res_json
+                return json.dumps(res)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 

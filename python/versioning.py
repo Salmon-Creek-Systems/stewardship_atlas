@@ -1,6 +1,7 @@
 from pathlib import Path
 import datetime
 import logging
+import shutil
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -35,8 +36,8 @@ def publish_new_version(config, version=None):
     """
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    staging_path = atlas_path(config, 'staging')
-    version_path = atlas_path(config, version)
+    staging_path = atlas_path(config, version='staging')
+    version_path = atlas_path(config, version=version)
     # make sure not already published
     if version_path.exists():
         raise ValueError(f"Version {version} already exists")
@@ -45,7 +46,8 @@ def publish_new_version(config, version=None):
     
     # trigger materialization of all versioned assets in staging
     # assume all inlsets and eddies are currently materialized (...safe?)
-    for outlet_name in config['versioned_outlets']:
+    # if `versioned_outlets` isn't set we don't rebuild any outlets, just copy them from staging.
+    for outlet_name in config.get('versioned_outlets', []):
         logger.info(f"Materializing outlet: {outlet_name}")
         outlets.materializers(config, outlet_name)
  
@@ -53,7 +55,8 @@ def publish_new_version(config, version=None):
 
 
     # copy all files to new version
-    shutil.copytree(staging_path, version_path)
+    logger.info(f"About to `shutil.copytree` from '{staging_path}' to '{version_path}'...")
+    shutil.copytree(staging_path, version_path, symlinks=True)
 
     # empty /work dirs in staging to prepare for new changes
     for work_dir in staging_path.glob('work/*'):
@@ -61,7 +64,7 @@ def publish_new_version(config, version=None):
 
     # point "production" to new version
     # repoint symbolic link in atlas root dir to new version
-    atlas_root = Path(config['data_root']) / config['name']
-    atlas_root.symlink_to(atlas_path)
+    #atlas_root = Path(config['data_root']) / config['name']
+    #atlas_root.symlink_to(atlas_path)
 
     return version_path
