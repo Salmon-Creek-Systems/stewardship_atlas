@@ -237,7 +237,7 @@ publish_status = {
 
 @app.get("/publish")
 async def publish(swale: str, background_tasks: BackgroundTasks):
-    logging.error("HELLO WORLD")
+    logging.info("Starting publish...")
     try:
         # Check if already publishing
         if publish_status["publishing"]:
@@ -252,7 +252,6 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))
 
-        
         # Start new publishing task
         publish_status["publishing"] = True
         publish_status["started_at"] = datetime.now().isoformat()
@@ -266,36 +265,27 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         }
         
         # Add the delayed task to background
-        async def test_finish_publishing():
-            await asyncio.sleep(5)
-            publish_status["log"].append(  [ ('update', datetime.now().isoformat()) ])
 
-            await asyncio.sleep(5)
-            publish_status["log"].append(  [ ('update', datetime.now().isoformat()) ])
-
-            await asyncio.sleep(5)
-            publish_status["log"].append(  [ ('update', datetime.now().isoformat()) ])
-
-            await asyncio.sleep(5)
-            publish_status["log"].append(  [ ('done', datetime.now().isoformat()) ])
-
-            publish_status["finished_at"] = datetime.now().isoformat()
-            publish_status["publishing"] = False
-            publish_status["log"] = []
             
         async def finish_publishing():
             try:
-                #ac = json.load(open(f"../atlases/{swale}_atlas_config.json"))
-                #dc = json.load(open(f"/root/data/{swale}/dataswale_config.json"))
-                # res = atlas.asset_materialize(ac, dc, ac['assets'][asset + "_delta"])
-                print(f"Starting publish with ac: {ac}")
+
+                logging.info(f"Starting publish with ac: {ac}")
+
+                for outlet_name in ac.get('versioned_outlets', []):
+                    logger.info(f"Materializing outlet: {outlet_name}")
+                    publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
+                    atlas.materialize(ac, outlet_name,outlets.asset_methods)
+                    publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
+                # res = versioning.publish_new_version(ac)
+                publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
                 res = versioning.publish_new_version(ac)
-                print("Done with publish...")
+                publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
                 # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
                 publish_status["log"] = []
-                print(res_json)
+                logger.info(res_json)
                 return json.dumps(res)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))

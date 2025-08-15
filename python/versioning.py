@@ -44,12 +44,7 @@ def publish_new_version(config, version=None):
     # make sure parent exists
     version_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # trigger materialization of all versioned assets in staging
-    # assume all inlsets and eddies are currently materialized (...safe?)
-    # if `versioned_outlets` isn't set we don't rebuild any outlets, just copy them from staging.
-    for outlet_name in config.get('versioned_outlets', []):
-        logger.info(f"Materializing outlet: {outlet_name}")
-        outlets.materializers(config, outlet_name)
+
  
    
 
