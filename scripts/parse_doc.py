@@ -64,7 +64,7 @@ def create_gpt_prompt(text_content: str) -> str:
 You are analyzing a document for a geospatial atlas system. Please extract:
 
 1. Up to 10 summary keywords (comma-separated)
-2. Geographic references mentioned in the text
+2. Geographic references mentioned in the text with the estimated point location as latitude and longitide in WGS84 coordinates.
 3. Any maps or spatial coverage areas described
 
 Document content:
@@ -77,7 +77,10 @@ Please respond with ONLY a valid JSON object in this exact format:
         {{
             "name": "Place Name",
             "type": "county|town|region|area",
-            "description": "Brief description of what this place is"
+            "description": "Brief description of what this place is",
+            "latitude": latitude in WGS84 CRS as a number with no quotation marks,
+            "longitude": longitude in WGS84 CRS as a number with no quotation marks
+    
         }}
     ],
     "map_coverage": [
@@ -144,6 +147,7 @@ def generate_geojson(gpt_response: Dict[str, Any]) -> Dict[str, Any]:
     
     # Process geographic references
     for ref in gpt_response.get('geographic_references', []):
+        # print(f"GEOREF: {ref}")
         # Create a simple bounding box for each place
         # This is a very rough approximation - in practice you'd want proper geocoding
         feature = {
@@ -155,14 +159,8 @@ def generate_geojson(gpt_response: Dict[str, Any]) -> Dict[str, Any]:
                 "source": "text_reference"
             },
             "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [-180, -90],  # Very rough bounding box
-                    [180, -90],
-                    [180, 90],
-                    [-180, 90],
-                    [-180, -90]
-                ]]
+                "type": "Point",
+                "coordinates": [ref['longitude'], ref['latitude']]
             }
         }
         features.append(feature)
@@ -282,6 +280,8 @@ def main():
     if args.output:
         with open(args.output, 'w') as f:
             json.dump(result, f, indent=2)
+        with open(args.output + ".geojson", 'w') as f:
+            json.dump(result['geojson'], f, indent=2)
         print(f"Results saved to: {args.output}")
     else:
         print(json.dumps(result, indent=2))

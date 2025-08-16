@@ -14,7 +14,7 @@ from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 
 import sys
-sys.path.insert(0, "/root/internal/python")
+sys.path.insert(0, "/root/stewardship_atlas/python")
 
 # Boring Imports
 import sys, os, subprocess, time, json, string, random, math
@@ -269,11 +269,12 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
             
         async def finish_publishing():
             try:
+                print(f"Starting publish with ac: {ac['dataswale'].get('versioned_outlets',[])}\n-----\n{ac}\n---")
+                # logging.info(f"Starting publish with ac['dataswale']: {ac['dataswale'].get('versioned_outlets',[])}")
 
-                logging.info(f"Starting publish with ac: {ac}")
-
-                for outlet_name in ac.get('versioned_outlets', []):
-                    logger.info(f"Materializing outlet: {outlet_name}")
+                for outlet_name in ac['dataswale'].get('versioned_outlets', []):
+                    print(f"Materializing outlet: {outlet_name}")
+                    #logger.info(f"Materializing outlet: {outlet_name}")
                     publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
                     atlas.materialize(ac, outlet_name,outlets.asset_methods)
                     publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
@@ -284,10 +285,11 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
-                publish_status["log"] = []
-                logger.info(res_json)
+                # publish_status["log"] = []
+                #logger.info(res_json)
                 return json.dumps(res)
             except Exception as e:
+                print(f"E! {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
 
