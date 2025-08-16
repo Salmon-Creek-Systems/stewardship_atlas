@@ -2,17 +2,22 @@
 """
 Minimal Proof of Concept: Document Parser for Geospatial Atlas
 Extracts keywords and generates GeoJSON from PDF documents using GPT-4.
+Now includes map image analysis using GPT-4V for spatial coverage.
 """
 
 import os
 import sys
 import json
 import argparse
+import base64
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import PyPDF2
 import openai
 from openai import OpenAI
+from pdf2image import convert_from_path
+import io
+from PIL import Image
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -50,6 +55,41 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         raise Exception(f"Failed to extract text from PDF: {str(e)}")
 
 
+def extract_images_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
+    """
+    Extract images from PDF pages for map analysis.
+    
+    Args:
+        pdf_path: Path to the PDF file
+        
+    Returns:
+        List of dictionaries containing page images and metadata
+    """
+    try:
+        # Convert PDF pages to images
+        images = convert_from_path(pdf_path, dpi=150)  # Good resolution for analysis
+        
+        extracted_images = []
+        for page_num, image in enumerate(images):
+            # Convert PIL image to base64 for API
+            img_buffer = io.BytesIO()
+            image.save(img_buffer, format='PNG')
+            img_str = base64.b64encode(img_buffer.getvalue()).decode()
+            
+            extracted_images.append({
+                'page': page_num + 1,
+                'image': img_str,
+                'width': image.width,
+                'height': image.height
+            })
+        
+        return extracted_images
+        
+    except Exception as e:
+        print(f"Warning: Could not extract images from PDF: {str(e)}")
+        return []
+
+
 def create_gpt_prompt(text_content: str) -> str:
     """
     Create a prompt for GPT-4 to extract keywords and geographic information.
@@ -64,7 +104,7 @@ def create_gpt_prompt(text_content: str) -> str:
 You are analyzing a document for a geospatial atlas system. Please extract:
 
 1. Up to 10 summary keywords (comma-separated)
-2. Geographic references mentioned in the text with the estimated point location as latitude and longitide in WGS84 coordinates.
+2. Geographic references mentioned in the text
 3. Any maps or spatial coverage areas described
 
 Document content:
@@ -78,9 +118,7 @@ Please respond with ONLY a valid JSON object in this exact format:
             "name": "Place Name",
             "type": "county|town|region|area",
             "description": "Brief description of what this place is",
-            "latitude": latitude in WGS84 CRS as a number with no quotation marks,
-            "longitude": longitude in WGS84 CRS as a number with no quotation marks
-    
+            "estimated_point_location": "estimated point location as latitude and longitude in WGS84 coordinates"
         }}
     ],
     "map_coverage": [
@@ -96,9 +134,48 @@ Important: Respond with ONLY the JSON, no other text or explanation.
 """
 
 
+def create_gpt4v_map_prompt() -> str:
+    """
+    Create a prompt for GPT-4V to analyze map images for spatial coverage.
+    
+    Returns:
+        Formatted prompt string for image analysis
+    """
+    return """
+Analyze this map image and extract the geographic area it covers.
+
+Focus on:
+1. The main geographic region or area shown on the map
+2. Approximate bounding box coordinates in WGS84 (latitude/longitude)
+3. Key landmarks or features that help define the coverage area
+
+Respond with ONLY a valid JSON object in this exact format:
+{
+    "map_analysis": {
+        "name": "Map Name or Description",
+        "description": "What geographic area this map shows",
+        "bounding_box": {
+            "north": latitude,
+            "south": latitude,
+            "east": longitude,
+            "west": longitude
+        },
+        "confidence": "high|medium|low",
+        "notes": "Any additional observations about the map coverage"
+    }
+}
+
+Important: 
+- Respond with ONLY the JSON, no other text
+- Use decimal degrees for coordinates
+- If you cannot determine coordinates, set confidence to "low"
+- Focus on the main area covered, not individual features
+"""
+
+
 def call_gpt4(client: OpenAI, prompt: str) -> Dict[str, Any]:
     """
-    Call GPT-4 API to extract information from the document.
+    Call GPT-4 API to extract information from the document text.
     
     Args:
         client: OpenAI client instance
@@ -133,39 +210,100 @@ def call_gpt4(client: OpenAI, prompt: str) -> Dict[str, Any]:
         raise Exception(f"GPT-4 API call failed: {str(e)}")
 
 
-def generate_geojson(gpt_response: Dict[str, Any]) -> Dict[str, Any]:
+def call_gpt4v_for_map(client: OpenAI, image_data: str, prompt: str) -> Dict[str, Any]:
     """
-    Generate GeoJSON FeatureCollection from GPT-4 extracted geographic information.
+    Call GPT-4V API to analyze map images for spatial coverage.
     
     Args:
-        gpt_response: Parsed response from GPT-4
+        client: OpenAI client instance
+        image_data: Base64 encoded image string
+        prompt: Formatted prompt for GPT-4V
+        
+    Returns:
+        Parsed JSON response from GPT-4V
+        
+    Raises:
+        Exception: If API call fails or response is invalid
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_data}",
+                                "detail": "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
+        )
+        
+        response_text = response.choices[0].message.content.strip()
+        
+        # Try to parse the JSON response
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError as e:
+            raise Exception(f"GPT-4V returned invalid JSON: {response_text[:200]}... Error: {str(e)}")
+            
+    except Exception as e:
+        raise Exception(f"GPT-4V API call failed: {str(e)}")
+
+
+def generate_geojson(gpt_response: Dict[str, Any], map_analysis_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Generate GeoJSON FeatureCollection from GPT-4 extracted geographic information and map analysis.
+    
+    Args:
+        gpt_response: Parsed response from GPT-4 text analysis
+        map_analysis_results: List of parsed responses from GPT-4V map analysis
         
     Returns:
         GeoJSON FeatureCollection as dictionary
     """
     features = []
     
-    # Process geographic references
+    # Process geographic references from text (Point features)
     for ref in gpt_response.get('geographic_references', []):
-        # print(f"GEOREF: {ref}")
-        # Create a simple bounding box for each place
-        # This is a very rough approximation - in practice you'd want proper geocoding
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "name": ref.get('name', 'Unknown'),
-                "type": ref.get('type', 'unknown'),
-                "description": ref.get('description', ''),
-                "source": "text_reference"
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [ref['longitude'], ref['latitude']]
-            }
-        }
-        features.append(feature)
+        # Extract coordinates from the estimated_point_location
+        coords_str = ref.get('estimated_point_location', '')
+        if coords_str:
+            try:
+                # Parse coordinates - assuming format like "37.7749, -122.4194"
+                coords = coords_str.replace('°', '').replace('N', '').replace('S', '').replace('E', '').replace('W', '').strip()
+                if ',' in coords:
+                    lat_str, lon_str = coords.split(',')
+                    lat = float(lat_str.strip())
+                    lon = float(lon_str.strip())
+                    
+                    feature = {
+                        "type": "Feature",
+                        "properties": {
+                            "name": ref.get('name', 'Unknown'),
+                            "type": ref.get('type', 'unknown'),
+                            "description": ref.get('description', ''),
+                            "source": "text_reference",
+                            "coordinates_source": coords_str
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [lon, lat]  # GeoJSON uses [longitude, latitude]
+                        }
+                    }
+                    features.append(feature)
+            except (ValueError, AttributeError) as e:
+                print(f"Warning: Could not parse coordinates '{coords_str}': {e}")
+                continue
     
-    # Process map coverage areas
+    # Process map coverage areas from text (Polygon features with global bounding box)
     for coverage in gpt_response.get('map_coverage', []):
         feature = {
             "type": "Feature",
@@ -173,7 +311,8 @@ def generate_geojson(gpt_response: Dict[str, Any]) -> Dict[str, Any]:
                 "name": coverage.get('name', 'Unknown'),
                 "description": coverage.get('description', ''),
                 "spatial_extent": coverage.get('spatial_extent', ''),
-                "source": "map_coverage"
+                "source": "text_map_coverage",
+                "type": "map_area"
             },
             "geometry": {
                 "type": "Polygon",
@@ -187,6 +326,46 @@ def generate_geojson(gpt_response: Dict[str, Any]) -> Dict[str, Any]:
             }
         }
         features.append(feature)
+    
+    # Process map analysis results from GPT-4V (Polygon features with actual bounding boxes)
+    for map_result in map_analysis_results:
+        map_data = map_result.get('map_analysis', {})
+        bbox = map_data.get('bounding_box', {})
+        
+        if all(key in bbox for key in ['north', 'south', 'east', 'west']):
+            try:
+                # Create polygon from bounding box coordinates
+                north = float(bbox['north'])
+                south = float(bbox['south'])
+                east = float(bbox['east'])
+                west = float(bbox['west'])
+                
+                feature = {
+                    "type": "Feature",
+                    "properties": {
+                        "name": map_data.get('name', 'Unknown'),
+                        "description": map_data.get('description', ''),
+                        "confidence": map_data.get('confidence', 'unknown'),
+                        "notes": map_data.get('notes', ''),
+                        "source": "image_analysis",
+                        "type": "map_area"
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [west, south],   # Southwest
+                            [east, south],   # Southeast
+                            [east, north],   # Northeast
+                            [west, north],   # Northwest
+                            [west, south]    # Close the polygon
+                        ]]
+                    }
+                }
+                features.append(feature)
+                
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not create polygon from bounding box: {e}")
+                continue
     
     return {
         "type": "FeatureCollection",
@@ -220,16 +399,37 @@ def parse_document(pdf_path: str, api_key: str) -> Dict[str, Any]:
         text_content = extract_text_from_pdf(pdf_path)
         print(f"Extracted {len(text_content)} characters of text")
         
-        # Create GPT-4 prompt
+        # Extract images from PDF for map analysis
+        print("Extracting images from PDF...")
+        extracted_images = extract_images_from_pdf(pdf_path)
+        print(f"Extracted {len(extracted_images)} page images")
+        
+        # Create GPT-4 prompt for text analysis
         prompt = create_gpt_prompt(text_content)
         
-        # Call GPT-4
-        print("Calling GPT-4 for analysis...")
+        # Call GPT-4 for text analysis
+        print("Calling GPT-4 for text analysis...")
         gpt_response = call_gpt4(client, prompt)
-        print("GPT-4 analysis complete")
+        print("GPT-4 text analysis complete")
         
-        # Generate GeoJSON
-        geojson = generate_geojson(gpt_response)
+        # Analyze images with GPT-4V for map coverage
+        map_analysis_results = []
+        if extracted_images:
+            print("Analyzing images with GPT-4V for map coverage...")
+            map_prompt = create_gpt4v_map_prompt()
+            
+            for img_data in extracted_images:
+                try:
+                    print(f"Analyzing page {img_data['page']}...")
+                    map_result = call_gpt4v_for_map(client, img_data['image'], map_prompt)
+                    map_analysis_results.append(map_result)
+                    print(f"Page {img_data['page']} analysis complete")
+                except Exception as e:
+                    print(f"Warning: Failed to analyze page {img_data['page']}: {e}")
+                    continue
+        
+        # Generate GeoJSON combining text and image analysis
+        geojson = generate_geojson(gpt_response, map_analysis_results)
         
         # Prepare final output
         result = {
@@ -237,9 +437,11 @@ def parse_document(pdf_path: str, api_key: str) -> Dict[str, Any]:
             "geojson": geojson,
             "metadata": {
                 "source_file": pdf_path,
-                "extraction_method": "gpt4_analysis",
+                "extraction_method": "gpt4_text_and_vision_analysis",
                 "text_length": len(text_content),
-                "features_extracted": len(geojson['features'])
+                "images_analyzed": len(extracted_images),
+                "features_extracted": len(geojson['features']),
+                "map_analysis_pages": [img['page'] for img in extracted_images]
             }
         }
         
@@ -280,9 +482,13 @@ def main():
     if args.output:
         with open(args.output, 'w') as f:
             json.dump(result, f, indent=2)
-        with open(args.output + ".geojson", 'w') as f:
-            json.dump(result['geojson'], f, indent=2)
         print(f"Results saved to: {args.output}")
+        
+        # Also save GeoJSON separately
+        geojson_path = args.output.replace('.json', '.geojson')
+        with open(geojson_path, 'w') as f:
+            json.dump(result['geojson'], f, indent=2)
+        print(f"GeoJSON saved to: {geojson_path}")
     else:
         print(json.dumps(result, indent=2))
 
