@@ -18,6 +18,7 @@ from openai import OpenAI
 from pdf2image import convert_from_path
 import io
 from PIL import Image
+import h3
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -272,21 +273,30 @@ def generate_geojson(gpt_response: Dict[str, Any], map_analysis_results: List[Di
         GeoJSON FeatureCollection as dictionary
     """
     features = []
-    #features.append(feature)
     
-    # Process geographic references from text (Point features)
+    # Process geographic references from text (Polygon features with bounding boxes)
+    print(f"Processing {len(gpt_response.get('geographic_references', []))} text-based geographic references...")
     for ref in gpt_response.get('geographic_references', []):
         feature = make_feature(ref)
-        print(f"Genreated Feature:\n{ref}\n--->>\n{feature}")
-        features.append(feature)        
+        if feature is not None:
+            features.append(feature)
+            print(f"Generated text feature: {ref.get('name', 'Unknown')} -> H3: {feature['properties'].get('h3_index', 'None')}")
+        else:
+            print(f"Failed to generate feature for text reference: {ref.get('name', 'Unknown')}")
     
     # Process map analysis results from GPT-4V (Polygon features with actual bounding boxes)
+    print(f"Processing {len(map_analysis_results)} image-based map analyses...")
     for map_result in map_analysis_results:
         map_data = map_result.get('map_analysis', {})
         feature = make_feature(map_data)
-        print(f"Genreated Feature:\n{feature}")
-        features.append(feature)
+        if feature is not None:
+            features.append(feature)
+            print(f"Generated image feature: {map_data.get('name', 'Unknown')} -> H3: {feature['properties'].get('h3_index', 'None')}")
+        else:
+            print(f"Failed to generate feature for map analysis: {map_data.get('name', 'Unknown')}")
                 
+    print(f"Successfully generated {len(features)} features")
+    
     return {
         "type": "FeatureCollection",
         "crs": {
@@ -302,35 +312,80 @@ def make_feature(map_data):
     bbox = map_data.get('bounding_box', {})
         
     if all(key in bbox for key in ['north', 'south', 'east', 'west']):
-        # Create polygon from bounding box coordinates
-        north = float(bbox['north'])
-        south = float(bbox['south'])
-        east = float(bbox['east'])
-        west = float(bbox['west'])
+        try:
+            # Create polygon from bounding box coordinates
+            north = float(bbox['north'])
+            south = float(bbox['south'])
+            east = float(bbox['east'])
+            west = float(bbox['west'])
             
-        return {
-            "type": "Feature",
-            "properties": {
-                "name": map_data.get('name', 'Unknown'),
-                "description": map_data.get('description', ''),
-                "confidence": map_data.get('confidence', 'unknown'),
-                "notes": map_data.get('notes', ''),
-                "source": "image_analysis",
-                "type": "map_area"
-            },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [west, south],   # Southwest
-                    [east, south],   # Southeast
-                    [east, north],   # Northeast
-                    [west, north],   # Northwest
-                    [west, south]    # Close the polygon
-                ]]
+            # Validate coordinate ranges
+            if not (-90 <= south <= 90) or not (-90 <= north <= 90):
+                print(f"Error: Invalid latitude values in bounding box: south={south}, north={north}")
+                return None
+            if not (-180 <= west <= 180) or not (-180 <= east <= 180):
+                print(f"Error: Invalid longitude values in bounding box: west={west}, east={east}")
+                return None
+            if south >= north:
+                print(f"Error: Invalid latitude order: south={south} >= north={north}")
+                return None
+            if west >= east:
+                print(f"Error: Invalid longitude order: west={west} >= east={east}")
+                return None
+            
+            # Create polygon coordinates
+            polygon_coords = [
+                [west, south],   # Southwest
+                [east, south],   # Southeast
+                [east, north],   # Northeast
+                [west, north],   # Northwest
+                [west, south]    # Close the polygon
+            ]
+            
+            # Generate H3 index for the polygon
+            # Use resolution 7 for a good balance between precision and index size
+            h3_index = h3.polyfill(
+                {
+                    "type": "Polygon",
+                    "coordinates": [polygon_coords]
+                },
+                res=7
+            )
+            
+            # Convert H3 set to list and take the first index as representative
+            h3_list = list(h3_index)
+            representative_h3 = h3_list[0] if h3_list else None
+            
+            return {
+                "type": "Feature",
+                "properties": {
+                    "name": map_data.get('name', 'Unknown'),
+                    "description": map_data.get('description', ''),
+                    "confidence": map_data.get('confidence', 'unknown'),
+                    "notes": map_data.get('notes', ''),
+                    "source": "image_analysis",
+                    "type": "map_area",
+                    "h3_index": representative_h3,
+                    "h3_resolution": 7,
+                    "h3_coverage_count": len(h3_list),
+                    "h3_polyfill": h3_list
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [polygon_coords]
+                }
             }
-        }
+            
+        except (ValueError, TypeError) as e:
+            print(f"Error: Could not create polygon from bounding box {bbox}: {e}")
+            return None
+        except Exception as e:
+            print(f"Error: Unexpected error creating polygon from bounding box {bbox}: {e}")
+            return None
     else:
-        print(f"Bad bbox: {bbox}")
+        missing_keys = [key for key in ['north', 'south', 'east', 'west'] if key not in bbox]
+        print(f"Error: Missing required bounding box keys: {missing_keys}")
+        print(f"Available keys: {list(bbox.keys())}")
         return None
         
 
