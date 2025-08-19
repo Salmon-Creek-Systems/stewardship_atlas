@@ -84,7 +84,7 @@
 	"name": "webmap",
 	"in_layers": ["basemap","ponds",  "contours", "roads", "creeks", "buildings", "watertanks", "poi"],
 	"config_def": "webmap",
-	"access": ["internal", "admin"]
+	"access": ["public", "internal", "admin"]
     },
     "spreadsheet_export" : {
 	"type": "outlet",
@@ -95,23 +95,16 @@
 
     "webedit" : {
 	"type": "outlet",
-	"name": "webmap",
+	"name": "webedit",
 	"in_layers": ["basemap","roads", "creeks", "buildings", "poi", "ponds", "watertanks"],
 	"config_def": "webedit"
-    },
-    "internal_webmap" : {
-        "type": "outlet",
-        "name": "internal_webmap",
-        "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural"],
-        "config_def": "webmap",
-        "access": ["admin"]
     },
     "runbook": {
         "type": "outlet",
         "name": "runbook",
 	"blend_percent": 50,
         "in_layers": ["lidar_basemap", "roads", "ponds", "creeks", "buildings"],
-        "access": ["internal", "admin"],
+        "access": ["public", "internal", "admin"],
         "config_def": "runbook",
         "regions" : []},
     "html": {
@@ -134,7 +127,7 @@
 	"name": "gazetteer",
 	"num_rows": 5,
 	"num_cols": 6,
-	"access": ["public", "internal", "admin"],
+	"access": ["internal", "admin"],
 	"config_def": "gazetteer",
 	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
 	"blend_percent": 40
