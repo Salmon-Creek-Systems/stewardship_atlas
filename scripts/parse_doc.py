@@ -344,13 +344,24 @@ def make_feature(map_data):
             
             # Generate H3 index for the polygon
             # Use resolution 7 for a good balance between precision and index size
-            h3_index = h3.polyfill(
-                {
-                    "type": "Polygon",
-                    "coordinates": [polygon_coords]
-                },
-                res=7
-            )
+            try:
+                # Try the newer API first (h3 >= 4.0.0)
+                h3_index = h3.polygon_to_cells(
+                    {
+                        "type": "Polygon",
+                        "coordinates": [polygon_coords]
+                    },
+                    res=7
+                )
+            except AttributeError:
+                # Fallback to older API (h3 < 4.0.0)
+                h3_index = h3.polyfill(
+                    {
+                        "type": "Polygon",
+                        "coordinates": [polygon_coords]
+                    },
+                    res=7
+                )
             
             # Convert H3 set to list and take the first index as representative
             h3_list = list(h3_index)
