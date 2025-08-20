@@ -728,6 +728,21 @@
             "license": "https://www.scvfd.fireatlas.org",
             "citation": "https://www.scvfd.fireatlas.org"
 	}
+    },
+    "h3_cells": {
+        "type": "eddy",
+        "in_layer": "roads",
+        "out_layer": "roads",
+        "starting_resolution": 8,
+        "algorithm": "max_num_cells",
+        "max_cells": 10,
+        "swap_coordinates": true,
+        "attribution": {
+            "url": "https://h3geo.org/",
+            "description": "H3 hexagonal hierarchical geospatial indexing system",
+            "license": "Apache 2.0",
+            "citation": "Uber H3"
+        }
     }
 }
 			
