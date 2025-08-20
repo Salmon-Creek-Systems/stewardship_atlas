@@ -6,7 +6,7 @@ Now includes map image analysis using GPT-4V for spatial coverage.
 """
 
 import os
-import sys
+import sys, traceback
 import json
 import argparse
 import base64
@@ -280,7 +280,7 @@ def generate_geojson(gpt_response: Dict[str, Any], map_analysis_results: List[Di
         feature = make_feature(ref)
         if feature is not None:
             features.append(feature)
-            print(f"Generated text feature: {ref.get('name', 'Unknown')} -> H3: {feature['properties'].get('h3_index', 'None')}")
+            print(f"Generated text feature: {ref.get('name', 'Unknown')} -> H3: {feature['properties'].get('h3_cells', 'None')}")
         else:
             print(f"Failed to generate feature for text reference: {ref.get('name', 'Unknown')}")
     
@@ -308,6 +308,19 @@ def generate_geojson(gpt_response: Dict[str, Any], map_analysis_results: List[Di
         "features": features
     }
 
+
+def h3_for_polygon(polygon_coords, res=9):
+    print(f"indexing {polygon_coords}")
+    h3poly = h3.LatLngPoly(polygon_coords)
+    
+    
+    h3_cells = None
+    while h3_cells is None or len(h3_cells) > 10:        
+        h3_cells = h3.h3shape_to_cells(h3poly, res)
+        print(f"built index: {len(h3_cells)}")
+        res -= 1
+    return h3_cells, res+1
+
 def make_feature(map_data):
     bbox = map_data.get('bounding_box', {})
         
@@ -320,6 +333,7 @@ def make_feature(map_data):
             west = float(bbox['west'])
             
             # Validate coordinate ranges
+            # TODO this seems broken outside this hemisphere Claude
             if not (-90 <= south <= 90) or not (-90 <= north <= 90):
                 print(f"Error: Invalid latitude values in bounding box: south={south}, north={north}")
                 return None
@@ -331,6 +345,10 @@ def make_feature(map_data):
                 return None
             if west >= east:
                 print(f"Error: Invalid longitude order: west={west} >= east={east}")
+                return None
+            max_feature_degress = 20
+            if (east - west > 20) or (north - south > 20):
+                print(f"Error: Too big! {bbox}")
                 return None
             
             # Create polygon coordinates
@@ -344,29 +362,15 @@ def make_feature(map_data):
             
             # Generate H3 index for the polygon
             # Use resolution 7 for a good balance between precision and index size
-            try:
-                # Try the newer API first (h3 >= 4.0.0)
-                h3_index = h3.polygon_to_cells(
-                    {
-                        "type": "Polygon",
-                        "coordinates": [polygon_coords]
-                    },
-                    res=7
-                )
-            except AttributeError:
-                # Fallback to older API (h3 < 4.0.0)
-                h3_index = h3.polyfill(
-                    {
-                        "type": "Polygon",
-                        "coordinates": [polygon_coords]
-                    },
-                    res=7
-                )
+            h3_cells, h3_res = h3_for_polygon( [ [b,a] for a,b in polygon_coords], 8)
             
             # Convert H3 set to list and take the first index as representative
-            h3_list = list(h3_index)
-            representative_h3 = h3_list[0] if h3_list else None
-            
+            # h3_list = list(h3_cells)
+            representative_h3 = h3_cells[0] if h3_cells else None
+            h3_length = len(h3_cells)
+            #if h3_length > 500:
+            #    print(f"Skipping large geo ({h3_length}: {map_data}")
+            #    return None
             return {
                 "type": "Feature",
                 "properties": {
@@ -377,9 +381,9 @@ def make_feature(map_data):
                     "source": "image_analysis",
                     "type": "map_area",
                     "h3_index": representative_h3,
-                    "h3_resolution": 7,
-                    "h3_coverage_count": len(h3_list),
-                    "h3_polyfill": h3_list
+                    "h3_resolution": h3_res,
+                    "h3_coverage_count": len(h3_cells),
+                    "h3_cells": h3_cells
                 },
                 "geometry": {
                     "type": "Polygon",
@@ -388,7 +392,8 @@ def make_feature(map_data):
             }
             
         except (ValueError, TypeError) as e:
-            print(f"Error: Could not create polygon from bounding box {bbox}: {e}")
+            print(traceback.print_exc())
+            print(f"Error: Could not create polygon from bounding box {bbox}: {e}: {map_data}")
             return None
         except Exception as e:
             print(f"Error: Unexpected error creating polygon from bounding box {bbox}: {e}")
