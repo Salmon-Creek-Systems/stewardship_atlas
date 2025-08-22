@@ -190,12 +190,44 @@ def webmap_json(config, name, sprite_json=None):
                 }
 
                 label_layer['paint'] |= layer.get('paint', {})
-                dynamic_layers.append(label_layer)
-
-        #else:
-        #    logger.error(f"not an outlet layer: {layer_name}.")
+                
+                # If we have sprites, add the layer to the initial style so it appears in legend
+                if sprite_json and layer['name'] in sprite_json:
+                    # Ensure the layer has proper source configuration
+                    if layer_name not in map_sources:
+                        # Add source for this layer if it doesn't exist
+                        map_sources[layer_name] = {
+                            'type': 'geojson',
+                            'data': f"../../layers/{layer_name}/{layer_name}.geojson"
+                        }
+                    
+                    # Add metadata for legend display
+                    label_layer['metadata'] = {
+                        'name': layer.get('display_name', layer['name']),
+                        'description': layer.get('description', f'{layer["name"]} layer'),
+                        'legend': {
+                            'type': 'symbol',
+                            'icon': layer['name'],  # This should match the sprite symbol name
+                            'label': layer.get('display_name', layer['name'])
+                        }
+                    }
+                    
+                    # Ensure the layer has proper layout properties for sprite display
+                    label_layer['layout']['icon-image'] = layer['name']  # Should match sprite symbol name
+                    label_layer['layout']['icon-size'] = layer.get('icon-size', 0.1)
+                    label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'center')
+                    
+                    map_layers.append(label_layer)
+                else:
+                    # Keep as dynamic layer for loadImage approach
+                    dynamic_layers.append(label_layer)
+    
     map_config['style']['sources'] = map_sources
     map_config['style']['layers'] = map_layers
+    
+    # Log the final map configuration for debugging
+    logger.info(f"Map style layers: {[layer.get('id', 'no-id') for layer in map_layers]}")
+    logger.info(f"Dynamic layers: {[layer.get('name', 'no-name') for layer in dynamic_layers]}")
   
     return {"map_config": map_config, "dynamic_layers": dynamic_layers}
 
@@ -208,22 +240,23 @@ def generate_map_page(title, map_config_data, output_path, sprite_json=None):
     
     # Generate JavaScript for dynamic layers
     js_bit = ""
-    if sprite_json:
-        # Use sprites for dynamic layers
-        for dynamic_layer in map_config_data['dynamic_layers']:
-            layer_name = dynamic_layer['name']
-            if layer_name in sprite_json:
-                # Remove the loadImage call and just add the layer directly
-                # The sprite is already loaded in the map style
-                js_bit += """
+    if map_config_data['dynamic_layers']:
+        if sprite_json:
+            # Use sprites for dynamic layers
+            for dynamic_layer in map_config_data['dynamic_layers']:
+                layer_name = dynamic_layer['name']
+                if layer_name in sprite_json:
+                    # Remove the loadImage call and just add the layer directly
+                    # The sprite is already loaded in the map style
+                    js_bit += """
 map.addLayer({layer_json});
 """.format(layer_json=json.dumps(dynamic_layer))
-            else:
-                # Fallback to original loadImage if sprite not found
-                im_uri = "/local/" + dynamic_layer['symbol_source']
-                im_name = dynamic_layer['name']
-                layer_json = dynamic_layer
-                js_bit += """
+                else:
+                    # Fallback to original loadImage if sprite not found
+                    im_uri = "/local/" + dynamic_layer['symbol_source']
+                    im_name = dynamic_layer['name']
+                    layer_json = dynamic_layer
+                    js_bit += """
 void await map.loadImage('{im_uri}',
     (error, image) => {{
         if (error) throw error;
@@ -233,13 +266,13 @@ void await map.loadImage('{im_uri}',
         }});
 
 """.format(**locals())
-    else:
-        # Original loadImage approach if no sprites
-        for dynamic_layer in map_config_data['dynamic_layers']:
-            im_uri = "/local/" + dynamic_layer['symbol_source']
-            im_name = dynamic_layer['name']
-            layer_json = dynamic_layer
-            js_bit += """
+        else:
+            # Original loadImage approach if no sprites
+            for dynamic_layer in map_config_data['dynamic_layers']:
+                im_uri = "/local/" + dynamic_layer['symbol_source']
+                im_name = dynamic_layer['name']
+                layer_json = dynamic_layer
+                js_bit += """
 void await map.loadImage('{im_uri}',
     (error, image) => {{
         if (error) throw error;
@@ -350,6 +383,10 @@ def generate_sprite_from_layers(layers_config, webmap_dir):
         json.dump(sprite_json, f, indent=2)
     
     logger.info(f"Generated sprite with {len(sprite_images)} icons: {sprite_png_path}")
+    
+    # Log the sprite JSON for debugging
+    logger.info(f"Sprite JSON content: {json.dumps(sprite_json, indent=2)}")
+    
     return sprite_json
 
 def outlet_webmap(config, name):
