@@ -109,7 +109,7 @@ class TestOutlets(unittest.TestCase):
 
     def test_webmap_json(self):
         """Test webmap JSON generation"""
-        result = webmap_json(self.test_config, 'test_webmap')
+        result = webmap_json(self.test_config, 'test_webmap', None)
         
         # Verify map config structure
         self.assertIn('map_config', result)
@@ -176,7 +176,7 @@ class TestOutlets(unittest.TestCase):
         }
         
         output_path = Path(self.test_config["data_root"]) / "test.html"
-        result = generate_map_page("Test Map", map_config_data, output_path)
+        result = generate_map_page("Test Map", map_config_data, output_path, None)
         
         # Verify file was written
         mock_file.assert_called_with(output_path, 'w')

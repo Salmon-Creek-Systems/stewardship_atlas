@@ -7,6 +7,8 @@ import duckdb
 import geopandas as gpd
 import pandas as pd
 import nbformat
+from PIL import Image
+import io
 
 import utils
 import versioning
@@ -24,7 +26,7 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-def webmap_json(config, name):
+def webmap_json(config, name, sprite_json=None):
     """Generate a JSON object for a web map in MapLibre.
     We will set up sources and layers as static content loaded initially in HTML where possible.
     Layers which invole dynamic content - marker images for example - will be added seperately 
@@ -47,6 +49,11 @@ def webmap_json(config, name):
             "zoom": zoom
             }
     }
+    
+    # Add sprite if available
+    if sprite_json:
+        map_config['style']['sprite'] = "sprite"
+    
     map_sources = {}
     map_layers = []
     dynamic_layers = []
@@ -192,20 +199,31 @@ def webmap_json(config, name):
   
     return {"map_config": map_config, "dynamic_layers": dynamic_layers}
 
-def generate_map_page(title, map_config_data, output_path):
+def generate_map_page(title, map_config_data, output_path, sprite_json=None):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     with open('../templates/map.html', 'r') as f:
         template = f.read()
     logger.debug(f"About to generate HTML to {output_path}: {template}.")
-    # TODO there is a much better way to do this, just handlign it dynamically in JS.
-    # For now though, let's just generate the JS as a string. Ugh.
+    
+    # Generate JavaScript for dynamic layers
     js_bit = ""
-    for dynamic_layer in map_config_data['dynamic_layers']:
-        im_uri = "/local/" + dynamic_layer['symbol_source']
-        im_name = dynamic_layer['name']
-        layer_json = dynamic_layer
-        js_bit += """
+    if sprite_json:
+        # Use sprites for dynamic layers
+        for dynamic_layer in map_config_data['dynamic_layers']:
+            layer_name = dynamic_layer['name']
+            if layer_name in sprite_json:
+                # Remove the loadImage call and just add the layer directly
+                # The sprite is already loaded in the map style
+                js_bit += """
+map.addLayer({layer_json});
+""".format(layer_json=json.dumps(dynamic_layer))
+            else:
+                # Fallback to original loadImage if sprite not found
+                im_uri = "/local/" + dynamic_layer['symbol_source']
+                im_name = dynamic_layer['name']
+                layer_json = dynamic_layer
+                js_bit += """
 void await map.loadImage('{im_uri}',
     (error, image) => {{
         if (error) throw error;
@@ -215,17 +233,124 @@ void await map.loadImage('{im_uri}',
         }});
 
 """.format(**locals())
+    else:
+        # Original loadImage approach if no sprites
+        for dynamic_layer in map_config_data['dynamic_layers']:
+            im_uri = "/local/" + dynamic_layer['symbol_source']
+            im_name = dynamic_layer['name']
+            layer_json = dynamic_layer
+            js_bit += """
+void await map.loadImage('{im_uri}',
+    (error, image) => {{
+        if (error) throw error;
+        // Add the image to the map style.                                                              
+        map.addImage('{im_name}', image);
+        map.addLayer(  {layer_json} );
+        }});
+
+""".format(**locals())
+    
     processed_template = template.format(
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit)
 
     with open(output_path, 'w') as f_out:
-      f_out.write(processed_template)          
+      f_out.write(processed_template)
+
+
+
+
+def generate_sprite_from_layers(layers_config, webmap_dir):
+    """Generate a sprite file from PNG images referenced in layers configuration.
+    
+    Args:
+        layers_config: List of layer configurations from config['dataswale']['layers']
+        webmap_dir: Path to the webmap output directory
         
-
-
-
+    Returns:
+        dict: Mapping of layer names to sprite symbol names, or None if no sprites needed
+    """
+    # Find all layers that have PNG symbols
+    sprite_layers = []
+    for layer in layers_config:
+        if layer.get('add_labels') and layer.get('symbol', {}).get('png'):
+            sprite_layers.append(layer)
+    
+    if not sprite_layers:
+        return None
+    
+    # Collect all unique PNG files
+    png_files = {}
+    for layer in sprite_layers:
+        png_path = layer['symbol']['png']
+        if png_path not in png_files:
+            png_files[png_path] = []
+        png_files[png_path].append(layer['name'])
+    
+    # Create sprite image and JSON
+    sprite_images = []
+    sprite_json = {}
+    
+    # Standard sprite dimensions - we'll use 32x32 for each icon
+    icon_size = 32
+    padding = 1
+    total_width = 0
+    max_height = 0
+    
+    # First pass: calculate dimensions and load images
+    for png_path, layer_names in png_files.items():
+        try:
+            # Load image from /local/ path (symlink to shared datastore)
+            full_path = f"/local/{png_path}"
+            if os.path.exists(full_path):
+                img = Image.open(full_path)
+                # Resize to standard icon size
+                img = img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
+                sprite_images.append((img, layer_names))
+                total_width += icon_size + padding
+                max_height = max(max_height, icon_size)
+            else:
+                logger.warning(f"PNG file not found: {full_path}")
+        except Exception as e:
+            logger.error(f"Failed to load PNG file {png_path}: {e}")
+    
+    if not sprite_images:
+        return None
+    
+    # Create sprite canvas
+    sprite_width = total_width
+    sprite_height = max_height
+    sprite_canvas = Image.new('RGBA', (sprite_width, sprite_height), (0, 0, 0, 0))
+    
+    # Second pass: place images on canvas and build JSON
+    x_offset = 0
+    for img, layer_names in sprite_images:
+        sprite_canvas.paste(img, (x_offset, 0))
+        
+        # Add to sprite JSON for each layer
+        for layer_name in layer_names:
+            sprite_json[layer_name] = {
+                "width": icon_size,
+                "height": icon_size,
+                "x": x_offset,
+                "y": 0,
+                "pixelRatio": 1
+            }
+        
+        x_offset += icon_size + padding
+    
+    # Save sprite files
+    sprite_png_path = webmap_dir / "sprite.png"
+    sprite_json_path = webmap_dir / "sprite.json"
+    
+    sprite_canvas.save(sprite_png_path, "PNG")
+    
+    with open(sprite_json_path, 'w') as f:
+        json.dump(sprite_json, f, indent=2)
+    
+    logger.info(f"Generated sprite with {len(sprite_images)} icons: {sprite_png_path}")
+    return sprite_json
 
 def outlet_webmap(config, name):
     """Generate an interactive web map using MapLibre GL JS.
@@ -239,13 +364,16 @@ def outlet_webmap(config, name):
     """
     
 
-    # Generate base map configuration
-    
-    map_config = webmap_json(config, name)
+    # Generate sprite file first if needed
     webmap_dir = versioning.atlas_path(config, "outlets") / name
     webmap_dir.mkdir(parents=True, exist_ok=True)
+    sprite_json = generate_sprite_from_layers(config['dataswale']['layers'], webmap_dir)
+    
+    # Generate base map configuration with sprite
+    map_config = webmap_json(config, name, sprite_json)
+    
     basemap_name = config['assets'][name]['in_layers'][0]
-    basemap_dir = versioning.atlas_path(config, "layers") / basemap_name 
+    basemap_dir = versioning.atlas_path(config, "layers") / basemap_name
     
     # make a JPG of basemap tiff..
     # TODO this should be a tiling URL instead of a local file..
@@ -263,7 +391,7 @@ def outlet_webmap(config, name):
     
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
-    html_path = generate_map_page("Fire Atlas Webmap", map_config, output_path)  
+    html_path = generate_map_page("Fire Atlas Webmap", map_config, output_path, sprite_json)  
   
     return output_path
 
@@ -339,8 +467,8 @@ def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
     
     # Generate base map configuration
-    map_config = webmap_json(config, name)
-    webedit_dir = versioning.atlas_path(config, "outlets") / name 
+    map_config = webmap_json(config, name, None)
+    webedit_dir = versioning.atlas_path(config, "outlets") / name
 
     subprocess.run(['cp', '-r', '../templates/css/', webedit_dir ])
     subprocess.run(['cp', '-r', '../templates/js/', webedit_dir ])
