@@ -40,6 +40,8 @@ def webmap_json(config, name, sprite_json=None):
     zoom = 12  # Default zoom, could be calculated based on bbox size
 
     # Set up the map config general properties
+    atlas_url = f"https://internal.fireatlas.org/atlas/{config['atlas_name']}"
+    sprite_url = atlas_url + "/outlets/" + name + "/sprite"
     map_config = {
         "container": "map",
         "style": {
@@ -52,7 +54,7 @@ def webmap_json(config, name, sprite_json=None):
     
     # Add sprite if available
     if sprite_json:
-        map_config['style']['sprite'] = "sprite"
+        map_config['style']['sprite'] = sprite_url
     
     map_sources = {}
     map_layers = []
@@ -329,11 +331,14 @@ def generate_sprite_from_layers(config, webmap_dir):
     sprite_images = []
     sprite_json = {}
     
-    # Standard sprite dimensions - we'll use 32x32 for each icon
-    icon_size = 32
+    # Standard sprite dimensions - we'll use 32x32 for each icon (1x) and 64x64 for 2x
+    icon_size_1x = 32
+    icon_size_2x = 64
     padding = 1
-    total_width = 0
-    max_height = 0
+    total_width_1x = 0
+    total_width_2x = 0
+    max_height_1x = 0
+    max_height_2x = 0
     
     # First pass: calculate dimensions and load images
     for png_path, layer_names in png_files.items():
@@ -342,11 +347,14 @@ def generate_sprite_from_layers(config, webmap_dir):
             full_path = local_path / png_path
             if os.path.exists(full_path):
                 img = Image.open(full_path)
-                # Resize to standard icon size
-                img = img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-                sprite_images.append((img, layer_names))
-                total_width += icon_size + padding
-                max_height = max(max_height, icon_size)
+                # Create both 1x and 2x versions
+                img_1x = img.resize((icon_size_1x, icon_size_1x), Image.Resampling.LANCZOS)
+                img_2x = img.resize((icon_size_2x, icon_size_2x), Image.Resampling.LANCZOS)
+                sprite_images.append((img_1x, img_2x, layer_names))
+                total_width_1x += icon_size_1x + padding
+                total_width_2x += icon_size_2x + padding
+                max_height_1x = max(max_height_1x, icon_size_1x)
+                max_height_2x = max(max_height_2x, icon_size_2x)
             else:
                 logger.warning(f"PNG file not found: {full_path}")
         except Exception as e:
@@ -355,38 +363,50 @@ def generate_sprite_from_layers(config, webmap_dir):
     if not sprite_images:
         return None
     
-    # Create sprite canvas
-    sprite_width = total_width
-    sprite_height = max_height
-    sprite_canvas = Image.new('RGBA', (sprite_width, sprite_height), (0, 0, 0, 0))
+    # Create sprite canvases for both densities
+    sprite_canvas_1x = Image.new('RGBA', (total_width_1x, max_height_1x), (0, 0, 0, 0))
+    sprite_canvas_2x = Image.new('RGBA', (total_width_2x, max_height_2x), (0, 0, 0, 0))
     
-    # Second pass: place images on canvas and build JSON
-    x_offset = 0
-    for img, layer_names in sprite_images:
-        sprite_canvas.paste(img, (x_offset, 0))
+    # Second pass: place images on both canvases and build JSON
+    x_offset_1x = 0
+    x_offset_2x = 0
+    for img_1x, img_2x, layer_names in sprite_images:
+        sprite_canvas_1x.paste(img_1x, (x_offset_1x, 0))
+        sprite_canvas_2x.paste(img_2x, (x_offset_2x, 0))
         
-        # Add to sprite JSON for each layer
+        # Add to sprite JSON for each layer with both densities
         for layer_name in layer_names:
             sprite_json[layer_name] = {
-                "width": icon_size,
-                "height": icon_size,
-                "x": x_offset,
+                "width": icon_size_1x,
+                "height": icon_size_1x,
+                "x": x_offset_1x,
                 "y": 0,
                 "pixelRatio": 1
             }
+            # Add 2x version
+            sprite_json[f"{layer_name}@2x"] = {
+                "width": icon_size_2x,
+                "height": icon_size_2x,
+                "x": x_offset_2x,
+                "y": 0,
+                "pixelRatio": 2
+            }
         
-        x_offset += icon_size + padding
+        x_offset_1x += icon_size_1x + padding
+        x_offset_2x += icon_size_2x + padding
     
-    # Save sprite files
-    sprite_png_path = webmap_dir / "sprite.png"
+    # Save sprite files for both densities
+    sprite_png_path_1x = webmap_dir / "sprite.png"
+    sprite_png_path_2x = webmap_dir / "sprite@2x.png"
     sprite_json_path = webmap_dir / "sprite.json"
     
-    sprite_canvas.save(sprite_png_path, "PNG")
+    sprite_canvas_1x.save(sprite_png_path_1x, "PNG")
+    sprite_canvas_2x.save(sprite_png_path_2x, "PNG")
     
     with open(sprite_json_path, 'w') as f:
         json.dump(sprite_json, f, indent=2)
     
-    logger.info(f"Generated sprite with {len(sprite_images)} icons: {sprite_png_path}")
+    logger.info(f"Generated sprites with {len(sprite_images)} icons: {sprite_png_path_1x} and {sprite_png_path_2x}")
     
     # Log the sprite JSON for debugging
     logger.info(f"Sprite JSON content: {json.dumps(sprite_json, indent=2)}")
