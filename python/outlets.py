@@ -294,7 +294,7 @@ void await map.loadImage('{im_uri}',
 
 
 
-def generate_sprite_from_layers(layers_config, webmap_dir):
+def generate_sprite_from_layers(config, webmap_dir):
     """Generate a sprite file from PNG images referenced in layers configuration.
     
     Args:
@@ -304,6 +304,9 @@ def generate_sprite_from_layers(layers_config, webmap_dir):
     Returns:
         dict: Mapping of layer names to sprite symbol names, or None if no sprites needed
     """
+    layers_config = config['dataswale']['layers']
+    local_path = versioning.atlas_path(config, "local") 
+    
     # Find all layers that have PNG symbols
     sprite_layers = []
     for layer in layers_config:
@@ -312,6 +315,7 @@ def generate_sprite_from_layers(layers_config, webmap_dir):
     
     if not sprite_layers:
         return None
+
     
     # Collect all unique PNG files
     png_files = {}
@@ -335,7 +339,7 @@ def generate_sprite_from_layers(layers_config, webmap_dir):
     for png_path, layer_names in png_files.items():
         try:
             # Load image from /local/ path (symlink to shared datastore)
-            full_path = f"/local/{png_path}"
+            full_path = local_path / png_path
             if os.path.exists(full_path):
                 img = Image.open(full_path)
                 # Resize to standard icon size
@@ -404,7 +408,7 @@ def outlet_webmap(config, name):
     # Generate sprite file first if needed
     webmap_dir = versioning.atlas_path(config, "outlets") / name
     webmap_dir.mkdir(parents=True, exist_ok=True)
-    sprite_json = generate_sprite_from_layers(config['dataswale']['layers'], webmap_dir)
+    sprite_json = generate_sprite_from_layers(config, webmap_dir)
     
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)
