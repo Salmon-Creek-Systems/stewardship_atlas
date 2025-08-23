@@ -307,7 +307,7 @@ def generate_sprite_from_layers(config, webmap_dir):
         dict: Mapping of layer names to sprite symbol names, or None if no sprites needed
     """
     layers_config = config['dataswale']['layers']
-    local_path = versioning.atlas_path(config, "local") 
+    local_path = versioning.atlas_path(config, "local")
     
     # Find all layers that have PNG symbols
     sprite_layers = []
@@ -329,7 +329,8 @@ def generate_sprite_from_layers(config, webmap_dir):
     
     # Create sprite image and JSON
     sprite_images = []
-    sprite_json = {}
+    sprite_json_1x = {}
+    sprite_json_2x = {}
     
     # Standard sprite dimensions - we'll use 32x32 for each icon (1x) and 64x64 for 2x
     icon_size_1x = 32
@@ -374,17 +375,16 @@ def generate_sprite_from_layers(config, webmap_dir):
         sprite_canvas_1x.paste(img_1x, (x_offset_1x, 0))
         sprite_canvas_2x.paste(img_2x, (x_offset_2x, 0))
         
-        # Add to sprite JSON for each layer with both densities
+        # Add to sprite JSON for each layer with separate densities
         for layer_name in layer_names:
-            sprite_json[layer_name] = {
+            sprite_json_1x[layer_name] = {
                 "width": icon_size_1x,
                 "height": icon_size_1x,
                 "x": x_offset_1x,
                 "y": 0,
                 "pixelRatio": 1
             }
-            # Add 2x version
-            sprite_json[f"{layer_name}@2x"] = {
+            sprite_json_2x[layer_name] = {
                 "width": icon_size_2x,
                 "height": icon_size_2x,
                 "x": x_offset_2x,
@@ -398,20 +398,25 @@ def generate_sprite_from_layers(config, webmap_dir):
     # Save sprite files for both densities
     sprite_png_path_1x = webmap_dir / "sprite.png"
     sprite_png_path_2x = webmap_dir / "sprite@2x.png"
-    sprite_json_path = webmap_dir / "sprite.json"
+    sprite_json_path_1x = webmap_dir / "sprite.json"
+    sprite_json_path_2x = webmap_dir / "sprite@2x.json"
     
     sprite_canvas_1x.save(sprite_png_path_1x, "PNG")
     sprite_canvas_2x.save(sprite_png_path_2x, "PNG")
     
-    with open(sprite_json_path, 'w') as f:
-        json.dump(sprite_json, f, indent=2)
+    with open(sprite_json_path_1x, 'w') as f:
+        json.dump(sprite_json_1x, f, indent=2)
+    
+    with open(sprite_json_path_2x, 'w') as f:
+        json.dump(sprite_json_2x, f, indent=2)
     
     logger.info(f"Generated sprites with {len(sprite_images)} icons: {sprite_png_path_1x} and {sprite_png_path_2x}")
     
     # Log the sprite JSON for debugging
-    logger.info(f"Sprite JSON content: {json.dumps(sprite_json, indent=2)}")
+    logger.info(f"Sprite 1x JSON content: {json.dumps(sprite_json_1x, indent=2)}")
+    logger.info(f"Sprite 2x JSON content: {json.dumps(sprite_json_2x, indent=2)}")
     
-    return sprite_json
+    return sprite_json_1x
 
 def outlet_webmap(config, name):
     """Generate an interactive web map using MapLibre GL JS.
