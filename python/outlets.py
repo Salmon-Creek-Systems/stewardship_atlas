@@ -219,12 +219,19 @@ def webmap_json(config, name, sprite_json=None):
                     label_layer['layout']['icon-size'] = layer.get('icon-size', 0.1)
                     label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'center')
                     
+                    # Ensure text and icon are both displayed
+                    label_layer['layout']['text-allow-overlap'] = True
+                    label_layer['layout']['icon-allow-overlap'] = True
+                    
                     # Add icon paint properties to make the symbol visible
                     if 'paint' not in label_layer:
                         label_layer['paint'] = {}
                     label_layer['paint']['icon-color'] = utils.rgb_to_css(layer.get('color', [150,150,150]))
                     label_layer['paint']['icon-halo-color'] = 'rgba(255,255,255,0.9)'
                     label_layer['paint']['icon-halo-blur'] = 10
+                    
+                    # Debug logging for sprite-based label layer
+                    logger.info(f"Adding sprite-based label layer: {label_layer['id']} with icon-image: {label_layer['layout'].get('icon-image')}")
                     
                     map_layers.append(label_layer)
                 else:
