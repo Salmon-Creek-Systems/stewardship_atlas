@@ -219,6 +219,13 @@ def webmap_json(config, name, sprite_json=None):
                     label_layer['layout']['icon-size'] = layer.get('icon-size', 0.1)
                     label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'center')
                     
+                    # Add icon paint properties to make the symbol visible
+                    if 'paint' not in label_layer:
+                        label_layer['paint'] = {}
+                    label_layer['paint']['icon-color'] = utils.rgb_to_css(layer.get('color', [150,150,150]))
+                    label_layer['paint']['icon-halo-color'] = 'rgba(255,255,255,0.9)'
+                    label_layer['paint']['icon-halo-blur'] = 10
+                    
                     map_layers.append(label_layer)
                 else:
                     # Keep as dynamic layer for loadImage approach
