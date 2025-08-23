@@ -216,12 +216,16 @@ def webmap_json(config, name, sprite_json=None):
                     
                     # Ensure the layer has proper layout properties for sprite display
                     label_layer['layout']['icon-image'] = layer['name']  # Should match sprite symbol name
-                    label_layer['layout']['icon-size'] = layer.get('icon-size', 0.1)
-                    label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'center')
+                    label_layer['layout']['icon-size'] = layer.get('icon-size', 0.5)  # Increased default size
+                    label_layer['layout']['icon-anchor'] = layer.get('icon-anchor', 'bottom')  # Position icon below text
                     
                     # Ensure text and icon are both displayed
                     label_layer['layout']['text-allow-overlap'] = True
                     label_layer['layout']['icon-allow-overlap'] = True
+                    
+                    # Position text above icon
+                    label_layer['layout']['text-anchor'] = 'top'
+                    label_layer['layout']['text-offset'] = [0, 1]  # Move text up slightly
                     
                     # Add icon paint properties to make the symbol visible
                     if 'paint' not in label_layer:
