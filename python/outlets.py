@@ -40,7 +40,7 @@ def webmap_json(config, name, sprite_json=None):
     zoom = 12  # Default zoom, could be calculated based on bbox size
 
     # Set up the map config general properties
-    atlas_url = f"https://internal.fireatlas.org/atlas/{config['atlas_name']}"
+    atlas_url = f"https://internal.fireatlas.org/{config['name']}/staging"
     sprite_url = atlas_url + "/outlets/" + name + "/sprite"
     map_config = {
         "container": "map",
