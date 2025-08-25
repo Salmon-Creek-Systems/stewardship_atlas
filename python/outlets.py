@@ -245,11 +245,8 @@ def webmap_json(config, name, sprite_json=None):
     map_config['style']['sources'] = map_sources
     map_config['style']['layers'] = map_layers
     
-    # Build layer control configuration for grouped visibility
-    layer_control_config = {
-        'collapsed': False,
-        'layers': []
-    }
+    # Build legend targets for grouped visibility
+    legend_targets = {}
     
     # Group primary layers with their label layers
     for layer in map_layers:
@@ -266,32 +263,22 @@ def webmap_json(config, name, sprite_json=None):
         
         if has_label_layer:
             # Primary layer with label - create group
-            layer_control_config['layers'].append({
-                'id': layer_id,
-                'group': layer_name,
-                'children': True  # This makes it a parent
-            })
-            
-            # Add label layer as hidden child
-            layer_control_config['layers'].append({
-                'id': label_layer_id,
-                'group': layer_name,
-                'hidden': True,  # Hidden from legend
-                'parent': layer_id  # Links to primary layer
-            })
+            legend_targets[layer_id] = {
+                'name': layer_name,
+                'children': [label_layer_id]  # Link to label layer
+            }
         else:
             # Standalone layer - add normally
-            layer_control_config['layers'].append({
-                'id': layer_id,
-                'group': layer_name
-            })
+            legend_targets[layer_id] = {
+                'name': layer_name
+            }
     
     # Log the final map configuration for debugging
     logger.info(f"Map style layers: {[layer.get('id', 'no-id') for layer in map_layers]}")
     logger.info(f"Dynamic layers: {[layer.get('name', 'no-name') for layer in dynamic_layers]}")
-    logger.info(f"Layer control config: {len(layer_control_config['layers'])} layers")
+    logger.info(f"Legend targets: {len(legend_targets)} layers")
   
-    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "layer_control_config": layer_control_config}
+    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets}
 
 def generate_map_page(title, map_config_data, output_path, sprite_json=None):
     """Generate the complete HTML page for viewing a map"""
@@ -349,7 +336,7 @@ void await map.loadImage('{im_uri}',
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
-            layer_control_config=json.dumps(map_config_data.get('layer_control_config', {}), indent=2))
+            legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2))
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)

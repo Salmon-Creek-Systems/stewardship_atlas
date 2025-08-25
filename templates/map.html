@@ -7,8 +7,8 @@
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='css/map.css' rel='stylesheet' />
     <link href='css/edit_controls.css' rel='stylesheet' />
-    <script src="https://unpkg.com/mapbox-layer-control@latest/dist/mapbox-layer-control.min.js"></script>
-    <link href="https://unpkg.com/mapbox-layer-control@latest/dist/mapbox-layer-control.css" rel="stylesheet">
+    <link href='https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.css' rel='stylesheet' />
+    <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
     <style>
         .help-popup {{
             position: fixed;
@@ -175,7 +175,7 @@
 
       // Initialize the map
       const MAP_CONFIG = {map_config};
-      const LAYER_CONTROL_CONFIG = {layer_control_config};
+      const LEGEND_TARGETS = {legend_targets};
       const map = new maplibregl.Map(MAP_CONFIG);
       
       // Function to get URL parameters
@@ -219,7 +219,7 @@
       }}
 				     ));
       
-    // Layer control will be added after map loads to ensure all layers are available
+    map.addControl(new MaplibreLegendControl.MaplibreLegendControl({{legendTargets: LEGEND_TARGETS}}, {{reverseOrder: false}}), 'bottom-left');
 // Add satellite source and layer
       map.on('load', async () => {{
  
@@ -286,12 +286,7 @@
               }}
 	  }});
 	  
-	  // Initialize layer control after all layers are loaded
-	  map.on('idle', () => {{
-	      if (typeof layerControl !== 'undefined') {{
-	          map.addControl(new layerControl(LAYER_CONTROL_CONFIG), 'bottom-left');
-	      }}
-	  }});
+
 
 	  map.addSource('satellite', SATELLITE_SOURCE);
 	  map.addSource('usgs', USGS_SOURCE);
