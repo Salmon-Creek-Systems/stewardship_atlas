@@ -264,25 +264,16 @@ def webmap_json(config, name, sprite_json=None):
         if has_label_layer:
             # Primary layer with label - create group
             legend_targets[layer_id] = {
-                'name': layer_name,
-                'type': 'group',
-                'children': [label_layer_id]  # Link to label layer
+                'name': layer_name
             }
             
-            # Add label layer as hidden child
-            legend_targets[label_layer_id] = {
-                'name': f"{layer_name} Labels",
-                'type': 'layer',
-                'hidden': True,
-                'parent': layer_id
-            }
+            # Don't add label layer to legend targets - let the plugin handle it
             
-            # Add metadata to the actual Maplibre layers for grouping
+            # Add basic legend properties that the plugin expects
             layer['metadata'] = {
                 'legend': {
                     'name': layer_name,
-                    'group': layer_name,
-                    'parent': True
+                    'type': 'symbol'  # or 'line', 'fill' based on layer type
                 }
             }
             
@@ -292,8 +283,7 @@ def webmap_json(config, name, sprite_json=None):
                     label_layer['metadata'] = {
                         'legend': {
                             'name': f"{layer_name} Labels",
-                            'group': layer_name,
-                            'parent': False,
+                            'type': 'symbol',
                             'hidden': True
                         }
                     }
@@ -305,10 +295,11 @@ def webmap_json(config, name, sprite_json=None):
                 'type': 'layer'
             }
             
-            # Add metadata to standalone layers
+            # Add basic legend properties
             layer['metadata'] = {
                 'legend': {
-                    'name': layer_name
+                    'name': layer_name,
+                    'type': 'symbol'  # or 'line', 'fill' based on layer type
                 }
             }
     
