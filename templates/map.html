@@ -219,7 +219,7 @@
       }}
 				     ));
       
-    map.addControl(new MaplibreLegendControl.MaplibreLegendControl({{legendTargets: LEGEND_TARGETS}}, {{reverseOrder: false}}), 'bottom-left');
+    map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {{reverseOrder: false}}), 'bottom-left');
 // Add satellite source and layer
       map.on('load', async () => {{
  

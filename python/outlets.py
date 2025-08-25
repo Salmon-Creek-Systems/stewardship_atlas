@@ -263,9 +263,7 @@ def webmap_json(config, name, sprite_json=None):
         
         if has_label_layer:
             # Primary layer with label - create group
-            legend_targets[layer_id] = {
-                'name': layer_name
-            }
+            legend_targets[layer_id] = layer_name
             
             # Don't add label layer to legend targets - let the plugin handle it
             
@@ -290,10 +288,7 @@ def webmap_json(config, name, sprite_json=None):
                     break
         else:
             # Standalone layer - add normally
-            legend_targets[layer_id] = {
-                'name': layer_name,
-                'type': 'layer'
-            }
+            legend_targets[layer_id] = layer_name
             
             # Add basic legend properties
             layer['metadata'] = {
