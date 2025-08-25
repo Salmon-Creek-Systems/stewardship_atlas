@@ -15,6 +15,8 @@ import utils
 import outlets
 import h3
 
+import dataswale_geojson as dataswale
+
 # Configure logging
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
@@ -328,7 +330,7 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
         raise Exception(f"Failed to generate H3 indices for LineString: {str(e)}")
 
 
-def h3_for_polygon(geometry, starting_res=8, swap_coordinates=True, max_num_cells=10):
+def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cells=10):
     """
     Generate H3 indices for a GeoJSON polygon geometry.
     
@@ -356,7 +358,7 @@ def h3_for_polygon(geometry, starting_res=8, swap_coordinates=True, max_num_cell
             raise Exception("Geometry must contain 'coordinates' field")
         
         coordinates = geometry['coordinates']
-        if not coordinates or not isinstance(coordinates, list):
+        if not coordinates or not isinstance(coordinates, list):  
             raise Exception("Coordinates must be a non-empty list")
         
         # Extract the outer ring (first polygon)
@@ -385,6 +387,8 @@ def h3_for_polygon(geometry, starting_res=8, swap_coordinates=True, max_num_cell
                 # Convert to list and check count
                 cell_list = list(h3_cells)
                 cell_count = len(cell_list)
+
+                logger.info(f"Hape conversion: {polygon_coords} -> {h3_cells}")
                 
                 # If we're under the threshold, we're done
                 if cell_count <= max_num_cells:
@@ -433,20 +437,21 @@ def h3_cells(config, in_layer, out_layer):
             raise Exception(f"Input and output layers must be identical for now. Got in_layer='{in_layer}', out_layer='{out_layer}'")
         
         # Get configuration parameters with defaults
-        starting_resolution = config.get('starting_resolution', 8)
+        starting_resolution = config.get('starting_resolution', 11)
         algorithm = config.get('algorithm', 'max_num_cells')
         max_cells = config.get('max_cells', 10)
         swap_coordinates = config.get('swap_coordinates', True)
         
         logger.info(f"Processing H3 cells for layer '{in_layer}' with resolution {starting_resolution}, algorithm '{algorithm}', max_cells {max_cells}")
-        
+
+        layers_dict = {x['name']: x for x in config['dataswale']['layers']}
         # Load the input layer
-        layer_data = utils.load_layer(in_layer)
+        layer_data = dataswale.layer_as_featurecollection(config, in_layer) #utils.load_layer(in_layer)
         if not layer_data or 'features' not in layer_data:
             raise Exception(f"Could not load layer '{in_layer}' or layer has no features")
         
         # Get layer definition to determine geometry type
-        layer_def = utils.get_layer_definition(in_layer)
+        layer_def = layers_dict[in_layer]
         if not layer_def:
             raise Exception(f"Could not get layer definition for '{in_layer}'")
         
@@ -483,7 +488,7 @@ def h3_cells(config, in_layer, out_layer):
                     swap_coordinates=swap_coordinates,
                     max_num_cells=max_cells
                 )
-                
+                logger.info(f"Indexing Geom (Swap: {swap_coordinates}): {geometry} got {h3_result}")
                 # Add H3 properties to the feature (preserving existing properties)
                 feature['properties'] = feature.get('properties', {})
                 feature['properties'].update({
