@@ -220,6 +220,48 @@
 				     ));
       
     map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {{reverseOrder: false}}), 'bottom-left');
+    
+    // Add group visibility control for related layers
+    map.on('styledata', () => {{
+        // Get all layers with group metadata
+        const style = map.getStyle();
+        const groupedLayers = {{}};
+        
+        // Build group mapping
+        style.layers.forEach(layer => {{
+            if (layer.metadata && layer.metadata.group) {{
+                if (!groupedLayers[layer.metadata.group]) {{
+                    groupedLayers[layer.metadata.group] = [];
+                }}
+                groupedLayers[layer.metadata.group].push(layer.id);
+            }}
+        }});
+        
+        // Store group mapping globally for visibility control
+        window.LAYER_GROUPS = groupedLayers;
+    }});
+    
+    // Override layer visibility to sync group members
+    const originalSetLayoutProperty = map.setLayoutProperty;
+    map.setLayoutProperty = function(layerId, property, value) {{
+        if (property === 'visibility' && window.LAYER_GROUPS) {{
+            // Find which group this layer belongs to
+            for (const [groupName, layerIds] of Object.entries(window.LAYER_GROUPS)) {{
+                if (layerIds.includes(layerId)) {{
+                    // Set visibility for all layers in the group
+                    layerIds.forEach(id => {{
+                        if (map.getLayer(id)) {{
+                            originalSetLayoutProperty.call(this, id, property, value);
+                        }}
+                    }});
+                    return; // Exit after handling the group
+                }}
+            }}
+        }}
+        
+        // Default behavior for non-grouped layers
+        return originalSetLayoutProperty.call(this, layerId, property, value);
+    }};
 // Add satellite source and layer
       map.on('load', async () => {{
  

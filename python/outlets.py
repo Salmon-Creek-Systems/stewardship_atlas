@@ -267,12 +267,13 @@ def webmap_json(config, name, sprite_json=None):
             
             # Don't add label layer to legend targets - let the plugin handle it
             
-            # Add basic legend properties that the plugin expects
+            # Add basic legend properties and group metadata
             layer['metadata'] = {
                 'legend': {
                     'name': layer_name,
                     'type': 'symbol'  # or 'line', 'fill' based on layer type
-                }
+                },
+                'group': layer_name  # Group primary and label layers together
             }
             
             # Find and update the label layer
@@ -283,7 +284,8 @@ def webmap_json(config, name, sprite_json=None):
                             'name': f"{layer_name} Labels",
                             'type': 'symbol',
                             'hidden': True
-                        }
+                        },
+                        'group': layer_name  # Same group as primary layer
                     }
                     break
         else:
@@ -295,7 +297,8 @@ def webmap_json(config, name, sprite_json=None):
                 'legend': {
                     'name': layer_name,
                     'type': 'symbol'  # or 'line', 'fill' based on layer type
-                }
+                },
+                'group': layer_name  # Standalone layers get their own group
             }
     
     # Log the final map configuration for debugging
