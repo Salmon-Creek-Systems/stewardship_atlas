@@ -265,12 +265,51 @@ def webmap_json(config, name, sprite_json=None):
             # Primary layer with label - create group
             legend_targets[layer_id] = {
                 'name': layer_name,
+                'type': 'group',
                 'children': [label_layer_id]  # Link to label layer
             }
+            
+            # Add label layer as hidden child
+            legend_targets[label_layer_id] = {
+                'name': f"{layer_name} Labels",
+                'type': 'layer',
+                'hidden': True,
+                'parent': layer_id
+            }
+            
+            # Add metadata to the actual Maplibre layers for grouping
+            layer['metadata'] = {
+                'legend': {
+                    'name': layer_name,
+                    'group': layer_name,
+                    'parent': True
+                }
+            }
+            
+            # Find and update the label layer
+            for label_layer in map_layers:
+                if label_layer.get('id') == label_layer_id:
+                    label_layer['metadata'] = {
+                        'legend': {
+                            'name': f"{layer_name} Labels",
+                            'group': layer_name,
+                            'parent': False,
+                            'hidden': True
+                        }
+                    }
+                    break
         else:
             # Standalone layer - add normally
             legend_targets[layer_id] = {
-                'name': layer_name
+                'name': layer_name,
+                'type': 'layer'
+            }
+            
+            # Add metadata to standalone layers
+            layer['metadata'] = {
+                'legend': {
+                    'name': layer_name
+                }
             }
     
     # Log the final map configuration for debugging
