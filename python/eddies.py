@@ -416,37 +416,39 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
         raise Exception(f"Failed to generate H3 indices for polygon: {str(e)}")
 
 
-def h3_cells(config, in_layer, out_layer):
+def h3_cells(config, asset_name):
     """
-    Eddy function to generate H3 cell indices for features in a layer.
+    Eddy function to generate hexagonal H3 cell features from input layer geometries.
     
     Args:
-        config: Eddy configuration dictionary
-        in_layer: Input layer name
-        out_layer: Output layer name (must be same as in_layer for now)
+        config: Configuration dictionary containing assets
+        asset_name: Name of the asset configuration to use
         
     Returns:
-        Updated layer with H3 properties added to each feature
+        New FeatureCollection with hexagonal features, one for each H3 cell.
+        Each hexagonal feature preserves all properties from the original feature
+        that created it, plus H3 metadata (h3_index, h3_resolution, etc.).
         
     Raises:
-        Exception: If input/output layers differ or processing fails
+        Exception: If configuration is invalid or processing fails
     """
     try:
-        # For now, input and output layers must be the same
-        if in_layer != out_layer:
-            raise Exception(f"Input and output layers must be identical for now. Got in_layer='{in_layer}', out_layer='{out_layer}'")
+        # Get the asset configuration
+        asset_config = config['assets'][asset_name]
         
-        # Get configuration parameters with defaults
-        starting_resolution = config.get('starting_resolution', 11)
-        algorithm = config.get('algorithm', 'max_num_cells')
-        max_cells = config.get('max_cells', 10)
-        swap_coordinates = config.get('swap_coordinates', True)
+        # Extract configuration parameters
+        in_layer = asset_config['in_layer']
+        out_layer = asset_config['out_layer']
+        starting_resolution = asset_config.get('starting_resolution', 11)
+        algorithm = asset_config.get('algorithm', 'max_num_cells')
+        max_cells = asset_config.get('max_cells', 10)
+        swap_coordinates = asset_config.get('swap_coordinates', True)
         
         logger.info(f"Processing H3 cells for layer '{in_layer}' with resolution {starting_resolution}, algorithm '{algorithm}', max_cells {max_cells}")
 
         layers_dict = {x['name']: x for x in config['dataswale']['layers']}
         # Load the input layer
-        layer_data = dataswale.layer_as_featurecollection(config, in_layer) #utils.load_layer(in_layer)
+        layer_data = dataswale.layer_as_featurecollection(config, in_layer)
         if not layer_data or 'features' not in layer_data:
             raise Exception(f"Could not load layer '{in_layer}' or layer has no features")
         
@@ -466,9 +468,11 @@ def h3_cells(config, in_layer, out_layer):
         else:
             raise Exception(f"Unsupported geometry type '{geometry_type}' for layer '{in_layer}'. Only 'polygon' and 'linestring' are supported.")
         
-        # Process each feature
+        # Process each feature and collect H3 cells with properties
         features = layer_data['features']
         logger.info(f"Processing {len(features)} features in layer '{in_layer}'")
+        
+        h3_cells_with_properties = []
         
         for i, feature in enumerate(features):
             try:
@@ -489,27 +493,58 @@ def h3_cells(config, in_layer, out_layer):
                     max_num_cells=max_cells
                 )
                 logger.info(f"Indexing Geom (Swap: {swap_coordinates}): {geometry} got {h3_result}")
-                # Add H3 properties to the feature (preserving existing properties)
-                feature['properties'] = feature.get('properties', {})
-                feature['properties'].update({
-                    'h3_cells': h3_result['cells'],
-                    'h3_resolution': h3_result['resolution'],
-                    'h3_cardinality': h3_result['cell_count'],
-                    'h3_cell': h3_result['representative_index']
-                })
                 
-                logger.debug(f"Feature {i}: Added H3 properties with {h3_result['cell_count']} cells at resolution {h3_result['resolution']}")
+                # Create a hexagonal feature for each H3 cell, preserving all original properties
+                for h3_cell in h3_result['cells']:
+                    # Convert H3 cell to hexagonal geometry
+                    try:
+                        hex_geometry = h3.cells_to_geo(h3_cell)
+                        # Convert to GeoJSON format (swap coordinates if needed)
+                        if swap_coordinates:
+                            # h3.cells_to_geo returns [lat, lng], convert to [lng, lat] for GeoJSON
+                            hex_coords = [[coord[1], coord[0]] for coord in hex_geometry]
+                        else:
+                            hex_coords = hex_geometry
+                        
+                        # Create hexagonal feature with all original properties plus H3 metadata
+                        hex_feature = {
+                            'type': 'Feature',
+                            'geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [hex_coords]
+                            },
+                            'properties': {
+                                **feature.get('properties', {}),  # Preserve all original properties
+                                'h3_index': h3_cell,
+                                'h3_resolution': h3_result['resolution'],
+                                'h3_cell_count': h3_result['cell_count'],
+                                'source_feature_id': i  # Track which original feature created this cell
+                            }
+                        }
+                        h3_cells_with_properties.append(hex_feature)
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to convert H3 cell {h3_cell} to geometry: {str(e)}")
+                        continue
+                
+                logger.debug(f"Feature {i}: Created {len(h3_result['cells'])} hexagonal features")
                 
             except Exception as e:
                 logger.error(f"Failed to process feature {i}: {str(e)}")
                 # Continue processing other features instead of failing completely
                 continue
         
-        # Save the updated layer back to the same location
-        utils.save_layer(out_layer, layer_data)
-        logger.info(f"Successfully updated layer '{out_layer}' with H3 properties")
+        # Create new feature collection with hexagonal features
+        hex_layer_data = {
+            'type': 'FeatureCollection',
+            'features': h3_cells_with_properties
+        }
         
-        return layer_data
+        # Save the new hexagonal layer to the output location
+        utils.save_layer(out_layer, hex_layer_data)
+        logger.info(f"Successfully created hexagonal layer '{out_layer}' with {len(h3_cells_with_properties)} features")
+        
+        return hex_layer_data
         
     except Exception as e:
         logger.error(f"H3 cells eddy failed: {str(e)}")

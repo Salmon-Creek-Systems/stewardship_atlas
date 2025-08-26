@@ -732,7 +732,7 @@
     "h3_cells": {
         "type": "eddy",
         "in_layer": "roads",
-        "out_layer": "roads",
+        "out_layer": "roads_hexagons",
         "starting_resolution": 8,
         "algorithm": "max_num_cells",
         "max_cells": 10,
