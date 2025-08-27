@@ -312,12 +312,15 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
                 #last_cell_count = cell_count
                 # If we're under the threshold, we're done
                 #if cell_count <= max_num_cells:
-                representative_index = cell_list[0] if cell_list else None
-                    
+                cell_set = list(set(cell_list))
+                representative_index = cell_set[0] if cell_set else None
+
+
                 return {
-                    "cells": cell_list,
+                    "all_cells": cell_list,
+                    "cells": cell_set,
                     "resolution": res,
-                    "cell_count": len(cell_list),
+                    "cell_count": len(cell_set),
                     "representative_index": representative_index
                     }
                 
