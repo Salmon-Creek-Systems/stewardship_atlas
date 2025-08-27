@@ -289,42 +289,50 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
         else:
             # Keep original order
             linestring_coords = coordinates
-        
+
+        logger.info(f"LS corrds: {len(linestring_coords)}")
         # Start with the specified resolution
         res = starting_res
-        
+        last_cell_count = 0
         # Try to find a resolution that gives us <= max_num_cells
         while res >= 0:
+            cell_list = []
             try:
                 # Create H3 line and get cells
-                h3_line = h3.LatLngLine(linestring_coords)
-                h3_cells = h3.h3shape_to_cells(h3_line, res)
-                
-                # Convert to list and check count
-                cell_list = list(h3_cells)
-                cell_count = len(cell_list)
-                
-                # If we're under the threshold, we're done
-                if cell_count <= max_num_cells:
-                    representative_index = cell_list[0] if cell_list else None
+                #h3_line = h3.LatLngLine(linestring_coords)
+                for lng, lat in linestring_coords:
                     
-                    return {
-                        "cells": cell_list,
-                        "resolution": res,
-                        "cell_count": cell_count,
-                        "representative_index": representative_index
+                    # h3_cells = h3.h3shape_to_cells(h3_line, res)
+                    cell_list.append( h3.latlng_to_cell(lng,lat, res))
+
+                # Convert to list and check count
+                #cell_list = list(h3_cells)
+                #cell_count = len(cell_list)
+
+                #last_cell_count = cell_count
+                # If we're under the threshold, we're done
+                #if cell_count <= max_num_cells:
+                representative_index = cell_list[0] if cell_list else None
+                    
+                return {
+                    "cells": cell_list,
+                    "resolution": res,
+                    "cell_count": len(cell_list),
+                    "representative_index": representative_index
                     }
                 
                 # Otherwise, reduce resolution and try again
+                logger.info(f"too many cells: {cell_count}")
                 res -= 1
                 
             except Exception as e:
                 # If this resolution fails, try a lower one
+                logger.error(f"LineString conversion (res: {res} coords: {len(linestring_coords)}) failed: {e}")
                 res -= 1
                 continue
         
         # If we get here, we couldn't find a suitable resolution
-        raise Exception(f"Could not find H3 resolution <= {starting_res} that produces <= {max_num_cells} cells")
+        raise Exception(f"LineString [{len(linestring_coords)}]: Could not find H3 resolution <= {starting_res} that produces <= {max_num_cells} cells [{last_cell_count}]")
         
     except Exception as e:
         raise Exception(f"Failed to generate H3 indices for LineString: {str(e)}")
@@ -388,7 +396,7 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
                 cell_list = list(h3_cells)
                 cell_count = len(cell_list)
 
-                logger.info(f"Hape conversion: {polygon_coords} -> {h3_cells}")
+                # logger.info(f"Hape conversion: {polygon_coords} -> {h3_cells}")
                 
                 # If we're under the threshold, we're done
                 if cell_count <= max_num_cells:
@@ -410,7 +418,7 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
                 continue
         
         # If we get here, we couldn't find a suitable resolution
-        raise Exception(f"Could not find H3 resolution <= {starting_res} that produces <= {max_num_cells} cells")
+        raise Exception(f"Could not find H3 resolution <= {starting_res} that produces <= {max_num_cells} cells [{cell_count}]")
         
     except Exception as e:
         raise Exception(f"Failed to generate H3 indices for polygon: {str(e)}")
@@ -492,19 +500,20 @@ def h3_cells(config, asset_name):
                     swap_coordinates=swap_coordinates,
                     max_num_cells=max_cells
                 )
-                logger.info(f"Indexing Geom (Swap: {swap_coordinates}): {geometry} got {h3_result}")
+                logger.info(f"Indexing Geom {geometry['type']}): {len(geometry['coordinates'])} coords, got {h3_result}")
                 
                 # Create a hexagonal feature for each H3 cell, preserving all original properties
                 for h3_cell in h3_result['cells']:
                     # Convert H3 cell to hexagonal geometry
                     try:
-                        hex_geometry = h3.cells_to_geo(h3_cell)
+                        hex_coords = h3.cell_to_boundary(h3_cell)
+                        # hex_geometry = h3.cells_to_geo(h3_cell)
                         # Convert to GeoJSON format (swap coordinates if needed)
                         if swap_coordinates:
                             # h3.cells_to_geo returns [lat, lng], convert to [lng, lat] for GeoJSON
-                            hex_coords = [[coord[1], coord[0]] for coord in hex_geometry]
-                        else:
-                            hex_coords = hex_geometry
+                            hex_coords = [[coord[1], coord[0]] for coord in hex_coords]
+                        #else:
+                        #    hex_coords = hex_geometry
                         
                         # Create hexagonal feature with all original properties plus H3 metadata
                         hex_feature = {
@@ -524,10 +533,10 @@ def h3_cells(config, asset_name):
                         h3_cells_with_properties.append(hex_feature)
                         
                     except Exception as e:
-                        logger.error(f"Failed to convert H3 cell {h3_cell} to geometry: {str(e)}")
+                        logger.error(f"Feature Conv ERR: Failed to convert H3 cell {h3_cell} to geometry: {str(e)}")
                         continue
                 
-                logger.debug(f"Feature {i}: Created {len(h3_result['cells'])} hexagonal features")
+                logger.debug(f"FeatureConv {i}: Created {len(h3_cells_with_properties)} hexagonal features")
                 
             except Exception as e:
                 logger.error(f"Failed to process feature {i}: {str(e)}")
@@ -541,7 +550,15 @@ def h3_cells(config, asset_name):
         }
         
         # Save the new hexagonal layer to the output location
-        utils.save_layer(out_layer, hex_layer_data)
+        # utils.save_layer(out_layer, hex_layer_data)
+    
+        out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+        fc = geojson.FeatureCollection(0)
+        fc['features'] = h3_cells_with_properties
+                                       
+        with open(out_path, 'w') as f:
+            geojson.dump(fc, f)
+
         logger.info(f"Successfully created hexagonal layer '{out_layer}' with {len(h3_cells_with_properties)} features")
         
         return hex_layer_data

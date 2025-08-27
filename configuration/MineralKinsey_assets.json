@@ -77,12 +77,33 @@
         "out_layer": "ponds",
         "config_def": "local_ponds"
     },
-"local_burns" : {
+    "local_burns" : {
         "type": "inlet",
         "out_layer": "burns",
         "config_def": "local_burns"
     },
-
+    "burns_h3" : {
+	"type": "eddy",
+	"in_layer": "burns",
+	"out_layer": "burns_index",
+	"config_def": "h3_cells"
+    },
+     "roads_h3" : {
+	"type": "eddy",
+	"in_layer": "roads",
+	"out_layer": "roads_index",
+	"config_def": "h3_cells"
+    },
+   
+    "creeks_h3" : {
+	"type": "eddy",
+	"in_layer": "creeks",
+	"out_layer": "creeks_index",
+	"starting_resolution":11,
+	"max_cells": 100,
+	"config_def": "h3_cells"
+    },
+    
     "local_turnouts" : {
         "type": "inlet",
         "out_layer": "turnouts",
@@ -92,7 +113,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["lidar_basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural", "burns"],
+    "in_layers": ["lidar_basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural", "burns", "burns_index", "creeks_index", "roads_index"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
