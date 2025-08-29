@@ -65,6 +65,26 @@ def refresh_raster_layer(config, name, delta_queue_builder=DQB):
     return layer_path
 
 
+def refresh_document_layer(config, name, delta_queue_builder=DQB):
+    """
+    Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.
+    """
+    
+    layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.tiff'
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    deltas_dir = versioning.atlas_path(config, "deltas") / name
+    work_dir = deltas_dir / 'work'
+    work_path = work_dir / f'{name}.tiff'
+    
+    for inpath in deltas_dir.glob("*"):
+        logger.info(f"refreshing raster layer [{name}]: {inpath} -> {layer_path} -> {work_path}")
+        shutil.copy(inpath, layer_path)
+        inpath.replace(work_path)
+        
+    return layer_path
+
+
+
 def layer_as_featurecollection(config:Dict[str, Any], name:str):    
     layer_path = layer_as_path(config, name)
     return geojson.load(open(layer_path))

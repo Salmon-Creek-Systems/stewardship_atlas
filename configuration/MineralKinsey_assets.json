@@ -66,7 +66,11 @@
         "out_layer": "creeks",
         "config_def": "nhd_creeks"
     },
-
+"local_documents" : {
+        "type": "inlet",
+        "out_layer": "documents",
+        "config_def": "local_documents"
+    },
     "local_hydrants" : {
         "type": "inlet",
         "out_layer": "hydrants",

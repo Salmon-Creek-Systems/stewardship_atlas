@@ -154,6 +154,22 @@
 			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
 		}
 	},
+"local_documents": {
+		"name": "documents",
+		"asset_type": "inlet",
+		"interaction": "download",
+		"fetch_type": "local_ogr",
+		"geometry": "dataswale",
+		"data_type": "document",
+		"feature_type": "document",
+		"inpath_template": "documents.zip",
+		"attribution": {
+			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+			"description": "Open Addresses",
+			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+		}
+	},
 	"local_lpss": {
 	    "name": "lpss",
 	    "asset_type": "inlet",
