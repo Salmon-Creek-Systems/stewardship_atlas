@@ -300,10 +300,16 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
             try:
                 # Create H3 line and get cells
                 #h3_line = h3.LatLngLine(linestring_coords)
+                old_endpoint = None
                 for lng, lat in linestring_coords:
                     
                     # h3_cells = h3.h3shape_to_cells(h3_line, res)
-                    cell_list.append( h3.latlng_to_cell(lng,lat, res))
+                    new_endpoint =  h3.latlng_to_cell(lng,lat, res)
+                    if old_endpoint:
+                        fill_cells = h3.grid_path_cells(old_endpoint, new_endpoint)
+                        cell_list += fill_cells
+                    cell_list.append(new_endpoint)
+                    old_endpoint = new_endpoint
 
                 # Convert to list and check count
                 #cell_list = list(h3_cells)
