@@ -1,5 +1,5 @@
 import geojson
-import logging
+import logging, json
 import shutil
 from typing import Iterator, Dict, Any, List, Tuple
 import eddies
@@ -70,18 +70,33 @@ def refresh_document_layer(config, name, delta_queue_builder=DQB):
     Rebuild the raster for a layer in the dataswale from the current state of the Delta Queue.
     """
     
-    layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.tiff'
-    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    layer_dir = versioning.atlas_path(config, 'layers') / name 
+    layer_dir.mkdir(parents=True, exist_ok=True)
     deltas_dir = versioning.atlas_path(config, "deltas") / name
     work_dir = deltas_dir / 'work'
-    work_path = work_dir / f'{name}.tiff'
+    # work_path = work_dir / f'{name}.tiff'
     
     for inpath in deltas_dir.glob("*"):
-        logger.info(f"refreshing raster layer [{name}]: {inpath} -> {layer_path} -> {work_path}")
-        shutil.copy(inpath, layer_path)
-        inpath.replace(work_path)
+        if inpath.is_dir():
+            logger.info(f"Skipping directory for layer update: {inpath}")
+            continue
+        doc_name = inpath.stem
+        logger.info(f"refreshing document layer [{name}]: {inpath} {doc_name} -> {layer_dir} -> {work_dir}")
+        shutil.copy(inpath, layer_dir / inpath.name)
+        inpath.replace(work_dir / inpath.name)
+
+        doc_data = {
+            "name": inpath.stem,
+            "file_type": inpath.suffix,
+            "corners" : config['dataswale']['bbox'],
+            "image_path": str( layer_dir / inpath.name )
+            }
         
-    return layer_path
+        with open(layer_dir / f"{inpath.stem}.json", "w") as f:
+            logger.info(f"Creating doc JSON ({inpath.stem}.json): {doc_data}")
+            json.dump(doc_data, f)
+        
+    return layer_dir
 
 
 
