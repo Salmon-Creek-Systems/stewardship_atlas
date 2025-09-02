@@ -7,10 +7,100 @@
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='css/map.css' rel='stylesheet' />
     <link href='css/edit_controls.css' rel='stylesheet' />
+    <link href='css/console.css' rel='stylesheet' />
     <link href='https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.css' rel='stylesheet' />
     <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
     <style>
-        .help-popup {{
+        /* Control panel styling with transparency */
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+        }
+        
+        /* Sub-panels with less transparency */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .control-panel:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Title panel */
+        .title-panel {
+            text-align: center;
+        }
+        
+        .title-panel h4 {
+            margin: 0;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        /* View panel */
+        .view-panel label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        /* Sharing panel */
+        .sharing-panel label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        /* Navigation panel */
+        .nav-panel {
+            text-align: center;
+        }
+        
+        /* Reuse console.css button styling */
+        .button {
+            background-color: #cccccc;
+            border: 1px solid #999;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: inline-block;
+        }
+        
+        .button:hover {
+            background-color: #bbbbbb;
+        }
+        
+        /* Input field styling */
+        .input-field {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-bottom: 5px;
+        }
+        
+        /* Progress bar styling */
+        #loading-progress {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 6px;
+            padding: 10px;
+        }
+        
+        .help-popup {
             position: fixed;
             top: 0;
             left: 0;
@@ -21,9 +111,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
-        }}
+        }
         
-        .help-content {{
+        .help-content {
             background: white;
             border-radius: 8px;
             max-width: 500px;
@@ -31,23 +121,23 @@
             max-height: 80%;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }}
+        }
         
-        .help-header {{
+        .help-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 20px 20px 0 20px;
             border-bottom: 1px solid #eee;
-        }}
+        }
         
-        .help-header h2 {{
+        .help-header h2 {
             margin: 0;
             color: #333;
             font-size: 1.5em;
-        }}
+        }
         
-        .close-button {{
+        .close-button {
             background: none;
             border: none;
             font-size: 24px;
@@ -59,44 +149,49 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }}
+        }
         
-        .close-button:hover {{
+        .close-button:hover {
             color: #333;
-        }}
+        }
         
-        .help-body {{
+        .help-body {
             padding: 20px;
-        }}
+        }
         
-        .help-body ul {{
+        .help-body ul {
             margin: 0;
             padding-left: 20px;
-        }}
+        }
         
-        .help-body li {{
+        .help-body li {
             margin-bottom: 10px;
             line-height: 1.4;
             color: #555;
-        }}
+        }
         
-        #help-link {{
+        #help-link {
             font-weight: bold;
             font-size: 1.2em;
             text-decoration: none;
             color: #007bff;
-        }}
+        }
         
-        #help-link:hover {{
+        #help-link:hover {
             color: #0056b3;
-        }}
+        }
     </style>
 </head>
 <body>
     <div id="controls">
-      <div class="input-group">
-	<h4>{title}</h4>
-            <label>Basemap:</label><br/>
+        <!-- Title Panel -->
+        <div class="control-panel title-panel">
+            <h4>{title}</h4>
+        </div>
+        
+        <!-- View Panel -->
+        <div class="control-panel view-panel">
+            <label>Basemap:</label>
             <select id="basemap-select" class="input-field">
                 <option value="basemap">LIDAR Hillshade</option>
                 <option value="satellite">Satellite (ESRI)</option>
@@ -104,22 +199,26 @@
                 <option value="terrain">OpenMapTiles Terrain</option>
             </select>
         </div>
-        <div class="input-group">
-            <label>Location sharing format:</label><br/>
+        
+        <!-- Sharing Panel -->
+        <div class="control-panel sharing-panel">
+            <label>Location sharing format:</label>
             <select id="coords-format-select" class="input-field">
                 <option value="json">JSON coordinates</option>
                 <option value="google">Google Maps link</option>
                 <option value="internal">Internal map link</option>
             </select>
-        </div>
-        <div class="input-group">
             <input type="text" id="location-input" class="input-field" placeholder="paste location here" style="width: calc(100% - 50px); display: inline-block;">
             <button id="go-location-btn" class="button" style="width: 40px; margin-left: 5px; padding: 5px;">Go</button>
         </div>
-        <div class="button-group">
+        
+        <!-- Navigation Panel -->
+        <div class="control-panel nav-panel">
             <a href="../html/admin" class="button link-button">Home</a>
             <a href="#" class="button link-button" id="help-link">?</a>
         </div>
+        
+        <!-- Progress Bar -->
         <div id="loading-progress" class="progress-bar">
             <div class="progress-fill"></div>
             <div class="progress-text">Loading layers...</div>
