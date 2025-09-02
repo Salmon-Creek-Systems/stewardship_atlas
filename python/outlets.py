@@ -66,13 +66,21 @@ def webmap_json(config, name, sprite_json=None):
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
-        map_sources[layer_name] =  {
-            'type': 'image', 
-            'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
-            'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])
-        } if layer['geometry_type'] == 'raster' else {
-                'type': 'geojson',
-                'data': f"../../layers/{layer_name}/{layer_name}.geojson"
+        if layer['geometry_type'] == 'raster':
+            map_sources[layer_name] =  {
+                'type': 'image', 
+                'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
+                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
+        elif layer['geometry_type'] == 'documents':
+            
+            map_sources[layer_name] =  {
+                'type': 'image', 
+                'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
+                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
+                
+        else:
+            'type': 'geojson',
+            'data': f"../../layers/{layer_name}/{layer_name}.geojson"
                 }
         # Add Display Layer
         map_layer = {
