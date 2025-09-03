@@ -324,6 +324,12 @@ def generate_map_page(title, map_config_data, output_path, sprite_json=None):
         template = f.read()
     logger.debug(f"About to generate HTML to {output_path}: {template}.")
     
+    # Read and convert markdown help content
+    import markdown
+    with open('../documents/webmap_help.md', 'r') as f:
+        help_markdown = f.read()
+    help_html = markdown.markdown(help_markdown)
+    
     # Generate JavaScript for dynamic layers
     js_bit = ""
     if map_config_data['dynamic_layers']:
@@ -373,7 +379,8 @@ void await map.loadImage('{im_uri}',
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
-            legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2))
+            legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
+            webmap_help=help_html)
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)
