@@ -12,7 +12,7 @@
     <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
     <style>
         /* Control panel styling with transparency */
-        #controls {
+        #controls {{
             position: absolute;
             top: 20px;
             right: 20px;
@@ -22,52 +22,52 @@
             padding: 10px;
             z-index: 1000;
             font-family: Arial, sans-serif;
-        }
+        }}
         
         /* Sub-panels with less transparency */
-        .control-panel {
+        .control-panel {{
             background: rgba(255, 255, 255, 0.8);
             border-radius: 6px;
             padding: 10px;
             margin-bottom: 10px;
-        }
+        }}
         
-        .control-panel:last-child {
+        .control-panel:last-child {{
             margin-bottom: 0;
-        }
+        }}
         
         /* Title panel */
-        .title-panel {
+        .title-panel {{
             text-align: center;
-        }
+        }}
         
-        .title-panel h4 {
+        .title-panel h4 {{
             margin: 0;
             font-size: 1.2em;
             font-weight: bold;
-        }
+        }}
         
         /* View panel */
-        .view-panel label {
+        .view-panel label {{
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
-        }
+        }}
         
         /* Sharing panel */
-        .sharing-panel label {
+        .sharing-panel label {{
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
-        }
+        }}
         
         /* Navigation panel */
-        .nav-panel {
+        .nav-panel {{
             text-align: center;
-        }
+        }}
         
         /* Reuse console.css button styling */
-        .button {
+        .button {{
             background-color: #cccccc;
             border: 1px solid #999;
             padding: 5px 10px;
@@ -77,30 +77,30 @@
             text-decoration: none;
             color: inherit;
             display: inline-block;
-        }
+        }}
         
-        .button:hover {
+        .button:hover {{
             background-color: #bbbbbb;
-        }
+        }}
         
         /* Input field styling */
-        .input-field {
+        .input-field {{
             width: 100%;
             padding: 5px;
             border: 1px solid #ccc;
             border-radius: 3px;
             margin-bottom: 5px;
-        }
+        }}
         
         /* Progress bar styling */
-        #loading-progress {
+        #loading-progress {{
             margin-top: 10px;
             background: rgba(255, 255, 255, 0.9);
             border-radius: 6px;
             padding: 10px;
-        }
+        }}
         
-        .help-popup {
+        .help-popup {{
             position: fixed;
             top: 0;
             left: 0;
@@ -111,9 +111,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
-        }
+        }}
         
-        .help-content {
+        .help-content {{
             background: white;
             border-radius: 8px;
             max-width: 500px;
@@ -121,23 +121,23 @@
             max-height: 80%;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
+        }}
         
-        .help-header {
+        .help-header {{
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 20px 20px 0 20px;
             border-bottom: 1px solid #eee;
-        }
+        }}
         
-        .help-header h2 {
+        .help-header h2 {{
             margin: 0;
             color: #333;
             font-size: 1.5em;
-        }
+        }}
         
-        .close-button {
+        .close-button {{
             background: none;
             border: none;
             font-size: 24px;
@@ -149,37 +149,37 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }
+        }}
         
-        .close-button:hover {
+        .close-button:hover {{
             color: #333;
-        }
+        }}
         
-        .help-body {
+        .help-body {{
             padding: 20px;
-        }
+        }}
         
-        .help-body ul {
+        .help-body ul {{
             margin: 0;
             padding-left: 20px;
-        }
+        }}
         
-        .help-body li {
+        .help-body li {{
             margin-bottom: 10px;
             line-height: 1.4;
             color: #555;
-        }
+        }}
         
-        #help-link {
+        #help-link {{
             font-weight: bold;
             font-size: 1.2em;
             text-decoration: none;
             color: #007bff;
-        }
+        }}
         
-        #help-link:hover {
+        #help-link:hover {{
             color: #0056b3;
-        }
+        }}
     </style>
 </head>
 <body>

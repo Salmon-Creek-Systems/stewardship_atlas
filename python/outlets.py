@@ -72,16 +72,17 @@ def webmap_json(config, name, sprite_json=None):
                 'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
                 'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
-            
-            map_sources[layer_name] =  {
-                'type': 'image', 
-                'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
-                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
+            pass
+            #map_sources[layer_name] =  {
+            #    'type': 'image', 
+            #    'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
+            #    'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
                 
         else:
+            map_sources[layer_name] =  {
             'type': 'geojson',
             'data': f"../../layers/{layer_name}/{layer_name}.geojson"
-                }
+            }
         # Add Display Layer
         map_layer = {
                 'id': f"{layer_name}-layer",
