@@ -1,6 +1,9 @@
 // Initialize the map
 const map = new maplibregl.Map(MAP_CONFIG);
 
+// Add legend control
+map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
+
 // Map the mode string to the correct TerraDraw mode
 const modeMap = {
     'point': 'TerraDrawPointMode',
@@ -32,33 +35,8 @@ map.on('load', () => {
     const style = map.getStyle();
     const firstLayerId = style.layers[0].id;
 
-    // Initialize progress tracking
-    const progressBar = document.getElementById('loading-progress');
-    const progressFill = progressBar.querySelector('.progress-fill');
-    const progressText = progressBar.querySelector('.progress-text');
-    let loadedLayers = 0;
-    const totalLayers = 4; // hillshade + 3 basemaps
-
-    // Update progress
-    const updateProgress = () => {
-        loadedLayers++;
-        const percent = (loadedLayers / totalLayers) * 100;
-        progressFill.style.width = `${percent}%`;
-        progressText.textContent = `Loading layers... ${Math.round(percent)}%`;
-        
-        if (loadedLayers === totalLayers) {
-            setTimeout(() => {
-                progressBar.style.display = 'none';
-            }, 500);
-        }
-    };
-
-    // Track layer loading
-    map.on('sourcedata', (e) => {
-        if (e.isSourceLoaded) {
-            updateProgress();
-        }
-    });
+    // Initialize enhanced progress tracking
+    const updateProgress = initializeProgressTracking(map, 4); // hillshade + 3 basemaps
 
     // Add sources
     map.addSource('satellite', SATELLITE_SOURCE);
@@ -93,49 +71,110 @@ map.on('load', () => {
         }
     }, firstLayerId);
 
-    // Handle basemap switching - moved inside load event
-    document.getElementById('basemap-select').addEventListener('change', (e) => {
-        const selectedBasemap = e.target.value;
-        const layerMap = {
-            'hillshade': 'hillshade-layer',
-            'satellite': 'satellite-layer',
-            'usgs': 'usgs-layer',
-            'terrain': 'terrain-layer'
-        };
+    // Initialize basemap switching
+    initializeBasemapSwitching(map);
+
+    // Initialize help popup
+    const helpContent = `
+        <h3>Edit Layer Help</h3>
+        <ul>
+            <li><strong>Drawing:</strong> Click to start drawing, double-click to finish</li>
+            <li><strong>Reset:</strong> Click "Reset Drawing" to clear all features</li>
+            <li><strong>Upload:</strong> Use "Upload GeoJSON" to import existing features</li>
+            <li><strong>Save:</strong> Click "Save Features" when done to submit your work</li>
+            <li><strong>Location:</strong> Use the location input to navigate to specific coordinates</li>
+            <li><strong>Basemap:</strong> Switch between different map backgrounds</li>
+        </ul>
+        <h4>Supported Location Formats:</h4>
+        <ul>
+            <li>Degrees: 40°14′18″ N 123°57′39″ W</li>
+            <li>JSON: {"latitude": 37.7749, "longitude": -122.4194}</li>
+            <li>Google Maps: https://maps.google.com/...</li>
+            <li>Plain: 37.7749, -122.4194</li>
+        </ul>
+    `;
+    initializeHelpPopup(helpContent);
+
+    // Initialize location input functionality
+    const goBtn = document.getElementById('go-location-btn');
+    const locationInput = document.getElementById('location-input');
+    
+    if (goBtn && locationInput) {
+        // Function to go to location
+        function goToLocation() {
+            const input = locationInput.value.trim();
+            if (!input) {
+                showErrorPopup('Please enter a location to go to.');
+                return;
+            }
+            
+            const coords = parseDegreesFormat(input);
+            if (!coords) {
+                showErrorPopup(`Cannot parse location: "${input}"<br><br>Supported formats:<br>• Degrees: 40°14′18″ N 123°57′39″ W<br>• JSON: {"latitude": 37.7749, "longitude": -122.4194}<br>• Google Maps: https://maps.google.com/...<br>• Plain: 37.7749, -122.4194`);
+                return;
+            }
+            
+            // Validate coordinates
+            if (!validateCoordinates(coords.lat, coords.lng)) {
+                showErrorPopup(`Invalid coordinates: ${coords.lat}, ${coords.lng}<br><br>Latitude must be between -90 and 90<br>Longitude must be between -180 and 180`);
+                return;
+            }
+            
+            // Center map on the specified location
+            map.setCenter([coords.lng, coords.lat]);
+            map.setZoom(14); // Default zoom level
+            
+            // Add a marker at the location
+            const markerEl = document.createElement('div');
+            markerEl.className = 'location-marker';
+            markerEl.style.cssText = `
+                width: 20px;
+                height: 20px;
+                background-color: #ff0000;
+                border: 2px solid #ffffff;
+                border-radius: 50%;
+                cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            `;
+            
+            // Remove any existing markers
+            const existingMarkers = document.querySelectorAll('.location-marker');
+            existingMarkers.forEach(marker => marker.remove());
+            
+            // Add the new marker to the map
+            new maplibregl.Marker(markerEl)
+                .setLngLat([coords.lng, coords.lat])
+                .addTo(map);
+                
+            showSuccessNotification('Location found and map centered!');
+        }
         
-        // Hide all layers first, with error handling
-        ['hillshade-layer', 'satellite-layer', 'usgs-layer', 'terrain-layer'].forEach(layer => {
-            try {
-                if (map.getLayer(layer)) {
-                    map.setLayoutProperty(layer, 'visibility', 'none');
-                }
-            } catch (error) {
-                console.warn(`Layer ${layer} not found`);
+        goBtn.addEventListener('click', goToLocation);
+        
+        locationInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                goToLocation();
             }
         });
-        
-        // Show selected layer, with error handling
-        try {
-            const layerId = layerMap[selectedBasemap];
-            if (map.getLayer(layerId)) {
-                map.setLayoutProperty(layerId, 'visibility', 'visible');
-            }
-        } catch (error) {
-            console.warn(`Could not show selected basemap layer: ${error.message}`);
-        }
-    });
+    }
 });
 
 // Add reset button functionality
 document.getElementById('reset-button').addEventListener('click', function() {
     if (confirm('Are you sure you want to reset? This will remove all features drawn in this session.')) {
         td.clear();
+        showSuccessNotification('Drawing reset successfully!');
     }
 });
 
 // Add save button functionality
 document.getElementById('save-button').addEventListener('click', function() {
     const features = td.getSnapshot();
+    
+    if (features.length === 0) {
+        showErrorPopup('No features to save. Please draw some features first.');
+        return;
+    }
     
     // Apply control values to features
     features.forEach(feature => {
@@ -146,15 +185,11 @@ document.getElementById('save-button').addEventListener('click', function() {
         EDIT_CONFIG.controls.forEach(control => {
             const value = document.getElementById(control.name).value;
             if (control.type === 'radio') {
-		// alert("Radio control detected! " + value);
-		// feature.properties[control.name] = value;
-		const values = JSON.parse(value)
-		//alert("Parsed: " + values);
+                const values = JSON.parse(value);
                 for (const key in values) {
                     feature.properties[key] = values[key];
                 }
             } else {
-		//alert("NON-Radio control detected! " + value); 
                 feature.properties[control.name] = value;
             }
         });
@@ -163,7 +198,7 @@ document.getElementById('save-button').addEventListener('click', function() {
     const geojson = {
         "type": "FeatureCollection",
         "layer": EDIT_CONFIG.layerName,
-	"action": EDIT_CONFIG.action,
+        "action": EDIT_CONFIG.action,
         "features": features
     };
     
@@ -173,15 +208,14 @@ document.getElementById('save-button').addEventListener('click', function() {
         xmlhttp.open("POST", 'https://internal.fireatlas.org:9998/delta_upload/' + EDIT_CONFIG.swalename);
         xmlhttp.setRequestHeader("Content-Type", "application/json");
         var geojson_data = JSON.stringify({"data":geojson});
-        //alert(geojson_data);
         xmlhttp.send(geojson_data);
     }
 
     xmlhttp.onreadystatechange = function() {
         if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-            alert('upload successful!');
+            showSuccessNotification('Upload successful!');
         } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
-            alert('looks like something went wrong');
+            showErrorPopup('Upload failed. Please try again.');
         }
     }
 });
@@ -207,21 +241,20 @@ document.getElementById('upload-button').addEventListener('click', function() {
                 geojson.action = EDIT_CONFIG.action;
                 // Send to server using the same API as store button
                 var xmlhttp = new XMLHttpRequest();
-		xmlhttp.open("POST", 'https://internal.fireatlas.org:9998/delta_upload/' + EDIT_CONFIG.swalename);
-                // xmlhttp.open("POST", 'http://fireatlas.org:9998/store/' + EDIT_CONFIG.swalename);
+                xmlhttp.open("POST", 'https://internal.fireatlas.org:9998/delta_upload/' + EDIT_CONFIG.swalename);
                 xmlhttp.setRequestHeader("Content-Type", "application/json");
                 var geojson_data = JSON.stringify({"data": geojson});
                 xmlhttp.send(geojson_data);
                 
                 xmlhttp.onreadystatechange = function() {
                     if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-                        alert('Upload successful!');
+                        showSuccessNotification('Upload successful!');
                     } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
-                        alert('Error uploading file: ' + (xmlhttp.responseText || 'Unknown error'));
+                        showErrorPopup('Error uploading file: ' + (xmlhttp.responseText || 'Unknown error'));
                     }
                 }
             } catch (error) {
-                alert('Error reading file: ' + error.message);
+                showErrorPopup('Error reading file: ' + error.message);
             }
         };
         reader.readAsText(file);

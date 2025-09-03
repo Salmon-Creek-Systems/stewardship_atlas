@@ -7,37 +7,62 @@
     <script src="https://unpkg.com/terra-draw@1.0.0-beta.0/dist/terra-draw.umd.js"></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='css/map.css' rel='stylesheet' />
-    <link href='css/edit_controls.css' rel='stylesheet' />
+    <link href='css/shared_controls.css' rel='stylesheet' />
+    <link href='https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.css' rel='stylesheet' />
+    <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
 </head>
 <body>
-    <center>
-        <h1>Edit Layer: {edit_layer_name}</h1>
-        <i>Click to draw, double click to end, click "Save" button when done.</i>
-        <A HREF="../html">cancel</a>
-    </center>
     <div id="controls">
-        <div class="input-group">
-            <label>Basemap:</label><br/>
-            <select id="basemap-select" class="form-select">
+        <!-- Title Panel -->
+        <div class="control-panel title-panel">
+            <h4>Edit Layer: {edit_layer_name}</h4>
+            <i>Click to draw, double click to end, click "Save" button when done.</i>
+        </div>
+        
+        <!-- View Panel -->
+        <div class="control-panel view-panel">
+            <label>Basemap:</label>
+            <select id="basemap-select" class="input-field">
                 <option value="hillshade">Hillshade</option>
                 <option value="satellite">Satellite (ESRI)</option>
                 <option value="usgs">USGS Topo</option>
                 <option value="terrain">OpenMapTiles Terrain</option>
             </select>
-            <div id="loading-progress" class="progress-bar">
-                <div class="progress-fill"></div>
-                <div class="progress-text">Loading layers...</div>
-            </div>
         </div>
-        {controls_html}
-        <div class="button-group">
+        
+        <!-- Location Panel -->
+        <div class="control-panel sharing-panel">
+            <label>Go to location:</label>
+            <input type="text" id="location-input" class="input-field" placeholder="paste location here" style="width: calc(100% - 50px); display: inline-block;">
+            <button id="go-location-btn" class="button" style="width: 40px; margin-left: 5px; padding: 5px;">Go</button>
+        </div>
+        
+        <!-- Edit Controls Panel -->
+        <div class="control-panel">
+            {controls_html}
+        </div>
+        
+        <!-- Navigation Panel -->
+        <div class="control-panel nav-panel">
             <a href="../html/admin" class="button link-button">Home</a>
+            <a href="#" class="button link-button" id="help-link">?</a>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div id="loading-progress" class="progress-bar">
+            <div class="progress-fill"></div>
+            <div class="progress-text">Loading layers...</div>
+        </div>
+        
+        <!-- Button Group -->
+        <div class="button-group">
             <button id="reset-button" class="warning-button">Reset Drawing</button>
             <button id="upload-button" class="button">Upload GeoJSON</button>
-            <button id="save-button">Save Features</button>
+            <button id="save-button" class="button">Save Features</button>
         </div>
     </div>
     <div id="map"></div>
+    <script src="js/shared_utils.js"></script>
     <script>
         const MAP_CONFIG = {map_config};
         const EDIT_CONFIG = {{
@@ -47,6 +72,7 @@
             mode: "{mode_string}",
             controls: {controls_config}
         }};
+        const LEGEND_TARGETS = {legend_targets};
         const SATELLITE_SOURCE = {{
             'type': 'raster',
             'tiles': [

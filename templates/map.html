@@ -6,181 +6,11 @@
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <link href='css/map.css' rel='stylesheet' />
-    <link href='css/edit_controls.css' rel='stylesheet' />
+    <link href='css/shared_controls.css' rel='stylesheet' />
     <link href='css/console.css' rel='stylesheet' />
     <link href='https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.css' rel='stylesheet' />
     <script src="https://www.unpkg.com/@watergis/maplibre-gl-legend@latest/dist/maplibre-gl-legend.umd.js"></script>
-    <style>
-        /* Control panel styling with transparency */
-        #controls {{
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 300px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            padding: 10px;
-            z-index: 1000;
-            font-family: Arial, sans-serif;
-        }}
-        
-        /* Sub-panels with less transparency */
-        .control-panel {{
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px;
-        }}
-        
-        .control-panel:last-child {{
-            margin-bottom: 0;
-        }}
-        
-        /* Title panel */
-        .title-panel {{
-            text-align: center;
-        }}
-        
-        .title-panel h4 {{
-            margin: 0;
-            font-size: 1.2em;
-            font-weight: bold;
-        }}
-        
-        /* View panel */
-        .view-panel label {{
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }}
-        
-        /* Sharing panel */
-        .sharing-panel label {{
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }}
-        
-        /* Navigation panel */
-        .nav-panel {{
-            text-align: center;
-        }}
-        
-        /* Reuse console.css button styling */
-        .button {{
-            background-color: #cccccc;
-            border: 1px solid #999;
-            padding: 5px 10px;
-            margin: 2px;
-            border-radius: 3px;
-            cursor: pointer;
-            text-decoration: none;
-            color: inherit;
-            display: inline-block;
-        }}
-        
-        .button:hover {{
-            background-color: #bbbbbb;
-        }}
-        
-        /* Input field styling */
-        .input-field {{
-            width: 100%;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            margin-bottom: 5px;
-        }}
-        
-        /* Progress bar styling */
-        #loading-progress {{
-            margin-top: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 6px;
-            padding: 10px;
-        }}
-        
-        .help-popup {{
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }}
-        
-        .help-content {{
-            background: white;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80%;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }}
-        
-        .help-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 20px 0 20px;
-            border-bottom: 1px solid #eee;
-        }}
-        
-        .help-header h2 {{
-            margin: 0;
-            color: #333;
-            font-size: 1.5em;
-        }}
-        
-        .close-button {{
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }}
-        
-        .close-button:hover {{
-            color: #333;
-        }}
-        
-        .help-body {{
-            padding: 20px;
-        }}
-        
-        .help-body ul {{
-            margin: 0;
-            padding-left: 20px;
-        }}
-        
-        .help-body li {{
-            margin-bottom: 10px;
-            line-height: 1.4;
-            color: #555;
-        }}
-        
-        #help-link {{
-            font-weight: bold;
-            font-size: 1.2em;
-            text-decoration: none;
-            color: #007bff;
-        }}
-        
-        #help-link:hover {{
-            color: #0056b3;
-        }}
-    </style>
+
 </head>
 <body>
     <div id="controls">
@@ -238,6 +68,7 @@
             </div>
         </div>
     </div>
+    <script src="js/shared_utils.js"></script>
     <script type="module">
       // maplibre-gl is already loaded globally via script tag, no import needed
 
@@ -394,33 +225,8 @@
         }}
     }}
 
-    // Initialize progress tracking
-    const progressBar = document.getElementById('loading-progress');
-    const progressFill = progressBar.querySelector('.progress-fill');
-    const progressText = progressBar.querySelector('.progress-text');
-    let loadedLayers = 0;
-    const totalLayers = 4; // basemap + 3 basemaps
-
-    // Update progress
-	  const updateProgress = () => {{
-              loadedLayers++;
-        const percent = (loadedLayers / totalLayers) * 100;
-        progressFill.style.width = `${{percent}}%`;
-        progressText.textContent = `Loading layers... ${{Math.round(percent)}}%`;
-        
-              if (loadedLayers === totalLayers) {{
-		  setTimeout(() => {{
-                      progressBar.style.display = 'none';
-		  }}, 500);
-              }}
-	  }};
-
-    // Track layer loading
-	  map.on('sourcedata', (e) => {{
-              if (e.isSourceLoaded) {{
-		  updateProgress();
-              }}
-	  }});
+    // Initialize enhanced progress tracking
+    const updateProgress = initializeProgressTracking(map, 4); // basemap + 3 basemaps
 	  
 
 
@@ -458,39 +264,8 @@
         }}
     }}, firstLayerId);
     
-    // Add event listener for basemap selection
-    document.getElementById('basemap-select').addEventListener('change', (event) => {{
-        const selectedBasemap = event.target.value;
-        
-        // Hide all basemap layers first
-        const layers = map.getStyle().layers;
-        for (const layer of layers) {{
-            if (layer.id === 'basemap-layer' || 
-                layer.id === 'satellite-layer' || 
-                layer.id === 'usgs-layer' || 
-                layer.id === 'terrain-layer') {{
-                map.setLayoutProperty(layer.id, 'visibility', 'none');
-            }}
-				    }}
-										     
-        
-        // Show the selected basemap
-	switch (selectedBasemap) {{
-            case 'basemap':
-                // The default basemap is already in the style, just make it visible
-                map.setLayoutProperty('basemap-layer', 'visibility', 'visible');
-                break;
-            case 'satellite':
-                map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
-                break;
-            case 'usgs':
-                map.setLayoutProperty('usgs-layer', 'visibility', 'visible');
-                break;
-            case 'terrain':
-                map.setLayoutProperty('terrain-layer', 'visibility', 'visible');
-                break;
-        }}
-    }});
+    // Initialize basemap switching
+    initializeBasemapSwitching(map);
 
     // Set initial visibility - hide all basemaps except the default one
     map.setLayoutProperty('satellite-layer', 'visibility', 'none');
@@ -532,27 +307,7 @@
         if (navigator.clipboard && navigator.clipboard.writeText) {{
             navigator.clipboard.writeText(textToCopy).then(() => {{
                 console.log('Successfully copied to clipboard');
-                // Show a brief notification
-                const notification = document.createElement('div');
-                notification.textContent = 'Location copied to clipboard!';
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    background: #4CAF50;
-                    color: white;
-                    padding: 10px 15px;
-                    border-radius: 5px;
-                    z-index: 1000;
-                    font-family: Arial, sans-serif;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                `;
-                document.body.appendChild(notification);
-                
-                // Remove notification after 2 seconds
-                setTimeout(() => {{
-                    notification.remove();
-                }}, 2000);
+                showSuccessNotification('Location copied to clipboard!');
             }}).catch(err => {{
                 console.error('Failed to copy coordinates:', err);
                 // Fallback: show the text in an alert
@@ -683,86 +438,9 @@
         }}
     }});
     
-    // Function to parse degrees format coordinates
-    function parseDegreesFormat(input) {{
-        console.log('Parsing input:', input);
-        
-        // Try to parse degrees format: "40°14′18″ N  123°57′39″ W"
-        const degreesPattern = /(\d+)°(\d+)′(\d+)″\s*([NS])\s*(\d+)°(\d+)′(\d+)″\s*([EW])/;
-        const match = input.trim().match(degreesPattern);
-        
-        if (match) {{
-            const [, latDeg, latMin, latSec, latDir, lngDeg, lngMin, lngSec, lngDir] = match;
-            
-            // Convert to decimal degrees
-            let lat = parseInt(latDeg) + parseInt(latMin) / 60 + parseInt(latSec) / 3600;
-            let lng = parseInt(lngDeg) + parseInt(lngMin) / 60 + parseInt(lngSec) / 3600;
-            
-            // Apply direction
-            if (latDir === 'S') lat = -lat;
-            if (lngDir === 'W') lng = -lng;
-            
-            console.log('Parsed degrees format:', {{ lat, lng }});
-            return {{ lat, lng }};
-        }}
-        
-        // Try to parse JSON format
-        try {{
-            const jsonCoords = JSON.parse(input.trim());
-            if (jsonCoords.latitude && jsonCoords.longitude) {{
-                console.log('Parsed JSON format:', jsonCoords);
-                return {{ lat: jsonCoords.latitude, lng: jsonCoords.longitude }};
-            }}
-        }} catch (e) {{
-            console.log('Not JSON format');
-        }}
-        
-        // Try to parse Google Maps link
-        const googlePattern = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-        const googleMatch = input.trim().match(googlePattern);
-        if (googleMatch) {{
-            const [, lat, lng] = googleMatch;
-            console.log('Parsed Google Maps format:', {{ lat: parseFloat(lat), lng: parseFloat(lng) }});
-            return {{ lat: parseFloat(lat), lng: parseFloat(lng) }};
-        }}
-        
-        // Try to parse plain comma-separated coordinates
-        const commaPattern = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
-        const commaMatch = input.trim().match(commaPattern);
-        if (commaMatch) {{
-            const [, lat, lng] = commaMatch;
-            console.log('Parsed comma format:', {{ lat: parseFloat(lat), lng: parseFloat(lng) }});
-            return {{ lat: parseFloat(lat), lng: parseFloat(lng) }};
-        }}
-        
-        return null;
-    }}
+
     
-    // Function to show error popup
-    function showErrorPopup(message) {{
-        const popup = document.createElement('div');
-        popup.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #ff4444;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            z-index: 2000;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            max-width: 400px;
-            text-align: center;
-        `;
-        popup.innerHTML = `
-            <h3>Cannot Parse Location</h3>
-            <p>${{message}}</p>
-            <button onclick="this.parentElement.remove()" style="margin-top: 10px; padding: 5px 15px; border: none; border-radius: 4px; cursor: pointer;">OK</button>
-        `;
-        document.body.appendChild(popup);
-    }}
+
     
     // Function to go to location
     function goToLocation() {{
@@ -774,18 +452,18 @@
         
         const coords = parseDegreesFormat(input);
         if (!coords) {{
-            showErrorPopup(`Cannot parse location: "${{input}}"<br><br>Supported formats:<br>• Degrees: 40°14′18″ N 123°57′39″ W<br>• JSON: {{"latitude": 37.7749, "longitude": -122.4194}}<br>• Google Maps: https://maps.google.com/...<br>• Plain: 37.7749, -122.4194`);
+            showErrorPopup(`Cannot parse location: "${input}"<br><br>Supported formats:<br>• Degrees: 40°14′18″ N 123°57′39″ W<br>• JSON: {"latitude": 37.7749, "longitude": -122.4194}<br>• Google Maps: https://maps.google.com/...<br>• Plain: 37.7749, -122.4194`);
             return;
         }}
         
         // Validate coordinates
-        if (coords.lat < -90 || coords.lat > 90 || coords.lng < -180 || coords.lng > 180) {{
-            showErrorPopup(`Invalid coordinates: ${{coords.lat}}, ${{coords.lng}}<br><br>Latitude must be between -90 and 90<br>Longitude must be between -180 and 180`);
+        if (!validateCoordinates(coords.lat, coords.lng)) {{
+            showErrorPopup(`Invalid coordinates: ${coords.lat}, ${coords.lng}<br><br>Latitude must be between -90 and 90<br>Longitude must be between -180 and 180`);
             return;
         }}
         
         // Redirect to internal map
-        const url = `https://${{window.location.hostname}}${{window.location.pathname}}?lat=${{coords.lat}}&lng=${{coords.lng}}`;
+        const url = `https://${window.location.hostname}${window.location.pathname}?lat=${coords.lat}&lng=${coords.lng}`;
         console.log('Redirecting to:', url);
         window.location.href = url;
     }}
@@ -806,29 +484,8 @@
         }});
     }}
 
-    // Help popup functionality
-    document.getElementById('help-link').addEventListener('click', (e) => {{
-        e.preventDefault();
-        document.getElementById('help-popup').style.display = 'flex';
-    }});
-
-    document.getElementById('close-help').addEventListener('click', () => {{
-        document.getElementById('help-popup').style.display = 'none';
-    }});
-
-    // Close popup when clicking outside
-    document.getElementById('help-popup').addEventListener('click', (e) => {{
-        if (e.target.id === 'help-popup') {{
-            document.getElementById('help-popup').style.display = 'none';
-        }}
-    }});
-
-    // Close popup with Escape key
-    document.addEventListener('keydown', (e) => {{
-        if (e.key === 'Escape') {{
-            document.getElementById('help-popup').style.display = 'none';
-        }}
-    }});
+    // Initialize help popup
+    initializeHelpPopup(document.getElementById('help-popup').querySelector('.help-body').innerHTML);
 
 }}); 
 
