@@ -25,13 +25,28 @@
      "interaction": "interface"},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
      "interaction": "interface", "vector_width":true},
-    {"name": "watertanks", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,
+    {"name": "watertanks", "geometry_type": "point", "add_labels": true,
+     "color": [50, 50, 250],"fill_color": [0, 0, 250], 
      "symbol": {"png": "hydrant.png", "icon": "custom/octy"},
-     "icon-size": 0.5,
-     "interaction": "interface"},
+     "icon-size": 1.0,
+     "interaction": "interface",
+     "editable_columns" :[
+	 {
+             "name": "size",
+             "type": "radio",
+             "values": [ 
+                 {"size": "< 2.5k gals.", "capacity": 2500 },
+		 {"size": "2.5k-5k gals", "capacity": 5000},
+		 {"size": "5-10k gals", "capacity": 10000},
+		 {"size": "> 10k gals", "capacity": 20000}
+             ],
+             "default": {"size": "2.5k-5k gals", "capacity": 5000}
+	 }]
+
+     },
     {"name": "ponds", "geometry_type": "polygon", "color": [50, 50, 250],"fill_color": [0, 0, 250], "add_labels": true,
      "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"}, "symbol": {"png": "waterdrop.png", "icon": "basic/pushpin"},
-     "icon-size": 0.5,
+     "icon-size": 2.0,
      "interaction": "interface",
      "editable_columns": [
          {"name": "name", "type": "string", "default": "" },
