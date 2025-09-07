@@ -172,20 +172,38 @@ map.on('load', () => {
                 console.log('addGeometryAtLocation called');
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
-                    const feature = {
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: [coords.lng, coords.lat]
-                        },
-                        properties: {}
-                    };
-                    
-                    td.addFeatures([feature]);
-                    
-                    // Show success message and log details
-                    showSuccessNotification('Location Added To Geometry');
-                    console.log('Location pin clicked - added geometry point:', feature);
+                    // Try using TerraDraw's addFeatures method with proper format
+                    try {
+                        const feature = {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [coords.lng, coords.lat]
+                            },
+                            properties: {}
+                        };
+                        
+                        console.log('Attempting to simulate click at location:', coords);
+                        
+                        // Try simulating a click at the exact location
+                        const point = map.project([coords.lng, coords.lat]);
+                        const clickEvent = new MouseEvent('click', {
+                            clientX: point.x,
+                            clientY: point.y,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        
+                        // Dispatch the click event on the map container
+                        map.getContainer().dispatchEvent(clickEvent);
+                        
+                        // Show success message and log details
+                        showSuccessNotification('Location Added To Geometry');
+                        console.log('Location pin clicked - added geometry point:', feature);
+                    } catch (error) {
+                        console.error('Error adding feature:', error);
+                        showErrorPopup('Error adding geometry: ' + error.message);
+                    }
                 } else {
                     console.log('Not in point mode, current mode:', EDIT_CONFIG.mode);
                 }
