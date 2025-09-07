@@ -172,8 +172,9 @@ map.on('load', () => {
                 console.log('addGeometryAtLocation called');
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
-                    // Try using TerraDraw's addFeatures method with proper format
                     try {
+                        console.log('Attempting to add feature directly:', coords);
+                        
                         const feature = {
                             type: 'Feature',
                             geometry: {
@@ -183,48 +184,19 @@ map.on('load', () => {
                             properties: {}
                         };
                         
-                        console.log('Attempting to simulate click at location:', coords);
+                        console.log('Adding feature:', feature);
+                        td.addFeatures([feature]);
                         
-                        // Try simulating a click at the exact location with MapLibre properties
-                        const point = map.project([coords.lng, coords.lat]);
-                        
-                        // Create a more complete click event that mimics MapLibre's structure
-                        const originalEvent = new MouseEvent('click', {
-                            clientX: point.x,
-                            clientY: point.y,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        
-                        // Create a MapLibre-style event object
-                        const mapLibreEvent = {
-                            lngLat: { lng: coords.lng, lat: coords.lat },
-                            point: { x: point.x, y: point.y },
-                            originalEvent: originalEvent,
-                            preventDefault: () => {},
-                            stopPropagation: () => {}
-                        };
-                        
-                        // Try dispatching on the map container with the MapLibre event structure
-                        const mapContainer = map.getContainer();
-                        
-                        // Add the MapLibre properties to the original event
-                        originalEvent.lngLat = mapLibreEvent.lngLat;
-                        originalEvent.point = mapLibreEvent.point;
-                        
-                        console.log('Dispatching enhanced click event:', originalEvent);
-                        mapContainer.dispatchEvent(originalEvent);
-                        
-                        // Check what TerraDraw actually has after the click
+                        // Check what TerraDraw actually has after adding
                         setTimeout(() => {
                             const currentFeatures = td.getSnapshot();
-                            console.log('TerraDraw features after simulated click:', currentFeatures);
+                            console.log('TerraDraw features after addFeatures:', currentFeatures);
                             console.log('Number of features:', currentFeatures.length);
                         }, 100);
                         
                         // Show success message and log details
                         showSuccessNotification('Location Added To Geometry');
-                        console.log('Location pin clicked - added geometry point:', feature);
+                        console.log('Location pin clicked - feature added directly');
                     } catch (error) {
                         console.error('Error adding feature:', error);
                         showErrorPopup('Error adding geometry: ' + error.message);
