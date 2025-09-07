@@ -148,8 +148,28 @@ map.on('load', () => {
             
             // Make marker clickable to create geometry point
             console.log('Adding click listener to location marker, mode:', EDIT_CONFIG.mode);
+            
+            // Try both approaches - direct element click and MapLibre click
             markerEl.addEventListener('click', (e) => {
-                console.log('Location marker clicked!', e);
+                console.log('Direct element click!', e);
+                e.stopPropagation();
+                addGeometryAtLocation();
+            });
+            
+            markerEl.addEventListener('mousedown', (e) => {
+                console.log('Mouse down on marker!', e);
+                e.stopPropagation();
+            });
+            
+            // Also try using MapLibre's click event
+            marker.getElement().addEventListener('click', (e) => {
+                console.log('MapLibre marker click!', e);
+                e.stopPropagation();
+                addGeometryAtLocation();
+            });
+            
+            function addGeometryAtLocation() {
+                console.log('addGeometryAtLocation called');
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
                     const feature = {
@@ -169,7 +189,7 @@ map.on('load', () => {
                 } else {
                     console.log('Not in point mode, current mode:', EDIT_CONFIG.mode);
                 }
-            });
+            }
                 
             showSuccessNotification('Location found and map centered!');
         }
