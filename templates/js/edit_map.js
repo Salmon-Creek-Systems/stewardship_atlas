@@ -150,14 +150,20 @@ map.on('load', () => {
             markerEl.addEventListener('click', () => {
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
-                    td.addFeatures([{
+                    const feature = {
                         type: 'Feature',
                         geometry: {
                             type: 'Point',
                             coordinates: [coords.lng, coords.lat]
                         },
                         properties: {}
-                    }]);
+                    };
+                    
+                    td.addFeatures([feature]);
+                    
+                    // Show success message and log details
+                    showSuccessNotification('Location Added To Geometry');
+                    console.log('Location pin clicked - added geometry point:', feature);
                 }
             });
                 
