@@ -166,7 +166,7 @@ map.on('load', async () => {
     map.setLayoutProperty('terrain-layer', 'visibility', 'none');
     // The default basemap should already be visible from the style
     // layers we need to load dynamically follow:
-    {dynamic_layers}
+    // {dynamic_layers}
 
     // Add Alt+Click handler to copy coordinates to clipboard
     map.on('click', (e) => {

@@ -625,9 +625,14 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
 def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
     
-    # Generate base map configuration
-    map_config = webmap_json(config, name, None)
     webedit_dir = versioning.atlas_path(config, "outlets") / name
+    webedit_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate sprite file first if needed
+    sprite_json = generate_sprite_from_layers(config, webedit_dir)
+    
+    # Generate base map configuration with sprite
+    map_config = webmap_json(config, name, sprite_json)
 
     subprocess.run(['cp', '-r', '../templates/css/', webedit_dir ])
     subprocess.run(['cp', '-r', '../templates/js/', webedit_dir ])
