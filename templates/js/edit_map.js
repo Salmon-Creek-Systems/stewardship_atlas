@@ -147,7 +147,9 @@ map.on('load', () => {
                 .addTo(map);
             
             // Make marker clickable to create geometry point
-            markerEl.addEventListener('click', () => {
+            console.log('Adding click listener to location marker, mode:', EDIT_CONFIG.mode);
+            markerEl.addEventListener('click', (e) => {
+                console.log('Location marker clicked!', e);
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
                     const feature = {
@@ -164,6 +166,8 @@ map.on('load', () => {
                     // Show success message and log details
                     showSuccessNotification('Location Added To Geometry');
                     console.log('Location pin clicked - added geometry point:', feature);
+                } else {
+                    console.log('Not in point mode, current mode:', EDIT_CONFIG.mode);
                 }
             });
                 
