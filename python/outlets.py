@@ -581,7 +581,16 @@ def generate_edit_controls_html(editable_attributes):
                 # {str_value} {value[ edit_att['name'] ] }
             select_html += "</select></div>"
             
-    return select_html + string_html
+    # Add drawing action buttons at the bottom of the editing controls
+    buttons_html = """
+        <div class="button-group">
+            <button id="reset-button" class="warning-button">Reset Drawing</button>
+            <button id="upload-button" class="button">Upload GeoJSON</button>
+            <button id="save-button" class="button">Save Features</button>
+        </div>
+    """
+    
+    return select_html + string_html + buttons_html
 
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
