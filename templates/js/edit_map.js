@@ -185,17 +185,42 @@ map.on('load', () => {
                         
                         console.log('Attempting to simulate click at location:', coords);
                         
-                        // Try simulating a click at the exact location
+                        // Try simulating a click at the exact location with MapLibre properties
                         const point = map.project([coords.lng, coords.lat]);
-                        const clickEvent = new MouseEvent('click', {
+                        
+                        // Create a more complete click event that mimics MapLibre's structure
+                        const originalEvent = new MouseEvent('click', {
                             clientX: point.x,
                             clientY: point.y,
                             bubbles: true,
                             cancelable: true
                         });
                         
-                        // Dispatch the click event on the map container
-                        map.getContainer().dispatchEvent(clickEvent);
+                        // Create a MapLibre-style event object
+                        const mapLibreEvent = {
+                            lngLat: { lng: coords.lng, lat: coords.lat },
+                            point: { x: point.x, y: point.y },
+                            originalEvent: originalEvent,
+                            preventDefault: () => {},
+                            stopPropagation: () => {}
+                        };
+                        
+                        // Try dispatching on the map container with the MapLibre event structure
+                        const mapContainer = map.getContainer();
+                        
+                        // Add the MapLibre properties to the original event
+                        originalEvent.lngLat = mapLibreEvent.lngLat;
+                        originalEvent.point = mapLibreEvent.point;
+                        
+                        console.log('Dispatching enhanced click event:', originalEvent);
+                        mapContainer.dispatchEvent(originalEvent);
+                        
+                        // Check what TerraDraw actually has after the click
+                        setTimeout(() => {
+                            const currentFeatures = td.getSnapshot();
+                            console.log('TerraDraw features after simulated click:', currentFeatures);
+                            console.log('Number of features:', currentFeatures.length);
+                        }, 100);
                         
                         // Show success message and log details
                         showSuccessNotification('Location Added To Geometry');
