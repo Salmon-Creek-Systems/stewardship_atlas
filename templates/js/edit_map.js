@@ -181,7 +181,8 @@ map.on('load', () => {
                                 type: 'Point',
                                 coordinates: [coords.lng, coords.lat]
                             },
-                            properties: {}
+                            properties: {},
+                            id: 'location-pin-point'
                         };
                         
                         console.log('Adding feature:', feature);
