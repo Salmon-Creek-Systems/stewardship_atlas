@@ -142,9 +142,24 @@ map.on('load', () => {
             existingMarkers.forEach(marker => marker.remove());
             
             // Add the new marker to the map
-            new maplibregl.Marker(markerEl)
+            const marker = new maplibregl.Marker(markerEl)
                 .setLngLat([coords.lng, coords.lat])
                 .addTo(map);
+            
+            // Make marker clickable to create geometry point
+            markerEl.addEventListener('click', () => {
+                // Only create geometry if we're in point mode
+                if (EDIT_CONFIG.mode === 'point') {
+                    td.addFeatures([{
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [coords.lng, coords.lat]
+                        },
+                        properties: {}
+                    }]);
+                }
+            });
                 
             showSuccessNotification('Location found and map centered!');
         }
