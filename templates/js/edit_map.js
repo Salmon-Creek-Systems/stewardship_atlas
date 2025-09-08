@@ -195,15 +195,22 @@ map.on('load', () => {
                         console.log('TerraDraw modes:', td._modes);
                         console.log('TerraDraw current mode:', td._mode);
                         
-                        // Try to access the current mode's validator and idStrategy
-                        if (td._modes) {
-                            const currentMode = td._modes.find(mode => mode.name === td.getMode());
-                            if (currentMode) {
-                                console.log('Current mode object:', currentMode);
-                                console.log('Mode validator:', currentMode.validator);
-                                console.log('Mode idStrategy:', currentMode.idStrategy);
-                            }
+                        // Access the current mode's validator and idStrategy
+                        const currentMode = td._modes[td.getMode()];
+                        if (currentMode) {
+                            console.log('Current mode object:', currentMode);
+                            console.log('Mode validator:', currentMode.validate);
+                            console.log('Mode idStrategy:', currentMode.idStrategy);
+                            
+                            // Test the idStrategy functions
+                            console.log('Testing idStrategy.getId():', currentMode.idStrategy.getId());
+                            console.log('Testing idStrategy.isValidId("location-pin-point"):', currentMode.idStrategy.isValidId("location-pin-point"));
                         }
+                        
+                        // Also check the store's idStrategy
+                        console.log('Store idStrategy:', td._store.idStrategy);
+                        console.log('Store idStrategy.getId():', td._store.idStrategy.getId());
+                        console.log('Store idStrategy.isValidId("location-pin-point"):', td._store.idStrategy.isValidId("location-pin-point"));
                         
                         td.addFeatures([feature]);
                         
