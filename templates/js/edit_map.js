@@ -173,52 +173,17 @@ map.on('load', () => {
                 // Only create geometry if we're in point mode
                 if (EDIT_CONFIG.mode === 'point') {
                     try {
-                        console.log('Attempting to add feature directly:', coords);
-                        
-                        // Generate a proper ID using TerraDraw's method
-                        const properId = td._store.idStrategy.getId();
-                        
                         const feature = {
                             type: 'Feature',
                             geometry: {
                                 type: 'Point',
                                 coordinates: [coords.lng, coords.lat]
                             },
-                            properties: {},
-                            id: properId
+                            properties: {
+                                mode: 'point'
+                            },
+                            id: td._store.idStrategy.getId()
                         };
-                        
-                        console.log('Adding feature:', feature);
-                        console.log('Current TerraDraw mode:', td.getMode());
-                        console.log('EDIT_CONFIG.mode:', EDIT_CONFIG.mode);
-                        
-                        // Interrogate TerraDraw's internal state
-                        console.log('TerraDraw object keys:', Object.keys(td));
-                        console.log('TerraDraw store:', td._store);
-                        console.log('TerraDraw modes:', td._modes);
-                        console.log('TerraDraw current mode:', td._mode);
-                        
-                        // Access the current mode's validator and idStrategy
-                        const currentMode = td._modes[td.getMode()];
-                        if (currentMode) {
-                            console.log('Current mode object:', currentMode);
-                            console.log('Mode validator:', currentMode.validate);
-                            console.log('Mode idStrategy:', currentMode.idStrategy);
-                        }
-                        
-                        // Check the store's idStrategy (this is what's actually being used)
-                        console.log('Store idStrategy:', td._store.idStrategy);
-                        if (td._store.idStrategy) {
-                            console.log('Store idStrategy.getId():', td._store.idStrategy.getId());
-                            console.log('Store idStrategy.isValidId("location-pin-point"):', td._store.idStrategy.isValidId("location-pin-point"));
-                            
-                            // Generate a proper ID using TerraDraw's method
-                            const properId = td._store.idStrategy.getId();
-                            console.log('Generated proper ID:', properId);
-                            
-                            // Test if this ID is valid
-                            console.log('Is generated ID valid?', td._store.idStrategy.isValidId(properId));
-                        }
                         
                         td.addFeatures([feature]);
                         
