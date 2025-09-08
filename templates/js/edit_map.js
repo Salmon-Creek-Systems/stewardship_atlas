@@ -191,15 +191,18 @@ map.on('load', () => {
                         
                         // Interrogate TerraDraw's internal state
                         console.log('TerraDraw object keys:', Object.keys(td));
-                        console.log('TerraDraw store:', td.store);
-                        console.log('TerraDraw modes:', td.modes);
+                        console.log('TerraDraw store:', td._store);
+                        console.log('TerraDraw modes:', td._modes);
+                        console.log('TerraDraw current mode:', td._mode);
                         
                         // Try to access the current mode's validator and idStrategy
-                        const currentMode = td.modes.find(mode => mode.name === td.getMode());
-                        if (currentMode) {
-                            console.log('Current mode object:', currentMode);
-                            console.log('Mode validator:', currentMode.validator);
-                            console.log('Mode idStrategy:', currentMode.idStrategy);
+                        if (td._modes) {
+                            const currentMode = td._modes.find(mode => mode.name === td.getMode());
+                            if (currentMode) {
+                                console.log('Current mode object:', currentMode);
+                                console.log('Mode validator:', currentMode.validator);
+                                console.log('Mode idStrategy:', currentMode.idStrategy);
+                            }
                         }
                         
                         td.addFeatures([feature]);
