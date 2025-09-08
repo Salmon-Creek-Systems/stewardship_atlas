@@ -199,9 +199,9 @@ map.on('load', () => {
                             const originalMode = td.getMode();
                             console.log('Original mode:', originalMode);
                             
-                            // Try switching to point mode explicitly
-                            td.setMode('TerraDrawPointMode');
-                            console.log('Switched to TerraDrawPointMode');
+                            // Try switching to point mode explicitly (use the actual mode name)
+                            td.setMode('point');
+                            console.log('Switched to point mode');
                             
                             try {
                                 td.addFeatures([feature]);
@@ -209,9 +209,18 @@ map.on('load', () => {
                             } catch (modeError) {
                                 console.error('Still failed with mode switch:', modeError);
                                 
-                                // Try without id field
+                                // Try without id field and with different structure
                                 const featureNoId = {
                                     type: 'Feature',
+                                    geometry: {
+                                        type: 'Point',
+                                        coordinates: [coords.lng, coords.lat]
+                                    },
+                                    properties: {}
+                                };
+                                
+                                // Also try a completely different approach - maybe TerraDraw expects a different format
+                                const simpleFeature = {
                                     geometry: {
                                         type: 'Point',
                                         coordinates: [coords.lng, coords.lat]
@@ -224,6 +233,14 @@ map.on('load', () => {
                                     console.log('Success without id field');
                                 } catch (noIdError) {
                                     console.error('Failed even without id:', noIdError);
+                                    
+                                    // Try the simplified format
+                                    try {
+                                        td.addFeatures([simpleFeature]);
+                                        console.log('Success with simplified format');
+                                    } catch (simpleError) {
+                                        console.error('Failed with simplified format:', simpleError);
+                                    }
                                 }
                             }
                         }
