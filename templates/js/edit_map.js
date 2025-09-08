@@ -186,7 +186,47 @@ map.on('load', () => {
                         };
                         
                         console.log('Adding feature:', feature);
-                        td.addFeatures([feature]);
+                        console.log('Current TerraDraw mode:', td.getMode());
+                        console.log('EDIT_CONFIG.mode:', EDIT_CONFIG.mode);
+                        
+                        // Try different approaches to add the feature
+                        try {
+                            td.addFeatures([feature]);
+                        } catch (addError) {
+                            console.error('addFeatures failed:', addError);
+                            
+                            // Try alternative approach - maybe we need to be in a specific mode
+                            const originalMode = td.getMode();
+                            console.log('Original mode:', originalMode);
+                            
+                            // Try switching to point mode explicitly
+                            td.setMode('TerraDrawPointMode');
+                            console.log('Switched to TerraDrawPointMode');
+                            
+                            try {
+                                td.addFeatures([feature]);
+                                console.log('Success with explicit mode switch');
+                            } catch (modeError) {
+                                console.error('Still failed with mode switch:', modeError);
+                                
+                                // Try without id field
+                                const featureNoId = {
+                                    type: 'Feature',
+                                    geometry: {
+                                        type: 'Point',
+                                        coordinates: [coords.lng, coords.lat]
+                                    },
+                                    properties: {}
+                                };
+                                
+                                try {
+                                    td.addFeatures([featureNoId]);
+                                    console.log('Success without id field');
+                                } catch (noIdError) {
+                                    console.error('Failed even without id:', noIdError);
+                                }
+                            }
+                        }
                         
                         // Check what TerraDraw actually has after adding
                         setTimeout(() => {
