@@ -27,7 +27,7 @@
      "interaction": "interface", "vector_width":true},
     {"name": "watertanks", "geometry_type": "point", "add_labels": true,
      "color": [50, 50, 250],"fill_color": [0, 0, 250], 
-     "symbol": {"png": "hydrant.png", "icon": "custom/octy"},
+     "symbol": {"png": "watertank.png", "icon": "custom/octy"},
      "icon-size": 1.0,
      "interaction": "interface",
      "editable_columns" :[
