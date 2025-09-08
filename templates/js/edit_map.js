@@ -175,6 +175,9 @@ map.on('load', () => {
                     try {
                         console.log('Attempting to add feature directly:', coords);
                         
+                        // Generate a proper ID using TerraDraw's method
+                        const properId = td._store.idStrategy.getId();
+                        
                         const feature = {
                             type: 'Feature',
                             geometry: {
@@ -182,7 +185,7 @@ map.on('load', () => {
                                 coordinates: [coords.lng, coords.lat]
                             },
                             properties: {},
-                            id: 'location-pin-point'
+                            id: properId
                         };
                         
                         console.log('Adding feature:', feature);
