@@ -189,61 +189,20 @@ map.on('load', () => {
                         console.log('Current TerraDraw mode:', td.getMode());
                         console.log('EDIT_CONFIG.mode:', EDIT_CONFIG.mode);
                         
-                        // Try different approaches to add the feature
-                        try {
-                            td.addFeatures([feature]);
-                        } catch (addError) {
-                            console.error('addFeatures failed:', addError);
-                            
-                            // Try alternative approach - maybe we need to be in a specific mode
-                            const originalMode = td.getMode();
-                            console.log('Original mode:', originalMode);
-                            
-                            // Try switching to point mode explicitly (use the actual mode name)
-                            td.setMode('point');
-                            console.log('Switched to point mode');
-                            
-                            try {
-                                td.addFeatures([feature]);
-                                console.log('Success with explicit mode switch');
-                            } catch (modeError) {
-                                console.error('Still failed with mode switch:', modeError);
-                                
-                                // Try without id field and with different structure
-                                const featureNoId = {
-                                    type: 'Feature',
-                                    geometry: {
-                                        type: 'Point',
-                                        coordinates: [coords.lng, coords.lat]
-                                    },
-                                    properties: {}
-                                };
-                                
-                                // Also try a completely different approach - maybe TerraDraw expects a different format
-                                const simpleFeature = {
-                                    geometry: {
-                                        type: 'Point',
-                                        coordinates: [coords.lng, coords.lat]
-                                    },
-                                    properties: {}
-                                };
-                                
-                                try {
-                                    td.addFeatures([featureNoId]);
-                                    console.log('Success without id field');
-                                } catch (noIdError) {
-                                    console.error('Failed even without id:', noIdError);
-                                    
-                                    // Try the simplified format
-                                    try {
-                                        td.addFeatures([simpleFeature]);
-                                        console.log('Success with simplified format');
-                                    } catch (simpleError) {
-                                        console.error('Failed with simplified format:', simpleError);
-                                    }
-                                }
-                            }
+                        // Interrogate TerraDraw's internal state
+                        console.log('TerraDraw object keys:', Object.keys(td));
+                        console.log('TerraDraw store:', td.store);
+                        console.log('TerraDraw modes:', td.modes);
+                        
+                        // Try to access the current mode's validator and idStrategy
+                        const currentMode = td.modes.find(mode => mode.name === td.getMode());
+                        if (currentMode) {
+                            console.log('Current mode object:', currentMode);
+                            console.log('Mode validator:', currentMode.validator);
+                            console.log('Mode idStrategy:', currentMode.idStrategy);
                         }
+                        
+                        td.addFeatures([feature]);
                         
                         // Check what TerraDraw actually has after adding
                         setTimeout(() => {
