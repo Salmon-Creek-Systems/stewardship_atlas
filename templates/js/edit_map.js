@@ -201,16 +201,21 @@ map.on('load', () => {
                             console.log('Current mode object:', currentMode);
                             console.log('Mode validator:', currentMode.validate);
                             console.log('Mode idStrategy:', currentMode.idStrategy);
-                            
-                            // Test the idStrategy functions
-                            console.log('Testing idStrategy.getId():', currentMode.idStrategy.getId());
-                            console.log('Testing idStrategy.isValidId("location-pin-point"):', currentMode.idStrategy.isValidId("location-pin-point"));
                         }
                         
-                        // Also check the store's idStrategy
+                        // Check the store's idStrategy (this is what's actually being used)
                         console.log('Store idStrategy:', td._store.idStrategy);
-                        console.log('Store idStrategy.getId():', td._store.idStrategy.getId());
-                        console.log('Store idStrategy.isValidId("location-pin-point"):', td._store.idStrategy.isValidId("location-pin-point"));
+                        if (td._store.idStrategy) {
+                            console.log('Store idStrategy.getId():', td._store.idStrategy.getId());
+                            console.log('Store idStrategy.isValidId("location-pin-point"):', td._store.idStrategy.isValidId("location-pin-point"));
+                            
+                            // Generate a proper ID using TerraDraw's method
+                            const properId = td._store.idStrategy.getId();
+                            console.log('Generated proper ID:', properId);
+                            
+                            // Test if this ID is valid
+                            console.log('Is generated ID valid?', td._store.idStrategy.isValidId(properId));
+                        }
                         
                         td.addFeatures([feature]);
                         
