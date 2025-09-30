@@ -30,6 +30,20 @@ def new_version():
 def asset():
     pass
 
+
+def clear_vector_layer(config, name, delta_queue_builder=DQB):
+    """
+    Rebuild the layer in the dataswale from the current state of the Delta Queue.
+    """
+    layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
+    with versioning.atlas_file(layer_path, mode="wt") as outfile:
+            geojson.dump(FeatureCollection(features=[]), outfile)
+
+    # refresh_vector_layer(config, name, delta_queue_builder)
+    # refresh_raster_layer(config, name, delta_queue_builder)
+    # refresh_document_layer(config, name, delta_queue_builder)
+
+
 def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     """
     Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.

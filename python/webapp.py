@@ -110,6 +110,19 @@ async def import_gsheet(swalename: str, layer_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/clear_layer/{swalename}/{layer_name}")
+async def clear_layer(swalename: str, layer_name: str):
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        dataswale_geojson.clear_vector_layer(ac, layer_name)
+        return {
+            "status": "success",
+            "message": f"Layer cleared successfully",
+            "layer_name": layer_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     try:
