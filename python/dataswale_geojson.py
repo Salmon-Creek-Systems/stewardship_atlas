@@ -37,7 +37,7 @@ def clear_vector_layer(config, name, delta_queue_builder=DQB):
     """
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
     with versioning.atlas_file(layer_path, mode="wt") as outfile:
-            geojson.dump(FeatureCollection(features=[]), outfile)
+            geojson.dump(geojson.FeatureCollection(features=[]), outfile)
 
     # refresh_vector_layer(config, name, delta_queue_builder)
     # refresh_raster_layer(config, name, delta_queue_builder)
