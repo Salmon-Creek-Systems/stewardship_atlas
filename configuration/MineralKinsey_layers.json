@@ -24,7 +24,7 @@
     
     {"name": "internal_roads", "geometry_type": "linestring", "color": [255, 155, 50],
      "add_labels": true, "access": [ "admin"], "vector_width":true},
-    {"name": "burns_index", "geometry_type": "polygon", "color": [0,0,0], "fill_color": [200, 55, 55], "fill_opacity": 0.6, "add_labels": true, "access": ["internal", "public", "admin"]},
+    {"name": "burns_index", "geometry_type": "polygon", "color": [0,0,0], "fill_color": [200, 55, 55], "fill_opacity": ["get", "haul_normalized"], "add_labels": true, "access": ["internal", "public", "admin"]},
     {"name": "creeks_index", "geometry_type": "polygon", "color": [50, 55, 255], "fill_color": [50, 55, 255], "fill_opacity": 0.3,"add_labels": false, "access": ["internal", "public", "admin"]},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
      "interaction": "interface", "vector_width":true},

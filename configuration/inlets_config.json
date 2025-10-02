@@ -599,24 +599,26 @@
 	"geometry": "dataswale",
 	"alterations": {
 	    "canonicalize": [
-		{
-		    "to": "name",
-		    "from": [
-			"gnis_name"
-		    ],
-		    "remove_prefix": []
-		}
-	    ],
-	    "vector_width": {
-		"attribute": "fcode_description",
-		"map": {
-		    "Stream/River: Hydrographic Category = Ephemeral": 2,
-		    "Stream/River: Hydrographic Category = Perennial": 3,
-		    "Stream/River: Hydrographic Category = Intermittent": 1,
-		    "Artificial Path": 1
-		},
-		"default": 1
-	    }
+			{
+				"to": "name",
+				"from": [
+				"gnis_name"
+				],
+				"remove_prefix": []
+			}],
+		"vector_width": {
+			"attribute": "fcode_description",
+			"map": {
+				"Stream/River: Hydrographic Category = Ephemeral": 2,
+				"Stream/River: Hydrographic Category = Perennial": 3,
+				"Stream/River: Hydrographic Category = Intermittent": 1,
+				"Artificial Path": 1
+			},
+			"default": 1
+			},
+			"filter": [
+				["require", "fcode_description", ["Stream/River: Hydrographic Category = Perennial"]]
+			]
 	},
 	"attribution": {
 	    "url": "https://www.usgs.gov/nhd",

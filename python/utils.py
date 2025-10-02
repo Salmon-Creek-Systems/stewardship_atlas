@@ -127,6 +127,9 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
     with open(json_path, 'r') as f:
         data = json.load(f)
     
+    # Handle feature filtering - collect features to keep
+    filtered_features = []
+    
     for feature in data['features']:
         # Handle property canonicalization
         if 'canonicalize' in alt_conf:
@@ -165,6 +168,34 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
                 feature['properties']['vector_width'] = width
             else:
                 feature['properties']['vector_width'] = width_conf['default']
+        
+        # Handle feature filtering
+        if 'filter' in alt_conf:
+            keep_feature = True
+            
+            for filter_rule in alt_conf['filter']:
+                operation, field_name, value_list = filter_rule
+                field_value = feature['properties'].get(field_name)
+                
+                if operation == 'require':
+                    # Keep feature only if field_value is in value_list
+                    if field_value not in value_list:
+                        keep_feature = False
+                        break
+                elif operation == 'remove':
+                    # Remove feature if field_value is in value_list
+                    if field_value in value_list:
+                        keep_feature = False
+                        break
+            
+            if keep_feature:
+                filtered_features.append(feature)
+        else:
+            # No filtering, keep all features
+            filtered_features.append(feature)
+    
+    # Update features list
+    data['features'] = filtered_features
     
     with open(json_path, 'w') as f:
         json.dump(data, f)
