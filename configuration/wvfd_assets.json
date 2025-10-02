@@ -51,7 +51,10 @@
 "public_creeks" : {
         "type": "inlet",
         "out_layer": "creeks",
-        "config_def": "nhd_creeks"
+        "config_def": "nhd_creeks",
+        "filter": [
+            ["require", "fcode_description", ["Stream/River: Hydrographic Category = Perennial"]]
+        ]
     },
     "local_hillshade" : {
         "type": "inlet",

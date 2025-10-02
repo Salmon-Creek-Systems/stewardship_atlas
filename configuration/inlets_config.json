@@ -617,7 +617,7 @@
 			"default": 1
 			},
 			"filter": [
-				["require", "fcode_description", ["Stream/River: Hydrographic Category = Perennial"]]
+				["remove", "fcode_description", []]
 			]
 	},
 	"attribution": {

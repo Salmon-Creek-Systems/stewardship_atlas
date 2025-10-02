@@ -135,7 +135,13 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     inlets_config = json.load(open("../configuration/inlets_config.json"))
     for asset_name, asset in config['assets'].items():
         if 'config_def' in asset:
-            asset['config'] = inlets_config[asset['config_def']]
+            # Start with the base config from inlets_config
+            asset['config'] = inlets_config[asset['config_def']].copy()
+            
+            # Apply overrides from asset config (except config_def)
+            for key, value in asset.items():
+                if key != 'config_def':
+                    asset['config'][key] = value
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
             if asset.get('access',['public']).count('public') == 0:
