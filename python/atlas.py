@@ -154,7 +154,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             
             # Apply overrides from asset config (except config_def)
             for key, value in asset.items():
-                if key != 'config_def':
+                if key != 'config':
                     asset['config'][key] = value
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
@@ -179,7 +179,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         
         # Apply overrides from layer config (except config_def)
         for key, value in layer.items():
-            if key != 'config_def':
+            if key != 'config':
                 layer_config[key] = value
         
         processed_layers.append(layer_config)
