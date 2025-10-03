@@ -132,11 +132,19 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
 
     config['spreadsheets'] = {}
     
+    # Load all config files
     inlets_config = json.load(open("../configuration/inlets_config.json"))
+    eddies_config = json.load(open("../configuration/default_eddies.json"))
+    outlets_config = json.load(open("../configuration/default_outlets.json"))
+    default_layers_config = json.load(open("../configuration/default_layers.json"))
+    
+    # Combine all configs into one lookup
+    all_configs = {**inlets_config, **eddies_config, **outlets_config}
+    
     for asset_name, asset in config['assets'].items():
         if 'config_def' in asset:
-            # Start with the base config from inlets_config
-            asset['config'] = inlets_config[asset['config_def']].copy()
+            # Start with the base config from appropriate config file
+            asset['config'] = all_configs[asset['config_def']].copy()
             
             # Apply overrides from asset config (except config_def)
             for key, value in asset.items():
@@ -152,7 +160,28 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             if asset.get('access',['public']).count('public') == 0:
                 # add htpasswrd to new directory
                 add_htpasswds(config,p / 'staging' / 'outlets' / asset_name, asset['access'])
+    
+    # Process layers with config_def support
+    processed_layers = []
     for layer in layers:
+        if 'config_def' in layer:
+            # Start with the base config from default_layers.json
+            layer_config = default_layers_config[layer['config_def']].copy()
+        else:
+            # Backward compatibility: start with empty config
+            layer_config = {}
+        
+        # Apply overrides from layer config (except config_def)
+        for key, value in layer.items():
+            if key != 'config_def':
+                layer_config[key] = value
+        
+        processed_layers.append(layer_config)
+    
+    # Update the layers in config
+    config['dataswale']['layers'] = processed_layers
+    
+    for layer in processed_layers:
         (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
         if layer.get('access',['public']).count('public') == 0:
             # add htpasswrd to new directory
