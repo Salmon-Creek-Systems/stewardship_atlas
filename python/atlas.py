@@ -177,15 +177,15 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
                 layer_config[key] = value
         
         processed_layers.append(layer_config)
+        
+        # Create directories for each layer
+        (p / 'staging' / 'layers' / layer_config['name']).mkdir(parents=True, exist_ok=True)
+        if layer_config.get('access',['public']).count('public') == 0:
+            # add htpasswrd to new directory
+            add_htpasswds(config, p / 'staging' / 'layers' / layer_config['name'], layer_config['access'])
     
     # Update the layers in config
     config['dataswale']['layers'] = processed_layers
-    
-    for layer in processed_layers:
-        (p / 'staging' / 'layers' / layer['name']).mkdir(parents=True, exist_ok=True)
-        if layer.get('access',['public']).count('public') == 0:
-            # add htpasswrd to new directory
-            add_htpasswds(config, p / 'staging' / 'layers' / layer['name'], layer['access'])
 
     if (p /'staging' / 'layers' / 'regions').exists():
         if feature_collection:
