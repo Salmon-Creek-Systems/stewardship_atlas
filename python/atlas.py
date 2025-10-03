@@ -147,7 +147,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     # Combine all configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}
     
-    for asset_name, asset in config['assets'].items():
+    for asset_name, asset in assets.items():
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
             asset['config'] = copy.deepcopy(all_configs[asset['config_def']])
