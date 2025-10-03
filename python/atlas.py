@@ -13,6 +13,7 @@ import json
 import os
 import logging
 import shutil
+import copy
 from datetime import datetime
 from pathlib import Path
 
@@ -144,7 +145,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     for asset_name, asset in config['assets'].items():
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
-            asset['config'] = all_configs[asset['config_def']].copy()
+            asset['config'] = copy.deepcopy(all_configs[asset['config_def']])
             
             # Apply overrides from asset config (except config_def)
             for key, value in asset.items():
@@ -166,7 +167,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     for layer in layers:
         if 'config_def' in layer:
             # Start with the base config from default_layers.json
-            layer_config = default_layers_config[layer['config_def']].copy()
+            layer_config = copy.deepcopy(default_layers_config[layer['config_def']])
         else:
             # Backward compatibility: start with empty config
             layer_config = {}
