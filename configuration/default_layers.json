@@ -1,0 +1,230 @@
+{
+    "regions": {
+        "geometry_type": "polygon",
+        "color": [50, 50, 50],
+        "interaction": "interface",
+        "access": ["admin"],
+        "editable_columns": [
+            {
+                "name": "name",
+                "type": "string",
+                "default": "region" 
+            },
+            {
+                "name": "desription",
+                "type": "string",
+                "default": "region"
+            },
+            {
+                "name": "page",
+                "type":     "string",
+                "default": "    region"
+            }]
+    },
+    "elevation": {
+        "geometry_type": "raster"
+    },
+    "contours": {
+        "geometry_type": "linestring",
+        "color": [240, 255, 240],
+        "constant_width": 4,
+        "vis": {
+            "minzoom": 14,
+            "maxzoom": 22
+        }
+    },
+    "basemap": {
+        "geometry_type": "raster"
+    },
+    "lidar_basemap": {
+        "geometry_type": "raster"
+    },
+    "roads": {
+        "geometry_type": "linestring",
+        "color": [20, 20, 20],
+        "add_labels": true,
+        "interaction": "interface",
+        "vector_width": true,
+        "editable_columns": [
+            {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+            },
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                    {"STREETTYPE": "RD", "vector_width": 15},
+                    {"STREETTYPE": "ST", "vector_width": 10},
+                    {"STREETTYPE": "Other", "vector_width": 5}
+                ],
+                "default": {"STREETTYPE": "ST", "vector_width": 10}
+            }
+        ]
+    },
+    "internal_roads": {
+        "geometry_type": "linestring",
+        "color": [255, 155, 50],
+        "add_labels": true,
+        "access": ["admin"],
+        "vector_width": true
+    },
+    "creeks": {
+        "geometry_type": "linestring",
+        "add_labels": true,
+        "color": [50, 50, 200],
+        "interaction": "interface",
+        "vector_width": true
+    },
+    "hydrants": {
+        "geometry_type": "point",
+        "color": [0, 0, 255],
+        "add_labels": true,
+        "symbol": {"png": "hydrant.png", "icon": "extra/half-circle"},
+        "icon-size": 1.0,
+        "interaction": "interface"
+    },
+    "watertanks": {
+        "geometry_type": "point",
+        "add_labels": true,
+        "color": [50, 50, 250],
+        "fill_color": [0, 0, 250],
+        "symbol": {"png": "watertank.png", "icon": "custom/octy"},
+        "icon-size": 1.0,
+        "interaction": "interface",
+        "editable_columns": [
+            {
+                "name": "size",
+                "type": "radio",
+                "values": [
+                    {"size": "< 2.5k gals.", "capacity": 2500},
+                    {"size": "2.5k-5k gals", "capacity": 5000},
+                    {"size": "5-10k gals", "capacity": 10000},
+                    {"size": "> 10k gals", "capacity": 20000}
+                ],
+                "default": {"size": "2.5k-5k gals", "capacity": 5000}
+            }
+        ]
+    },
+    "ponds": {
+        "geometry_type": "polygon",
+        "color": [50, 50, 250],
+        "fill_color": [0, 0, 250],
+        "add_labels": true,
+        "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"},
+        "symbol": {"png": "waterdrop.png", "icon": "basic/pushpin"},
+        "icon-size": 2.0,
+        "interaction": "interface",
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": ""},
+            {
+                "name": "accessible",
+                "type": "radio",
+                "values": [
+                    {"accessible": "yes"},
+                    {"accessible": "no"}
+                ],
+                "default": {"accessible": "no"}
+            },
+            {
+                "name": "size",
+                "type": "radio",
+                "values": [
+                    {"size": "> 500k gals.", "capacity": 500},
+                    {"size": "100k-500k gals", "capacity": 100},
+                    {"size": "10k-100k gals", "capacity": 10},
+                    {"size": "< 10k gals", "capacity": 0}
+                ],
+                "default": {"size": "10k-100k gals", "capacity": 10}
+            }
+        ]
+    },
+    "buildings": {
+        "geometry_type": "polygon",
+        "color": [240, 0, 0],
+        "fill_color": [250, 0, 0],
+        "add_labels": true,
+        "interaction": "interface"
+    },
+    "addresses": {
+        "geometry_type": "polygon",
+        "color": [255, 0, 0]
+    },
+    "parcels": {
+        "geometry_type": "polygon",
+        "color": [255, 0, 0, 0.3],
+        "fill_color": [0, 0, 0, 0]
+    },
+    "burns": {
+        "geometry_type": "polygon",
+        "color": [155, 5, 5],
+        "fill_color": [255, 50, 50],
+        "add_labels": true,
+        "interaction": "interface",
+        "access": ["admin"],
+        "paint": {"fill-opacity": 0.75},
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road"},
+            {
+                "name": "readiness",
+                "type": "radio",
+                "values": [
+                    {"readiness": "low", "fill_color": [200, 100, 100]},
+                    {"readiness": "med", "fill_color": [100, 200, 100]},
+                    {"readiness": "high", "fill_color": [100, 100, 200]}
+                ],
+                "default": {"readiness": "med", "fill_color": [100, 200, 100]}
+            }
+        ]
+    },
+    "poi": {
+        "geometry_type": "point",
+        "color": [20, 155, 200],
+        "add_labels": true,
+        "access": ["admin"],
+        "editable_columns": [{"name": "name", "type": "string", "default": ""}],
+        "interaction": "interface"
+    },
+    "lpss": {
+        "geometry_type": "point",
+        "color": [0, 155, 50],
+        "add_labels": true,
+        "access": ["admin"]
+    },
+    "natural": {
+        "geometry_type": "point",
+        "color": [0, 200, 55],
+        "add_labels": true,
+        "symbol": {"png": "pin.png", "icon": "custom/octy"},
+        "icon-size": 1.0,
+        "interaction": "interface"
+    },
+    "documents": {
+        "geometry_type": "document"
+    },
+    "roads_index": {
+        "geometry_type": "polygon",
+        "color": [100, 55, 50],
+        "fill_color": [100, 55, 50],
+        "fill_opacity": 0.3,
+        "add_labels": false,
+        "access": ["internal", "admin"]
+    },
+    "burns_index": {
+        "geometry_type": "polygon",
+        "color": [0, 0, 0],
+        "fill_color": [200, 55, 55],
+        "fill_opacity": ["get", "haul_normalized"],
+        "add_labels": true,
+        "access": ["internal", "public", "admin"]
+    },
+    "creeks_index": {
+        "geometry_type": "polygon",
+        "color": [50, 55, 255],
+        "fill_color": [50, 55, 255],
+        "fill_opacity": 0.3,
+        "add_labels": false,
+        "access": ["internal", "public", "admin"]
+    }
+}
