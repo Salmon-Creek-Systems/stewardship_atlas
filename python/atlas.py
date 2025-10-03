@@ -126,10 +126,15 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
 
     if layers_path is not None:
         layers = json.load(open(layers_path))
+    else:
+        layers = DEFAULT_LAYERS
+    
     if assets_path is not None:
         assets = json.load(open(assets_path))
-    config['dataswale']['layers'] = layers
-    config['assets'] = assets
+    else:
+        assets = DEFAULT_ASSETS
+    
+    # Don't set layers/assets in config yet - we'll process them first
 
     config['spreadsheets'] = {}
     
@@ -185,8 +190,9 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             # add htpasswrd to new directory
             add_htpasswds(config, p / 'staging' / 'layers' / layer_config['name'], layer_config['access'])
     
-    # Update the layers in config
+    # Set processed layers and assets in config
     config['dataswale']['layers'] = processed_layers
+    config['assets'] = assets
 
     if (p /'staging' / 'layers' / 'regions').exists():
         if feature_collection:
