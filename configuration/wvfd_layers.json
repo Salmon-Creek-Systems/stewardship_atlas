@@ -35,10 +35,10 @@
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
      "editable_columns": [
          {"name": "name", "type": "string", "default": "Road" }],
-     "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 1.2, "access": [ "internal", "admin"], "interaction": "interface"},
+     "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,
      "symbol": {"png": "hydrant.png", "icon": "custom/hydrant"},
-     "icon-size": 1.2,
+     "icon-size": 3.0,
      "interaction": "interface",
                  "editable_columns": [
 		     {"name": "name", "type": "string", "default": "Road" }]},

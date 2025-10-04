@@ -95,7 +95,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural"],
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural", "helilandings", "hydrants"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
