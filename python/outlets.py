@@ -40,7 +40,7 @@ def webmap_json(config, name, sprite_json=None):
     zoom = 12  # Default zoom, could be calculated based on bbox size
 
     # Set up the map config general properties
-    atlas_url = f"https://internal.fireatlas.org/{config['name']}/staging"
+    atlas_url = f"{config['base_url']}/staging"
     sprite_url = atlas_url + "/outlets/" + name + "/sprite"
     map_config = {
         "container": "map",
@@ -811,7 +811,7 @@ def build_region_map_grass(config, outlet_name, region):
                 logger.debug("Adding Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=20,
+                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=50,
                          label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
             if lc.get("icon_if"):
