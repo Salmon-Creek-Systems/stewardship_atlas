@@ -104,11 +104,11 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     if feature_collection:
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
-        base_url = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
+        config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
         
-        
+    
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)
 
