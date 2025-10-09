@@ -110,6 +110,33 @@ async def import_gsheet(swalename: str, layer_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/export_gsheet/{swalename}/{layer_name}")
+async def export_gsheet(swalename: str, layer_name: str):
+    print("HIIYYEEEEEEE")
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        ac['assets']['spreadsheet_export']['in_layers'] = [layer_name]
+        layer_fc = outlets.gsheet_export(ac, 'spreadsheet_export')
+
+
+        # store the config since we may have updated spreadsheet URLs
+        #outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
+        with open(config_path, "w") as f:
+            json.dump(ac, f)
+
+
+        return {
+            "status": "success",
+            "message": f"Data stored successfully, refreshed: {ac['spreadsheets']}",
+            "filename": os.path.basename(config_path),
+            "path": config_path}
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+    
 @app.post("/clear_layer/{swalename}/{layer_name}")
 async def clear_layer(swalename: str, layer_name: str):
     try:

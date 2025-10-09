@@ -128,12 +128,13 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     if layers_path is not None:
         layers = json.load(open(layers_path))
     else:
-        layers = DEFAULT_LAYERS
+        layers = layers or DEFAULT_LAYERS
     
     if assets_path is not None:
         assets = json.load(open(assets_path))
     else:
-        assets = DEFAULT_ASSETS
+
+        assets = assets or DEFAULT_ASSETS
     
     # Don't set layers/assets in config yet - we'll process them first
 
