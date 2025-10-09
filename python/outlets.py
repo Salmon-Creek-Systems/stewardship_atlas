@@ -811,15 +811,15 @@ def build_region_map_grass(config, outlet_name, region):
                 logger.debug("Adding Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=50,
+                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=100,
                          label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
-            if lc.get("icon_if"):
+            elif lc.get("icon_if"):
                 icon_sql = f"{lc['icon_if']['property']} == \'{lc['icon_if']['value']}\'"
                 logger.info(f"Conditional POINT icon! {lc['icon_if']} -> [{icon_sql}]")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc['icon_if']['icon'], size=5,
+                         icon=lc['icon_if']['icon'], size=100,
                          where=icon_sql)
 
                 
