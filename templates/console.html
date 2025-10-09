@@ -207,7 +207,7 @@
 		    a4.textContent = ' (export sheet) ';
 		    a4.onclick = function(e) {
 		        e.preventDefault();
-		        exportToSheet(item.name);
+		        exportToSheet(item.name, this);
 		    };
 		    li.appendChild(document.createTextNode(' '));
 		    li.appendChild(a4);       
@@ -345,13 +345,13 @@
                 });
         }
 
-        function exportToSheet(layerName) {
+        function exportToSheet(layerName, linkElement) {
             console.log(`Exporting layer: ${layerName}`);
             
             // Show loading state
-            const originalText = event.target.textContent;
-            event.target.textContent = ' (exporting...) ';
-            event.target.style.pointerEvents = 'none';
+            const originalText = linkElement.textContent;
+            linkElement.textContent = ' (exporting...) ';
+            linkElement.style.pointerEvents = 'none';
             
             fetch(`https://internal.fireatlas.org:9998/export_gsheet/${swalename}/${layerName}`)
                 .then(response => response.json())
@@ -383,8 +383,8 @@
                 })
                 .finally(() => {
                     // Restore original state
-                    event.target.textContent = originalText;
-                    event.target.style.pointerEvents = 'auto';
+                    linkElement.textContent = originalText;
+                    linkElement.style.pointerEvents = 'auto';
                 });
         }
     </script>
