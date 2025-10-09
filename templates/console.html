@@ -203,8 +203,12 @@
 		    //if (item.name in data.spreadsheets) {
 		    // Link to gheet export
 		    const a4 = document.createElement('a');
-		    a4.href = `https://internal.fireatlas.org:9998/export_gsheet/${swalename}/${item.name}`;
+		    a4.href = '#';
 		    a4.textContent = ' (export sheet) ';
+		    a4.onclick = function(e) {
+		        e.preventDefault();
+		        exportToSheet(item.name);
+		    };
 		    li.appendChild(document.createTextNode(' '));
 		    li.appendChild(a4);       
 		    
@@ -338,6 +342,49 @@
                 .catch(error => {
                     statusDiv.innerHTML = 'Error: ' + error;
                     publishButton.disabled = false;
+                });
+        }
+
+        function exportToSheet(layerName) {
+            console.log(`Exporting layer: ${layerName}`);
+            
+            // Show loading state
+            const originalText = event.target.textContent;
+            event.target.textContent = ' (exporting...) ';
+            event.target.style.pointerEvents = 'none';
+            
+            fetch(`https://internal.fireatlas.org:9998/export_gsheet/${swalename}/${layerName}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Export response:', data);
+                    
+                    if (data.status === 'success') {
+                        // Extract the Google Sheets URL from the message
+                        const urlMatch = data.message.match(/https:\/\/docs\.google\.com\/spreadsheets\/d\/[^'"]+/);
+                        if (urlMatch) {
+                            const sheetsUrl = urlMatch[0];
+                            console.log('Google Sheets URL:', sheetsUrl);
+                            
+                            // Show success message and open the sheet
+                            alert(`Export successful! Opening Google Sheets...`);
+                            window.open(sheetsUrl, '_blank');
+                        } else {
+                            console.log('Could not extract URL from response:', data.message);
+                            alert('Export successful! Check the console for details.');
+                        }
+                    } else {
+                        console.error('Export failed:', data);
+                        alert('There was a problem with the export. Check the console for details.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Export error:', error);
+                    alert('There was a problem with the export. Check the console for details.');
+                })
+                .finally(() => {
+                    // Restore original state
+                    event.target.textContent = originalText;
+                    event.target.style.pointerEvents = 'auto';
                 });
         }
     </script>
