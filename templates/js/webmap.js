@@ -263,35 +263,32 @@ map.on('load', async () => {
         }
     }, firstLayerId);
     
-    // Add grid labels
+    // Add grid labels using HTML markers (more reliable)
     const gridLabelsData = generateGridLabels();
     console.log('Grid labels generated:', gridLabelsData.features.length, 'labels');
     
-    map.addSource('grid-labels', {
-        'type': 'geojson',
-        'data': gridLabelsData
-    });
-    
-    map.addLayer({
-        'id': 'grid-labels',
-        'type': 'symbol',
-        'source': 'grid-labels',
-        'layout': {
-            'text-field': '{label}',
-            'text-font': ['Arial Unicode MS Regular'],
-            'text-size': 12,
-            'text-anchor': 'center',
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'visibility': 'visible'
-        },
-        'paint': {
-            'text-color': '#000000',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2,
-            'text-halo-blur': 1,
-            'text-opacity': 1
-        }
+    // Create HTML markers for labels
+    gridLabelsData.features.forEach(feature => {
+        const coords = feature.geometry.coordinates;
+        const label = feature.properties.label;
+        
+        // Create HTML element for label
+        const labelEl = document.createElement('div');
+        labelEl.textContent = label;
+        labelEl.style.cssText = `
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #333;
+            padding: 2px 4px;
+            font-size: 10px;
+            font-family: Arial, sans-serif;
+            border-radius: 2px;
+            pointer-events: none;
+        `;
+        
+        // Add marker to map
+        new maplibregl.Marker(labelEl)
+            .setLngLat(coords)
+            .addTo(map);
     });
     
     // Initialize basemap switching
