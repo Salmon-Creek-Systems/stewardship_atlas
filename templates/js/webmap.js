@@ -16,6 +16,52 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
+// Function to generate grid lines with 0.5 degree spacing
+function generateGridLines() {
+    const features = [];
+    
+    // Generate latitude lines (horizontal)
+    for (let lat = -90; lat <= 90; lat += 0.5) {
+        features.push({
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: [
+                    [-180, lat],
+                    [180, lat]
+                ]
+            },
+            properties: {
+                type: 'lat',
+                value: lat
+            }
+        });
+    }
+    
+    // Generate longitude lines (vertical)
+    for (let lng = -180; lng <= 180; lng += 0.5) {
+        features.push({
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: [
+                    [lng, -90],
+                    [lng, 90]
+                ]
+            },
+            properties: {
+                type: 'lng',
+                value: lng
+            }
+        });
+    }
+    
+    return {
+        type: 'FeatureCollection',
+        features: features
+    };
+}
+
 // Function to add a marker at specified coordinates
 function addLocationMarker(lat, lng) {
     // Create a marker element
@@ -154,6 +200,23 @@ map.on('load', async () => {
         'source': 'terrain',
         'paint': {
             'raster-opacity': 0.7
+        }
+    }, firstLayerId);
+    
+    // Add grid lines (0.5 degree spacing)
+    map.addSource('grid-lines', {
+        'type': 'geojson',
+        'data': generateGridLines()
+    });
+    
+    map.addLayer({
+        'id': 'grid-lines',
+        'type': 'line',
+        'source': 'grid-lines',
+        'paint': {
+            'line-color': '#666666',
+            'line-width': 0.5,
+            'line-opacity': 0.3
         }
     }, firstLayerId);
     
