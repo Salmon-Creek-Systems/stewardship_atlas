@@ -199,7 +199,6 @@ map.on('load', async () => {
 
     // Add touch event listeners to the map container
     const mapContainer = map.getContainer();
-    alert(`Mobile touch listeners attached to: ${mapContainer.tagName} (${mapContainer.id || 'no-id'})`);
     
     mapContainer.addEventListener('touchstart', (e) => {
         // Only handle single touch and don't start if already in progress
@@ -218,13 +217,8 @@ map.on('load', async () => {
         // Start long-press timer
         longPressTimer = setTimeout(() => {
             console.log('Long press detected');
-            alert('Timer callback fired! About to call handleLocationShare...');
-            
-            // Debug touchStartPos
-            alert(`touchStartPos: ${JSON.stringify(touchStartPos)}`);
             
             if (!touchStartPos) {
-                alert('ERROR: touchStartPos is null!');
                 return;
             }
             
@@ -232,12 +226,9 @@ map.on('load', async () => {
             try {
                 // Convert screen coordinates directly to map coordinates
                 const lngLat = map.unproject([touchStartPos.x, touchStartPos.y]);
-                alert(`Converted lngLat: ${JSON.stringify(lngLat)}`);
-                
-                alert(`About to call handleLocationShare with: ${lngLat.lat}, ${lngLat.lng}`);
                 handleLocationShare(lngLat);
             } catch (error) {
-                alert(`ERROR in coordinate conversion: ${error.message}`);
+                console.error('Error in coordinate conversion:', error);
             }
             
             // Clear the timer since we successfully completed the long press
@@ -273,16 +264,6 @@ map.on('load', async () => {
         // Only process if we have a valid touch sequence
         if (!touchStartTime) return;
         
-        touchEndTime = Date.now();
-        
-        // Show comprehensive debug popup
-        const duration = touchEndTime - touchStartTime;
-        const outcome = maxMovement > MOVEMENT_THRESHOLD ? `CANCELLED (movement: ${maxMovement.toFixed(1)}px)` :
-                       duration >= LONG_PRESS_DELAY ? 'SUCCESS (long press detected)' :
-                       longPressTimer ? 'CANCELLED (touch ended early)' : 'CANCELLED (too short)';
-        
-        alert(`Touch Debug:\nStart: ${touchStartTime}\nEnd: ${touchEndTime}\nDuration: ${duration}ms\nMax Movement: ${maxMovement.toFixed(1)}px\nOutcome: ${outcome}`);
-        
         // Cancel long-press on touch end
         if (longPressTimer) {
             console.log('Touch end, canceling long-press');
@@ -298,14 +279,6 @@ map.on('load', async () => {
     mapContainer.addEventListener('touchcancel', (e) => {
         // Only process if we have a valid touch sequence
         if (!touchStartTime) return;
-        
-        touchEndTime = Date.now();
-        
-        // Show comprehensive debug popup
-        const duration = touchEndTime - touchStartTime;
-        const outcome = 'CANCELLED (touch canceled)';
-        
-        alert(`Touch Debug:\nStart: ${touchStartTime}\nEnd: ${touchEndTime}\nDuration: ${duration}ms\nMax Movement: ${maxMovement.toFixed(1)}px\nOutcome: ${outcome}`);
         
         // Cancel long-press on touch cancel
         if (longPressTimer) {
@@ -329,7 +302,6 @@ map.on('load', async () => {
     // Function to handle location sharing
     function handleLocationShare(lngLat) {
         console.log('Location sharing triggered at:', lngLat);
-        alert(`handleLocationShare called with: ${lngLat.lat}, ${lngLat.lng}`);
         
         const coords = {
             latitude: lngLat.lat,
@@ -337,8 +309,6 @@ map.on('load', async () => {
         };
         
         const format = document.getElementById('coords-format-select').value;
-        alert(`Format selected: ${format}`);
-        
         let textToCopy;
 
         if (format === 'json') {
@@ -350,7 +320,6 @@ map.on('load', async () => {
         }
         
         console.log('Text to copy:', textToCopy);
-        alert(`Text to copy: ${textToCopy}`);
         
         // Try to copy to clipboard (works for desktop Alt+click)
         if (navigator.clipboard && navigator.clipboard.writeText) {
