@@ -222,6 +222,8 @@ map.on('load', async () => {
             const point = map.project([touchStartPos.x, touchStartPos.y]);
             const lngLat = map.unproject(point);
             handleLocationShare(lngLat);
+            // Clear the timer since we successfully completed the long press
+            longPressTimer = null;
         }, LONG_PRESS_DELAY);
     });
     
