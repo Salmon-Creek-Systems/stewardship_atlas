@@ -202,8 +202,8 @@ map.on('load', async () => {
     alert(`Mobile touch listeners attached to: ${mapContainer.tagName} (${mapContainer.id || 'no-id'})`);
     
     mapContainer.addEventListener('touchstart', (e) => {
-        // Only handle single touch
-        if (e.touches.length !== 1) return;
+        // Only handle single touch and don't start if already in progress
+        if (e.touches.length !== 1 || longPressTimer !== null) return;
         
         const touch = e.touches[0];
         touchStartPos = {
@@ -252,13 +252,16 @@ map.on('load', async () => {
     });
     
     mapContainer.addEventListener('touchend', (e) => {
+        // Only process if we have a valid touch sequence
+        if (!touchStartTime) return;
+        
         touchEndTime = Date.now();
         
         // Show comprehensive debug popup
         const duration = touchEndTime - touchStartTime;
-        const outcome = longPressTimer ? 'CANCELLED (touch ended early)' : 
-                       maxMovement > MOVEMENT_THRESHOLD ? `CANCELLED (movement: ${maxMovement.toFixed(1)}px)` :
-                       duration >= LONG_PRESS_DELAY ? 'SUCCESS (long press detected)' : 'CANCELLED (too short)';
+        const outcome = maxMovement > MOVEMENT_THRESHOLD ? `CANCELLED (movement: ${maxMovement.toFixed(1)}px)` :
+                       duration >= LONG_PRESS_DELAY ? 'SUCCESS (long press detected)' :
+                       longPressTimer ? 'CANCELLED (touch ended early)' : 'CANCELLED (too short)';
         
         alert(`Touch Debug:\nStart: ${touchStartTime}\nEnd: ${touchEndTime}\nDuration: ${duration}ms\nMax Movement: ${maxMovement.toFixed(1)}px\nOutcome: ${outcome}`);
         
@@ -275,6 +278,9 @@ map.on('load', async () => {
     });
     
     mapContainer.addEventListener('touchcancel', (e) => {
+        // Only process if we have a valid touch sequence
+        if (!touchStartTime) return;
+        
         touchEndTime = Date.now();
         
         // Show comprehensive debug popup
