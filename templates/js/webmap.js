@@ -68,32 +68,34 @@ function generateGridLabels() {
     
     // Generate latitude labels (every 0.1 degree)
     for (let lat = -90; lat <= 90; lat += 0.1) {
+        const latFixed = parseFloat(lat.toFixed(1));
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [-179, lat]
+                coordinates: [-179, latFixed]
             },
             properties: {
                 type: 'lat',
-                value: lat,
-                label: `${lat.toFixed(1)}°`
+                value: latFixed,
+                label: `${latFixed}°`
             }
         });
     }
     
     // Generate longitude labels (every 0.1 degree)
     for (let lng = -180; lng <= 180; lng += 0.1) {
+        const lngFixed = parseFloat(lng.toFixed(1));
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [lng, -89]
+                coordinates: [lngFixed, -89]
             },
             properties: {
                 type: 'lng',
-                value: lng,
-                label: `${lng.toFixed(1)}°`
+                value: lngFixed,
+                label: `${lngFixed}°`
             }
         });
     }
