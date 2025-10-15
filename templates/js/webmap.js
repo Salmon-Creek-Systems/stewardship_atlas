@@ -279,18 +279,20 @@ map.on('load', async () => {
         'type': 'symbol',
         'source': 'grid-labels',
         'layout': {
-            'text-field': ['get', 'label'],
+            'text-field': '{label}',
             'text-font': ['Arial Unicode MS Regular'],
-            'text-size': 10,
+            'text-size': 12,
             'text-anchor': 'center',
             'text-allow-overlap': true,
-            'text-ignore-placement': true
+            'text-ignore-placement': true,
+            'visibility': 'visible'
         },
         'paint': {
             'text-color': '#000000',
             'text-halo-color': '#ffffff',
             'text-halo-width': 2,
-            'text-halo-blur': 1
+            'text-halo-blur': 1,
+            'text-opacity': 1
         }
     });
     
