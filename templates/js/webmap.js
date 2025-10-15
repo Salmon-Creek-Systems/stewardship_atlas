@@ -352,22 +352,20 @@ map.on('load', async () => {
         console.log('Text to copy:', textToCopy);
         alert(`Text to copy: ${textToCopy}`);
         
-        // Try to copy to clipboard
+        // Try to copy to clipboard (works for desktop Alt+click)
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy).then(() => {
                 console.log('Successfully copied to clipboard');
-                alert('Successfully copied to clipboard!');
                 showSuccessNotification('Location copied to clipboard!');
             }).catch(err => {
                 console.error('Failed to copy coordinates:', err);
-                alert(`Failed to copy: ${err.message}`);
                 // Fallback: show the text in an alert
                 alert(`Location: ${textToCopy}`);
             });
         } else {
             // Fallback for browsers that don't support clipboard API
             console.log('Clipboard API not supported, showing alert');
-            alert(`Clipboard API not supported. Location: ${textToCopy}`);
+            alert(`Location: ${textToCopy}`);
         }
     }
     
