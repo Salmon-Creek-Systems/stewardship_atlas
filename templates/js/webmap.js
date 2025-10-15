@@ -218,9 +218,11 @@ map.on('load', async () => {
         // Start long-press timer
         longPressTimer = setTimeout(() => {
             console.log('Long press detected');
+            alert('Timer callback fired! About to call handleLocationShare...');
             // Get coordinates from the touch position
             const point = map.project([touchStartPos.x, touchStartPos.y]);
             const lngLat = map.unproject(point);
+            alert(`About to call handleLocationShare with: ${lngLat.lat}, ${lngLat.lng}`);
             handleLocationShare(lngLat);
             // Clear the timer since we successfully completed the long press
             longPressTimer = null;
