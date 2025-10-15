@@ -267,28 +267,44 @@ map.on('load', async () => {
     const gridLabelsData = generateGridLabels();
     console.log('Grid labels generated:', gridLabelsData.features.length, 'labels');
     
-    // Create HTML markers for labels
-    gridLabelsData.features.forEach(feature => {
+    // Test with just one simple marker first
+    const testEl = document.createElement('div');
+    testEl.textContent = 'TEST';
+    testEl.style.cssText = `
+        background: red;
+        color: white;
+        padding: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        border: 2px solid black;
+    `;
+    
+    new maplibregl.Marker(testEl)
+        .setLngLat([-122, 40])
+        .addTo(map);
+    
+    console.log('Test marker added at [-122, 40]');
+    
+    // Create HTML markers for labels (simplified)
+    gridLabelsData.features.forEach((feature, index) => {
         const coords = feature.geometry.coordinates;
         const label = feature.properties.label;
+        
+        // Only create first 5 markers for testing
+        if (index >= 5) return;
         
         console.log('Creating marker for:', label, 'at coords:', coords);
         
         // Create HTML element for label
         const labelEl = document.createElement('div');
-        labelEl.innerHTML = label; // Use innerHTML instead of textContent
+        labelEl.textContent = label;
         labelEl.style.cssText = `
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #000;
-            padding: 2px 4px;
-            font-size: 12px;
-            font-family: Arial, sans-serif;
-            border-radius: 3px;
-            pointer-events: none;
-            color: #000;
+            background: yellow;
+            color: black;
+            padding: 3px;
+            font-size: 14px;
             font-weight: bold;
-            min-width: 20px;
-            text-align: center;
+            border: 1px solid black;
         `;
         
         // Only add marker if coordinates are valid
