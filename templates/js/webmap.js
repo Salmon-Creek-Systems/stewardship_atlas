@@ -230,11 +230,9 @@ map.on('load', async () => {
             
             // Get coordinates from the touch position
             try {
-                const point = map.project([touchStartPos.x, touchStartPos.y]);
-                alert(`Projected point: ${JSON.stringify(point)}`);
-                
-                const lngLat = map.unproject(point);
-                alert(`Unprojected lngLat: ${JSON.stringify(lngLat)}`);
+                // Convert screen coordinates directly to map coordinates
+                const lngLat = map.unproject([touchStartPos.x, touchStartPos.y]);
+                alert(`Converted lngLat: ${JSON.stringify(lngLat)}`);
                 
                 alert(`About to call handleLocationShare with: ${lngLat.lat}, ${lngLat.lng}`);
                 handleLocationShare(lngLat);
