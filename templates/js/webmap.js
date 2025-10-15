@@ -16,12 +16,12 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// Function to generate grid lines with 0.5 degree spacing
+// Function to generate grid lines with 0.1 degree spacing
 function generateGridLines() {
     const features = [];
     
     // Generate latitude lines (horizontal)
-    for (let lat = -90; lat <= 90; lat += 0.5) {
+    for (let lat = -90; lat <= 90; lat += 0.1) {
         features.push({
             type: 'Feature',
             geometry: {
@@ -39,7 +39,7 @@ function generateGridLines() {
     }
     
     // Generate longitude lines (vertical)
-    for (let lng = -180; lng <= 180; lng += 0.5) {
+    for (let lng = -180; lng <= 180; lng += 0.1) {
         features.push({
             type: 'Feature',
             geometry: {
@@ -52,6 +52,48 @@ function generateGridLines() {
             properties: {
                 type: 'lng',
                 value: lng
+            }
+        });
+    }
+    
+    return {
+        type: 'FeatureCollection',
+        features: features
+    };
+}
+
+// Function to generate grid labels
+function generateGridLabels() {
+    const features = [];
+    
+    // Generate latitude labels (every 0.1 degree)
+    for (let lat = -90; lat <= 90; lat += 0.1) {
+        features.push({
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [-179, lat]
+            },
+            properties: {
+                type: 'lat',
+                value: lat,
+                label: `${lat.toFixed(1)}°`
+            }
+        });
+    }
+    
+    // Generate longitude labels (every 0.1 degree)
+    for (let lng = -180; lng <= 180; lng += 0.1) {
+        features.push({
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [lng, -89]
+            },
+            properties: {
+                type: 'lng',
+                value: lng,
+                label: `${lng.toFixed(1)}°`
             }
         });
     }
@@ -203,7 +245,7 @@ map.on('load', async () => {
         }
     }, firstLayerId);
     
-    // Add grid lines (0.5 degree spacing)
+    // Add grid lines (0.1 degree spacing)
     map.addSource('grid-lines', {
         'type': 'geojson',
         'data': generateGridLines()
@@ -217,6 +259,32 @@ map.on('load', async () => {
             'line-color': '#666666',
             'line-width': 0.5,
             'line-opacity': 0.3
+        }
+    }, firstLayerId);
+    
+    // Add grid labels
+    map.addSource('grid-labels', {
+        'type': 'geojson',
+        'data': generateGridLabels()
+    });
+    
+    map.addLayer({
+        'id': 'grid-labels',
+        'type': 'symbol',
+        'source': 'grid-labels',
+        'layout': {
+            'text-field': ['get', 'label'],
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': 8,
+            'text-anchor': 'center',
+            'text-allow-overlap': true,
+            'text-ignore-placement': true
+        },
+        'paint': {
+            'text-color': '#333333',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1,
+            'text-halo-blur': 1
         }
     }, firstLayerId);
     

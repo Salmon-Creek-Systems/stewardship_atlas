@@ -864,7 +864,7 @@ def build_region_map_grass(config, outlet_name, region):
 
 
             
-    m.d_grid(size=0.5,color='black')
+    m.d_grid(size='00:10:00')
 
     # add neighboring gazeteer text                                                                                                                                              
     nbr = region.get('gazetteer_neighbors')
