@@ -62,44 +62,42 @@ function generateGridLines() {
     };
 }
 
-// Function to generate grid labels
+// Function to generate grid labels - simplified test version
 function generateGridLabels() {
     const features = [];
     
-    // Generate latitude labels (every 0.1 degree) - positioned closer to center
-    for (let lat = -90; lat <= 90; lat += 0.1) {
-        const latFixed = parseFloat(lat.toFixed(1));
+    // Test with just a few labels first - every 10 degrees
+    for (let lat = -90; lat <= 90; lat += 10) {
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [-120, latFixed]  // Moved from -179 to -120
+                coordinates: [-122, lat]  // California longitude
             },
             properties: {
                 type: 'lat',
-                value: latFixed,
-                label: `${latFixed}°`
+                value: lat,
+                label: `${lat}°`
             }
         });
     }
     
-    // Generate longitude labels (every 0.1 degree) - positioned closer to center
-    for (let lng = -180; lng <= 180; lng += 0.1) {
-        const lngFixed = parseFloat(lng.toFixed(1));
+    for (let lng = -180; lng <= 180; lng += 10) {
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [lngFixed, 30]  // Moved from -89 to 30
+                coordinates: [lng, 40]  // California latitude
             },
             properties: {
                 type: 'lng',
-                value: lngFixed,
-                label: `${lngFixed}°`
+                value: lng,
+                label: `${lng}°`
             }
         });
     }
     
+    console.log('Test labels generated:', features.length);
     console.log('Sample label:', features[0]);
     return {
         type: 'FeatureCollection',
