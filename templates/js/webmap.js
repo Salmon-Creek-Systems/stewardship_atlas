@@ -192,6 +192,8 @@ map.on('load', async () => {
     let longPressTimer = null;
     let touchStartPos = null;
     let touchStartTime = null;
+    let touchEndTime = null;
+    let maxMovement = 0;
     const LONG_PRESS_DELAY = 800; // 800ms delay
     const MOVEMENT_THRESHOLD = 10; // 10px movement threshold
 
@@ -200,14 +202,8 @@ map.on('load', async () => {
     alert(`Mobile touch listeners attached to: ${mapContainer.tagName} (${mapContainer.id || 'no-id'})`);
     
     mapContainer.addEventListener('touchstart', (e) => {
-        // Debug popup for touch detection
-        alert(`Touch detected! Touches: ${e.touches.length}, Target: ${e.target.tagName}`);
-        
         // Only handle single touch
-        if (e.touches.length !== 1) {
-            alert(`Ignoring touch - ${e.touches.length} touches detected`);
-            return;
-        }
+        if (e.touches.length !== 1) return;
         
         const touch = e.touches[0];
         touchStartPos = {
@@ -215,14 +211,13 @@ map.on('load', async () => {
             y: touch.clientY
         };
         touchStartTime = Date.now();
+        maxMovement = 0;
         
         console.log('Touch start at:', touchStartPos);
-        alert(`Touch start at: ${touchStartPos.x}, ${touchStartPos.y} - Starting ${LONG_PRESS_DELAY}ms timer`);
         
         // Start long-press timer
         longPressTimer = setTimeout(() => {
             console.log('Long press detected');
-            alert('Long press detected! Processing location share...');
             // Get coordinates from the touch position
             const point = map.project([touchStartPos.x, touchStartPos.y]);
             const lngLat = map.unproject(point);
@@ -244,9 +239,10 @@ map.on('load', async () => {
                 Math.pow(currentPos.y - touchStartPos.y, 2)
             );
             
+            maxMovement = Math.max(maxMovement, movement);
+            
             if (movement > MOVEMENT_THRESHOLD) {
                 console.log('Touch movement detected, canceling long-press');
-                alert(`Touch movement detected: ${movement.toFixed(1)}px - Canceling long-press`);
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
@@ -254,27 +250,47 @@ map.on('load', async () => {
     });
     
     mapContainer.addEventListener('touchend', (e) => {
+        touchEndTime = Date.now();
+        
+        // Show comprehensive debug popup
+        const duration = touchEndTime - touchStartTime;
+        const outcome = longPressTimer ? 'CANCELLED (touch ended early)' : 
+                       maxMovement > MOVEMENT_THRESHOLD ? `CANCELLED (movement: ${maxMovement.toFixed(1)}px)` :
+                       duration >= LONG_PRESS_DELAY ? 'SUCCESS (long press detected)' : 'CANCELLED (too short)';
+        
+        alert(`Touch Debug:\nStart: ${touchStartTime}\nEnd: ${touchEndTime}\nDuration: ${duration}ms\nMax Movement: ${maxMovement.toFixed(1)}px\nOutcome: ${outcome}`);
+        
         // Cancel long-press on touch end
         if (longPressTimer) {
             console.log('Touch end, canceling long-press');
-            alert('Touch ended - Canceling long-press');
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
         touchStartPos = null;
         touchStartTime = null;
+        touchEndTime = null;
+        maxMovement = 0;
     });
     
     mapContainer.addEventListener('touchcancel', (e) => {
+        touchEndTime = Date.now();
+        
+        // Show comprehensive debug popup
+        const duration = touchEndTime - touchStartTime;
+        const outcome = 'CANCELLED (touch canceled)';
+        
+        alert(`Touch Debug:\nStart: ${touchStartTime}\nEnd: ${touchEndTime}\nDuration: ${duration}ms\nMax Movement: ${maxMovement.toFixed(1)}px\nOutcome: ${outcome}`);
+        
         // Cancel long-press on touch cancel
         if (longPressTimer) {
             console.log('Touch cancel, canceling long-press');
-            alert('Touch canceled - Canceling long-press');
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
         touchStartPos = null;
         touchStartTime = null;
+        touchEndTime = null;
+        maxMovement = 0;
     });
     
     // Add a global click listener to see if alt-clicks are being captured elsewhere
