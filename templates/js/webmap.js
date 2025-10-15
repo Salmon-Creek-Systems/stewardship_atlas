@@ -263,9 +263,12 @@ map.on('load', async () => {
     }, firstLayerId);
     
     // Add grid labels
+    const gridLabelsData = generateGridLabels();
+    console.log('Grid labels generated:', gridLabelsData.features.length, 'labels');
+    
     map.addSource('grid-labels', {
         'type': 'geojson',
-        'data': generateGridLabels()
+        'data': gridLabelsData
     });
     
     map.addLayer({
@@ -274,19 +277,19 @@ map.on('load', async () => {
         'source': 'grid-labels',
         'layout': {
             'text-field': ['get', 'label'],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-            'text-size': 8,
+            'text-font': ['Arial Unicode MS Regular'],
+            'text-size': 10,
             'text-anchor': 'center',
             'text-allow-overlap': true,
             'text-ignore-placement': true
         },
         'paint': {
-            'text-color': '#333333',
+            'text-color': '#000000',
             'text-halo-color': '#ffffff',
-            'text-halo-width': 1,
+            'text-halo-width': 2,
             'text-halo-blur': 1
         }
-    }, firstLayerId);
+    });
     
     // Initialize basemap switching
     initializeBasemapSwitching(map);
