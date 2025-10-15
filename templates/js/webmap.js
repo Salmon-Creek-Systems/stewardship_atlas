@@ -197,10 +197,17 @@ map.on('load', async () => {
 
     // Add touch event listeners to the map container
     const mapContainer = map.getContainer();
+    alert(`Mobile touch listeners attached to: ${mapContainer.tagName} (${mapContainer.id || 'no-id'})`);
     
     mapContainer.addEventListener('touchstart', (e) => {
+        // Debug popup for touch detection
+        alert(`Touch detected! Touches: ${e.touches.length}, Target: ${e.target.tagName}`);
+        
         // Only handle single touch
-        if (e.touches.length !== 1) return;
+        if (e.touches.length !== 1) {
+            alert(`Ignoring touch - ${e.touches.length} touches detected`);
+            return;
+        }
         
         const touch = e.touches[0];
         touchStartPos = {
@@ -210,10 +217,12 @@ map.on('load', async () => {
         touchStartTime = Date.now();
         
         console.log('Touch start at:', touchStartPos);
+        alert(`Touch start at: ${touchStartPos.x}, ${touchStartPos.y} - Starting ${LONG_PRESS_DELAY}ms timer`);
         
         // Start long-press timer
         longPressTimer = setTimeout(() => {
             console.log('Long press detected');
+            alert('Long press detected! Processing location share...');
             // Get coordinates from the touch position
             const point = map.project([touchStartPos.x, touchStartPos.y]);
             const lngLat = map.unproject(point);
@@ -237,6 +246,7 @@ map.on('load', async () => {
             
             if (movement > MOVEMENT_THRESHOLD) {
                 console.log('Touch movement detected, canceling long-press');
+                alert(`Touch movement detected: ${movement.toFixed(1)}px - Canceling long-press`);
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
@@ -247,6 +257,7 @@ map.on('load', async () => {
         // Cancel long-press on touch end
         if (longPressTimer) {
             console.log('Touch end, canceling long-press');
+            alert('Touch ended - Canceling long-press');
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
@@ -258,6 +269,7 @@ map.on('load', async () => {
         // Cancel long-press on touch cancel
         if (longPressTimer) {
             console.log('Touch cancel, canceling long-press');
+            alert('Touch canceled - Canceling long-press');
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
