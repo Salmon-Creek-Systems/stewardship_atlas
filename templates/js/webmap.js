@@ -272,23 +272,33 @@ map.on('load', async () => {
         const coords = feature.geometry.coordinates;
         const label = feature.properties.label;
         
+        console.log('Creating marker for:', label, 'at coords:', coords);
+        
         // Create HTML element for label
         const labelEl = document.createElement('div');
-        labelEl.textContent = label;
+        labelEl.innerHTML = label; // Use innerHTML instead of textContent
         labelEl.style.cssText = `
-            background: rgba(255, 255, 255, 0.8);
-            border: 1px solid #333;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #000;
             padding: 2px 4px;
-            font-size: 10px;
+            font-size: 12px;
             font-family: Arial, sans-serif;
-            border-radius: 2px;
+            border-radius: 3px;
             pointer-events: none;
+            color: #000;
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
         `;
         
-        // Add marker to map
-        new maplibregl.Marker(labelEl)
-            .setLngLat(coords)
-            .addTo(map);
+        // Only add marker if coordinates are valid
+        if (coords && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+            new maplibregl.Marker(labelEl)
+                .setLngLat(coords)
+                .addTo(map);
+        } else {
+            console.warn('Invalid coordinates for label:', label, coords);
+        }
     });
     
     // Initialize basemap switching
