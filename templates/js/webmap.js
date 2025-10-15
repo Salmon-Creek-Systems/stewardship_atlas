@@ -329,12 +329,12 @@ map.on('load', async () => {
             }).catch(err => {
                 console.error('Failed to copy coordinates:', err);
                 // Fallback: show the text in an alert
-                alert(`Location: ${textToCopy}`);
+                alert(`Select, Copy, and Share:\n\n${textToCopy}`);
             });
         } else {
             // Fallback for browsers that don't support clipboard API
             console.log('Clipboard API not supported, showing alert');
-            alert(`Location: ${textToCopy}`);
+            alert(`Select, Copy, and Share:\n\n${textToCopy}`);
         }
     }
     
