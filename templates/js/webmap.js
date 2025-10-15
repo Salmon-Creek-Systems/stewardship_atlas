@@ -66,14 +66,14 @@ function generateGridLines() {
 function generateGridLabels() {
     const features = [];
     
-    // Generate latitude labels (every 0.1 degree)
+    // Generate latitude labels (every 0.1 degree) - positioned closer to center
     for (let lat = -90; lat <= 90; lat += 0.1) {
         const latFixed = parseFloat(lat.toFixed(1));
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [-179, latFixed]
+                coordinates: [-120, latFixed]  // Moved from -179 to -120
             },
             properties: {
                 type: 'lat',
@@ -83,14 +83,14 @@ function generateGridLabels() {
         });
     }
     
-    // Generate longitude labels (every 0.1 degree)
+    // Generate longitude labels (every 0.1 degree) - positioned closer to center
     for (let lng = -180; lng <= 180; lng += 0.1) {
         const lngFixed = parseFloat(lng.toFixed(1));
         features.push({
             type: 'Feature',
             geometry: {
                 type: 'Point',
-                coordinates: [lngFixed, -89]
+                coordinates: [lngFixed, 30]  // Moved from -89 to 30
             },
             properties: {
                 type: 'lng',
@@ -100,6 +100,7 @@ function generateGridLabels() {
         });
     }
     
+    console.log('Sample label:', features[0]);
     return {
         type: 'FeatureCollection',
         features: features
