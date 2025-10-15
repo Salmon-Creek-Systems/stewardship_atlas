@@ -187,6 +187,83 @@ map.on('load', async () => {
             console.log('Alt key not pressed, ignoring click');
         }
     });
+
+    // Mobile long-press for location sharing
+    let longPressTimer = null;
+    let touchStartPos = null;
+    let touchStartTime = null;
+    const LONG_PRESS_DELAY = 800; // 800ms delay
+    const MOVEMENT_THRESHOLD = 10; // 10px movement threshold
+
+    // Add touch event listeners to the map container
+    const mapContainer = map.getContainer();
+    
+    mapContainer.addEventListener('touchstart', (e) => {
+        // Only handle single touch
+        if (e.touches.length !== 1) return;
+        
+        const touch = e.touches[0];
+        touchStartPos = {
+            x: touch.clientX,
+            y: touch.clientY
+        };
+        touchStartTime = Date.now();
+        
+        console.log('Touch start at:', touchStartPos);
+        
+        // Start long-press timer
+        longPressTimer = setTimeout(() => {
+            console.log('Long press detected');
+            // Get coordinates from the touch position
+            const point = map.project([touchStartPos.x, touchStartPos.y]);
+            const lngLat = map.unproject(point);
+            handleLocationShare(lngLat);
+        }, LONG_PRESS_DELAY);
+    });
+    
+    mapContainer.addEventListener('touchmove', (e) => {
+        // Cancel long-press if finger moves too much
+        if (longPressTimer && touchStartPos) {
+            const touch = e.touches[0];
+            const currentPos = {
+                x: touch.clientX,
+                y: touch.clientY
+            };
+            
+            const movement = Math.sqrt(
+                Math.pow(currentPos.x - touchStartPos.x, 2) + 
+                Math.pow(currentPos.y - touchStartPos.y, 2)
+            );
+            
+            if (movement > MOVEMENT_THRESHOLD) {
+                console.log('Touch movement detected, canceling long-press');
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
+    });
+    
+    mapContainer.addEventListener('touchend', (e) => {
+        // Cancel long-press on touch end
+        if (longPressTimer) {
+            console.log('Touch end, canceling long-press');
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+        touchStartPos = null;
+        touchStartTime = null;
+    });
+    
+    mapContainer.addEventListener('touchcancel', (e) => {
+        // Cancel long-press on touch cancel
+        if (longPressTimer) {
+            console.log('Touch cancel, canceling long-press');
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+        touchStartPos = null;
+        touchStartTime = null;
+    });
     
     // Add a global click listener to see if alt-clicks are being captured elsewhere
     document.addEventListener('click', (e) => {
