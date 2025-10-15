@@ -311,6 +311,7 @@ map.on('load', async () => {
     // Function to handle location sharing
     function handleLocationShare(lngLat) {
         console.log('Location sharing triggered at:', lngLat);
+        alert(`handleLocationShare called with: ${lngLat.lat}, ${lngLat.lng}`);
         
         const coords = {
             latitude: lngLat.lat,
@@ -318,6 +319,8 @@ map.on('load', async () => {
         };
         
         const format = document.getElementById('coords-format-select').value;
+        alert(`Format selected: ${format}`);
+        
         let textToCopy;
 
         if (format === 'json') {
@@ -329,21 +332,24 @@ map.on('load', async () => {
         }
         
         console.log('Text to copy:', textToCopy);
+        alert(`Text to copy: ${textToCopy}`);
         
         // Try to copy to clipboard
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy).then(() => {
                 console.log('Successfully copied to clipboard');
+                alert('Successfully copied to clipboard!');
                 showSuccessNotification('Location copied to clipboard!');
             }).catch(err => {
                 console.error('Failed to copy coordinates:', err);
+                alert(`Failed to copy: ${err.message}`);
                 // Fallback: show the text in an alert
                 alert(`Location: ${textToCopy}`);
             });
         } else {
             // Fallback for browsers that don't support clipboard API
             console.log('Clipboard API not supported, showing alert');
-            alert(`Location: ${textToCopy}`);
+            alert(`Clipboard API not supported. Location: ${textToCopy}`);
         }
     }
     
