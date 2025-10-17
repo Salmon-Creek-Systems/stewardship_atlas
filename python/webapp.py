@@ -88,6 +88,16 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error extracting coordinates: {str(e)}")
 
+@app.get("/status")
+async def get_status():
+    print("STATUS GET")
+    return {
+        "status": "success",
+        "message": "Getting Status via API",
+        "filename": "None",
+        "path": "none"}
+
+    
 @app.post("/import_gsheet/{swalename}/{layer_name}")
 async def import_gsheet(swalename: str, layer_name: str):
     try:
