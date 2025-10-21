@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>3dview.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>3dview.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>3D Terrain View Generator for Stewardship Atlas
+Uses MapLibre GL JS to create 3D terrain visualization from existing elevation data.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">import</span> <span class="nn">versioning</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Generate a 3D terrain HTML page using MapLibre GL JS.</p>
+<p>Args:
+    atlas_name: Name of the atlas
+    config: Atlas configuration dictionary</p>
+<p>Returns:
+    HTML content as string</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">generate_3d_terrain_html</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Get paths for existing data</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">atlas_name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">atlas_path</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">elevation_dir</span> <span class="o">=</span> <span class="n">atlas_path</span> <span class="o">/</span> <span class="s2">&quot;layers&quot;</span> <span class="o">/</span> <span class="s2">&quot;elevation&quot;</span>
+    <span class="n">basemap_dir</span> <span class="o">=</span> <span class="n">atlas_path</span> <span class="o">/</span> <span class="s2">&quot;layers&quot;</span> <span class="o">/</span> <span class="s2">&quot;basemap&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Find elevation files (TIFF or PNG)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">elevation_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">elevation_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.tiff&quot;</span><span class="p">))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">elevation_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.tif&quot;</span><span class="p">))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">elevation_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.png&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">elevation_files</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No elevation files found in </span><span class="si">{</span><span class="n">elevation_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Use the first elevation file found</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">elevation_file</span> <span class="o">=</span> <span class="n">elevation_files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">elevation_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/</span><span class="si">{</span><span class="n">atlas_name</span><span class="si">}</span><span class="s2">/staging/layers/elevation/</span><span class="si">{</span><span class="n">elevation_file</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Find satellite basemap files</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">satellite_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">basemap_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*satellite*&quot;</span><span class="p">))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">basemap_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*sat*&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">satellite_files</span><span class="p">:</span>
+        <span class="n">basemap_file</span> <span class="o">=</span> <span class="n">satellite_files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">basemap_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/atlas/</span><span class="si">{</span><span class="n">atlas_name</span><span class="si">}</span><span class="s2">/layers/basemap/</span><span class="si">{</span><span class="n">basemap_file</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">use_local_basemap</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Fallback to external satellite source</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">basemap_url</span> <span class="o">=</span> <span class="s2">&quot;https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/</span><span class="si">{z}</span><span class="s2">/</span><span class="si">{y}</span><span class="s2">/</span><span class="si">{x}</span><span class="s2">&quot;</span>
+        <span class="n">use_local_basemap</span> <span class="o">=</span> <span class="kc">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Get map bounds from config if available</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">bounds</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;bounds&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">bounds</span><span class="p">:</span>
+        <span class="n">center_lng</span> <span class="o">=</span> <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">center_lat</span> <span class="o">=</span> <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="k">else</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Default center if no bounds specified</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">center_lng</span><span class="p">,</span> <span class="n">center_lat</span> <span class="o">=</span> <span class="o">-</span><span class="mf">123.0</span><span class="p">,</span> <span class="mf">40.0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>Generate the HTML content</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">html_content</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;&lt;!DOCTYPE html&gt;</span>
+<span class="s2">&lt;html lang=&quot;en&quot;&gt;</span>
+<span class="s2">&lt;head&gt;</span>
+<span class="s2">    &lt;title&gt;3D Terrain - </span><span class="si">{</span><span class="n">atlas_name</span><span class="o">.</span><span class="n">title</span><span class="p">()</span><span class="si">}</span><span class="s2">&lt;/title&gt;</span>
+<span class="s2">    &lt;meta charset=&#39;utf-8&#39;&gt;</span>
+<span class="s2">    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;</span>
+<span class="s2">    &lt;link rel=&#39;stylesheet&#39; href=&#39;https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css&#39; /&gt;</span>
+<span class="s2">    &lt;link rel=&#39;stylesheet&#39; href=&#39;/static/map.css&#39; /&gt;</span>
+<span class="s2">    &lt;link rel=&#39;stylesheet&#39; href=&#39;/static/edit_controls.css&#39; /&gt;</span>
+<span class="s2">    &lt;script src=&#39;https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js&#39;&gt;&lt;/script&gt;</span>
+<span class="s2">    &lt;style&gt;</span>
+<span class="s2">        body </span><span class="se">{{</span><span class="s2"> </span>
+<span class="s2">            margin: 0; </span>
+<span class="s2">            padding: 0; </span>
+<span class="s2">            font-family: Arial, sans-serif;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        html, body, #map </span><span class="se">{{</span><span class="s2"> </span>
+<span class="s2">            height: 100%; </span>
+<span class="s2">            width: 100%;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .map-container </span><span class="se">{{</span>
+<span class="s2">            position: relative;</span>
+<span class="s2">            width: 100%;</span>
+<span class="s2">            height: 100%;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .info-panel </span><span class="se">{{</span>
+<span class="s2">            position: absolute;</span>
+<span class="s2">            top: 10px;</span>
+<span class="s2">            left: 10px;</span>
+<span class="s2">            background: rgba(255, 255, 255, 0.9);</span>
+<span class="s2">            padding: 10px;</span>
+<span class="s2">            border-radius: 5px;</span>
+<span class="s2">            z-index: 1000;</span>
+<span class="s2">            max-width: 300px;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .info-panel h3 </span><span class="se">{{</span>
+<span class="s2">            margin: 0 0 10px 0;</span>
+<span class="s2">            color: #333;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .info-panel p </span><span class="se">{{</span>
+<span class="s2">            margin: 5px 0;</span>
+<span class="s2">            font-size: 14px;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .terrain-controls </span><span class="se">{{</span>
+<span class="s2">            position: absolute;</span>
+<span class="s2">            top: 10px;</span>
+<span class="s2">            right: 10px;</span>
+<span class="s2">            background: rgba(255, 255, 255, 0.9);</span>
+<span class="s2">            padding: 10px;</span>
+<span class="s2">            border-radius: 5px;</span>
+<span class="s2">            z-index: 1000;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .terrain-controls label </span><span class="se">{{</span>
+<span class="s2">            display: block;</span>
+<span class="s2">            margin: 5px 0;</span>
+<span class="s2">            font-size: 14px;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .terrain-controls input </span><span class="se">{{</span>
+<span class="s2">            width: 100px;</span>
+<span class="s2">            margin-left: 10px;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .back-link </span><span class="se">{{</span>
+<span class="s2">            position: absolute;</span>
+<span class="s2">            bottom: 10px;</span>
+<span class="s2">            left: 10px;</span>
+<span class="s2">            background: rgba(255, 255, 255, 0.9);</span>
+<span class="s2">            padding: 8px 15px;</span>
+<span class="s2">            border-radius: 5px;</span>
+<span class="s2">            z-index: 1000;</span>
+<span class="s2">            text-decoration: none;</span>
+<span class="s2">            color: #333;</span>
+<span class="s2">            font-weight: bold;</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">        .back-link:hover </span><span class="se">{{</span>
+<span class="s2">            background: rgba(255, 255, 255, 1);</span>
+<span class="s2">        </span><span class="se">}}</span>
+<span class="s2">    &lt;/style&gt;</span>
+<span class="s2">&lt;/head&gt;</span>
+<span class="s2">&lt;body&gt;</span>
+<span class="s2">    &lt;div class=&quot;map-container&quot;&gt;</span>
+<span class="s2">        &lt;div id=&quot;map&quot;&gt;&lt;/div&gt;</span>
+<span class="s2">        </span>
+<span class="s2">        &lt;div class=&quot;info-panel&quot;&gt;</span>
+<span class="s2">            &lt;h3&gt;3D Terrain View&lt;/h3&gt;</span>
+<span class="s2">            &lt;p&gt;&lt;strong&gt;Atlas:&lt;/strong&gt; </span><span class="si">{</span><span class="n">atlas_name</span><span class="o">.</span><span class="n">title</span><span class="p">()</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">            &lt;p&gt;&lt;strong&gt;Elevation:&lt;/strong&gt; </span><span class="si">{</span><span class="n">elevation_file</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">            &lt;p&gt;&lt;strong&gt;Basemap:&lt;/strong&gt; </span><span class="si">{</span><span class="s1">&#39;Local Satellite&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">use_local_basemap</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;External Satellite&#39;</span><span class="si">}</span><span class="s2">&lt;/p&gt;</span>
+<span class="s2">            &lt;p&gt;&lt;em&gt;Use mouse to navigate: drag to pan, scroll to zoom, right-click to rotate&lt;/em&gt;&lt;/p&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        </span>
+<span class="s2">        &lt;div class=&quot;terrain-controls&quot;&gt;</span>
+<span class="s2">            &lt;label&gt;</span>
+<span class="s2">                Terrain Exaggeration:</span>
+<span class="s2">                &lt;input type=&quot;range&quot; id=&quot;exaggeration&quot; min=&quot;0.1&quot; max=&quot;3&quot; step=&quot;0.1&quot; value=&quot;1.5&quot;&gt;</span>
+<span class="s2">                &lt;span id=&quot;exaggeration-value&quot;&gt;1.5x&lt;/span&gt;</span>
+<span class="s2">            &lt;/label&gt;</span>
+<span class="s2">            &lt;label&gt;</span>
+<span class="s2">                Pitch:</span>
+<span class="s2">                &lt;input type=&quot;range&quot; id=&quot;pitch&quot; min=&quot;0&quot; max=&quot;85&quot; step=&quot;5&quot; value=&quot;60&quot;&gt;</span>
+<span class="s2">                &lt;span id=&quot;pitch-value&quot;&gt;60°&lt;/span&gt;</span>
+<span class="s2">            &lt;/label&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        </span>
+<span class="s2">        &lt;a href=&quot;/atlas/</span><span class="si">{</span><span class="n">atlas_name</span><span class="si">}</span><span class="s2">/map.html&quot; class=&quot;back-link&quot;&gt;← Back to 2D Map&lt;/a&gt;</span>
+<span class="s2">    &lt;/div&gt;</span>
+
+<span class="s2">    &lt;script&gt;</span>
+<span class="s2">        // Initialize the map</span>
+<span class="s2">        const map = new maplibregl.Map(</span><span class="se">{{</span>
+<span class="s2">            container: &#39;map&#39;,</span>
+<span class="s2">            zoom: 12,</span>
+<span class="s2">            center: [</span><span class="si">{</span><span class="n">center_lng</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">center_lat</span><span class="si">}</span><span class="s2">],</span>
+<span class="s2">            pitch: 60,</span>
+<span class="s2">            bearing: 0,</span>
+<span class="s2">            style: </span><span class="se">{{</span>
+<span class="s2">                version: 8,</span>
+<span class="s2">                sources: </span><span class="se">{{</span>
+<span class="s2">                    // Satellite basemap</span>
+<span class="s2">                    satellite: </span><span class="se">{{</span>
+<span class="s2">                        type: &#39;raster&#39;,</span>
+<span class="s2">                        tiles: [&#39;</span><span class="si">{</span><span class="n">basemap_url</span><span class="si">}</span><span class="s2">&#39;],</span>
+<span class="s2">                        tileSize: 256,</span>
+<span class="s2">                        attribution: &#39;&amp;copy; Satellite Imagery&#39;,</span>
+<span class="s2">                        maxzoom: 19</span>
+<span class="s2">                    </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">                    // Elevation data for terrain</span>
+<span class="s2">                    elevation: </span><span class="se">{{</span>
+<span class="s2">                        type: &#39;raster-dem&#39;,</span>
+<span class="s2">                        tiles: [&#39;</span><span class="si">{</span><span class="n">elevation_url</span><span class="si">}</span><span class="s2">&#39;],</span>
+<span class="s2">                        tileSize: 256,</span>
+<span class="s2">                        maxzoom: 15</span>
+<span class="s2">                    </span><span class="se">}}</span>
+<span class="s2">                </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">                layers: [</span>
+<span class="s2">                    </span><span class="se">{{</span>
+<span class="s2">                        id: &#39;satellite&#39;,</span>
+<span class="s2">                        type: &#39;raster&#39;,</span>
+<span class="s2">                        source: &#39;satellite&#39;,</span>
+<span class="s2">                        paint: </span><span class="se">{{</span>
+<span class="s2">                            &#39;raster-opacity&#39;: 0.9</span>
+<span class="s2">                        </span><span class="se">}}</span>
+<span class="s2">                    </span><span class="se">}}</span>
+<span class="s2">                ],</span>
+<span class="s2">                terrain: </span><span class="se">{{</span>
+<span class="s2">                    source: &#39;elevation&#39;,</span>
+<span class="s2">                    exaggeration: 1.5</span>
+<span class="s2">                </span><span class="se">}}</span>
+<span class="s2">            </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">            maxZoom: 18,</span>
+<span class="s2">            maxPitch: 85</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+
+<span class="s2">        // Add navigation controls</span>
+<span class="s2">        map.addControl(new maplibregl.NavigationControl(</span><span class="se">{{</span>
+<span class="s2">            visualizePitch: true,</span>
+<span class="s2">            showZoom: true,</span>
+<span class="s2">            showCompass: true</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">));</span>
+
+<span class="s2">        // Add terrain control</span>
+<span class="s2">        map.addControl(new maplibregl.TerrainControl(</span><span class="se">{{</span>
+<span class="s2">            source: &#39;elevation&#39;,</span>
+<span class="s2">            exaggeration: 1.5</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">));</span>
+
+<span class="s2">        // Handle terrain exaggeration slider</span>
+<span class="s2">        const exaggerationSlider = document.getElementById(&#39;exaggeration&#39;);</span>
+<span class="s2">        const exaggerationValue = document.getElementById(&#39;exaggeration-value&#39;);</span>
+<span class="s2">        </span>
+<span class="s2">        exaggerationSlider.addEventListener(&#39;input&#39;, (e) =&gt; </span><span class="se">{{</span>
+<span class="s2">            const value = parseFloat(e.target.value);</span>
+<span class="s2">            exaggerationValue.textContent = value + &#39;x&#39;;</span>
+<span class="s2">            map.setTerrain(</span><span class="se">{{</span>
+<span class="s2">                source: &#39;elevation&#39;,</span>
+<span class="s2">                exaggeration: value</span>
+<span class="s2">            </span><span class="se">}}</span><span class="s2">);</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+
+<span class="s2">        // Handle pitch slider</span>
+<span class="s2">        const pitchSlider = document.getElementById(&#39;pitch&#39;);</span>
+<span class="s2">        const pitchValue = document.getElementById(&#39;pitch-value&#39;);</span>
+<span class="s2">        </span>
+<span class="s2">        pitchSlider.addEventListener(&#39;input&#39;, (e) =&gt; </span><span class="se">{{</span>
+<span class="s2">            const value = parseInt(e.target.value);</span>
+<span class="s2">            pitchValue.textContent = value + &#39;°&#39;;</span>
+<span class="s2">            map.setPitch(value);</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+
+<span class="s2">        // Update sliders when map changes</span>
+<span class="s2">        map.on(&#39;pitch&#39;, () =&gt; </span><span class="se">{{</span>
+<span class="s2">            const pitch = map.getPitch();</span>
+<span class="s2">            pitchSlider.value = pitch;</span>
+<span class="s2">            pitchValue.textContent = Math.round(pitch) + &#39;°&#39;;</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+
+<span class="s2">        // Add some helpful console logging</span>
+<span class="s2">        map.on(&#39;load&#39;, () =&gt; </span><span class="se">{{</span>
+<span class="s2">            console.log(&#39;3D Terrain map loaded successfully&#39;);</span>
+<span class="s2">            console.log(&#39;Atlas:&#39;, &#39;</span><span class="si">{</span><span class="n">atlas_name</span><span class="si">}</span><span class="s2">&#39;);</span>
+<span class="s2">            console.log(&#39;Elevation source:&#39;, &#39;</span><span class="si">{</span><span class="n">elevation_url</span><span class="si">}</span><span class="s2">&#39;);</span>
+<span class="s2">            console.log(&#39;Basemap source:&#39;, &#39;</span><span class="si">{</span><span class="n">basemap_url</span><span class="si">}</span><span class="s2">&#39;);</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+
+<span class="s2">        // Handle errors gracefully</span>
+<span class="s2">        map.on(&#39;error&#39;, (e) =&gt; </span><span class="se">{{</span>
+<span class="s2">            console.error(&#39;MapLibre error:&#39;, e);</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">);</span>
+<span class="s2">    &lt;/script&gt;</span>
+<span class="s2">&lt;/body&gt;</span>
+<span class="s2">&lt;/html&gt;&quot;&quot;&quot;</span>
+    
+    <span class="k">return</span> <span class="n">html_content</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>output_path = versioning.atlas_path(config)  / &ldquo;outlets&rdquo; / &ldquo;3dview&rdquo; /  &ldquo;index.html&rdquo;</p>
+<h1>output_path = atlas_path / &ldquo;outlets&rdquo; / &ldquo;3dview&rdquo; /  &ldquo;index.html&rdquo;</h1>
+<h1>Generate HTML content</h1>
+<p>html_content = generate_3d_terrain_html(config)</p>
+<h1>Write to file</h1>
+<p>with open(output_path, &lsquo;w&rsquo;, encoding=&rsquo;utf-8&rsquo;) as f:
+    f.write(html_content)</p>
+<p>print(f&rdquo;3D terrain view generated: {output_path}&rdquo;)
+return output_path</p>
+<p>if <strong>name</strong> == &ldquo;<strong>main</strong>&rdquo;:</p>
+<h1>Test function - can be run directly for testing</h1>
+<p>import sys
+if len(sys.argv) &gt; 1:
+    config_path = sys.argv[1]
+    config = json.load(open(config_path))
+    create_3d_terrain_view(config)
+else:
+    print(&ldquo;Usage: python 3dview.py <atlas_name>&ldquo;) </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">create_3d_terrain_view</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    Create a 3D terrain HTML file for the given atlas.</span>
+<span class="s2">    </span>
+<span class="s2">    Args:</span>
+<span class="s2">        atlas_name: Name of the atlas</span>
+<span class="s2">        config: Atlas configuration dictionary</span>
+<span class="s2">        output_path: Optional output path (defaults to outlets/3dview.html)</span>
+<span class="s2">    </span>
+<span class="s2">    Returns:</span>
+<span class="s2">        Path to the generated HTML file</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

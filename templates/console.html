@@ -273,10 +273,10 @@
 		    // Link to refresh/materialize
                     const refreshLink = document.createElement('a');
                     refreshLink.href = '#';
-                    refreshLink.textContent = ' (refresh) ';
+                    refreshLink.textContent = ' (clear) ';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`http://fireatlas.org:9998/refresh?swale=scvfd&asset=${item.name}`)
+                        fetch(`http://insternal.fireatlas.org:9998//clear_layer/${swalename}/${item_name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
@@ -291,7 +291,7 @@
                             });
                     };
                     li.appendChild(document.createTextNode(' '));
-                    //li.appendChild(refreshLink);
+                    li.appendChild(refreshLink);
 
                     layersList.appendChild(li);
                 });
