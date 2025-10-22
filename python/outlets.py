@@ -1444,7 +1444,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     logger.info(f"Generated Admin Layers: {admin_layers}")
     # Define use cases
     use_case_paths = Path("../documents/help/").glob('*.md')
-    use_cases = { path.stem: ["Howto: " + path.read_text().splitlines()[0], str("https://internal.fireatlas.org/documentats/help/" + path.name)] for path in use_case_paths}
+    use_cases = { path.stem: [path.read_text().splitlines()[0][8:], str("/local/documentats/help/" + path.name)] for path in use_case_paths}
     # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
     #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
     #              "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
