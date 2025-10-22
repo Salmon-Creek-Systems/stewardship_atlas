@@ -1443,19 +1443,21 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     ]
     logger.info(f"Generated Admin Layers: {admin_layers}")
     # Define use cases
-    use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
-                 "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
-                 "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
-                 "download_gpkg": ["Howto: Download atlas as GeoPKG", "https://internal.fireatlas.org/documentation/"],
-                 "download_runbook": ["Howto: download Run Book","https://internal.fireatlas.org/documentation/"],
-                 "download_runbook": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-                 "hide_layers": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-                 "upload_geojson": ["Howto: Add a GeoJSON file to an existing vector layer.","https://internal.fireatlas.org/documentation/"],
-                 "platform_overview": ["Overview of Stewardship Atlas Platform","https://internal.fireatlas.org/documentation/"],
-                 "python_overview": ["Python Documentation","https://internal.fireatlas.org/documentation/"],
-                 "schema_overview": ["Schema Documentation","https://internal.fireatlas.org/documentation/"]
+    use_case_paths = Path("../documents/help/").glob('*.md')
+    use_cases = { path.stem: ["Howto: " + path.read_text().splitlines()[0], str("https://internal.fireatlas.org/documentats/help/" + path.name)] for path in use_case_paths}
+    # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
+    #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
+    #              "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
+    #              "download_gpkg": ["Howto: Download atlas as GeoPKG", "https://internal.fireatlas.org/documentation/"],
+    #              "download_runbook": ["Howto: download Run Book","https://internal.fireatlas.org/documentation/"],
+    #              "download_runbook": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
+    #              "hide_layers": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
+    #              "upload_geojson": ["Howto: Add a GeoJSON file to an existing vector layer.","https://internal.fireatlas.org/documentation/"],
+    #              "platform_overview": ["Overview of Stewardship Atlas Platform","https://internal.fireatlas.org/documentation/"],
+    #              "python_overview": ["Python Documentation","https://internal.fireatlas.org/documentation/"],
+    #              "schema_overview": ["Schema Documentation","https://internal.fireatlas.org/documentation/"]
                  
-                 }
+    #              }
                                    
     user_cases_config = [
         #{"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
@@ -1468,10 +1470,10 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         ]
     user_cases = []
     for u in user_cases_config:
-        uc = [{'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in u['cases']]
+        uc = [{'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in u['cases'] if label in use_cases]
         user_cases.append( {'name': u['name'], 'cases': uc} )
-
-         
+    user_cases.append( {"name": "All Users", "cases": [ {'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in use_cases.keys()]})
+    logger.info(f"Generated User Cases: {user_cases}")
          
     # Generate admin view
     admin_html = make_console_html(
