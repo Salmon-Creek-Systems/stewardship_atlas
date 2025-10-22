@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>vector_inlets.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>vector_inlets.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">duckdb</span>
+<span class="kn">import</span> <span class="nn">geojson</span>
+
+<span class="kn">import</span> <span class="nn">versioning</span>
+<span class="kn">import</span> <span class="nn">utils</span>
+<span class="kn">import</span> <span class="nn">deltas_geojson</span> <span class="k">as</span> <span class="nn">deltas</span>
+
+<span class="kn">import</span> <span class="nn">overpass</span>
+
+<span class="n">DELTA_QUEUE</span> <span class="o">=</span> <span class="n">deltas</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Configure logging</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Fetch Overture data and return a Delta to push into queue</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">overture_duckdb</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="n">DELTA_QUEUE</span><span class="p">,</span> <span class="n">quick</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">version_string</span> <span class="o">=</span> <span class="s1">&#39;staging&#39;</span>
+    <span class="n">inlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">name</span><span class="p">][</span><span class="s1">&#39;config&#39;</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Get query from template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">query</span> <span class="o">=</span> <span class="n">inlet_config</span><span class="p">[</span><span class="s1">&#39;inpath_template&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">])</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetching Overture data with query: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Execute query</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;                                                                                                                   </span>
+<span class="s2">INSTALL spatial;                                                                                                                     </span>
+<span class="s2">LOAD spatial;                                                                                                                        </span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+
+    <span class="n">features</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">row</span><span class="p">))</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()]:</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">Feature</span><span class="p">(</span><span class="n">geometry</span><span class="o">=</span><span class="n">geojson</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;geom&#39;</span><span class="p">]))</span>
+        <span class="k">del</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;geom&#39;</span><span class="p">])</span>
+        <span class="n">f</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">row</span>
+        <span class="n">features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="n">feature_collection</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+  
+    <span class="n">delta_paths</span> <span class="o">=</span> <span class="n">delta_queue</span><span class="o">.</span><span class="n">add_deltas_from_features</span><span class="p">(</span><span class="n">config</span><span class="p">,</span><span class="n">name</span><span class="p">,</span> <span class="n">feature_collection</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s1">&#39;alterations&#39;</span> <span class="ow">in</span> <span class="n">inlet_config</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">outpath</span> <span class="ow">in</span> <span class="n">delta_paths</span><span class="p">:</span>
+            <span class="n">utils</span><span class="o">.</span><span class="n">alter_geojson</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="n">inlet_config</span><span class="p">[</span><span class="s1">&#39;alterations&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Fetch OpenStreetMap data and store in versioned directory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">fetch_osm</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="n">DELTA_QUEUE</span><span class="p">,</span> <span class="n">quick</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Initialize Overpass API</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">api</span> <span class="o">=</span> <span class="n">overpass</span><span class="o">.</span><span class="n">API</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Get query from template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">query</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">name</span><span class="p">][</span><span class="s1">&#39;config&#39;</span><span class="p">][</span><span class="s1">&#39;template&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">])</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fetching OSM data with query: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>Execute query</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">response</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">responseformat</span><span class="o">=</span><span class="s2">&quot;geojson&quot;</span><span class="p">)</span>
+
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">delta_queue</span><span class="o">.</span><span class="n">delta_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Ensure directory exists</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">outpath</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Write response</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">geojson</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>Load OGR datafile and store in versioned directory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">local_ogr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="n">DELTA_QUEUE</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>Get input path from template</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">inlet_config</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;assets&#39;</span><span class="p">][</span><span class="n">name</span><span class="p">][</span><span class="s1">&#39;config&#39;</span><span class="p">]</span>
+
+    <span class="n">inpath</span> <span class="o">=</span> <span class="n">versioning</span><span class="o">.</span><span class="n">atlas_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;local&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">inlet_config</span><span class="p">[</span><span class="s1">&#39;inpath_template&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">outpath</span> <span class="o">=</span> <span class="n">delta_queue</span><span class="o">.</span><span class="n">delta_path</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>Extract data using ogr2ogr and CLI args</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ogr2ogr&#39;</span><span class="p">,</span> <span class="s1">&#39;-f&#39;</span><span class="p">,</span> <span class="s1">&#39;GeoJSON&#39;</span><span class="p">,</span> <span class="s1">&#39;-t_srs&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">]]</span>
+    <span class="k">if</span> <span class="s1">&#39;geometry&#39;</span> <span class="ow">in</span> <span class="n">inlet_config</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>Add spatial filter if geometry is specified</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">bbox</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;bbox&#39;</span><span class="p">]</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;-spat&#39;</span><span class="p">,</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">]),</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">])])</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;-spat_srs&#39;</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;dataswale&#39;</span><span class="p">][</span><span class="s1">&#39;crs&#39;</span><span class="p">]])</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">outpath</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">inpath</span><span class="p">)])</span>
+    <span class="k">if</span> <span class="s1">&#39;layer&#39;</span> <span class="ow">in</span> <span class="n">inlet_config</span><span class="p">:</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">inlet_config</span><span class="p">[</span><span class="s1">&#39;layer&#39;</span><span class="p">])</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running ogr2ogr with args: </span><span class="si">{</span><span class="n">args</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s1">&#39;alterations&#39;</span> <span class="ow">in</span> <span class="n">inlet_config</span><span class="p">:</span>
+        <span class="n">utils</span><span class="o">.</span><span class="n">alter_geojson</span><span class="p">(</span><span class="n">outpath</span><span class="p">,</span> <span class="n">inlet_config</span><span class="p">[</span><span class="s1">&#39;alterations&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">outpath</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>Import a Google Sheet layer into a dataswale atlas</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">import_gsheet</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="n">DELTA_QUEUE</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">if</span> <span class="ow">not</span> <span class="n">layer_name</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;layer_name is required&quot;</span><span class="p">)</span>
+    
+    <span class="n">gsheet_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1"> Fire Atlas: </span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s1">&#39;</span>
+    <span class="n">gc</span> <span class="o">=</span> <span class="n">gspread</span><span class="o">.</span><span class="n">service_account</span><span class="p">()</span>
+    <span class="n">wks</span> <span class="o">=</span> <span class="n">gc</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">gsheet_name</span><span class="p">)</span><span class="o">.</span><span class="n">sheet1</span>
+    <span class="n">features</span> <span class="o">=</span> <span class="n">wks</span><span class="o">.</span><span class="n">get_all_records</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>convert to geojson</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="n">geojson_features</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">geojson</span><span class="o">.</span><span class="n">Feature</span><span class="p">(</span><span class="n">geometry</span><span class="o">=</span><span class="n">feature</span><span class="p">[</span><span class="s1">&#39;geometry&#39;</span><span class="p">])</span>
+        <span class="k">del</span><span class="p">(</span><span class="n">feature</span><span class="p">[</span><span class="s1">&#39;geometry&#39;</span><span class="p">])</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">properties</span> <span class="o">=</span> <span class="n">feature</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span>
+        <span class="n">geojson_features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+       
+    <span class="k">return</span> <span class="n">geojson</span><span class="o">.</span><span class="n">FeatureCollection</span><span class="p">(</span><span class="n">geojson_features</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <p>get path to layer
+layer = dataswale_geojson.layer_as_featurecollection(config, name)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">asset_methods</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;overture_duckdb&quot;</span><span class="p">:</span> <span class="n">overture_duckdb</span><span class="p">,</span>
+    <span class="s2">&quot;local_ogr&quot;</span><span class="p">:</span> <span class="n">local_ogr</span>
+    <span class="p">}</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>raster_inlets.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>raster_inlets.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span><span class="o">,</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">shutil</span><span class="o">,</span> <span class="nn">zipfile</span><span class="o">,</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">versioning</span>
+<span class="kn">import</span> <span class="nn">utils</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Configure logging</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Fetch data from local file and save to versioned outpath.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">local_raster</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delta_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">Do</span> <span class="n">some</span> <span class="n">CRS</span> <span class="ow">and</span> <span class="n">rescaling</span> <span class="k">if</span> <span class="n">needed</span><span class="o">.</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    inlet_config = config[&#39;assets&#39;][name][&#39;config&#39;]</span>
+<span class="s2">    inpath = versioning.atlas_path(config, &quot;local&quot;) / inlet_config[&#39;inpath_template&#39;].format(**config)</span>
+<span class="s2">    outpath = delta_queue.delta_path(config, name, &#39;create&#39;)</span>
+<span class="s2">    logger.info(f&quot;Delta raster in </span><span class="si">{outpath}</span><span class="s2">&quot;)   </span>
+<span class="s2">    return utils.canonicalize_raster(inpath, </span>
+<span class="s2">                                    outpath, </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;crs&#39;], </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;bbox&#39;], </span>
+<span class="s2">                                    inlet_config.get(&#39;resample_width&#39;, None))</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):</span>
+<span class="s2">    &quot;&quot;&quot;</span><span class="n">Fetch</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">URL</span> <span class="ow">and</span> <span class="n">save</span> <span class="n">to</span> <span class="n">versioned</span> <span class="n">outpath</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    inlet_config = config[&#39;assets&#39;][name][&#39;config&#39;]</span>
+<span class="s2">    bbox = config[&#39;dataswale&#39;][&#39;bbox&#39;]</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">    outpath = delta_queue.delta_path(config, name, &#39;create&#39;)</span>
+<span class="s2">    workdir = outpath.parent / &#39;work&#39;</span>
+<span class="s2">    workfile = workdir / outpath.name </span>
+<span class="s2">    </span>
+<span class="s2">    url = inlet_config[&#39;inpath_template&#39;].format(</span>
+<span class="s2">        north=bbox[&#39;north&#39;],</span>
+<span class="s2">        south=bbox[&#39;south&#39;],</span>
+<span class="s2">        east=bbox[&#39;east&#39;],</span>
+<span class="s2">        west=bbox[&#39;west&#39;],</span>
+<span class="s2">        **config)</span>
+<span class="s2">    logger.info(f&quot;Fetching data from URL: </span><span class="si">{url}</span><span class="s2">&quot;)</span>
+<span class="s2">    try:</span>
+<span class="s2">        response = requests.get(url)</span>
+<span class="s2">        response.raise_for_status()</span>
+
+<span class="s2">        if url.endswith(&#39;.zip&#39;) or  inlet_config.get(&#39;unzip&#39;, False):</span>
+<span class="s2">            logger.debug(&quot;Extracting zip contents&quot;)</span>
+<span class="s2">            with zipfile.ZipFile(io.BytesIO(response.content)) as z:</span>
+<span class="s2">                z.extractall(os.path.dirname(workfile))</span>
+<span class="s2">        else:</span>
+<span class="s2">#DIVIDER</span>
+<span class="s2">            with open(workfile, &#39;wb&#39;) as f:</span>
+<span class="s2">                f.write(response.content)</span>
+<span class="s2">                logger.debug(f&quot;Successfully wrote content to: </span><span class="si">{workfile}</span><span class="s2">&quot;)</span>
+<span class="s2">                </span>
+<span class="s2">    except requests.exceptions.RequestException as e:</span>
+<span class="s2">        logger.error(f&quot;Failed to fetch URL </span><span class="si">{url}</span><span class="s2">: </span><span class="si">{e}</span><span class="s2">&quot;)</span>
+<span class="s2">        raise</span>
+<span class="s2">    except Exception as e:</span>
+<span class="s2">        logger.error(f&quot;Error processing data from </span><span class="si">{url}</span><span class="s2">: </span><span class="si">{e}</span><span class="s2">&quot;)</span>
+<span class="s2">        raise</span>
+<span class="s2"> </span>
+<span class="s2">    return utils.canonicalize_raster(workfile, </span>
+<span class="s2">                                    outpath, </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;crs&#39;], </span>
+<span class="s2">                                    config[&#39;dataswale&#39;][&#39;bbox&#39;], </span>
+<span class="s2">                                    inlet_config.get(&#39;resample_width&#39;, None))</span>
+<span class="s2">    </span>
+
+<span class="s2">asset_methods = {</span>
+<span class="s2">    &#39;url_raster&#39;: url_raster,</span>
+<span class="s2">    &#39;local_raster&#39;: local_raster</span>
+<span class="s2">    }</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>inpath = versioning.atlas_path(config, &ldquo;local&rdquo;) / inlet_config[&lsquo;inpath_template&rsquo;].format(**config)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Write content directly to file</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>
