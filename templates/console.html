@@ -243,7 +243,7 @@
                             
                             // Add layer name to the GeoJSON
                             geojson.layer = item.name;
-                            geojson.action = 'add'; // or whatever default action you want
+                            geojson.action = 'create'; // or whatever default action you want
                             
                             // Send to server using the same API as upload button
                             var xmlhttp = new XMLHttpRequest();
@@ -277,7 +277,7 @@
                     refreshLink.textContent = ' (clear) ';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`${baseurl}:9998//clear_layer/${swalename}/${item.name}`)
+                        fetch(`${baseurl}:9998/clear_layer/${swalename}/${item.name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
@@ -308,7 +308,7 @@
             publishButton.disabled = true;
             statusDiv.innerHTML = `Processing... ${swalename}`;
             
-            fetch(`https://internal.fireatlas.org:9998/publish?swale=${swalename}`)
+            fetch(`${baseurl}:9998/publish?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -327,7 +327,7 @@
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
             
-            fetch(`https://internal.fireatlas.org:9998/publish-status?swale=${swalename}`)
+            fetch(`${baseurl}:9998/publish-status?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -354,7 +354,7 @@
             linkElement.textContent = ' (exporting...) ';
             linkElement.style.pointerEvents = 'none';
             
-            fetch(`https://internal.fireatlas.org:9998/export_gsheet/${swalename}/${layerName}`)
+            fetch(`${baseurl}:9998/export_gsheet/${swalename}/${layerName}`)
                 .then(response => response.json())
                 .then(data => {
                     console.log('Export response:', data);
