@@ -1,5 +1,5 @@
-# Adding to a vector layer
-#Scs #howto #fireatlas
+# Add to a vector layer
+
 
 ## Drawing Features directly on to an Existing Layer
 

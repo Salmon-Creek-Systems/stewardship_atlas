@@ -1,5 +1,5 @@
-# How-to: Download Atlas as GeoPKG
-#scs #atlas
+# Download Atlas as GeoPKG
+
 
 * From the Admin page
 * Click “GeoPKG” in the Downloads part of the Maps panel at top left.

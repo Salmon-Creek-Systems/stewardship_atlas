@@ -1,5 +1,5 @@
-# How-to: Export Layer
-#scs #atlas
+# Export Layer
+
 Exporting a layer allows you to work on it in other software or incorporate it in other maps and datasets. If you’d like to export more than a single layer, look into “Export Atlas as GeoPKG”.
 
 * Go to the Admin page
