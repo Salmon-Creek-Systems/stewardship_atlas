@@ -247,7 +247,7 @@
                             
                             // Send to server using the same API as upload button
                             var xmlhttp = new XMLHttpRequest();
-                            xmlhttp.open("POST", `${baseurl}:9998/delta_upload/${swalename}/${item.name}`);
+                            xmlhttp.open("POST", `${baseurl}:9998/delta_upload/${swalename}`);
                             xmlhttp.setRequestHeader("Content-Type", "application/json");
                             var geojson_data = JSON.stringify({"data": geojson});
                             xmlhttp.send(geojson_data);
