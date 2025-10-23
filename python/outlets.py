@@ -1452,6 +1452,10 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     local_docs_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Generating help into docs dir: {str(local_docs_path)}: {use_case_paths}")
 
+    # Read the help template
+    help_template_path = Path("../templates/help.html")
+    help_template = help_template_path.read_text()
+
     for path in use_case_paths:
         # Read markdown content
         logger.info(f"Converting {path.name} to HTML...")
@@ -1460,11 +1464,21 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         # Convert to HTML
         html_content = markdown.markdown(markdown_content)
         
+        # Extract title from first line (remove "# " prefix)
+        title = markdown_content.splitlines()[0].replace('# ', '') if markdown_content.startswith('#') else path.stem
+        
+        # Generate styled HTML using template
+        styled_html = help_template.format(
+            atlas_name=config['name'],
+            title=title,
+            content=html_content
+        )
+        
         # Write HTML file
         html_filename = path.stem + ".html"
         html_path = local_docs_path / html_filename
         with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+            f.write(styled_html)
         
         logger.info(f"Converted {path.name} to {html_filename}")
     
