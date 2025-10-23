@@ -94,6 +94,7 @@
 	    document.getElementById('panel-header').textContent = data.panelHeader;
 
 	    swalename=data.swaleName;
+        baseurl=data.baseurl;
 	    
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
@@ -246,7 +247,7 @@
                             
                             // Send to server using the same API as upload button
                             var xmlhttp = new XMLHttpRequest();
-                            xmlhttp.open("POST", `http://fireatlas.org:9998/delta_upload/${swalename}/${item.name}`);
+                            xmlhttp.open("POST", `${baseurl}:9998/delta_upload/${swalename}/${item.name}`);
                             xmlhttp.setRequestHeader("Content-Type", "application/json");
                             var geojson_data = JSON.stringify({"data": geojson});
                             xmlhttp.send(geojson_data);
@@ -276,7 +277,7 @@
                     refreshLink.textContent = ' (clear) ';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`http://insternal.fireatlas.org:9998//clear_layer/${swalename}/${item.name}`)
+                        fetch(`${baseurl}:9998//clear_layer/${swalename}/${item.name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
