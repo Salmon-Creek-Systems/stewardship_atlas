@@ -1445,6 +1445,28 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     # Define use cases
     use_case_paths = Path("../documents/help/").glob('*.md')
     use_cases = { path.stem: [path.read_text().splitlines()[0][8:], str("/local/documentats/help/" + path.name)] for path in use_case_paths}
+    
+    # Convert markdown files to HTML and write to local documents/help directory
+    import markdown
+    local_docs_path = versioning.atlas_path(config, "local") / "documents" / "help"
+    local_docs_path.mkdir(parents=True, exist_ok=True)
+    
+    for path in use_case_paths:
+        # Read markdown content
+        markdown_content = path.read_text()
+        
+        # Convert to HTML
+        html_content = markdown.markdown(markdown_content)
+        
+        # Write HTML file
+        html_filename = path.stem + ".html"
+        html_path = local_docs_path / html_filename
+        with open(html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        logger.info(f"Converted {path.name} to {html_filename}")
+    
+
     # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
     #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
     #              "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
