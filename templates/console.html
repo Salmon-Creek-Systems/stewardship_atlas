@@ -276,7 +276,7 @@
                     refreshLink.textContent = ' (clear) ';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`http://insternal.fireatlas.org:9998//clear_layer/${swalename}/${item_name}`)
+                        fetch(`http://insternal.fireatlas.org:9998//clear_layer/${swalename}/${item.name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
