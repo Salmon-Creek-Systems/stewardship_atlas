@@ -1441,7 +1441,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         # and ac.get('access',['public']).count('admin') > 0      
         # and ac.get('interaction') == 'interface'
     ]
-    logger.info(f"Generated Admin Layers: {admin_layers}")
+    
     # Define use cases
     use_case_paths = Path("../documents/help/").glob('*.md')
     use_cases = { path.stem: [path.read_text().splitlines()[0][8:], str("/local/documentats/help/" + path.name)] for path in use_case_paths}
@@ -1450,9 +1450,11 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     import markdown
     local_docs_path = versioning.atlas_path(config, "local") / "documents" / "help"
     local_docs_path.mkdir(parents=True, exist_ok=True)
-    
+    logger.info(f"Generated Admin Layers: {admin_layers}: {use_case_paths}")
+
     for path in use_case_paths:
         # Read markdown content
+        logger.info(f"Converting {path.name} to HTML...")
         markdown_content = path.read_text()
         
         # Convert to HTML
