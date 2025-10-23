@@ -1450,7 +1450,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     import markdown
     local_docs_path = versioning.atlas_path(config, "local") / "documents" / "help"
     local_docs_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Generated Admin Layers: {admin_layers}: {use_case_paths}")
+    logger.info(f"Generating help into docs dir: {string(local_docs_path)}: {use_case_paths}")
 
     for path in use_case_paths:
         # Read markdown content
