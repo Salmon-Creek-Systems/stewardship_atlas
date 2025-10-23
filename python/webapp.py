@@ -147,7 +147,7 @@ async def export_gsheet(swalename: str, layer_name: str):
 
 
     
-@app.post("/clear_layer/{swalename}/{layer_name}")
+@app.get("/clear_layer/{swalename}/{layer_name}")
 async def clear_layer(swalename: str, layer_name: str):
     try:
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
