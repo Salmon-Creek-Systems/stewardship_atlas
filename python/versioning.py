@@ -43,7 +43,8 @@ def publish_new_version(config, version=None):
 
     # add version to config
     config['dataswale']['versions'].append(version)
-    with open(config['atlas_config_path'], 'w') as f:
+    atlas_config_path = atlas_path(config, version='staging', local_path="atlas_config.json")
+    with open(atlas_config_path, 'w') as f:
         json.dump(config, f, indent=2)
     logger.info(f"Added version {version} to config")
 
