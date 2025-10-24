@@ -332,6 +332,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                     publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
                 # res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
+                
                 res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
                 # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])

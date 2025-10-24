@@ -40,6 +40,13 @@ def publish_new_version(config, version=None):
     staging_path = atlas_path(config, version='staging')
     version_path = atlas_path(config, version=version)
     logger.info(f"Publishing NEW VERSION: {version} from {staging_path} to {version_path}")
+
+    # add version to config
+    config['versions'].append(version)
+    with open(config['atlas_config_path'], 'w') as f:
+        json.dump(config, f, indent=2)
+    logger.info(f"Added version {version} to config")
+
     # make sure not already published
     if version_path.exists():
         logger.error(f"Version {version} already exists")
