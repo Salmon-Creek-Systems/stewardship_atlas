@@ -107,7 +107,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
-        
+        config['dataswale']['versioned_outlets'] = feature['properties'].get('versioned_outlets', [])
     
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)

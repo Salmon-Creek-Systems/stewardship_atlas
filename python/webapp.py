@@ -191,6 +191,8 @@ async def json_upload(payload: JSONPayload, swalename: str):
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# TODO do we use this anywhere? And why is delta_upload different?
 @app.post("/store/{swalename}")
 async def store_json(swalename: str, payload: JSONPayload):
     try:
