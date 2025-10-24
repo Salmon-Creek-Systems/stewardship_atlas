@@ -36,14 +36,19 @@ def publish_new_version(config, version=None):
     """
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    ")
     staging_path = atlas_path(config, version='staging')
     version_path = atlas_path(config, version=version)
+    logger.info(f"Publishing NEW VERSION: {version} from {staging_path} to {version_path}")
     # make sure not already published
     if version_path.exists():
+        logger.error(f"Version {version} already exists")
         raise ValueError(f"Version {version} already exists")
     # make sure parent exists
+    logger.info(f"Making sure parent exists for {version_path}")
     version_path.parent.mkdir(parents=True, exist_ok=True)
-    
+    #logger.info(f"Parent exists for {version_path}")
+    logger.info(f"Copying from {staging_path} to {version_path}")
 
  
    
