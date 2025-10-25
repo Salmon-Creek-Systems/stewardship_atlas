@@ -1523,7 +1523,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         displayed_downloads=admin_downloads, 
         displayed_inlets=admin_layers,
         spreadsheets = config['spreadsheets'],
-        displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
+        displayed_versions=['published'] + [v['version_string'] for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
         use_cases=[]
     )
@@ -1542,7 +1542,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         displayed_interfaces=internal_interfaces, 
         displayed_downloads=internal_downloads, 
         displayed_inlets=[], 
-        displayed_versions=['published'] + [v['version_string'] for v in config.get('versions', [])],
+        displayed_versions=['published'] + [v['version_string'] for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
         use_cases=user_cases
     )
