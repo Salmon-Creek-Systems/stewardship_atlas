@@ -302,7 +302,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
 
         config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
         print(f"publish loading config from {config_path}")
-        ac = {}}
+        ac = {}
         with open(config_path, 'r') as f:
             ac = json.load(f)
         # ac = json.load(open(config_path))
