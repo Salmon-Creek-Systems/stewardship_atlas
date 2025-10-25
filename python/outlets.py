@@ -1523,7 +1523,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         displayed_downloads=admin_downloads, 
         displayed_inlets=admin_layers,
         spreadsheets = config['spreadsheets'],
-        displayed_versions=['published'] + [v['version_string'] for v in config.get('dataswale', {}).get('versions', [])],
+        displayed_versions=['published'] + [str(v)for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
         use_cases=[]
     )
