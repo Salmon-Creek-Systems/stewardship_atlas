@@ -302,7 +302,9 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
 
         config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
-        ac = json.load(open(config_path))
+        with open(config_path, 'r') as f:
+            ac = json.load(f)
+        # ac = json.load(open(config_path))
 
         # Start new publishing task
         publish_status["publishing"] = True
@@ -332,7 +334,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                     publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
                 # res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
-                
+
                 res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
                 # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
