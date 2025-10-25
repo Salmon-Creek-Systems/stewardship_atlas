@@ -343,7 +343,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 publish_status["publishing"] = False
                 # publish_status["log"] = []
                 #logger.info(res_json)
-                return json.dumps(res)
+                return str(res)
             except Exception as e:
                 print(f"E! {e}")
                 raise HTTPException(status_code=500, detail=str(e))
