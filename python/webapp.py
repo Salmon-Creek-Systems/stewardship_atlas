@@ -301,11 +301,11 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
             }
 
         config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
-        print(f"loading config from {config_path}")
+        print(f"publish loading config from {config_path}")
         with open(config_path, 'r') as f:
             ac = json.load(f)
         # ac = json.load(open(config_path))
-
+        print(f"publish loaded config: {ac}")
         # Start new publishing task
         publish_status["publishing"] = True
         publish_status["started_at"] = datetime.now().isoformat()

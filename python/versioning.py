@@ -37,7 +37,7 @@ def publish_new_version(config, version=None):
     """
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    
+    logger.info(f"Publishing NEW VERSION: {version}")
     staging_path = atlas_path(config, version='staging')
     version_path = atlas_path(config, version=version)
     logger.info(f"Publishing NEW VERSION: {version} from {staging_path} to {version_path}")
