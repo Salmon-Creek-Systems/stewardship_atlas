@@ -1,5 +1,11 @@
 [
-    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"],
+    "editable_columns": [
+        {"name": "name", "type": "string", "default": "unique name" },
+        {"name": "description", "type": "string", "default": "Text describing the region" },
+        {"name": "caption", "type": "string", "default": "Displayed Title" }
+    ]   
+},
     {"name": "tsunami_fillcolor", "geometry_type": "polygon", "color": [0,0,255], "fill_color": "none", "fill_opacity": 0.3},
     {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.3},
     {"name": "elevation", "geometry_type": "raster"},

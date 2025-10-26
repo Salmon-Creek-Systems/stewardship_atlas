@@ -343,6 +343,8 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 publish_status["publishing"] = False
                 # publish_status["log"] = []
                 #logger.info(res_json)
+                # let's always refresh the HTML after all this.
+                atlas.materialize(ac, 'html',outlets.asset_methods)
                 return str(res)
             except Exception as e:
                 print(f"E! {e}")
