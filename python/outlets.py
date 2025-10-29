@@ -1457,6 +1457,9 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     help_template_path = Path("../templates/help.html")
     help_template = help_template_path.read_text()
 
+    # Track titles and filenames for index generation
+    page_list = []
+    
     for path in use_case_paths:
         # Read markdown content
         logger.info(f"Converting {path.name} to HTML...")
@@ -1481,7 +1484,37 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(styled_html)
         
+        # Store for index generation
+        page_list.append((title, html_filename))
+        
         logger.info(f"Converted {path.name} to {html_filename}")
+    
+    # Generate index.html with list of all help pages
+    if page_list:
+        # Create list items for all pages
+        page_links = "\n".join([f'        <li><a href="{filename}">{title}</a></li>' for title, filename in sorted(page_list)])
+        
+        index_content = f"""
+        <h2>Help Topics</h2>
+        <p>Browse the available help documentation:</p>
+        <ul>
+{page_links}
+        </ul>
+        """
+        
+        # Generate styled HTML using template
+        index_html = help_template.format(
+            atlas_name=config['name'],
+            title="Help Index",
+            content=index_content
+        )
+        
+        # Write index.html
+        index_path = local_docs_path / "index.html"
+        with open(index_path, 'w', encoding='utf-8') as f:
+            f.write(index_html)
+        
+        logger.info(f"Generated index.html with {len(page_list)} help pages")
     
 
     # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
