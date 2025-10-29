@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{atlas_name} - Configuration Editor</title>
+    
+    <!-- JSONEditor CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.4/jsoneditor.min.css" rel="stylesheet" type="text/css">
+    
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        
+        h1 {{
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }}
+        
+        .toolbar {{
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }}
+        
+        button {{
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }}
+        
+        button:hover {{
+            background-color: #45a049;
+        }}
+        
+        button:disabled {{
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }}
+        
+        .danger-button {{
+            background-color: #f44336;
+        }}
+        
+        .danger-button:hover {{
+            background-color: #da190b;
+        }}
+        
+        #jsoneditor {{
+            height: 700px;
+            border: 1px solid #ddd;
+        }}
+        
+        .status-message {{
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }}
+        
+        .status-message.success {{
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }}
+        
+        .status-message.error {{
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }}
+        
+        .status-message.info {{
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }}
+        
+        .back-link {{
+            display: inline-block;
+            margin-bottom: 10px;
+            color: #4CAF50;
+            text-decoration: none;
+        }}
+        
+        .back-link:hover {{
+            text-decoration: underline;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../html/admin" class="back-link">← Back to Admin Console</a>
+        
+        <h1>{atlas_name} Atlas - Configuration Editor</h1>
+        
+        <div class="toolbar">
+            <button id="save-button" onclick="saveConfig()">💾 Save Configuration</button>
+            <button id="reload-button" onclick="reloadConfig()">🔄 Reload from Server</button>
+            <button id="validate-button" onclick="validateConfig()">✓ Validate</button>
+            <button id="format-button" onclick="formatConfig()">📝 Format JSON</button>
+            <span id="file-info" style="margin-left: auto; color: #666;">
+                File: <code>atlas_config.json</code>
+            </span>
+        </div>
+        
+        <div id="status-message" class="status-message"></div>
+        
+        <div id="jsoneditor"></div>
+        
+        <div style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+            <strong>⚠️ Important:</strong> 
+            <ul style="margin: 10px 0 0 0;">
+                <li>Changes are saved immediately to the staging configuration</li>
+                <li>After saving, you may need to refresh outlets to see changes</li>
+                <li>Invalid JSON will not be saved - check for errors before saving</li>
+                <li>Use the tree view for easy navigation, code view for advanced editing</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- JSONEditor JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.10.4/jsoneditor.min.js"></script>
+    
+    <script>
+        let editor;
+        let originalConfig;
+        const swaleName = '{swale_name}';
+        const baseUrl = '{base_url}';
+        
+        // Initialize the editor
+        document.addEventListener('DOMContentLoaded', function() {{
+            const container = document.getElementById('jsoneditor');
+            
+            const options = {{
+                mode: 'tree',
+                modes: ['tree', 'code', 'text', 'preview'],
+                search: true,
+                history: true,
+                onError: function(err) {{
+                    showStatus('Error: ' + err.toString(), 'error');
+                }},
+                onChange: function() {{
+                    // Could add auto-save or dirty indicator here
+                }},
+                onModeChange: function(newMode, oldMode) {{
+                    console.log('Mode changed from', oldMode, 'to', newMode);
+                }},
+                sortObjectKeys: false,
+                navigationBar: true,
+                statusBar: true,
+                indentation: 4
+            }};
+            
+            editor = new JSONEditor(container, options);
+            
+            // Load the configuration
+            loadConfig();
+        }});
+        
+        function loadConfig() {{
+            showStatus('Loading configuration...', 'info');
+            
+            fetch('/staging/atlas_config.json')
+                .then(response => {{
+                    if (!response.ok) {{
+                        throw new Error('Failed to load configuration: ' + response.statusText);
+                    }}
+                    return response.json();
+                }})
+                .then(data => {{
+                    originalConfig = JSON.parse(JSON.stringify(data)); // Deep clone
+                    editor.set(data);
+                    editor.expandAll();
+                    showStatus('Configuration loaded successfully', 'success');
+                    setTimeout(() => hideStatus(), 2000);
+                }})
+                .catch(error => {{
+                    showStatus('Failed to load configuration: ' + error.message, 'error');
+                }});
+        }}
+        
+        function saveConfig() {{
+            try {{
+                const config = editor.get();
+                
+                showStatus('Validating configuration...', 'info');
+                
+                // Basic validation
+                if (!config.name || !config.dataswale) {{
+                    throw new Error('Configuration must have "name" and "dataswale" properties');
+                }}
+                
+                showStatus('Saving configuration...', 'info');
+                
+                // Save via API
+                fetch(`${{baseUrl}}:9998/save_config/${{swaleName}}`, {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                    }},
+                    body: JSON.stringify({{ data: config }})
+                }})
+                .then(response => {{
+                    if (!response.ok) {{
+                        return response.json().then(err => {{
+                            throw new Error(err.detail || 'Failed to save configuration');
+                        }});
+                    }}
+                    return response.json();
+                }})
+                .then(data => {{
+                    showStatus('✓ Configuration saved successfully!', 'success');
+                    originalConfig = JSON.parse(JSON.stringify(config));
+                    setTimeout(() => hideStatus(), 3000);
+                }})
+                .catch(error => {{
+                    showStatus('Failed to save: ' + error.message, 'error');
+                }});
+                
+            }} catch (error) {{
+                showStatus('Validation error: ' + error.message, 'error');
+            }}
+        }}
+        
+        function reloadConfig() {{
+            if (confirm('Reload configuration from server? Any unsaved changes will be lost.')) {{
+                loadConfig();
+            }}
+        }}
+        
+        function validateConfig() {{
+            try {{
+                const config = editor.get();
+                
+                // Basic validation
+                const errors = [];
+                
+                if (!config.name) errors.push('Missing "name" property');
+                if (!config.dataswale) errors.push('Missing "dataswale" property');
+                if (config.dataswale && !config.dataswale.bbox) errors.push('Missing "dataswale.bbox" property');
+                if (config.dataswale && !config.dataswale.layers) errors.push('Missing "dataswale.layers" property');
+                
+                if (errors.length > 0) {{
+                    showStatus('Validation failed: ' + errors.join(', '), 'error');
+                }} else {{
+                    showStatus('✓ Configuration is valid!', 'success');
+                    setTimeout(() => hideStatus(), 2000);
+                }}
+                
+            }} catch (error) {{
+                showStatus('Validation error: ' + error.message, 'error');
+            }}
+        }}
+        
+        function formatConfig() {{
+            try {{
+                const config = editor.get();
+                editor.set(config);
+                showStatus('Configuration formatted', 'success');
+                setTimeout(() => hideStatus(), 2000);
+            }} catch (error) {{
+                showStatus('Format error: ' + error.message, 'error');
+            }}
+        }}
+        
+        function showStatus(message, type) {{
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message ' + type;
+            statusDiv.style.display = 'block';
+        }}
+        
+        function hideStatus() {{
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.style.display = 'none';
+        }}
+        
+        // Warn before leaving if changes are unsaved
+        window.addEventListener('beforeunload', function(e) {{
+            try {{
+                const currentConfig = editor.get();
+                if (JSON.stringify(currentConfig) !== JSON.stringify(originalConfig)) {{
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                }}
+            }} catch (error) {{
+                // If we can't get the config, don't block navigation
+            }}
+        }});
+    </script>
+</body>
+</html>
+

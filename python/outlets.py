@@ -1732,6 +1732,36 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     subprocess.run(['cp', '../templates/js/sqlquery.js', str(js_dir)])
     
     return outpath / 'index.html'
+
+def outlet_config_editor(config: dict, outlet_name: str):
+    """Generate HTML interface for editing the atlas configuration file.
+    
+    This creates an interactive JSON editor using JSONEditor by Jos de Jong
+    that allows administrators to view and edit the atlas_config.json file
+    with syntax highlighting, validation, and a user-friendly interface.
+    """
+    outlet_config = config['assets'][outlet_name]
+    outpath = versioning.atlas_path(config, "outlets") / outlet_name
+    outpath.mkdir(parents=True, exist_ok=True)
+    
+    # Read the template file
+    with open('../templates/config_editor.html', 'r') as f:
+        template = f.read()
+    
+    # Replace placeholders
+    html_content = template.format(
+        atlas_name=config['name'],
+        swale_name=config['name'],
+        base_url=config.get('base_url', 'http://localhost')
+    )
+    
+    # Write the HTML file
+    with open(outpath / 'index.html', 'w') as f:
+        f.write(html_content)
+    
+    logger.info(f"Created config editor at {outpath / 'index.html'}")
+    
+    return outpath / 'index.html'
    
 #blah = """
 asset_methods = {
@@ -1744,7 +1774,8 @@ asset_methods = {
     'webmap': outlet_webmap,
     #'webmap_public': outlet_webmap,
     'webedit': outlet_webmap_edit,
-    'sqlquery': outlet_sqlquery
+    'sqlquery': outlet_sqlquery,
+    'config_editor': outlet_config_editor
 }
 #"""
 

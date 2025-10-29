@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import json
 from datetime import datetime
 import os
+import shutil
 from typing import Dict, Any
 import asyncio
 import logging
@@ -400,4 +401,43 @@ async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
         print(f"ERROR executing SQL query. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/save_config/{swalename}")
+async def save_config(swalename: str, payload: JSONPayload):
+    """Save the atlas configuration file."""
+    try:
+        config_data = payload.data
+        
+        # Validate basic structure
+        if not config_data.get('name'):
+            raise ValueError("Configuration must have a 'name' property")
+        if not config_data.get('dataswale'):
+            raise ValueError("Configuration must have a 'dataswale' property")
+        
+        # Construct config path
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        
+        # Create backup of existing config
+        if config_path.exists():
+            backup_path = config_path.parent / f"atlas_config.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            shutil.copy(config_path, backup_path)
+            logging.info(f"Created backup at {backup_path}")
+        
+        # Save the new configuration
+        with open(config_path, 'w') as f:
+            json.dump(config_data, f, indent=2)
+        
+        logging.info(f"Saved configuration to {config_path}")
+        
+        return {
+            "status": "success",
+            "message": "Configuration saved successfully",
+            "path": str(config_path)
+        }
+        
+    except Exception as e:
+        logging.error(f"Error saving configuration: {str(e)}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))

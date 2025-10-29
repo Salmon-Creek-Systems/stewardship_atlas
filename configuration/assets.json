@@ -153,6 +153,14 @@
     "config_def": "sqlquery",
     "access": ["admin"]
 },
+"config_editor": {
+    "type": "outlet",
+    "name": "config_editor",
+    "config": {
+        "interaction": "interface"
+    },
+    "access": ["admin"]
+},
 "gazetteer": {
     "type": "outlet",
     "name": "gazetteer",
