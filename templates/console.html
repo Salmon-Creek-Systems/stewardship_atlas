@@ -44,10 +44,10 @@
                 <div id="help-section" style="margin: 20px;">
                 <ul id="help-list">
                     <li>
-                        <a href="/help">About</a>
+                        <a href="/local/documents/about.html">About</a>
                     </li>
                     <li>
-                        <a href="/help">Help</a>
+                        <a href="/local/documents/help/index.html">Help</a>
                     </li>
                     <li>
                         <a href="/staging/outlets/html/internal">Internal</a>
@@ -59,7 +59,7 @@
                         <a href="https://www.google.com/maps/search/volunteer+fire+departments">VFD</a>
                     </li>
                     <li>
-                        <a href="/help">Contact</a>
+                        <a href="/local/documents/contact.html">Contact</a>
                     </li>
 
                 </ul>    
@@ -130,7 +130,7 @@
                 data.versions.forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
-                    a.href = `../../${item}/html/admin.html`;
+                    a.href = `/${item}/html/admin.html`;
                     a.textContent = item;
                     li.appendChild(a);
                     versionsList.appendChild(li);

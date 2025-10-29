@@ -1516,6 +1516,86 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         
         logger.info(f"Generated index.html with {len(page_list)} help pages")
     
+    # Generate contact page in documents directory (one level up from help)
+    contact_content = """
+        <h2>Contact Information</h2>
+        <p>For questions, support, or more information about this atlas, please reach out:</p>
+        
+        <h3>General Inquiries</h3>
+        <p>
+            <strong>Email:</strong> <a href="mailto:info@example.org">info@example.org</a><br>
+            <strong>Website:</strong> <a href="https://www.example.org" target="_blank">www.example.org</a>
+        </p>
+        
+        <h3>Technical Support</h3>
+        <p>
+            <strong>Email:</strong> <a href="mailto:support@example.org">support@example.org</a><br>
+            <strong>Website:</strong> <a href="https://support.example.org" target="_blank">support.example.org</a>
+        </p>
+        
+        <h3>Administration</h3>
+        <p>
+            <strong>Email:</strong> <a href="mailto:admin@example.org">admin@example.org</a><br>
+            <strong>Phone:</strong> (555) 123-4567
+        </p>
+        """
+    
+    # Generate styled HTML using template
+    contact_html = help_template.format(
+        atlas_name=config['name'],
+        title="Contact",
+        content=contact_content
+    )
+    
+    # Write contact.html to documents directory (parent of help directory)
+    contact_path = local_docs_path.parent / "contact.html"
+    with open(contact_path, 'w', encoding='utf-8') as f:
+        f.write(contact_html)
+    
+    logger.info(f"Generated contact page at {contact_path}")
+    
+    # Generate about page in documents directory
+    about_content = """
+        <h2>About Stewardship Atlas</h2>
+        
+        <p>
+            Stewardship Atlas is a powerful geospatial platform designed to help community organizations, volunteer fire departments, 
+            land stewards, and local agencies manage and share critical location-based information. By combining interactive web maps, 
+            downloadable data packages, and collaborative editing tools, the platform makes it easy to maintain up-to-date records of 
+            roads, buildings, water sources, access points, and other essential infrastructure. Whether you're planning emergency response 
+            routes, coordinating land management activities, or simply need to share accurate maps with your team, Stewardship Atlas 
+            provides the tools to do it efficiently.
+        </p>
+        
+        <p>
+            The platform is built around the concept of making geospatial data accessible to everyone, not just GIS professionals. 
+            Community members can view and interact with maps through any web browser, download mobile-ready formats for offline use 
+            in the field, and contribute updates through simple web interfaces. Administrators have fine-grained control over data 
+            layers, user access levels, and versioning, ensuring that information stays accurate and secure while remaining accessible 
+            to those who need it.
+        </p>
+        
+        <p>
+            Whether your organization needs to maintain a comprehensive atlas of local roads and structures, coordinate with multiple 
+            agencies on shared resources, or simply provide your volunteers with reliable maps they can use on their phones, 
+            Stewardship Atlas offers a flexible, scalable solution. The platform supports standard GIS formats, integrates with 
+            existing workflows, and can be customized to meet the specific needs of your community.
+        </p>
+        """
+    
+    # Generate styled HTML using template
+    about_html = help_template.format(
+        atlas_name=config['name'],
+        title="About",
+        content=about_content
+    )
+    
+    # Write about.html to documents directory
+    about_path = local_docs_path.parent / "about.html"
+    with open(about_path, 'w', encoding='utf-8') as f:
+        f.write(about_html)
+    
+    logger.info(f"Generated about page at {about_path}")
 
     # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
     #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
