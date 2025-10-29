@@ -1445,7 +1445,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     
     # Define use cases
     use_case_paths = list(Path("../documents/help/").glob('*.md'))
-    use_cases = { path.stem: [path.read_text().splitlines()[0], str("/local/documents/help/" + path.name)] for path in use_case_paths}
+    use_cases = { path.stem: [path.read_text().splitlines()[0].replace('# ', ''), str("/local/documents/help/" + path.name)] for path in use_case_paths}
     
     # Convert markdown files to HTML and write to local documents/help directory
     import markdown
