@@ -71,6 +71,11 @@
     "out_layer": "helilandings",
     "config_def": "local_helilandings"
 },
+"local_incidents" : {
+    "type": "inlet",
+    "out_layer": "incidents",
+    "config_def": "local_incidents"
+},
     "local_hydrants" : {
         "type": "inlet",
         "out_layer": "hydrants",
@@ -95,7 +100,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural", "helilandings", "hydrants"],
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
@@ -113,14 +118,14 @@
 "internal_webmap" : {
         "type": "outlet",
         "name": "internal_webmap",
-        "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "hydrants"],
+        "in_layers": ["basemap", "parcels", "contours", "roads", "internal_roads", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "incidents", "hydrants"],
         "config_def": "webmap",
         "access": ["admin"]
     },
 "runbook": {
         "type": "outlet",
         "name": "runbook",
-        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads", "creeks", "buildings",  "campgrounds", "helilandings", "milemarkers", "hydrants"],
+        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads", "creeks", "buildings",  "campgrounds", "helilandings", "incidents", "milemarkers", "hydrants"],
         "access": ["internal", "admin"],
     "config_def": "runbook",
     "blend_percent": 50,

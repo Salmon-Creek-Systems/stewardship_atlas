@@ -285,31 +285,32 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           },
 		"alterations": {	
-		"canonicalize": [
-		    {
-			"to": "name",
-			"from": ["PMc"],
-			"remove_prefix": []
-		    }
-		],
-		"vector_width": {
-		    "default": 3
-		},
-	"require":  [
-		    ["endswith", ["0.0", "5.0"]],
-		    ["equals", [
-			["91.0", "Callbox #911 mm 91.08"],
-			["89.6","Callbox #896 mm 89.63"],
-			["87.1","Callbox #878 mm 87.15"],
-			["85.7","Callbox #860 mm 85.74"],
-			["84.0","Callbox #840 mm 84.0"],
-			["81.6","Callbox #817 mm 81.62"],
-			["79.1","Callbox #790 mm 79.12"],
-			["76.5","Callbox #768 mm 76.57"],
-			["71.8","Callbox #714 mm 71.84"]
-			]]
-			]
-		    
+			"canonicalize": [
+				{
+				"to": "name",
+				"from": ["PMc"],
+				"remove_prefix": []
+				}
+			],
+			"vector_width": {
+				"default": 3
+			},
+			"filter":  [
+					["endswith", "name", ["0.0", "5.0"]]
+			],
+			"equals": [
+					["91.0", "Callbox #911 mm 91.08"],
+					["89.6","Callbox #896 mm 89.63"],
+					["87.1","Callbox #878 mm 87.15"],
+					["85.7","Callbox #860 mm 85.74"],
+					["84.0","Callbox #840 mm 84.0"],
+					["81.6","Callbox #817 mm 81.62"],
+					["79.1","Callbox #790 mm 79.12"],
+					["76.5","Callbox #768 mm 76.57"],
+					["71.8","Callbox #714 mm 71.84"]
+					]
+				
+					
 			}
 		},	
     "local_helilandings": {
@@ -332,7 +333,28 @@
             "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
+    },
+    "local_incidents": {
+        "name": "incidents_delta",
+        "asset_type": "inlet", 
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "alterations": {
+            "vector_width": {
+		"default": 10
+            }
         },
+	    "inpath_template": "westport_incidents.geojson",
+        "outpath_template": "/incidents_delta",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "Local incident data",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
     "local_hydrants": {
         "name": "hydrants",
         "asset_type": "inlet", 
