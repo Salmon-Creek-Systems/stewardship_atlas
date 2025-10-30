@@ -188,10 +188,10 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
                         keep_feature = False
                         break
                 elif operation == 'endswith':
-                    keep_feature = False
+                    #keep_feature = False
                     # Keep feature only if field_value ends with any value in value_list
                     if field_value is None or not any(str(field_value).endswith(v) for v in value_list):
-                        keep_feature = True
+                        keep_feature = False
                         break
             
             if keep_feature:
