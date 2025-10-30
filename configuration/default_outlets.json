@@ -8,6 +8,15 @@
         "template": "NONE",
         "fetch_type": "export_gsheet"
     },
+"config_editor": {
+    "type": "outlet",
+    "name": "config_editor",
+    "config": {
+        "interaction": "interface"
+    },
+    "access": ["admin"]
+},
+
     "gsheet_import": {
         "name": "sheet_import",
         "asset_type": "outlet",
