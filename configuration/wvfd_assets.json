@@ -110,14 +110,14 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants", "campgrounds"],
+    "in_layers": ["basemap", "regions","tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants", "campgrounds"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
 "webedit" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "campgrounds"],
+    "in_layers": ["basemap", "regions", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "campgrounds"],
     "config_def": "webedit"
 },
     "config_edit" : {
