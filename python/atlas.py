@@ -53,6 +53,29 @@ DEFAULT_SHARED_DIR = Path('/root/data')
 DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods
 
 
+def discover_versions(swale_path: Path) -> List[str]:
+    """Discover all existing versions in a swale directory.
+    
+    Versions are subdirectories that contain an atlas_config.json file.
+    
+    Args:
+        swale_path: Path to the swale directory
+    
+    Returns:
+        List of version names (directory names)
+    """
+    versions = []
+    if not swale_path.exists():
+        return versions
+    
+    for item in swale_path.iterdir():
+        if item.is_dir() and (item / 'atlas_config.json').exists():
+            versions.append(item.name)
+    
+    logger.debug(f"Discovered versions in {swale_path}: {versions}")
+    return sorted(versions)
+
+
 def add_htpasswds(config, path, access):
     """Add htpasswd entries for users with access to a directory.
     
@@ -124,6 +147,9 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['data_root'] = data_root
     config['name'] = name
     config['dataswale']['bbox'] = bbox
+    
+    # Discover existing versions in the swale directory
+    config['dataswale']['versions'] = discover_versions(p)
 
     if layers_path is not None:
         layers = json.load(open(layers_path))
