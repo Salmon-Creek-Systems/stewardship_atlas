@@ -13,7 +13,7 @@
         "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
-    {"name": "roads-primary", "geometry_type": "linestring", 
+    {"name": "roads_primary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
@@ -27,7 +27,7 @@
                 ],
               "default": {"STREETTYPE": "RD", "vector_width": 9}
             }]},
-    {"name": "roads-secondary", "geometry_type": "linestring", 
+    {"name": "roads_secondary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
@@ -41,7 +41,7 @@
                 ],
               "default": {"STREETTYPE": "RD", "vector_width": 9}
             }]},
-    {"name": "roads-tertiary", "geometry_type": "linestring", 
+    {"name": "roads_tertiary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },

@@ -44,17 +44,18 @@
     },
     "internal_roads_primary" : {
         "type": "inlet",
-        "out_layer": "roads-primary",
+        "inpath_template": "westport_primary_roads.geojson",
+        "out_layer": "roads_primary",
         "config_def": "internal_roads"
     },
     "internal_roads_secondary" : {
         "type": "inlet",
-        "out_layer": "roads-secondary",
+        "out_layer": "roads_secondary",
         "config_def": "internal_roads"
     },
     "internal_roads_tertiary" : {
         "type": "inlet",
-        "out_layer": "roads-tertiary",
+        "out_layer": "roads_tertiary",
         "config_def": "internal_roads"
     },
 
