@@ -151,12 +151,11 @@ def build_region_map_mapnik(config, outlet_name, region):
             
             # Add labels if requested
             if lc.get('add_labels', False):
-                text_sym = mapnik.TextSymbolizer(
-                    mapnik.Expression(f"[{lc.get('alterations', {}).get('label_attribute', 'name')}]"),
-                    'DejaVu Sans Book',
-                    10,
-                    stroke_color
-                )
+                text_sym = mapnik.TextSymbolizer()
+                text_sym.name = mapnik.Expression(f"[{lc.get('alterations', {}).get('label_attribute', 'name')}]")
+                text_sym.face_name = 'DejaVu Sans Book'
+                text_sym.text_size = 10
+                text_sym.fill = stroke_color
                 text_sym.halo_fill = mapnik.Color('white')
                 text_sym.halo_radius = 1
                 text_sym.allow_overlap = False
@@ -187,16 +186,15 @@ def build_region_map_mapnik(config, outlet_name, region):
             # Add labels if requested
             if lc.get('add_labels', False):
                 label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
-                text_sym = mapnik.TextSymbolizer(
-                    mapnik.Expression(f"[{label_attr}]"),
-                    'DejaVu Sans Book',
-                    12,
-                    stroke_color
-                )
+                text_sym = mapnik.TextSymbolizer()
+                text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                text_sym.face_name = 'DejaVu Sans Book'
+                text_sym.text_size = 12
+                text_sym.fill = stroke_color
                 text_sym.halo_fill = mapnik.Color('white')
                 text_sym.halo_radius = 2
                 text_sym.allow_overlap = False
-                text_sym.placement = mapnik.line_placement if geometry_type == 'linestring' else mapnik.point_placement
+                text_sym.placement_type = mapnik.label_placement.line_placement if geometry_type == 'linestring' else mapnik.label_placement.point_placement
                 rule.symbols.append(text_sym)
         
         style.rules.append(rule)
