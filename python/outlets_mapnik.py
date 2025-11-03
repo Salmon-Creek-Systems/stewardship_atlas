@@ -5,6 +5,8 @@ Drop-in replacement functions for GRASS-based rendering.
 import mapnik
 import json
 import logging
+import tempfile
+import os
 from pathlib import Path
 
 import versioning
@@ -15,6 +17,37 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+
+
+def ensure_label_attribute(layer_data, label_attr, layer_name):
+    """Ensure all features have the specified label attribute.
+    
+    If a feature is missing the attribute, add a synthetic one like
+    'layer_name_1', 'layer_name_2', etc.
+    
+    Args:
+        layer_data (dict): GeoJSON data with features
+        label_attr (str): The attribute name to check/add
+        layer_name (str): Name of the layer for synthetic labels
+        
+    Returns:
+        bool: True if modifications were made, False otherwise
+    """
+    modified = False
+    features = layer_data.get('features', [])
+    
+    for idx, feature in enumerate(features, start=1):
+        props = feature.get('properties', {})
+        if label_attr not in props or props[label_attr] is None or props[label_attr] == '':
+            # Add synthetic label
+            synthetic_label = f"{layer_name}_{idx}"
+            if 'properties' not in feature:
+                feature['properties'] = {}
+            feature['properties'][label_attr] = synthetic_label
+            modified = True
+            logger.debug(f"Added synthetic label '{synthetic_label}' to feature {idx}")
+    
+    return modified
 
 
 def build_region_map_mapnik(config, outlet_name, region):
@@ -64,6 +97,9 @@ def build_region_map_mapnik(config, outlet_name, region):
     
     logger.info(f"Building Mapnik map for region {region['name']} at {size}x{size}px")
     
+    # Track temporary files for cleanup
+    temp_files = []
+    
     # Handle raster basemap with blending if present
     if len(region.get('raster', [])) > 0:
         blend_percent = config['assets'][outlet_name].get('blend_percent', 10)
@@ -104,7 +140,7 @@ def build_region_map_mapnik(config, outlet_name, region):
     for lc, lp in region['vectors']:
         logger.debug(f"Adding layer {lc['name']} from {lp}")
         
-        # Check for empty layers
+        # Check for empty layers and load data
         try:
             with open(lp) as f:
                 layer_data = json.load(f)
@@ -114,6 +150,20 @@ def build_region_map_mapnik(config, outlet_name, region):
         except Exception as e:
             logger.warning(f"Could not read layer {lc['name']}: {e}")
             continue
+        
+        # If labels are requested, ensure the label attribute exists
+        layer_file_to_use = lp
+        if lc.get('add_labels', False):
+            label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
+            modified = ensure_label_attribute(layer_data, label_attr, lc['name'])
+            
+            if modified:
+                # Write modified data to temporary file
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
+                    json.dump(layer_data, tf)
+                    layer_file_to_use = tf.name
+                    temp_files.append(tf.name)
+                logger.info(f"Added synthetic labels to layer {lc['name']}")
         
         # Get colors
         color = lc.get('color', (100, 100, 100))
@@ -202,7 +252,7 @@ def build_region_map_mapnik(config, outlet_name, region):
         
         # Create layer
         layer = mapnik.Layer(lc['name'])
-        layer.datasource = mapnik.GeoJSON(file=str(lp))
+        layer.datasource = mapnik.GeoJSON(file=str(layer_file_to_use))
         layer.styles.append(style_name)
         m.layers.append(layer)
         
@@ -214,6 +264,14 @@ def build_region_map_mapnik(config, outlet_name, region):
     
     logger.info(f"Rendering to {outpath}...")
     mapnik.render_to_file(m, str(outpath), 'png')
+    
+    # Clean up temporary files
+    for temp_file in temp_files:
+        try:
+            os.unlink(temp_file)
+            logger.debug(f"Cleaned up temporary file: {temp_file}")
+        except Exception as e:
+            logger.warning(f"Could not remove temporary file {temp_file}: {e}")
     
     logger.info(f"Map rendered successfully [{time.time() - t:.2f}s total]")
     
