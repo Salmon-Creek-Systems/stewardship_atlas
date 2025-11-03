@@ -185,6 +185,15 @@ def build_region_map_mapnik(config, outlet_name, region):
             if modified:
                 logger.info(f"Added synthetic labels to layer {lc['name']}")
         
+        # Create layer and datasource FIRST so Mapnik can validate field names
+        layer = mapnik.Layer(lc['name'])
+        layer.datasource = mapnik.GeoJSON(file=str(layer_file_to_use))
+        
+        # Debug: check what fields Mapnik sees in the datasource
+        if lc.get('add_labels', False):
+            ds_fields = layer.datasource.fields()
+            logger.info(f"Mapnik datasource fields for {lc['name']}: {ds_fields}")
+        
         # Get colors
         color = lc.get('color', (100, 100, 100))
         fill_color = lc.get('fill_color', color)
@@ -221,16 +230,21 @@ def build_region_map_mapnik(config, outlet_name, region):
             
             # Add labels if requested
             if lc.get('add_labels', False):
-                text_sym = mapnik.TextSymbolizer()
-                text_sym.name = mapnik.Expression(f"[{lc.get('alterations', {}).get('label_attribute', 'name')}]")
-                text_sym.face_name = 'DejaVu Sans Book'
-                text_sym.text_size = 10
-                text_sym.fill = stroke_color
-                text_sym.halo_fill = mapnik.Color('white')
-                text_sym.halo_radius = 1
-                text_sym.allow_overlap = False
-                text_sym.avoid_edges = True
-                rule.symbols.append(text_sym)
+                label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
+                try:
+                    text_sym = mapnik.TextSymbolizer()
+                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                    text_sym.face_name = 'DejaVu Sans Book'
+                    text_sym.text_size = 10
+                    text_sym.fill = stroke_color
+                    text_sym.halo_fill = mapnik.Color('white')
+                    text_sym.halo_radius = 1
+                    text_sym.allow_overlap = False
+                    text_sym.avoid_edges = True
+                    rule.symbols.append(text_sym)
+                except RuntimeError as e:
+                    logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
+                    logger.warning(f"Labels will be skipped for this layer")
         
         else:
             # Line or polygon symbolizer
@@ -256,23 +270,25 @@ def build_region_map_mapnik(config, outlet_name, region):
             # Add labels if requested
             if lc.get('add_labels', False):
                 label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
-                text_sym = mapnik.TextSymbolizer()
-                text_sym.name = mapnik.Expression(f"[{label_attr}]")
-                text_sym.face_name = 'DejaVu Sans Book'
-                text_sym.text_size = 12
-                text_sym.fill = stroke_color
-                text_sym.halo_fill = mapnik.Color('white')
-                text_sym.halo_radius = 2
-                text_sym.allow_overlap = False
-                text_sym.placement_type = mapnik.label_placement.line_placement if geometry_type == 'linestring' else mapnik.label_placement.point_placement
-                rule.symbols.append(text_sym)
+                try:
+                    text_sym = mapnik.TextSymbolizer()
+                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                    text_sym.face_name = 'DejaVu Sans Book'
+                    text_sym.text_size = 12
+                    text_sym.fill = stroke_color
+                    text_sym.halo_fill = mapnik.Color('white')
+                    text_sym.halo_radius = 2
+                    text_sym.allow_overlap = False
+                    text_sym.placement_type = mapnik.label_placement.line_placement if geometry_type == 'linestring' else mapnik.label_placement.point_placement
+                    rule.symbols.append(text_sym)
+                except RuntimeError as e:
+                    logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
+                    logger.warning(f"Labels will be skipped for this layer")
         
         style.rules.append(rule)
         m.append_style(style_name, style)
         
-        # Create layer
-        layer = mapnik.Layer(lc['name'])
-        layer.datasource = mapnik.GeoJSON(file=str(layer_file_to_use))
+        # Attach style to layer and add to map
         layer.styles.append(style_name)
         m.layers.append(layer)
         
