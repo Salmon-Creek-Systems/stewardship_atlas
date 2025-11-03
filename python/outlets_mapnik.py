@@ -138,7 +138,7 @@ def build_region_map_mapnik(config, outlet_name, region):
     
     # Add vector layers
     for lc, lp in region['vectors']:
-        logger.debug(f"Adding layer {lc['name']} from {lp}")
+        logger.info(f"Adding layer {lc['name']} from {lp}")
         
         # Check for empty layers and load data
         try:
@@ -162,6 +162,7 @@ def build_region_map_mapnik(config, outlet_name, region):
                 logger.info(f"Layer {lc['name']} sample properties: {list(sample_props.keys())}")
             
             modified = ensure_label_attribute(layer_data, label_attr, lc['name'])
+
             
             # Always write to temp file when labels are requested to ensure Mapnik can find the attribute
             with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
@@ -180,6 +181,7 @@ def build_region_map_mapnik(config, outlet_name, region):
                         logger.warning(f"✗ Label attribute '{label_attr}' NOT found in temp file for {lc['name']}!")
                         logger.warning(f"  Available properties: {list(verify_props.keys())}")
             
+
             if modified:
                 logger.info(f"Added synthetic labels to layer {lc['name']}")
         

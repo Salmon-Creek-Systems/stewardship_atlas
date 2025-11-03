@@ -136,7 +136,7 @@
 "runbook": {
         "type": "outlet",
         "name": "runbook",
-        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "creeks", "buildings",  "helilandings", "incidents", "milemarkers", "hydrants", "campgrounds"],
+        "in_layers": ["basemap", "contours", "roads_primary", "creeks", "buildings",  "helilandings", "milemarkers", "hydrants", "campgrounds"],
         "access": ["internal", "admin"],
     "config_def": "runbook",
     "blend_percent": 50,
