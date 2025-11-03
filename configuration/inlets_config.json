@@ -40,7 +40,7 @@
             }
 	},	
 	"data_type": "geojson",
-	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry,  ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=buildings/type=building/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry,  ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-10-22.0/theme=buildings/type=building/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
       "outpath_template": "/staging/raw_buildings.geojson",
 	"attribution": {
         "url": "https://portal.opentopography.org/api/terms",
