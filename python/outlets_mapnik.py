@@ -138,7 +138,7 @@ def build_region_map_mapnik(config, outlet_name, region):
     
     # Add vector layers
     for lc, lp in region['vectors']:
-        logger.debug(f"Adding layer {lc['name']} from {lp}")
+        logger.info(f"Adding layer {lc['name']} from {lp}")
         
         # Check for empty layers and load data
         try:
@@ -156,7 +156,8 @@ def build_region_map_mapnik(config, outlet_name, region):
         if lc.get('add_labels', False):
             label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
             modified = ensure_label_attribute(layer_data, label_attr, lc['name'])
-            
+            logger.info(f"checked {lc['name']} for {label_attr}, got: {modified}")
+    
             if modified:
                 # Write modified data to temporary file
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
