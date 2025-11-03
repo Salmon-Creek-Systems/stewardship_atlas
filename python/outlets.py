@@ -18,6 +18,7 @@ import gspread
 
 import dataswale_geojson
 import utils
+from outlets_mapnik import build_region_map_mapnik
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -978,7 +979,9 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
         for region in regions:
             logger.info(f"Building map for region: {region['name']}  [{time.time() - t}] with wtf config: {region}")
             # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
-            build_region_map_grass(config, outlet_name, region)
+            # build_region_map_grass(config, outlet_name, region)
+            
+            build_region_map_mapnik(config, outlet_name, region)
 
         # save regions config as JSON for later use
         regions_json_path = versioning.atlas_path(config, "outlets") / outlet_name / f"regions_config.json"
