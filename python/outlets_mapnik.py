@@ -194,6 +194,11 @@ def build_region_map_mapnik(config, outlet_name, region):
             ds_fields = layer.datasource.fields()
             logger.info(f"Mapnik datasource fields for {lc['name']}: {ds_fields}")
         
+        # Store label attribute for later use
+        label_attr = None
+        if lc.get('add_labels', False):
+            label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
+        
         # Get colors
         color = lc.get('color', (100, 100, 100))
         fill_color = lc.get('fill_color', color)
@@ -228,23 +233,8 @@ def build_region_map_mapnik(config, outlet_name, region):
             point_sym.allow_overlap = True
             rule.symbols.append(point_sym)
             
-            # Add labels if requested
-            if lc.get('add_labels', False):
-                label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
-                try:
-                    text_sym = mapnik.TextSymbolizer()
-                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
-                    text_sym.face_name = 'DejaVu Sans Book'
-                    text_sym.text_size = 10
-                    text_sym.fill = stroke_color
-                    text_sym.halo_fill = mapnik.Color('white')
-                    text_sym.halo_radius = 1
-                    text_sym.allow_overlap = False
-                    text_sym.avoid_edges = True
-                    rule.symbols.append(text_sym)
-                except RuntimeError as e:
-                    logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
-                    logger.warning(f"Labels will be skipped for this layer")
+            # Add labels if requested - will be configured after layer is added to map
+            # (skip for now, will add after layer is in map)
         
         else:
             # Line or polygon symbolizer
@@ -267,23 +257,8 @@ def build_region_map_mapnik(config, outlet_name, region):
                 poly_sym.fill = fill_mapnik
                 rule.symbols.append(poly_sym)
             
-            # Add labels if requested
-            if lc.get('add_labels', False):
-                label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
-                try:
-                    text_sym = mapnik.TextSymbolizer()
-                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
-                    text_sym.face_name = 'DejaVu Sans Book'
-                    text_sym.text_size = 12
-                    text_sym.fill = stroke_color
-                    text_sym.halo_fill = mapnik.Color('white')
-                    text_sym.halo_radius = 2
-                    text_sym.allow_overlap = False
-                    text_sym.placement_type = mapnik.label_placement.line_placement if geometry_type == 'linestring' else mapnik.label_placement.point_placement
-                    rule.symbols.append(text_sym)
-                except RuntimeError as e:
-                    logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
-                    logger.warning(f"Labels will be skipped for this layer")
+            # Add labels if requested - will be configured after layer is added to map
+            # (skip for now, will add after layer is in map)
         
         style.rules.append(rule)
         m.append_style(style_name, style)
@@ -291,6 +266,48 @@ def build_region_map_mapnik(config, outlet_name, region):
         # Attach style to layer and add to map
         layer.styles.append(style_name)
         m.layers.append(layer)
+        
+        # NOW add labels after layer is in the map
+        if label_attr is not None:
+            try:
+                # Create a new style just for labels
+                label_style_name = f"LabelStyle_{lc['name']}"
+                label_style = mapnik.Style()
+                label_rule = mapnik.Rule()
+                
+                text_sym = mapnik.TextSymbolizer()
+                text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                text_sym.face_name = 'DejaVu Sans Book'
+                
+                # Size based on geometry type
+                if geometry_type == 'point':
+                    text_sym.text_size = 24
+                else:
+                    text_sym.text_size = 32
+                    
+                text_sym.fill = mapnik.Color(0, 0, 0, 255)  # Black text
+                text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)  # White halo
+                text_sym.halo_radius = 3
+                text_sym.allow_overlap = True  # Allow overlaps for testing
+                
+                # Set placement for line features
+                if geometry_type == 'linestring':
+                    text_sym.label_placement = mapnik.label_placement.LINE_PLACEMENT
+                    text_sym.spacing = 400  # Space between repeated labels on long lines
+                else:
+                    text_sym.label_placement = mapnik.label_placement.POINT_PLACEMENT
+                
+                label_rule.symbols.append(text_sym)
+                label_style.rules.append(label_rule)
+                m.append_style(label_style_name, label_style)
+                
+                # Add label style to existing layer
+                layer.styles.append(label_style_name)
+                
+                logger.info(f"✓ Added text labels for {geometry_type} layer {lc['name']}")
+            except RuntimeError as e:
+                logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
+                logger.warning(f"Labels will be skipped for this layer")
         
         logger.info(f"{region['name']} : {lc['name']} [{time.time() - t:.2f}s]")
     
