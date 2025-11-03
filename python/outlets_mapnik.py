@@ -155,14 +155,32 @@ def build_region_map_mapnik(config, outlet_name, region):
         layer_file_to_use = lp
         if lc.get('add_labels', False):
             label_attr = lc.get('alterations', {}).get('label_attribute', 'name')
+            
+            # Debug: check what properties exist
+            if layer_data.get('features'):
+                sample_props = layer_data['features'][0].get('properties', {})
+                logger.info(f"Layer {lc['name']} sample properties: {list(sample_props.keys())}")
+            
             modified = ensure_label_attribute(layer_data, label_attr, lc['name'])
             
+            # Always write to temp file when labels are requested to ensure Mapnik can find the attribute
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
+                json.dump(layer_data, tf)
+                layer_file_to_use = tf.name
+                temp_files.append(tf.name)
+            
+            # Verify the temp file has the label attribute
+            with open(layer_file_to_use, 'r') as vf:
+                verify_data = json.load(vf)
+                if verify_data.get('features'):
+                    verify_props = verify_data['features'][0].get('properties', {})
+                    if label_attr in verify_props:
+                        logger.info(f"✓ Label attribute '{label_attr}' confirmed in temp file for {lc['name']}")
+                    else:
+                        logger.warning(f"✗ Label attribute '{label_attr}' NOT found in temp file for {lc['name']}!")
+                        logger.warning(f"  Available properties: {list(verify_props.keys())}")
+            
             if modified:
-                # Write modified data to temporary file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
-                    json.dump(layer_data, tf)
-                    layer_file_to_use = tf.name
-                    temp_files.append(tf.name)
                 logger.info(f"Added synthetic labels to layer {lc['name']}")
         
         # Get colors
