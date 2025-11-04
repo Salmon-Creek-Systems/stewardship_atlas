@@ -18,6 +18,10 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+# Log Mapnik version on module load
+logger.info(f"Mapnik version: {mapnik.mapnik_version()}")
+logger.info(f"Mapnik version string: {mapnik.mapnik_version_string()}")
+
 
 def ensure_label_attribute(layer_data, label_attr, layer_name):
     """Ensure all features have the specified label attribute.
@@ -283,7 +287,28 @@ def build_region_map_mapnik(config, outlet_name, region):
                 
                 logger.info(f"Style fully connected to map/layer, now setting properties...")
                 try:
-                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                    # Try passing layer as context to Expression
+                    logger.info(f"Attempting Expression with layer context...")
+                    expr = mapnik.Expression(f"[{label_attr}]", layer)
+                except:
+                    try:
+                        # Try with datasource
+                        logger.info(f"Attempting Expression with datasource context...")
+                        expr = mapnik.Expression(f"[{label_attr}]", layer.datasource)
+                    except:
+                        # Try without validation (if there's a flag)
+                        logger.info(f"Attempting Expression without context...")
+                        # Some Mapnik versions might accept a second parameter to skip validation
+                        try:
+                            expr = mapnik.Expression(f"[{label_attr}]", False)
+                        except:
+                            logger.warning(f"All Expression creation methods failed!")
+                            logger.info(f"Trying to set name as plain string...")
+                            # Last resort - maybe in 3.1.0 we just use strings?
+                            expr = f"[{label_attr}]"
+                
+                try:
+                    text_sym.name = expr
                     text_sym.face_name = 'DejaVu Sans Book'
                     text_sym.text_size = 32 if geometry_type != 'point' else 24
                     text_sym.fill = mapnik.Color(0, 0, 0, 255)
