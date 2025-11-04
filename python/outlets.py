@@ -752,6 +752,72 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
  
     return outpath
 
+def build_region_minimap_grass(swale_config,  asset_name, region):
+    swale_name = swale_config['name']
+    data_root = swale_config['data_root']
+    version_string = swale_config['version_string']
+    grass_init(swale_name)
+    import grass.script as gs
+    import grass.jupyter as gj
+    size = 400
+    m = gj.Map(height=size, width=size)
+    region_bbox = region['bbox']
+    region_polygon = geojson.Polygon([utils.bbox_to_polygon(region_bbox)])
+
+    clip_bbox = swale_config['geometry']['bbox']
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
+
+    
+    #gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
+    # load region layers
+    raster_name = 'hillshade_' + 'all'
+    raster_path = f"{data_root}/{swale_name}/{version_string}/staging/hillshade.tiff"
+    print(f"making map image with {raster_path}.")
+    gs.read_command('r.in.gdal',  band=1,input=raster_path, output=raster_name)
+    # gs.read_command('r.colors', map=raster_name)
+    #
+    #gs.read_command('g.region', raster=raster_name)
+
+    
+    # generate temporary vector file with box/etc
+    # use resolve path!
+    region_name = region['name'].lower()
+    outpath = f"{data_root}/{swale_name}/{version_string}/{asset_name}/page_{region_name}_minimap"
+    f = geojson.FeatureCollection([geojson.Feature(
+        properties={"name": region['caption']},
+        geometry=region_polygon)])
+    geojson_path = outpath + ".geojson"
+    geojson.dump(f, open(geojson_path, 'w'))
+    
+    print(f"writing temp GeoJSON to: {geojson_path}:\n{f}")    
+
+    lame = json.load(open(geojson_path))
+    num_feats = len(lame['features'])
+    print(f"testloaded {num_feats} from {geojson_path} as:\n{lame}")
+    #if 
+    #    continue
+
+    
+    # read in as vector
+    gs.read_command('v.import', input=geojson_path, output=region_name)
+
+    print(f"read temp GeoJSON from: {geojson_path} -> {region_name}:\n")    
+    # draw on map
+    c = [100,255,150]
+    
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
+    m.d_rast(map=raster_name)
+    m.d_vect(map=region_name,
+             color=f"{c[0]}:{c[1]}:{c[2]}",
+             fill_color='none',
+             width=5,
+             icon='basic/marker',size=20)
+    gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
+    #gs.read_command('g.region', raster=raster_name)
+    # export map
+    m.save(outpath + ".png")
+
+
 
 def build_region_map_grass(config, outlet_name, region):
     """Build a map image for a region using GRASS GIS.
@@ -978,7 +1044,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
         # Build maps for each region
         for region in regions:
             logger.info(f"Building map for region: {region['name']}  [{time.time() - t}] with wtf config: {region}")
-            # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
+            build_region_minimap_grass(config, outlet_name, region)
             build_region_map_grass(config, outlet_name, region)
             
             # build_region_map_mapnik(config, outlet_name, region)
