@@ -168,7 +168,7 @@ map.on('load', async () => {
     // layers we need to load dynamically follow:
     // {dynamic_layers}
 
-    // Add Alt+Click handler to copy coordinates to clipboard
+    // Add click handler for features and coordinates
     map.on('click', (e) => {
         console.log('Map click event fired', {
             ctrlKey: e.originalEvent.ctrlKey,
@@ -179,12 +179,28 @@ map.on('load', async () => {
             target: e.originalEvent.target.tagName
         });
         
-        // Check if meta key is pressed (Alt+Click)
+        // Check if meta key is pressed (Alt+Click) for location sharing
         if (e.originalEvent.metaKey) {
             console.log('Alt key pressed, processing click');
             handleLocationShare(e.lngLat);
         } else {
-            console.log('Alt key not pressed, ignoring click');
+            // Check if we clicked on any features with a URL
+            const features = map.queryRenderedFeatures(e.point);
+            
+            if (features.length > 0) {
+                // Look for the first feature with a URL
+                for (const feature of features) {
+                    const url = feature.properties.URL;
+                    if (url && url.trim() !== '') {
+                        // Open URL in new tab
+                        window.open(url, '_blank');
+                        console.log('Opening URL:', url);
+                        break; // Only open the first URL found
+                    }
+                }
+            }
+            
+            console.log('Alt key not pressed, checked for features with URLs');
         }
     });
 
