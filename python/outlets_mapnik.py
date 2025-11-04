@@ -265,16 +265,23 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_style = mapnik.Style()
                 label_rule = mapnik.Rule()
                 
-                # The issue appears to be that TextSymbolizer validates properties against datasource
-                # Try adding the symbolizer to rule FIRST, then setting properties
-                logger.info(f"Creating bare TextSymbolizer and adding to rule first...")
+                # Build the entire style and attach to map/layer BEFORE setting text properties
+                logger.info(f"Creating bare TextSymbolizer...")
                 text_sym = mapnik.TextSymbolizer()
                 
-                # Add to rule BEFORE setting any properties
+                # Add to rule
                 label_rule.symbols.append(text_sym)
                 
-                # Now try setting properties after it's in the rule
-                logger.info(f"Setting properties after adding to rule...")
+                # Add rule to style
+                label_style.rules.append(label_rule)
+                
+                # Add style to map
+                m.append_style(label_style_name, label_style)
+                
+                # Add style to layer (layer is already in map)
+                layer.styles.append(label_style_name)
+                
+                logger.info(f"Style fully connected to map/layer, now setting properties...")
                 try:
                     text_sym.name = mapnik.Expression(f"[{label_attr}]")
                     text_sym.face_name = 'DejaVu Sans Book'
@@ -285,9 +292,8 @@ def build_region_map_mapnik(config, outlet_name, region):
                     text_sym.allow_overlap = True
                     logger.info(f"✓ All properties set successfully!")
                 except Exception as e:
-                    logger.warning(f"Setting properties after adding to rule failed: {e}")
-                    # Remove the symbolizer if it failed
-                    label_rule.symbols.remove(text_sym)
+                    logger.warning(f"Setting properties after full connection failed: {e}")
+                    # Can't easily clean up, just log and continue
                     raise
                 
                 # Set placement for line features
@@ -297,13 +303,7 @@ def build_region_map_mapnik(config, outlet_name, region):
                 else:
                     text_sym.label_placement = mapnik.label_placement.POINT_PLACEMENT
                 
-                label_rule.symbols.append(text_sym)
-                label_style.rules.append(label_rule)
-                m.append_style(label_style_name, label_style)
-                
-                # Add label style to existing layer
-                layer.styles.append(label_style_name)
-                
+                # Already added above during property setting test
                 logger.info(f"✓ Added text labels for {geometry_type} layer {lc['name']}")
             except RuntimeError as e:
                 logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
