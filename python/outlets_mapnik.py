@@ -159,32 +159,22 @@ def build_region_map_mapnik(config, outlet_name, region):
             # Debug: check what properties exist
             if layer_data.get('features'):
                 sample_props = layer_data['features'][0].get('properties', {})
-                logger.info(f"Layer {lc['name']} sample properties: {list(sample_props.keys())}")
+                mum_features = len(layer_data['features'])
+                logger.info(f"Layer {lc['name']} sample properties: {list(sample_props.keys())} {mum_features} features")
             
             modified = ensure_label_attribute(layer_data, label_attr, lc['name'])
-
+            logger.info(f"ensure_label_attribute returned modified={modified} for {lc['name']}")
             
-            # Always write to temp file when labels are requested to ensure Mapnik can find the attribute
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
-                json.dump(layer_data, tf)
-                layer_file_to_use = tf.name
-                temp_files.append(tf.name)
-            
-            # Verify the temp file has the label attribute
-            with open(layer_file_to_use, 'r') as vf:
-                verify_data = json.load(vf)
-                if verify_data.get('features'):
-                    verify_props = verify_data['features'][0].get('properties', {})
-                    if label_attr in verify_props:
-                        logger.info(f"✓ Label attribute '{label_attr}' confirmed in temp file for {lc['name']}")
-                    else:
-                        logger.warning(f"✗ Label attribute '{label_attr}' NOT found in temp file for {lc['name']}!")
-                        logger.warning(f"  Available properties: {list(verify_props.keys())}")
-            
-
+            # Only write temp file if we modified the data
             if modified:
-                logger.info(f"Added synthetic labels to layer {lc['name']}")
-        
+                logger.info(f"Writing modified data with synthetic labels to temp file for {lc['name']}")
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as tf:
+                    json.dump(layer_data, tf)
+                    layer_file_to_use = tf.name
+                    temp_files.append(tf.name)
+            else:
+                logger.info(f"Label attribute '{label_attr}' already exists, using original file for {lc['name']}")
+        logger.info(f"Layer File To Use: {layer_file_to_use}")
         # Create layer and datasource FIRST so Mapnik can validate field names
         layer = mapnik.Layer(lc['name'])
         layer.datasource = mapnik.GeoJSON(file=str(layer_file_to_use))
@@ -276,7 +266,11 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_rule = mapnik.Rule()
                 
                 text_sym = mapnik.TextSymbolizer()
-                text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                # Try creating expression with proper formatting
+                logger.info(f"Creating Expression for attribute: [{label_attr}]")
+                expr = mapnik.Expression(f"[{label_attr}]")
+                logger.info(f"Expression created successfully: {expr}")
+                text_sym.name = expr
                 text_sym.face_name = 'DejaVu Sans Book'
                 
                 # Size based on geometry type
