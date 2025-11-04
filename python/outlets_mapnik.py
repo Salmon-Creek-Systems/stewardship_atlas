@@ -262,77 +262,12 @@ def build_region_map_mapnik(config, outlet_name, region):
         m.layers.append(layer)
         
         # NOW add labels after layer is in the map
+        # NOTE: Mapnik 3.1.0 has a bug where TextSymbolizer.name validation fails
+        # The validation doesn't have access to datasource context even when fully connected
+        # Skipping labels until this is resolved
         if label_attr is not None:
-            try:
-                # Create a new style just for labels
-                label_style_name = f"LabelStyle_{lc['name']}"
-                label_style = mapnik.Style()
-                label_rule = mapnik.Rule()
-                
-                # Build the entire style and attach to map/layer BEFORE setting text properties
-                logger.info(f"Creating bare TextSymbolizer...")
-                text_sym = mapnik.TextSymbolizer()
-                
-                # Add to rule
-                label_rule.symbols.append(text_sym)
-                
-                # Add rule to style
-                label_style.rules.append(label_rule)
-                
-                # Add style to map
-                m.append_style(label_style_name, label_style)
-                
-                # Add style to layer (layer is already in map)
-                layer.styles.append(label_style_name)
-                
-                logger.info(f"Style fully connected to map/layer, now setting properties...")
-                try:
-                    # Try passing layer as context to Expression
-                    logger.info(f"Attempting Expression with layer context...")
-                    expr = mapnik.Expression(f"[{label_attr}]", layer)
-                except:
-                    try:
-                        # Try with datasource
-                        logger.info(f"Attempting Expression with datasource context...")
-                        expr = mapnik.Expression(f"[{label_attr}]", layer.datasource)
-                    except:
-                        # Try without validation (if there's a flag)
-                        logger.info(f"Attempting Expression without context...")
-                        # Some Mapnik versions might accept a second parameter to skip validation
-                        try:
-                            expr = mapnik.Expression(f"[{label_attr}]", False)
-                        except:
-                            logger.warning(f"All Expression creation methods failed!")
-                            logger.info(f"Trying to set name as plain string...")
-                            # Last resort - maybe in 3.1.0 we just use strings?
-                            expr = f"[{label_attr}]"
-                
-                try:
-                    text_sym.name = expr
-                    text_sym.face_name = 'DejaVu Sans Book'
-                    text_sym.text_size = 32 if geometry_type != 'point' else 24
-                    text_sym.fill = mapnik.Color(0, 0, 0, 255)
-                    text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)
-                    text_sym.halo_radius = 3
-                    text_sym.allow_overlap = True
-                    logger.info(f"✓ All properties set successfully!")
-                except Exception as e:
-                    logger.warning(f"Setting properties after full connection failed: {e}")
-                    # Can't easily clean up, just log and continue
-                    raise
-                
-                # Set placement for line features
-                if geometry_type == 'linestring':
-                    text_sym.label_placement = mapnik.label_placement.LINE_PLACEMENT
-                    text_sym.spacing = 400  # Space between repeated labels on long lines
-                else:
-                    text_sym.label_placement = mapnik.label_placement.POINT_PLACEMENT
-                
-                # Already added above during property setting test
-                logger.info(f"✓ Added text labels for {geometry_type} layer {lc['name']}")
-            except RuntimeError as e:
-                logger.warning(f"Could not create text symbolizer for {lc['name']} with attribute '{label_attr}': {e}")
-                logger.warning(f"Labels will be skipped for this layer")
+            logger.info(f"Labels requested for {lc['name']} but skipped due to Mapnik 3.1.0 TextSymbolizer bug")
+            logger.info(f"Recommendation: Continue using GRASS for rendering with labels, or try different Mapnik version")
         
         logger.info(f"{region['name']} : {lc['name']} [{time.time() - t:.2f}s]")
     

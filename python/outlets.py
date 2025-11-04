@@ -812,7 +812,7 @@ def build_region_map_grass(config, outlet_name, region):
                 logger.debug("Adding Points")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=100,
+                         icon=lc.get('symbol', {}).get("icon",'basic/diamond'),size=50,
                          label_size=25,
                          attribute_column=lc.get('alterations', {}).get('label_attribute', 'name'))
             elif lc.get("icon_if"):
@@ -820,7 +820,7 @@ def build_region_map_grass(config, outlet_name, region):
                 logger.info(f"Conditional POINT icon! {lc['icon_if']} -> [{icon_sql}]")
                 m.d_vect(map=lc['name'],
                          color=f"{c[0]}:{c[1]}:{c[2]}",
-                         icon=lc['icon_if']['icon'], size=100,
+                         icon=lc['icon_if']['icon'], size=50,
                          where=icon_sql)
 
                 
@@ -979,9 +979,9 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
         for region in regions:
             logger.info(f"Building map for region: {region['name']}  [{time.time() - t}] with wtf config: {region}")
             # build_region_minimap(swale_config, swale_config['data_root'], swale_name, version_string,  outlet_config['name'], region)
-            # build_region_map_grass(config, outlet_name, region)
+            build_region_map_grass(config, outlet_name, region)
             
-            build_region_map_mapnik(config, outlet_name, region)
+            # build_region_map_mapnik(config, outlet_name, region)
 
         # save regions config as JSON for later use
         regions_json_path = versioning.atlas_path(config, "outlets") / outlet_name / f"regions_config.json"
