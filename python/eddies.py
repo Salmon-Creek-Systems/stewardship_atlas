@@ -123,15 +123,38 @@ def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
         # Blend hillshade with white background based on intensity
         hillshade = hillshade * intensity + background * (1 - intensity)
     
-    logger.debug("Calculated hillshade: {in_path} -> {out_path} ({intensity})")
+    # Create RGB image from grayscale hillshade
+    # Convert hillshade to 0-255 range
+    hillshade_scaled = (hillshade * 255).astype(np.uint8)
     
-    # Save hillshade
+    # Create RGB bands (initially all grayscale)
+    rgb_bands = np.stack([hillshade_scaled, hillshade_scaled, hillshade_scaled], axis=0)
+    
+    # Create mask for zero and below elevation (water/ocean)
+    water_mask = elevation <= 0
+    
+    # Apply dark blue color to water areas (RGB: 0, 50, 100)
+    # Preserve some hillshade intensity for underwater terrain
+    if np.any(water_mask):
+        water_intensity = hillshade[water_mask]
+        rgb_bands[0][water_mask] = (water_intensity * 0).astype(np.uint8)      # Red: 0
+        rgb_bands[1][water_mask] = (water_intensity * 50).astype(np.uint8)     # Green: 0-50 based on hillshade
+        rgb_bands[2][water_mask] = (water_intensity * 100).astype(np.uint8)    # Blue: 0-100 based on hillshade
+        logger.info(f"Colored {np.sum(water_mask)} water pixels with dark blue")
+    
+    logger.debug(f"Calculated hillshade: {in_path} -> {out_path} ({intensity})")
+    
+    # Save RGB hillshade
     driver = gdal.GetDriverByName('GTiff')
-    out_ds = driver.Create(str(out_path), ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Float32)
+    out_ds = driver.Create(str(out_path), ds.RasterXSize, ds.RasterYSize, 3, gdal.GDT_Byte)
     out_ds.SetGeoTransform(ds.GetGeoTransform())
     out_ds.SetProjection(ds.GetProjection())
-    out_ds.GetRasterBand(1).WriteArray(hillshade)
-    logger.debug(f"Saved hillshade to: {out_path}")
+    
+    # Write each RGB band
+    for i in range(3):
+        out_ds.GetRasterBand(i + 1).WriteArray(rgb_bands[i])
+    
+    logger.debug(f"Saved RGB hillshade to: {out_path}")
     
     # Clean up
     ds = None
