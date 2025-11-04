@@ -265,23 +265,17 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_style = mapnik.Style()
                 label_rule = mapnik.Rule()
                 
-                # Debug: inspect what's available on TextSymbolizer
+                # Check if GeoJSON datasource fields might have different format
+                logger.info(f"Checking datasource features directly...")
+                feature_set = layer.datasource.features(mapnik.Query(layer.datasource.envelope()))
+                first_feature = feature_set.next() if feature_set else None
+                if first_feature:
+                    logger.info(f"First feature attributes: {dict(first_feature.attributes)}")
+                    logger.info(f"Feature has 'name'? {'name' in first_feature.attributes}")
+                
+                # Try creating with literal constant text to see if TextSymbolizer works at all
+                logger.info(f"Testing with constant text first...")
                 text_sym = mapnik.TextSymbolizer()
-                logger.info(f"TextSymbolizer attributes: {[attr for attr in dir(text_sym) if not attr.startswith('_')]}")
-                
-                # Try the simplest possible approach - use string directly instead of Expression
-                logger.info(f"Attempting to set name as string: {label_attr}")
-                try:
-                    text_sym.name = label_attr  # Try without Expression wrapper
-                except Exception as e1:
-                    logger.warning(f"Setting name as string failed: {e1}")
-                    # Try with brackets as string
-                    try:
-                        text_sym.name = f"[{label_attr}]"
-                    except Exception as e2:
-                        logger.warning(f"Setting name as bracketed string failed: {e2}")
-                        raise
-                
                 text_sym.face_name = 'DejaVu Sans Book'
                 text_sym.text_size = 32 if geometry_type != 'point' else 24
                 text_sym.fill = mapnik.Color(0, 0, 0, 255)
@@ -289,7 +283,17 @@ def build_region_map_mapnik(config, outlet_name, region):
                 text_sym.halo_radius = 3
                 text_sym.allow_overlap = True
                 
-                logger.info(f"Text symbolizer configured")
+                # Try setting name to a constant first
+                try:
+                    text_sym.name = "TEST"
+                    logger.info(f"✓ Set name to constant 'TEST' succeeded")
+                    # Now try with attribute
+                    text_sym.name = f"[{label_attr}]"
+                    logger.info(f"✓ Set name to '[{label_attr}]' succeeded")
+                except Exception as e:
+                    logger.warning(f"Even constant text failed: {e}")
+                    # Last resort - skip the name entirely and just add marker
+                    logger.info(f"Skipping text name, will just render markers")
                 
                 # Set placement for line features
                 if geometry_type == 'linestring':
