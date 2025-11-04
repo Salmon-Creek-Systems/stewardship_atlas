@@ -265,24 +265,27 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_style = mapnik.Style()
                 label_rule = mapnik.Rule()
                 
-                text_sym = mapnik.TextSymbolizer()
-                # Try creating expression with proper formatting
-                logger.info(f"Creating Expression for attribute: [{label_attr}]")
-                expr = mapnik.Expression(f"[{label_attr}]")
-                logger.info(f"Expression created successfully: {expr}")
-                text_sym.name = expr
-                text_sym.face_name = 'DejaVu Sans Book'
+                # Try using format tree/formatter approach for Mapnik 3.x
+                logger.info(f"Attempting to create TextSymbolizer with formatting for attribute: {label_attr}")
                 
-                # Size based on geometry type
-                if geometry_type == 'point':
-                    text_sym.text_size = 24
-                else:
-                    text_sym.text_size = 32
-                    
-                text_sym.fill = mapnik.Color(0, 0, 0, 255)  # Black text
-                text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)  # White halo
-                text_sym.halo_radius = 3
+                # Create format tree
+                format_tree = mapnik.FormattingFormat()
+                format_tree.face_name = 'DejaVu Sans Book'
+                format_tree.text_size = 32 if geometry_type != 'point' else 24
+                format_tree.fill = mapnik.Color(0, 0, 0, 255)
+                format_tree.halo_fill = mapnik.Color(255, 255, 255, 200)
+                format_tree.halo_radius = 3
+                
+                # Create text node with expression
+                text_node = mapnik.FormattingText(mapnik.Expression(f"[{label_attr}]"))
+                format_tree.child = text_node
+                
+                # Create text symbolizer with format tree
+                text_sym = mapnik.TextSymbolizer()
+                text_sym.format_tree = format_tree
                 text_sym.allow_overlap = True  # Allow overlaps for testing
+                
+                logger.info(f"Text symbolizer configured with format tree")
                 
                 # Set placement for line features
                 if geometry_type == 'linestring':
