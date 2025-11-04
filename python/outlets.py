@@ -755,7 +755,7 @@ def extract_region_layer_raster_grass(config, outlet_name, layer, region, use_jp
 def build_region_minimap_grass(swale_config,  asset_name, region):
     swale_name = swale_config['name']
     data_root = swale_config['data_root']
-    version_string = swale_config['version_string']
+    # version_string = swale_config['version_string']
     grass_init(swale_name)
     import grass.script as gs
     import grass.jupyter as gj
@@ -771,7 +771,9 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     #gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])   
     # load region layers
     raster_name = 'hillshade_' + 'all'
-    raster_path = f"{data_root}/{swale_name}/{version_string}/staging/hillshade.tiff"
+    #raster_path = versioning.atlas_path(swale_config, "layers") / "hillshade" / "hillshade.tiff"
+    raster_path = region['raster'][1]
+    # raster_path = f"{data_root}/{swale_name}/{version_string}/staging/hillshade.tiff"
     print(f"making map image with {raster_path}.")
     gs.read_command('r.in.gdal',  band=1,input=raster_path, output=raster_name)
     # gs.read_command('r.colors', map=raster_name)
@@ -782,7 +784,8 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     # generate temporary vector file with box/etc
     # use resolve path!
     region_name = region['name'].lower()
-    outpath = f"{data_root}/{swale_name}/{version_string}/{asset_name}/page_{region_name}_minimap"
+    outpath = versioning.atlas_path(swale_config, "outlets") / asset_name / f"page_{region_name}_minimap"
+    # outpath = f"{data_root}/{swale_name}/{version_string}/{asset_name}/page_{region_name}_minimap"
     f = geojson.FeatureCollection([geojson.Feature(
         properties={"name": region['caption']},
         geometry=region_polygon)])
