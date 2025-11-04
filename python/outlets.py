@@ -1033,6 +1033,12 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
 
                 gs.read_command('v.import', input=staging_path, output=lc['name'])
                 for region in regions:
+                    # Check if this region has custom in_layers, otherwise use outlet default
+                    region_in_layers = region.get('in_layers', outlet_config['in_layers'])
+                    if lc['name'] not in region_in_layers:
+                        logger.debug(f"Skipping layer {lc['name']} for region {region['name']} (not in region's in_layers)")
+                        continue
+                    
                     logger.debug(f"Processing vector region: {region['name']}")
                     region_extract_path = extract_region_layer_ogr_grass(config, outlet_name, lc['name'], region, reuse=reuse_vector_extracts)
                     processed_region_extract_path = process_region(lc, region_extract_path)
@@ -1040,6 +1046,11 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
             else:
                 gs.read_command('r.in.gdal', input=staging_path, output=lc['name'])
                 for region in regions:
+                    # Check if this region has custom in_layers, otherwise use outlet default
+                    region_in_layers = region.get('in_layers', outlet_config['in_layers'])
+                    if lc['name'] not in region_in_layers:
+                        logger.debug(f"Skipping layer {lc['name']} for region {region['name']} (not in region's in_layers)")
+                        continue
 
                     region['raster'] = [lc,
                                         str(extract_region_layer_raster_grass(config, outlet_name, lc['name'], region, use_jpg=False, reuse=reuse_raster_extracts))]
@@ -1103,6 +1114,53 @@ def regions_from_geojson(path, start_at=2,limit=3):
                 "prev": regions[prev_idx]['name'],
                 "next": regions[next_idx]['name']}                 
             
+    return regions
+
+
+def make_summary_regions(config, outlet_name):
+    """Create summary regions for each summary layer covering the entire dataswale area.
+    
+    Each region shows one summary layer (e.g., helilandings, milemarkers) with 
+    background layers for context.
+    
+    Args:
+        config: The configuration dictionary
+        outlet_name: Name of the outlet asset
+        
+    Returns:
+        List of region dictionaries, each containing:
+            - name: layer name (e.g., 'helilandings')
+            - caption: display name
+            - bbox: dataswale bounding box
+            - vectors: empty list (will be populated by outlet_regions_grass)
+            - raster: empty string
+            - in_layers: list of layers to include (background + summary layer)
+    """
+    outlet_config = config['assets'][outlet_name]
+    bbox = config['dataswale']['bbox']
+    
+    # Get configuration with defaults
+    summary_layers = outlet_config.get('summary_layers', ['helilandings', 'milemarkers'])
+    summary_background_layers = outlet_config.get('summary_background_layers', ['basemap', 'roads_primary'])
+    
+    regions = []
+    
+    for layer_name in summary_layers:
+        # Build the list of layers to include for this summary
+        in_layers = summary_background_layers + [layer_name]
+        
+        region = {
+            'name': layer_name,
+            'caption': f"{layer_name.replace('_', ' ').title()} Summary",
+            'bbox': bbox,
+            'vectors': [],
+            'raster': '',
+            'in_layers': in_layers  # Custom layer list for this region
+        }
+        
+        regions.append(region)
+        logger.info(f"Created summary region for {layer_name} with layers: {in_layers}")
+    
     return regions
 
 
