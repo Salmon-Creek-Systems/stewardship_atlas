@@ -53,7 +53,8 @@ def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
     
     
     logger.debug(f"Converting TIFF to JPG: {jpg_path}")
-    subprocess.check_output(['gdal_translate', '-b', '1', '-scale',tiff_path, jpg_path])
+    subprocess.check_output(['gdal_translate', '-b', '1', '-b', '2','-b', '3','-scale',tiff_path, jpg_path])
+    # subprocess.check_output(['gdal_translate','-scale',tiff_path, jpg_path])
     
     return jpg_path
 

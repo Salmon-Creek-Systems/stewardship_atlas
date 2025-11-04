@@ -137,9 +137,9 @@ def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
     # Preserve some hillshade intensity for underwater terrain
     if np.any(water_mask):
         water_intensity = hillshade[water_mask]
-        rgb_bands[0][water_mask] = (water_intensity * 0).astype(np.uint8)      # Red: 0
-        rgb_bands[1][water_mask] = (water_intensity * 50).astype(np.uint8)     # Green: 0-50 based on hillshade
-        rgb_bands[2][water_mask] = (water_intensity * 100).astype(np.uint8)    # Blue: 0-100 based on hillshade
+        rgb_bands[0][water_mask] = 0 #(water_intensity * 0).astype(np.uint8)      # Red: 0
+        rgb_bands[1][water_mask] = 50 #(water_intensity * 50).astype(np.uint8)     # Green: 0-50 based on hillshade
+        rgb_bands[2][water_mask] = 100 # (water_intensity * 100).astype(np.uint8)    # Blue: 0-100 based on hillshade
         logger.info(f"Colored {np.sum(water_mask)} water pixels with dark blue")
     
     logger.debug(f"Calculated hillshade: {in_path} -> {out_path} ({intensity})")
