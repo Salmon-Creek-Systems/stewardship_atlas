@@ -764,7 +764,7 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     region_bbox = region['bbox']
     region_polygon = geojson.Polygon([utils.bbox_to_polygon(region_bbox)])
 
-    clip_bbox = swale_config['geometry']['bbox']
+    clip_bbox = swale_config['dataswale']['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
 
     

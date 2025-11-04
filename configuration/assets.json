@@ -39,22 +39,22 @@
 
     "public_roads" : {
         "type": "inlet",
-        "out_layer": "roads-secondary",
+        "out_layer": "roads_secondary",
         "config_def": "overture_roads"
     },
     "internal_roads_primary" : {
         "type": "inlet",
-        "out_layer": "roads-primary",
+        "out_layer": "roads_primary",
         "config_def": "internal_roads"
     },
     "internal_roads_secondary" : {
         "type": "inlet",
-        "out_layer": "roads-secondary",
+        "out_layer": "roads_secondary",
         "config_def": "internal_roads"
     },
     "internal_roads_tertiary" : {
         "type": "inlet",
-        "out_layer": "roads-tertiary",
+        "out_layer": "roads_tertiary",
         "config_def": "internal_roads"
     },
 
@@ -107,27 +107,27 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural"],
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
 "webedit" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural"],
+    "in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural"],
     "config_def": "webedit"
 },
 "internal_webmap" : {
         "type": "outlet",
         "name": "internal_webmap",
-        "in_layers": ["basemap", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "incidents", "hydrants"],
+        "in_layers": ["basemap", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "incidents", "hydrants"],
         "config_def": "webmap",
         "access": ["admin"]
     },
 "runbook": {
         "type": "outlet",
         "name": "runbook",
-        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "creeks", "buildings",  "campgrounds", "helilandings", "incidents", "milemarkers", "hydrants"],
+        "in_layers": ["lidar_basemap", "tsunami", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "creeks", "buildings",  "campgrounds", "helilandings", "incidents", "milemarkers", "hydrants"],
         "access": ["internal", "admin"],
          "config_def": "runbook",
          "regions" : [
@@ -160,7 +160,7 @@
 "sqldb": {
     "type": "outlet",
     "name": "sqldb",
-    "layers": ["basemap", "roads-secondary", "creeks"]
+    "layers": ["basemap", "roads_secondary", "creeks"]
 },
 "sqlquery": {
     "type": "outlet",
@@ -179,6 +179,6 @@
 "gazetteer": {
     "type": "outlet",
     "name": "gazetteer",
-    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-secondary", "milemarkers", "creeks", "buildings", "natural"]
+    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
 }
 }

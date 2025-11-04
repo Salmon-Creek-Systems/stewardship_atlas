@@ -39,7 +39,7 @@
 
     "public_roads" : {
         "type": "inlet",
-        "out_layer": "roads-secondary",
+        "out_layer": "roads_secondary",
         "config_def": "overture_roads"
     },
     "internal_roads_primary" : {
@@ -111,14 +111,14 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "regions","tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants", "campgrounds"],
+    "in_layers": ["basemap", "regions", "sites""tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants", "campgrounds"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
 "webedit" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["basemap", "regions", "tsunami", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "milemarkers", "creeks", "buildings", "natural", "campgrounds"],
+    "in_layers": ["basemap", "regions", "tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural", "campgrounds"],
     "config_def": "webedit"
 },
     "config_edit" : {
@@ -129,7 +129,7 @@
 "internal_webmap" : {
         "type": "outlet",
         "name": "internal_webmap",
-        "in_layers": ["basemap", "parcels", "contours", "roads-primary", "roads-secondary", "roads-tertiary", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "incidents", "hydrants", "campgrounds"],
+        "in_layers": ["basemap", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "turnouts", "milemarkers", "creeks", "buildings", "helilandings", "incidents", "hydrants", "campgrounds"],
         "config_def": "webmap",
         "access": ["admin"]
     },
@@ -170,7 +170,7 @@
 "sqldb": {
     "type": "outlet",
     "name": "sqldb",
-    "layers": ["basemap", "roads-secondary", "creeks"]
+    "layers": ["basemap", "roads_secondary", "creeks"]
 },
 "sqlquery": {
     "type": "outlet",
@@ -181,6 +181,6 @@
 "gazetteer": {
     "type": "outlet",
     "name": "gazetteer",
-    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads-secondary", "milemarkers", "creeks", "buildings", "natural"]
+    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
 }
 }
