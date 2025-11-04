@@ -265,27 +265,31 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_style = mapnik.Style()
                 label_rule = mapnik.Rule()
                 
-                # Try using format tree/formatter approach for Mapnik 3.x
-                logger.info(f"Attempting to create TextSymbolizer with formatting for attribute: {label_attr}")
-                
-                # Create format tree
-                format_tree = mapnik.FormattingFormat()
-                format_tree.face_name = 'DejaVu Sans Book'
-                format_tree.text_size = 32 if geometry_type != 'point' else 24
-                format_tree.fill = mapnik.Color(0, 0, 0, 255)
-                format_tree.halo_fill = mapnik.Color(255, 255, 255, 200)
-                format_tree.halo_radius = 3
-                
-                # Create text node with expression
-                text_node = mapnik.FormattingText(mapnik.Expression(f"[{label_attr}]"))
-                format_tree.child = text_node
-                
-                # Create text symbolizer with format tree
+                # Debug: inspect what's available on TextSymbolizer
                 text_sym = mapnik.TextSymbolizer()
-                text_sym.format_tree = format_tree
-                text_sym.allow_overlap = True  # Allow overlaps for testing
+                logger.info(f"TextSymbolizer attributes: {[attr for attr in dir(text_sym) if not attr.startswith('_')]}")
                 
-                logger.info(f"Text symbolizer configured with format tree")
+                # Try the simplest possible approach - use string directly instead of Expression
+                logger.info(f"Attempting to set name as string: {label_attr}")
+                try:
+                    text_sym.name = label_attr  # Try without Expression wrapper
+                except Exception as e1:
+                    logger.warning(f"Setting name as string failed: {e1}")
+                    # Try with brackets as string
+                    try:
+                        text_sym.name = f"[{label_attr}]"
+                    except Exception as e2:
+                        logger.warning(f"Setting name as bracketed string failed: {e2}")
+                        raise
+                
+                text_sym.face_name = 'DejaVu Sans Book'
+                text_sym.text_size = 32 if geometry_type != 'point' else 24
+                text_sym.fill = mapnik.Color(0, 0, 0, 255)
+                text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)
+                text_sym.halo_radius = 3
+                text_sym.allow_overlap = True
+                
+                logger.info(f"Text symbolizer configured")
                 
                 # Set placement for line features
                 if geometry_type == 'linestring':
