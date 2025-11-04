@@ -764,7 +764,7 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     region_bbox = region['bbox']
     region_polygon = geojson.Polygon([utils.bbox_to_polygon(region_bbox)])
 
-    clip_bbox = swale_config['geometry']['bbox']
+    clip_bbox = swale_config['dataswale']['bbox']
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
 
     
@@ -784,12 +784,13 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     # generate temporary vector file with box/etc
     # use resolve path!
     region_name = region['name'].lower()
-    outpath = versioning.atlas_path(swale_config, "outlets") / asset_name / f"page_{region_name}_minimap"
+    minimap_filename = f"page_{region_name}_minimap"
+    outpath = versioning.atlas_path(swale_config, "outlets") / asset_name 
     # outpath = f"{data_root}/{swale_name}/{version_string}/{asset_name}/page_{region_name}_minimap"
     f = geojson.FeatureCollection([geojson.Feature(
         properties={"name": region['caption']},
         geometry=region_polygon)])
-    geojson_path = outpath + ".geojson"
+    geojson_path = outpath / f"{minimap_filename}.geojson"
     geojson.dump(f, open(geojson_path, 'w'))
     
     print(f"writing temp GeoJSON to: {geojson_path}:\n{f}")    
@@ -818,7 +819,7 @@ def build_region_minimap_grass(swale_config,  asset_name, region):
     gs.read_command('g.region', n=clip_bbox['north'], s=clip_bbox['south'],e=clip_bbox['east'],w=clip_bbox['west'])
     #gs.read_command('g.region', raster=raster_name)
     # export map
-    m.save(outpath + ".png")
+    m.save(str(outpath / f"{minimap_filename}.png"))
 
 
 
