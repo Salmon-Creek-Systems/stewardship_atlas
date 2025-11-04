@@ -265,35 +265,30 @@ def build_region_map_mapnik(config, outlet_name, region):
                 label_style = mapnik.Style()
                 label_rule = mapnik.Rule()
                 
-                # Check if GeoJSON datasource fields might have different format
-                logger.info(f"Checking datasource features directly...")
-                feature_set = layer.datasource.features(mapnik.Query(layer.datasource.envelope()))
-                first_feature = feature_set.next() if feature_set else None
-                if first_feature:
-                    logger.info(f"First feature attributes: {dict(first_feature.attributes)}")
-                    logger.info(f"Feature has 'name'? {'name' in first_feature.attributes}")
-                
-                # Try creating with literal constant text to see if TextSymbolizer works at all
-                logger.info(f"Testing with constant text first...")
+                # The issue appears to be that TextSymbolizer validates properties against datasource
+                # Try adding the symbolizer to rule FIRST, then setting properties
+                logger.info(f"Creating bare TextSymbolizer and adding to rule first...")
                 text_sym = mapnik.TextSymbolizer()
-                text_sym.face_name = 'DejaVu Sans Book'
-                text_sym.text_size = 32 if geometry_type != 'point' else 24
-                text_sym.fill = mapnik.Color(0, 0, 0, 255)
-                text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)
-                text_sym.halo_radius = 3
-                text_sym.allow_overlap = True
                 
-                # Try setting name to a constant first
+                # Add to rule BEFORE setting any properties
+                label_rule.symbols.append(text_sym)
+                
+                # Now try setting properties after it's in the rule
+                logger.info(f"Setting properties after adding to rule...")
                 try:
-                    text_sym.name = "TEST"
-                    logger.info(f"✓ Set name to constant 'TEST' succeeded")
-                    # Now try with attribute
-                    text_sym.name = f"[{label_attr}]"
-                    logger.info(f"✓ Set name to '[{label_attr}]' succeeded")
+                    text_sym.name = mapnik.Expression(f"[{label_attr}]")
+                    text_sym.face_name = 'DejaVu Sans Book'
+                    text_sym.text_size = 32 if geometry_type != 'point' else 24
+                    text_sym.fill = mapnik.Color(0, 0, 0, 255)
+                    text_sym.halo_fill = mapnik.Color(255, 255, 255, 200)
+                    text_sym.halo_radius = 3
+                    text_sym.allow_overlap = True
+                    logger.info(f"✓ All properties set successfully!")
                 except Exception as e:
-                    logger.warning(f"Even constant text failed: {e}")
-                    # Last resort - skip the name entirely and just add marker
-                    logger.info(f"Skipping text name, will just render markers")
+                    logger.warning(f"Setting properties after adding to rule failed: {e}")
+                    # Remove the symbolizer if it failed
+                    label_rule.symbols.remove(text_sym)
+                    raise
                 
                 # Set placement for line features
                 if geometry_type == 'linestring':
