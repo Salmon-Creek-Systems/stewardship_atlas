@@ -1297,12 +1297,22 @@ def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
     index_html = "<html><body><h1>Run Book</h1><ul>"
-    for i,r in enumerate(regions):
-        index_html += f"<li><a href='{r['name']}.html'>{r['caption']}</a></li>"
+    index_html += f"<h1>Full RunBook: <A HREF='https://scs-internal.s3.us-west-1.amazonaws.com/collated.pdf'> here</A></h1> <br>"
+    index_html += "<H1>Webmap View: <A HREF='../webmap'> here</A> </h1><br>"
+    index_html += "<h1>Per Page:</H1><br>"
+    new_regions = dataswale_geojson.layer_as_featurecollection(config, 'regions')
+    for i,r in enumerate(new_regions['features']):
+    # for i,r in enumerate(regions):
+        cname  = r['properties'].get('name', f"region_{i}").replace(" ", "+")
+        url = f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages/{cname}.pdf"
+        index_html += f"<li><a href='{url}'>{r['properties']['name']}</a></li>"
     index_html += "</ul></body></html>"
     with open(f"{outlet_dir}/index.html", "w") as f:
         f.write(index_html)
-    
+
+    return f"{outlet_dir}/index.html"
+
+def old_outlet_runbook(config, outletname):
     html_template = """
 <html></body><table><tr><TD><!--<A HREF="../runbook/"><img src='page_{name}_minimap.png' width=400/></A>--></TD></td>
 <td>
@@ -2238,22 +2248,35 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     sh.share('gateless@gmail.com', perm_type='user', role='writer')
     
 
-    sh.add_worksheet(title=layer_name, rows=100, cols=20)
-    wks = sh.get_worksheet(1)
-    header = []
+    # sh.add_worksheet(title=layer_name, rows=100, cols=20)
+    wks = sh.get_worksheet(0)
+
+    
+
+    headers = set()
+    for f in layer['features']:
+        headers.update(f['properties'].keys())
+    header = sorted(list(headers))
+
+    wtf = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     cells = []
+    for ih,h in enumerate(header + ["Geometry"]):
+        cells.append(gspread.Cell(row=1, col=1+ih, value=h))
+        
     for i,f in enumerate(layer['features']):
         #logger.info(f"Adding row for Prop [{type(f['properties'])}]: {f['properties']} and geom [{type(f['properties'])}]:: {f['geometry']}...")
-            
-        for j,p in enumerate(f['properties'].items()):
+        for ih,h in enumerate(header):    
+            cells.append( gspread.Cell(row=i+2, col=ih+1, value=f['properties'].get(h, '')))
+            #for j,p in enumerate(f['properties'].items()):
             # if first row set the headers
-            if i == 0:
-                cells.append(gspread.Cell(row=i+1, col=j+1, value=p[0]))
+            
+                
                 #wks.update_cell(i+1, j+1, p[0])
             #wks.update_cell(i+2, j+1, p[1])
-            cells.append( gspread.Cell(row=i+2, col=j+1, value=p[1]))
-        cells.append( gspread.Cell(row=i+2, col=j+2, value=geojson.dumps(f['geometry'])) )
+
+        cells.append( gspread.Cell(row=i+2, col=ih+2, value=geojson.dumps(f['geometry'])) )
     wks.update_cells(cells)
+    wks.format('A1:Z1', {'textFormat': {'bold': True}})
     links[layer_name] =  sh.url
     #sh.close()
     
@@ -2265,5 +2288,5 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     #json.dump(state, open(statefile_path, "w"))
     json.dump(config, open(config_path, "w"))
                   
-        return statefile_path
+    return statefile_path
 
