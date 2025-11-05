@@ -2222,46 +2222,48 @@ atlas.materialize(c, 'webedit')
 
     
 
-def gsheet_export(config: dict, outlet_name: str) -> str:
+def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""
  
     # set up spreadsheet
     statefile_path = versioning.atlas_path(config) / "state.json"
     gc = gspread.service_account()
     links = {}
+    gsheet_name = f"{config['name']} Fire Atlas: {layer_name}"
+    sh = gc.create(gsheet_name)
     # get layers in outlet config
-    for layer_name in config['assets'][outlet_name]['in_layers']:
-        # get path to layer
-        layer = dataswale_geojson.layer_as_featurecollection(config, layer_name)
-        gsheet_name = f"{config['name']} Fire Atlas: {layer_name}"
-        sh = gc.create(gsheet_name)
-        sh.share('gateless@gmail.com', perm_type='user', role='writer')
+    #for layer_name in config['assets'][outlet_name]['in_layers']:
+    # get path to layer
+    layer = dataswale_geojson.layer_as_featurecollection(config, layer_name)
+    sh.share('gateless@gmail.com', perm_type='user', role='writer')
+    
 
-        sh.add_worksheet(title=layer_name, rows=100, cols=20)
-        wks = sh.get_worksheet(0)
-        header = []
-        cells = []
-        for i,f in enumerate(layer['features']):
-            #logger.info(f"Adding row for Prop [{type(f['properties'])}]: {f['properties']} and geom [{type(f['properties'])}]:: {f['geometry']}...")
-                
-            for j,p in enumerate(f['properties'].items()):
-                if i == 0:
-                    cells.append(gspread.Cell(row=i+1, col=j+1, value=p[0]))
-                    #wks.update_cell(i+1, j+1, p[0])
-                #wks.update_cell(i+2, j+1, p[1])
-                cells.append( gspread.Cell(row=i+2, col=j+1, value=p[1]))
-            cells.append( gspread.Cell(row=i+1, col=j+2, value=geojson.dumps(f['geometry'])) )
-        wks.update_cells(cells)
-        links[layer_name] =  sh.url
-        #sh.close()
-        
-        #state = json.load(open(statefile_path))
+    sh.add_worksheet(title=layer_name, rows=100, cols=20)
+    wks = sh.get_worksheet(1)
+    header = []
+    cells = []
+    for i,f in enumerate(layer['features']):
+        #logger.info(f"Adding row for Prop [{type(f['properties'])}]: {f['properties']} and geom [{type(f['properties'])}]:: {f['geometry']}...")
+            
+        for j,p in enumerate(f['properties'].items()):
+            # if first row set the headers
+            if i == 0:
+                cells.append(gspread.Cell(row=i+1, col=j+1, value=p[0]))
+                #wks.update_cell(i+1, j+1, p[0])
+            #wks.update_cell(i+2, j+1, p[1])
+            cells.append( gspread.Cell(row=i+2, col=j+1, value=p[1]))
+        cells.append( gspread.Cell(row=i+2, col=j+2, value=geojson.dumps(f['geometry'])) )
+    wks.update_cells(cells)
+    links[layer_name] =  sh.url
+    #sh.close()
+    
+    #state = json.load(open(statefile_path))
 
-        # Set and write state to reflect generated spreadsheets
-        config_path = versioning.atlas_path(config) / "atlas_config.json"
-        config['spreadsheets'] = links
-        #json.dump(state, open(statefile_path, "w"))
-        json.dump(config, open(config_path, "w"))
+    # Set and write state to reflect generated spreadsheets
+    config_path = versioning.atlas_path(config) / "atlas_config.json"
+    config['spreadsheets'] = links
+    #json.dump(state, open(statefile_path, "w"))
+    json.dump(config, open(config_path, "w"))
                   
         return statefile_path
 
