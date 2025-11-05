@@ -166,7 +166,7 @@ def webmap_json(config, name, sprite_json=None):
             elif map_layer.get('type', 'point') == "fill":
                 label_layer.update({
                     'paint': {
-                        'text-color': 'rgb(255,255,255)'
+                        'text-color': 'rgb(0,0,0)'
                     }
                 })
 
