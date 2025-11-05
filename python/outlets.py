@@ -1296,17 +1296,116 @@ def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
 
     swale_name = config['name']
     outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
-    index_html = "<html><body><h1>Run Book</h1><ul>"
-    index_html += f"<h1>Full RunBook: <A HREF='https://scs-internal.s3.us-west-1.amazonaws.com/collated.pdf'> here</A></h1> <br>"
-    index_html += "<H1>Webmap View: <A HREF='../webmap'> here</A> </h1><br>"
-    index_html += "<h1>Per Page:</H1><br>"
+    
+    # Build HTML with CSS styling
+    index_html = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Run Book</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            margin: 20px 0;
+        }
+        
+        h2 {
+            color: #555;
+            margin: 15px 0;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        
+        li {
+            margin: 10px 0;
+            padding: 12px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s;
+        }
+        
+        li:hover {
+            background-color: #f0f0f0;
+            border-color: #ccc;
+            transform: translateX(5px);
+        }
+        
+        a {
+            text-decoration: none;
+            color: #0066cc;
+            font-size: 1.1em;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+            color: #004499;
+        }
+        
+        .main-link {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>""" + swale_name + """ Run Book</h1>
+        
+        <div class="section">
+            <h2>Full RunBook</h2>
+            <p><a href='https://scs-internal.s3.us-west-1.amazonaws.com/collated.pdf' class='main-link'>Download Complete PDF</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Webmap View</h2>
+            <p><a href='../webmap' class='main-link'>Open Interactive Map</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Individual Pages</h2>
+            <ul>"""
+    
     new_regions = dataswale_geojson.layer_as_featurecollection(config, 'regions')
     for i,r in enumerate(new_regions['features']):
-    # for i,r in enumerate(regions):
         cname  = r['properties'].get('name', f"region_{i}").replace(" ", "+")
         url = f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages/{cname}.pdf"
-        index_html += f"<li><a href='{url}'>{r['properties']['name']}</a></li>"
-    index_html += "</ul></body></html>"
+        index_html += f"<li><a href='{url}'>{r['properties']['name']}</a></li>\n"
+    
+    index_html += """            </ul>
+        </div>
+    </div>
+</body>
+</html>"""
+    
     with open(f"{outlet_dir}/index.html", "w") as f:
         f.write(index_html)
 
