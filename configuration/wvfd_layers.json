@@ -1,6 +1,6 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"],
-    "fill_opacity": 0.2
+     "fill_opacity": 0.2,
     "editable_columns": [
         {"name": "name", "type": "string", "default": "unique name" },
         {"name": "description", "type": "string", "default": "Text describing the region" },
@@ -8,7 +8,7 @@
     ]   
 },
     {"name": "sites", "geometry_type": "polygon", "color": [0, 150, 255], "interaction": "interface", "access": ["admin"],
-    "fill_opacity": 0.2
+     "fill_opacity": 0.2,
     "editable_columns": [
         {"name": "name", "type": "string", "default": "unique name" },
         {"name": "description", "type": "string", "default": "Text describing the region" },

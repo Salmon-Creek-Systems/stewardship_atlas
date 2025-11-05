@@ -178,9 +178,15 @@
     "config_def": "sqlquery",
     "access": ["admin"]
 },
-"gazetteer": {
-    "type": "outlet",
-    "name": "gazetteer",
-    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
-}
+    "spreadsheet_export" : {
+	"type": "outlet",
+	"name": "spreadsheet_export",
+	"config_def": "gsheet_export",
+	"in_layers": ["helilandings", "hydrants", "milemarkers"]
+    },
+    "gazetteer": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
+    }
 }
