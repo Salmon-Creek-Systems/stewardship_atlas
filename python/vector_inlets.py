@@ -104,32 +104,25 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
     return outpath
 
 
-def import_gsheet(config, name, delta_queue=DELTA_QUEUE, layer_name=None):
-    """Import a Google Sheet layer into a dataswale atlas"""
-
-    if not layer_name:
-        raise ValueError("layer_name is required")
-    
-    gsheet_name = f'{config["name"]} Fire Atlas: {layer_name}'
-    gc = gspread.service_account()
-    wks = gc.open(gsheet_name).sheet1
-    features = wks.get_all_records()
-
-    # convert to geojson
-    
+def import_sheet(config, layer_name):
+    logger.info(f"Importing Google Sheet: {layer_name}")
+    rows = utils.read_gsheet(config, sheet_name=f"{config['name']} Fire Atlas: {layer_name}")
     geojson_features = []
-    for feature in features:
-        f = geojson.Feature(geometry=feature['geometry'])
+    for feature in rows:
+        # print(f"Row: {feature}")
+        f = geojson.Feature(geometry=geojson.loads(feature['geometry']))
         del(feature['geometry'])
-        f.properties = feature['properties']
+        f.properties = feature
         geojson_features.append(f)
-       
-    return geojson.FeatureCollection(geojson_features)
     
-
-
-    # get path to layer
-    #layer = dataswale_geojson.layer_as_featurecollection(config, name)
+    # Create feature collection from the features
+    feature_collection = geojson.FeatureCollection(geojson_features)
+    
+    # Add deltas and return paths
+    delta_paths = delta_queue.add_deltas_from_features(
+        config, layer_name, feature_collection, 'create')
+    return delta_paths
+    
 
 
 

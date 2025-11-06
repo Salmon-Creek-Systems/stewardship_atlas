@@ -215,8 +215,12 @@
 		    
 		    // Link to gheet import
 		    const a5 = document.createElement('a');
-		    a5.href = data.spreadsheets[item.name];
+		    a5.href = '#';
 		    a5.textContent = ' (import sheet) ';
+		    a5.onclick = function(e) {
+		        e.preventDefault();
+		        importFromSheet(item.name, this);
+		    };
 		    li.appendChild(document.createTextNode(' '));
 		    li.appendChild(a5);       
 		    //};
@@ -381,6 +385,40 @@
                 .catch(error => {
                     console.error('Export error:', error);
                     alert('There was a problem with the export. Check the console for details.');
+                })
+                .finally(() => {
+                    // Restore original state
+                    linkElement.textContent = originalText;
+                    linkElement.style.pointerEvents = 'auto';
+                });
+        }
+        
+        function importFromSheet(layerName, linkElement) {
+            console.log(`Importing layer from sheet: ${layerName}`);
+            
+            // Show loading state
+            const originalText = linkElement.textContent;
+            linkElement.textContent = ' (importing...) ';
+            linkElement.style.pointerEvents = 'none';
+            
+            fetch(`${baseurl}:9998/import_sheet/${swalename}/${layerName}`, {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Import response:', data);
+                    
+                    if (data.status === 'success') {
+                        alert(`Import successful! Layer "${layerName}" has been refreshed.`);
+                        console.log('Delta paths:', data.delta_paths);
+                    } else {
+                        console.error('Import failed:', data);
+                        alert('There was a problem with the import. Check the console for details.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Import error:', error);
+                    alert('There was a problem with the import. Check the console for details.');
                 })
                 .finally(() => {
                     // Restore original state

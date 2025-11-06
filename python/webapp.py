@@ -30,6 +30,7 @@ import dataswale_geojson
 import outlets
 import versioning   
 import deltas_geojson
+import vector_inlets
 app = FastAPI()
 logger.logger.setLevel(0)
 
@@ -146,6 +147,30 @@ async def export_gsheet(swalename: str, layer_name: str):
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/import_sheet/{swalename}/{layer_name}")
+async def import_sheet_endpoint(swalename: str, layer_name: str):
+    """Import data from Google Sheet and refresh the layer."""
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        
+        # Call vector_inlets.import_sheet to get delta paths
+        delta_paths = vector_inlets.import_sheet(ac, layer_name)
+        
+        # Refresh the layer to overwrite with new data
+        res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
+        
+        return {
+            "status": "success",
+            "message": f"Sheet imported and layer refreshed: {res}",
+            "delta_paths": delta_paths,
+            "layer": layer_name
+        }
+    except Exception as e:
+        logging.error(f"Error importing sheet for {layer_name}: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
     
 @app.get("/clear_layer/{swalename}/{layer_name}")
