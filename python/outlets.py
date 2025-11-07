@@ -18,7 +18,7 @@ import gspread
 
 import dataswale_geojson
 import utils
-from outlets_mapnik import build_region_map_mapnik
+# from outlets_mapnik import build_region_map_mapnik
 
 # Configure logging
 logger = logging.getLogger(__name__)

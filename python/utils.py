@@ -205,3 +205,14 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
     
     with open(json_path, 'w') as f:
         json.dump(data, f)
+
+
+def read_gsheet(config, sheet_name=None):
+    """Read a sigle-worksheet Google Sheet into a list of dictionaries"""
+    logger.info(f"Reading Google Sheet: {sheet_name}")
+    if not sheet_name:
+        raise ValueError("sheet_name is required")
+    gc = gspread.service_account()
+    wks = gc.open(sheet_name)# .get_worksheet(sheet_name)
+    return wks.get_worksheet(0).get_all_records()
+    

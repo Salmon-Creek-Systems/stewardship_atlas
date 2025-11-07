@@ -129,7 +129,7 @@ async def export_gsheet(swalename: str, layer_name: str):
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
         ac['assets']['spreadsheet_export']['in_layers'] = [layer_name]
-        layer_fc = outlets.gsheet_export(ac, 'spreadsheet_export')
+        layer_fc = outlets.gsheet_export(ac, 'spreadsheet_export', layer_name)
 
 
         # store the config since we may have updated spreadsheet URLs
