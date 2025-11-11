@@ -1,5 +1,6 @@
 
 import logging, subprocess, json
+import gspread, geojson
 
 # Configure logging
 logger = logging.getLogger(__name__)

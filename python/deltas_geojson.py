@@ -110,7 +110,12 @@ def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action:
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
-def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_collection: FeatureCollection, delta_action: str) -> Tuple[int, str]:
+def add_deltas_from_features(
+        config: Dict[str, Any],
+        asset_name: str,
+        feature_collection: FeatureCollection,
+        delta_action: str,
+        layer_name: str = None) -> Tuple[int, str]:
     """
     Add a new delta file to the layer's deltas directory.
     
@@ -124,8 +129,10 @@ def add_deltas_from_features(config: Dict[str, Any], asset_name: str, feature_co
     Raises:
         InvalidDelta: If the feature collection is invalid
     """    
- 
-    outpath = delta_path(config, asset_name, delta_action)
+    if layer_name:
+        outpath = delta_path_from_layer(config, layer_name, delta_action)
+    else:
+        outpath = delta_path(config, asset_name, delta_action)
     with versioning.atlas_file(outpath, mode="wt") as outfile:
         json.dump(feature_collection, outfile)
     
@@ -164,12 +171,11 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
             # read the layer file
             with open(layer_filepath, mode="rt") as infile:
                 layer = geojson.load(infile)
-
-            with versioning.atlas_file(filepath, mode="rt") as infile:
-                
+                logger.info(f"Apply Delta loaded {len(layer['features'])} LAYER  features from {layer_filepath}...")
+            with versioning.atlas_file(filepath, mode="rt") as infile:                
                 # for now, apply transforms to delta here, as static file...
                 delta = geojson.load(infile)
-
+                logger.info(f"Apply Delta loaded {len(delta['features'])} DELTA features from {filepath}...")
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
                 geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
 
