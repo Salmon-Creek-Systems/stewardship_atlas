@@ -104,7 +104,7 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
     return outpath
 
 
-def import_sheet(config, layer_name):
+def import_sheet(config, layer_name, delta_queue=DELTA_QUEUE):
     logger.info(f"Importing Google Sheet: {layer_name}")
     rows = utils.read_gsheet(config, sheet_name=f"{config['name']} Fire Atlas: {layer_name}")
     geojson_features = []
@@ -120,7 +120,7 @@ def import_sheet(config, layer_name):
     
     # Add deltas and return paths
     delta_paths = delta_queue.add_deltas_from_features(
-        config, layer_name, feature_collection, 'create')
+        config, None, feature_collection, 'create', layer_name=layer_name)
     return delta_paths
     
 

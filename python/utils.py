@@ -1,5 +1,6 @@
 
 import logging, subprocess, json
+import gspread, geojson
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -258,4 +259,3 @@ def deduplicate_json(json_list, key_fields=None):
             seen.add(key)
             result.append(item)
     return result
-    
