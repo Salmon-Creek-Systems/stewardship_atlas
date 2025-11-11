@@ -179,9 +179,9 @@ map.on('load', async () => {
             target: e.originalEvent.target.tagName
         });
         
-        // Check if meta key is pressed (Alt+Click) for location sharing
-        if (e.originalEvent.metaKey) {
-            console.log('Alt key pressed, processing click');
+        // Check if meta, alt, or ctrl key is pressed for location sharing
+        if (e.originalEvent.metaKey || e.originalEvent.altKey || e.originalEvent.ctrlKey) {
+            console.log('Modifier key pressed (Meta/Alt/Ctrl), processing click');
             handleLocationShare(e.lngLat);
         } else {
             // Check if we clicked on any features with a URL
@@ -200,7 +200,7 @@ map.on('load', async () => {
                 }
             }
             
-            console.log('Alt key not pressed, checked for features with URLs');
+            console.log('No modifier key pressed, checked for features with URLs');
         }
     });
 
@@ -308,10 +308,10 @@ map.on('load', async () => {
         maxMovement = 0;
     });
     
-    // Add a global click listener to see if alt-clicks are being captured elsewhere
+    // Add a global click listener to see if modifier-clicks are being captured elsewhere
     document.addEventListener('click', (e) => {
-        if (e.metaKey) {
-            console.log('Global click listener detected alt-click on:', e.target.tagName, e.target.className);
+        if (e.metaKey || e.altKey || e.ctrlKey) {
+            console.log('Global click listener detected modifier-click on:', e.target.tagName, e.target.className);
         }
     });
 

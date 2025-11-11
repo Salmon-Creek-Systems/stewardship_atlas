@@ -215,4 +215,47 @@ def read_gsheet(config, sheet_name=None):
     gc = gspread.service_account()
     wks = gc.open(sheet_name)# .get_worksheet(sheet_name)
     return wks.get_worksheet(0).get_all_records()
+
+
+def deduplicate_json(json_list, key_fields=None):
+    """
+    Deduplicate a list of dictionaries.
+    
+    Args:
+        json_list: List of dictionaries to deduplicate
+        key_fields: Optional list of field names to use for comparison.
+                   If None, entire objects are compared.
+        
+    Returns:
+        List of unique dictionaries (keeps first occurrence)
+    
+    Examples:
+        >>> data = [{"a": 1, "b": 2}, {"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        >>> deduplicate_json(data)
+        [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        
+        >>> data = [{"id": 1, "name": "A"}, {"id": 1, "name": "B"}, {"id": 2, "name": "C"}]
+        >>> deduplicate_json(data, ["id"])
+        [{"id": 1, "name": "A"}, {"id": 2, "name": "C"}]
+    """
+    if not key_fields:
+        # Deduplicate by entire object
+        seen = set()
+        result = []
+        for item in json_list:
+            key = json.dumps(item, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                result.append(item)
+        return result
+    
+    # Deduplicate by specific fields
+    seen = set()
+    result = []
+    for item in json_list:
+        key = tuple(item.get(field) for field in key_fields)
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
     
