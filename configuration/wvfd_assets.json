@@ -176,7 +176,7 @@
     "type": "outlet",
     "name": "sqlquery",
     "config_def": "sqlquery",
-    "access": ["admin"]
+    "access": ["technical"]
 },
     "spreadsheet_export" : {
 	"type": "outlet",
