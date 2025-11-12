@@ -2359,7 +2359,7 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
 
     wtf = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     cells = []
-    for ih,h in enumerate(header + ["Geometry"]):
+    for ih,h in enumerate(header + ["geometry"]):
         cells.append(gspread.Cell(row=1, col=1+ih, value=h))
         
     for i,f in enumerate(layer['features']):
