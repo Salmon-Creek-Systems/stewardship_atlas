@@ -327,7 +327,7 @@ def generate_map_page(title, map_config_data, output_path, sprite_json=None):
     
     # Read and convert markdown help content
     import markdown
-    with open('../documents/webmap_help.md', 'r') as f:
+    with open('../documents/help/webmap_help.md', 'r') as f:
         help_markdown = f.read()
     help_html = markdown.markdown(help_markdown)
     
