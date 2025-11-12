@@ -129,7 +129,7 @@
 "internal_webmap" : {
         "type": "outlet",
         "name": "internal_webmap",
-        "in_layers": ["basemap", "regions",  "roads_primary", "roads_secondary"\],
+        "in_layers": ["basemap", "regions",  "roads_primary", "roads_secondary"],
         "config_def": "webmap",
         "access": ["admin"]
     },
