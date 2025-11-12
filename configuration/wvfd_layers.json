@@ -17,7 +17,7 @@
     ]   
 },
     {"name": "tsunami_fillcolor", "geometry_type": "polygon", "color": [0,0,255], "fill_color": "none", "fill_opacity": 0.15},
-    {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.3},
+    {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.2},
     {"name": "elevation", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50],
         "vis" : {"minzoom": 14, "maxzoom": 22}},
@@ -25,6 +25,7 @@
     {"name": "lidar_basemap", "geometry_type": "raster"},
     {"name": "roads_primary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+        "minzoom": 6, "maxzoom": 22,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
             {
@@ -39,6 +40,7 @@
             }]},
     {"name": "roads_secondary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+        "minzoom": 9, "maxzoom": 22,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
             {
@@ -53,6 +55,7 @@
             }]},
     {"name": "roads_tertiary", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+        "minzoom": 12, "maxzoom": 22,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
             {
@@ -76,9 +79,9 @@
          {"name": "name", "type": "string", "default": "Road" }]},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": true,
         "symbol" : {"png": "milemarker.png", "icon": "basic/marker"},
-        "icon-size": 0.15, "icon-anchor": "bottom","vis" : {"minzoom": 16, "maxzoom": 22}},
+        "icon-size": 0.15, "icon-anchor": "bottom","vis" : {"minzoom": 12, "maxzoom": 22}},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
-     "vis" : {"minzoom": 14, "maxzoom": 22}, 
+     "vis" : {"minzoom": 10, "maxzoom": 22}, 
      "editable_columns": [
          {"name": "name", "type": "string", "default": "Road" }],
         "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
@@ -87,7 +90,7 @@
             {"name": "name", "type": "string", "default": "Incident" }],
         "symbol": {"png": "incident.png", "icon": "basic/pushpin"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], 
-        "vis" : {"minzoom": 14, "maxzoom": 22}, "add_labels": true,
+        "vis" : {"minzoom": 12, "maxzoom": 22}, "add_labels": true,
         "symbol": {"png": "hydrant.png", "icon": "custom/hydrant"},
         "icon-size": 3.0,
         "interaction": "interface",
@@ -96,8 +99,11 @@
     {"name": "natural", "geometry_type": "point", "color": [0, 200, 55], "add_labels": true,
      "icon-size": 0.05,
      "interaction": "interface"},    
-    {"name": "buildings", "geometry_type": "polygon", "color": [0, 0, 0], "fill_color": [100,100,100], "add_labels": true, "interaction": "interface",
-                "editable_columns": [
+    {"name": "buildings", "geometry_type": "polygon", 
+        "color": [0, 0, 0], "fill_color": [100,100,100], 
+        "add_labels": true, "interaction": "interface",
+        "minzoom": 12, "maxzoom": 22,
+                "editable_columns": [   
             {"name": "name", "type": "string", "default": "Road" }]},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
