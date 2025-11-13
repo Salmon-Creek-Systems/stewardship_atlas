@@ -1888,6 +1888,11 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         use_cases=[]
     )
 
+    tech_path = outpath / "technical"
+    tech_path.mkdir(parents=True, exist_ok=True)
+    with open(tech_path / "index.html", "w") as f:
+        f.write(technical_html)
+    logger.debug(f"Wrote admin view to: {tech_path}")
 
 
     # Generate admin view
@@ -2367,8 +2372,10 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     #for layer_name in config['assets'][outlet_name]['in_layers']:
     # get path to layer
     layer = dataswale_geojson.layer_as_featurecollection(config, layer_name)
-    sh.share('gateless@gmail.com', perm_type='user', role='writer')
-    
+    for admin_email in config['admin_emails']:
+        logger.info(f"Sharing Gsheet to {admin_email}")
+        sh.share(admin_email, perm_type='user', role='writer')
+        
 
     # sh.add_worksheet(title=layer_name, rows=100, cols=20)
     wks = sh.get_worksheet(0)

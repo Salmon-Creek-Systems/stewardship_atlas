@@ -122,9 +122,11 @@
     "config_def": "webedit"
 },
     "config_edit" : {
-    "type": "outlet",
-    "name": "config_edit",
-    "config_def": "config_editor"
+	"type": "outlet",
+	"name": "config_edit",
+	"access": ["technical"],
+	"interaction": "interface",
+	"config_def": "config_editor"
 },
 "internal_webmap" : {
         "type": "outlet",

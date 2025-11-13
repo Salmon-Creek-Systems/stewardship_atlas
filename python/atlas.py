@@ -117,6 +117,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
            data_root: str = DEFAULT_DATA_ROOT,
            shared_dir: Path = DEFAULT_SHARED_DIR,
            name: str = "Nameless",
+           admin_emails = [],
            bbox: Dict[str, Any] = DEFAULT_BBOX,
            feature_collection: Dict[str, Any] = None) -> None:
     """
@@ -127,6 +128,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     if feature_collection:
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
+        admin_emails = feature['properties']['admin_emails']
         config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
@@ -147,6 +149,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['data_root'] = data_root
     config['name'] = name
     config['dataswale']['bbox'] = bbox
+    config['admin_emails'] = admin_emails
     
     # Discover existing versions in the swale directory
     config['dataswale']['versions'] = discover_versions(p)
