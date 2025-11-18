@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Minimal QGIS API test script - reads GeoJSON and exports to PDF with optional GeoTIFF basemap.
-Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff]
+Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff] [N S E W]
+       Coordinates should be in decimal degrees (lat/long)
 """
 import os
 import sys
@@ -19,17 +20,55 @@ from qgis.core import (
     QgsLayoutPoint,
     QgsLayoutSize,
     QgsPrintLayout,
-    QgsUnitTypes
+    QgsUnitTypes,
+    QgsRectangle,
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform
 )
 
 def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff]")
+    if len(sys.argv) < 3:
+        print("Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff] [N S E W]")
+        print("       Coordinates should be in decimal degrees (lat/long)")
         sys.exit(1)
     
     input_path = sys.argv[1]
     output_path = sys.argv[2]
-    basemap_path = sys.argv[3] if len(sys.argv) == 4 else None
+    
+    # Parse optional arguments
+    basemap_path = None
+    bbox = None
+    
+    if len(sys.argv) == 4:
+        # Just basemap, no bbox
+        basemap_path = sys.argv[3]
+    elif len(sys.argv) == 6:
+        # No basemap, but bbox: input output N S E W
+        try:
+            north = float(sys.argv[3])
+            south = float(sys.argv[4])
+            east = float(sys.argv[5])
+            west = float(sys.argv[6])
+            bbox = (north, south, east, west)
+        except ValueError:
+            print("Error: N, S, E, W coordinates must be numeric")
+            sys.exit(1)
+    elif len(sys.argv) == 7:
+        # Basemap + bbox: input output basemap N S E W
+        basemap_path = sys.argv[3]
+        try:
+            north = float(sys.argv[4])
+            south = float(sys.argv[5])
+            east = float(sys.argv[6])
+            west = float(sys.argv[7])
+            bbox = (north, south, east, west)
+        except ValueError:
+            print("Error: N, S, E, W coordinates must be numeric")
+            sys.exit(1)
+    elif len(sys.argv) > 7:
+        print("Error: Too many arguments")
+        print("Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff] [N S E W]")
+        sys.exit(1)
     
     # Initialize QGIS application
     qgs = QgsApplication([], False)
@@ -68,8 +107,24 @@ def main():
         map_item.attemptMove(QgsLayoutPoint(5, 5, QgsUnitTypes.LayoutMillimeters))
         map_item.attemptResize(QgsLayoutSize(200, 287, QgsUnitTypes.LayoutMillimeters))
         
-        # Set extent to polygon layer extent (both layers will be visible)
-        map_item.setExtent(layer.extent())
+        # Set extent - either from bbox or from layer extent
+        if bbox:
+            north, south, east, west = bbox
+            # Create rectangle in WGS84 (EPSG:4326)
+            bbox_rect = QgsRectangle(west, south, east, north)
+            wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+            layer_crs = layer.crs()
+            
+            # Transform bbox to layer's CRS if needed
+            if layer_crs != wgs84:
+                transform = QgsCoordinateTransform(wgs84, layer_crs, project)
+                bbox_rect = transform.transformBoundingBox(bbox_rect)
+            
+            map_item.setExtent(bbox_rect)
+        else:
+            # Use polygon layer extent (both layers will be visible)
+            map_item.setExtent(layer.extent())
+        
         layout.addLayoutItem(map_item)
         
         # Export to PDF
