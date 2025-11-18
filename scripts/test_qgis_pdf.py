@@ -53,7 +53,7 @@ def main():
         except ValueError:
             print("Error: N, S, E, W coordinates must be numeric")
             sys.exit(1)
-    elif len(sys.argv) == 7:
+    elif len(sys.argv) == 8:
         # Basemap + bbox: input output basemap N S E W
         basemap_path = sys.argv[3]
         try:
@@ -65,8 +65,8 @@ def main():
         except ValueError:
             print("Error: N, S, E, W coordinates must be numeric")
             sys.exit(1)
-    elif len(sys.argv) > 7:
-        print("Error: Too many arguments")
+    elif len(sys.argv) > 8:
+        print(f"Error: Too many arguments ({len(sys.argv)}) - {'|'.join(sys.argv)}")
         print("Usage: python test_qgis_pdf.py <input.geojson> <output.pdf> [basemap.tiff] [N S E W]")
         sys.exit(1)
     
