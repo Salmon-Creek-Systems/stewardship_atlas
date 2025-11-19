@@ -84,6 +84,74 @@ def qgis_init():
     return _qgs_app
 
 
+def load_regions_from_geojson(geojson_path, first_n=0):
+    """
+    Load regions directly from a GeoJSON file.
+    
+    Args:
+        geojson_path: Path to regions GeoJSON file
+        first_n: Only load first N regions (0 = all)
+        
+    Returns:
+        List of region dicts with bbox, name, caption, etc.
+    """
+    geojson_path = Path(geojson_path)
+    if not geojson_path.exists():
+        logger.error(f"Regions GeoJSON not found: {geojson_path}")
+        return []
+    
+    regions = []
+    
+    with open(geojson_path, 'r') as f:
+        geojson_data = json.load(f)
+    
+    features = geojson_data.get('features', [])
+    logger.info(f"Found {len(features)} feature(s) in regions GeoJSON")
+    
+    for i, feature in enumerate(features):
+        # Apply first_n limit
+        if first_n > 0 and i >= first_n:
+            logger.info(f"Reached limit of {first_n} regions, stopping")
+            break
+        
+        # Extract bbox from geometry coordinates
+        coords = feature['geometry']['coordinates'][0]
+        bbox = utils.geojson_to_bbox(coords)
+        
+        # Get properties
+        props = feature.get('properties', {})
+        default_name = f"Region_{i}"
+        name = props.get('name', props.get('Description', default_name))
+        caption = props.get('caption', props.get('Description', default_name))
+        
+        region = {
+            'name': utils.canonicalize_name(name),
+            'caption': caption,
+            'text': props.get('text', caption),
+            'bbox': bbox,
+            'neighbors': props.get('neighbors'),
+            'vectors': [],
+            'raster': '',
+            'properties': props  # Keep all properties for reference
+        }
+        
+        regions.append(region)
+        logger.debug(f"Loaded region {i}: {region['name']}")
+    
+    # Set up neighbor links if not already present
+    for i, r in enumerate(regions):
+        if r['neighbors'] is None:
+            next_idx = (i + 1) % len(regions)
+            prev_idx = (i - 1) % len(regions)
+            r['neighbors'] = {
+                "prev": regions[prev_idx]['name'],
+                "next": regions[next_idx]['name']
+            }
+    
+    logger.info(f"Loaded {len(regions)} region(s) from GeoJSON")
+    return regions
+
+
 def qgis_cleanup():
     """Cleanup QGIS application (note: may cause segfaults in offscreen mode)."""
     global _qgs_app
@@ -352,42 +420,61 @@ def export_region_geopdf(layout, output_path):
         return False
 
 
-def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[], 
-                        skips=[], reuse_extracts=False, first_n=0):
+def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=None, 
+                        regions_html=[], skips=[], reuse_extracts=False, first_n=0):
     """
     Generate region maps using QGIS API (GeoPDF output).
     
-    This is a drop-in replacement for outlet_regions_grass() that uses QGIS
-    instead of GRASS GIS for map generation.
+    This is a simplified version that reads regions directly from GeoJSON,
+    eliminating the need for pre-processing and intermediate file extraction.
     
     Args:
         config: Atlas configuration dict
         outlet_name: Name of the outlet (e.g., 'gazetteer', 'runbook')
-        regions: List of region dicts with bbox, name, caption, vectors, raster
+        regions_geojson_path: Path to regions GeoJSON file (preferred method)
+        regions: List of region dicts (legacy compatibility, use regions_geojson_path instead)
         regions_html: List of (path, content) tuples for HTML outputs
         skips: List of processing steps to skip
         reuse_extracts: Ignored (for compatibility with GRASS version)
         first_n: Only process first N regions (for testing)
         
     Returns:
-        Updated regions list with output paths
+        List of region dicts with output paths
     """
     t = time.time()
     swale_name = config['name']
     outlet_config = config['assets'][outlet_name]
-    print("WTF")
-    if 'region_maps' in skips:
-        logger.info("Skipping region maps generation")
-        return regions
     
-    # Limit regions if requested
-    if first_n > 0:
-        logger.info(f"Only using first {first_n} regions...")
-        regions = regions[:first_n]
-    logger.info(f"Starting INIT at {t}...")
-    # Initialize QGIS
+    logger.info(f"=== QGIS Outlet Regions Start ===")
+    logger.info(f"Atlas: {swale_name}, Outlet: {outlet_name}")
+    
+    if 'region_maps' in skips:
+        logger.info("Skipping region maps generation (in skips list)")
+        return []
+    
+    # Load regions from GeoJSON if path provided
+    if regions_geojson_path:
+        logger.info(f"Loading regions from: {regions_geojson_path}")
+        regions_list = load_regions_from_geojson(regions_geojson_path, first_n=first_n)
+        logger.info(f"Loaded {len(regions_list)} region(s)")
+    elif regions:
+        # Legacy compatibility - regions already provided
+        logger.info(f"Using provided regions list: {len(regions)} region(s)")
+        regions_list = regions
+        if first_n > 0:
+            logger.info(f"Limiting to first {first_n} regions...")
+            regions_list = regions_list[:first_n]
+    else:
+        logger.error("No regions provided! Specify regions_geojson_path or regions parameter")
+        return []
+    
+    if not regions_list:
+        logger.warning("No regions to process!")
+        return []
+    
+    logger.info(f"Starting QGIS initialization...")
     qgis_init()
-    logger.info(f"Finished INIT at {t}...")
+    logger.info(f"QGIS initialized")    
     try:
         # Create project
         project = QgsProject.instance()
@@ -397,13 +484,14 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
         logger.info("Loading full layers...")
         loaded_layers = {}
         in_layers = outlet_config.get('in_layers', [])
-
-        logger.info(f"processing layers at {t}...")
+ 
         for layer_config in config['dataswale']['layers']:
             layer_name = layer_config['name']
-            logger.info(f"processing layer  {layer_name}...")
+            logger.info(f"Processing layer: {layer_name}...")
+            
             # Skip if not in outlet's in_layers
             if layer_name not in in_layers:
+                logger.debug(f"Skipping {layer_name} - not in outlet's in_layers")
                 continue
             
             # Load layer
@@ -419,13 +507,13 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
             project.addMapLayer(layer)
             loaded_layers[layer_name] = layer
             
-            logger.info(f"Loaded and styled layer: {layer_name} [{time.time() - t:.2f}s]")
+            logger.info(f"✓ Loaded and styled layer: {layer_name} [{time.time() - t:.2f}s]")
         
-        logger.info(f"Loaded {len(loaded_layers)} layers total")
+        logger.info(f"Loaded {len(loaded_layers)} layer(s) total")
         
         # Process each region
-        for i, region in enumerate(regions):
-            logger.info(f"Processing region {i+1}/{len(regions)}: {region['name']} [{time.time() - t:.2f}s]")
+        for i, region in enumerate(regions_list):
+            logger.info(f"Processing region {i+1}/{len(regions_list)}: {region['name']} [{time.time() - t:.2f}s]")
             
             # Check if this region has custom in_layers
             region_in_layers = region.get('in_layers', in_layers)
@@ -449,15 +537,15 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
                 if 'outputs' not in region:
                     region['outputs'] = {}
                 region['outputs']['pdf'] = str(output_path)
-                logger.info(f"Completed region {region['name']} [{time.time() - t:.2f}s]")
+                logger.info(f"✓ Completed region {region['name']} [{time.time() - t:.2f}s]")
             else:
-                logger.error(f"Failed to export region {region['name']}")
+                logger.error(f"✗ Failed to export region {region['name']}")
         
         # Save regions config as JSON
         if first_n == 0:
             regions_json_path = versioning.atlas_path(config, "outlets") / outlet_name / "regions_config.json"
             with open(regions_json_path, "w") as f:
-                json.dump(regions, f, indent=2)
+                json.dump(regions_list, f, indent=2)
             logger.info(f"Saved regions config to: {regions_json_path}")
         
         # Write HTML outputs
@@ -467,8 +555,8 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
             with open(versioned_path, "w") as f:
                 f.write(outfile_content)
         
-        logger.info(f"Completed all regions in {time.time() - t:.2f}s")
-        return regions
+        logger.info(f"=== Completed all regions in {time.time() - t:.2f}s ===")
+        return regions_list
         
     finally:
         # Note: Not calling qgis_cleanup() to avoid segfault
@@ -479,6 +567,78 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
 asset_methods = {
     'qgis_regions': outlet_regions_qgis
     }
+def outlet_runbook_qgis(config, outlet_name='runbook', skips=[], start_at=0, limit=0, first_n=0):
+    """
+    Generate runbook using QGIS (simplified - reads regions GeoJSON directly).
+    
+    Args:
+        config: Atlas configuration dict
+        outlet_name: Name of the runbook outlet (default: 'runbook')
+        skips: List of processing steps to skip
+        start_at: Start at this region index (deprecated, use first_n instead)
+        limit: Limit to this many regions (deprecated, use first_n instead)
+        first_n: Only process first N regions (0 = all)
+        
+    Returns:
+        List of processed regions
+    """
+    # Get regions GeoJSON path
+    regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
+    
+    if not regions_path.exists():
+        logger.error(f"Regions layer not found: {regions_path}")
+        return []
+    
+    # Convert legacy limit parameter to first_n
+    if limit > 0 and first_n == 0:
+        first_n = limit
+    
+    logger.info(f"Running QGIS runbook outlet from: {regions_path}")
+    
+    return outlet_regions_qgis(
+        config=config,
+        outlet_name=outlet_name,
+        regions_geojson_path=str(regions_path),
+        skips=skips,
+        first_n=first_n
+    )
+
+
+def outlet_gazetteer_qgis(config, outlet_name='gazetteer', skips=[], first_n=0):
+    """
+    Generate gazetteer using QGIS (generates grid regions automatically).
+    
+    For now, this still uses the GRASS approach for region generation
+    but renders with QGIS. Full QGIS implementation coming in Phase 2.
+    
+    Args:
+        config: Atlas configuration dict
+        outlet_name: Name of the gazetteer outlet (default: 'gazetteer')
+        skips: List of processing steps to skip
+        first_n: Only process first N regions (0 = all)
+        
+    Returns:
+        List of processed regions
+    """
+    # Import here to avoid circular dependency
+    from outlets import generate_gazetteerregions
+    
+    logger.info(f"Running QGIS gazetteer outlet")
+    
+    # Generate grid regions (still uses existing logic)
+    gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name)
+    
+    # Render with QGIS
+    return outlet_regions_qgis(
+        config=config,
+        outlet_name=outlet_name,
+        regions=gaz_regions,
+        regions_html=gaz_html,
+        skips=skips,
+        first_n=first_n
+    )
+
+
 if __name__ == "__main__":
     # Basic test
     print("QGIS outlets module loaded successfully")
