@@ -193,10 +193,10 @@
     },
     "qgis_runbook": {
 	"type": "outlet",
-	"name": "qgis_regions",
+	"name": "qgis_runbook",
 	"access": ["internal", "admin"],
-	"config_def": "qgis_regions",
-    "regions_layer": "regions",
+	"config_def": "qgis_runbook",
+	"regions_layer": "regions",
 	"in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
     }
 }

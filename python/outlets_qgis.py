@@ -595,9 +595,7 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
 
 
 
-asset_methods = {
-    'qgis_regions': outlet_regions_qgis
-    }
+
 def outlet_runbook_qgis(config, outlet_name='runbook', skips=[], start_at=0, limit=0, first_n=0):
     """
     Generate runbook using QGIS (simplified - reads regions GeoJSON directly).
@@ -673,6 +671,9 @@ def outlet_gazetteer_qgis(config, outlet_name='gazetteer', skips=[], first_n=0):
         first_n=first_n
     )
 
+asset_methods = {
+    'qgis_runbook': outlet_runbook_qgis
+    }
 
 if __name__ == "__main__":
     # Basic test
