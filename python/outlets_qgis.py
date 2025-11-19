@@ -199,17 +199,26 @@ def load_full_layer(layer_config, config):
         layer_format = 'geojson'
         layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
         
-        # Try loading with explicit options to handle problematic fid fields
+        # Try loading with explicit options to handle problematic fid fields from GRASS
         options = QgsVectorLayer.LayerOptions()
         options.loadDefaultStyle = False
         
-        # Try with AUTODETECT_TYPE=YES to handle mixed field types
-        layer_uri = f"{layer_path}|option:AUTODETECT_TYPE=YES"
+        # Build URI with multiple GDAL options to handle fid issues:
+        # - AUTODETECT_TYPE=YES: handle mixed field types
+        # - FLATTEN_NESTED_ATTRIBUTES=YES: simplify complex attributes
+        # - ARRAY_AS_STRING=YES: convert arrays to strings
+        gdal_opts = [
+            "AUTODETECT_TYPE=YES",
+            "FLATTEN_NESTED_ATTRIBUTES=YES"
+        ]
+        layer_uri = f"{layer_path}|" + "|".join(f"option:{opt}" for opt in gdal_opts)
+        
+        logger.debug(f"Loading {layer_name} with URI: {layer_uri}")
         layer = QgsVectorLayer(layer_uri, layer_name, "ogr", options)
         
         if not layer.isValid():
-            # If that failed, try without the option
-            logger.debug(f"Retrying layer load without AUTODETECT_TYPE option")
+            # If that failed, try with basic URI
+            logger.debug(f"Retrying layer load with basic URI")
             layer = QgsVectorLayer(str(layer_path), layer_name, "ogr", options)
             
         if not layer.isValid():
@@ -217,7 +226,12 @@ def load_full_layer(layer_config, config):
             logger.warning(f"Layer error: {layer.error().message()}")
             return None
         
-        logger.info(f"Loaded vector layer: {layer_name} ({layer.featureCount()} features)")
+        # Check if layer has a valid CRS
+        if not layer.crs().isValid():
+            logger.warning(f"Layer {layer_name} has invalid CRS, setting to WGS84")
+            layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        
+        logger.info(f"Loaded vector layer: {layer_name} ({layer.featureCount()} features, CRS: {layer.crs().authid()})")
         return layer
 
 
@@ -424,12 +438,26 @@ def export_region_geopdf(layout, output_path):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
+    # Error code mapping for debugging
+    error_codes = {
+        0: "Success",
+        1: "Canceled", 
+        2: "MemoryError",
+        3: "FileError",
+        4: "PrintError",
+        5: "SvgLayerError",
+        6: "IteratorError"
+    }
+    
     # Configure PDF export settings
     settings = QgsLayoutExporter.PdfExportSettings()
     settings.rasterizeWholeImage = False  # Keep vectors as vectors
     settings.exportMetadata = True  # Include georeferencing
     settings.writeGeoPdf = True  # Enable GeoPDF
     settings.dpi = 300  # High quality
+    
+    logger.debug(f"Exporting to: {output_path}")
+    logger.debug(f"Layout has {len(layout.items())} items")
     
     # Export
     exporter = QgsLayoutExporter(layout)
@@ -439,8 +467,21 @@ def export_region_geopdf(layout, output_path):
         logger.info(f"Successfully exported GeoPDF to: {output_path}")
         return True
     else:
-        logger.error(f"Failed to export PDF with code: {result}")
-        return False
+        error_name = error_codes.get(result, f"Unknown({result})")
+        logger.error(f"Failed to export PDF: {error_name} (code {result})")
+        
+        # Try simpler export without GeoPDF features
+        logger.info("Retrying with simplified settings (non-GeoPDF)...")
+        settings.writeGeoPdf = False
+        settings.rasterizeWholeImage = True  # Rasterize to avoid vector issues
+        
+        result2 = exporter.exportToPdf(str(output_path), settings)
+        if result2 == QgsLayoutExporter.Success:
+            logger.warning(f"✓ Exported as rasterized PDF (not GeoPDF) to: {output_path}")
+            return True
+        else:
+            logger.error(f"✗ Simplified export also failed with code: {result2}")
+            return False
 
 
 def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=None, 
@@ -558,6 +599,21 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
             
             # Create layout for region
             layout = create_region_layout(region, project, config, outlet_name)
+            
+            # Validate layout before export
+            if layout is None:
+                logger.error(f"Failed to create layout for region {region['name']}")
+                continue
+            
+            map_items = [item for item in layout.items() if isinstance(item, QgsLayoutItemMap)]
+            if not map_items:
+                logger.error(f"No map items in layout for region {region['name']}")
+                continue
+            
+            map_item = map_items[0]
+            logger.debug(f"Map extent: {map_item.extent().toString()}")
+            logger.debug(f"Map CRS: {map_item.crs().authid()}")
+            logger.debug(f"Visible layers in project: {len(project.mapLayers())}")
             
             # Export to GeoPDF
             output_path = versioning.atlas_path(config, "outlets") / outlet_name / f"page_{region['name']}.pdf"
