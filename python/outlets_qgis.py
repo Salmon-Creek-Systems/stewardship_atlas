@@ -60,7 +60,15 @@ except ImportError:
     import versioning
     import utils
 
+#logger = logging.getLogger(__name__)
+
+# Configure logging
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
 
 # Global QGIS application instance
 _qgs_app = None
@@ -367,7 +375,7 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
     t = time.time()
     swale_name = config['name']
     outlet_config = config['assets'][outlet_name]
-    
+    print("WTF")
     if 'region_maps' in skips:
         logger.info("Skipping region maps generation")
         return regions
@@ -376,10 +384,10 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
     if first_n > 0:
         logger.info(f"Only using first {first_n} regions...")
         regions = regions[:first_n]
-    
+    logger.info(f"Starting INIT at {t}...")
     # Initialize QGIS
     qgis_init()
-    
+    logger.info(f"Finished INIT at {t}...")
     try:
         # Create project
         project = QgsProject.instance()
@@ -389,10 +397,11 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
         logger.info("Loading full layers...")
         loaded_layers = {}
         in_layers = outlet_config.get('in_layers', [])
-        
+
+        logger.info(f"processing layers at {t}...")
         for layer_config in config['dataswale']['layers']:
             layer_name = layer_config['name']
-            
+            logger.info(f"processing layer  {layer_name}...")
             # Skip if not in outlet's in_layers
             if layer_name not in in_layers:
                 continue
