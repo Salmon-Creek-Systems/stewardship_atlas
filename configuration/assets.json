@@ -176,9 +176,26 @@
     },
     "access": ["admin"]
 },
-"gazetteer": {
-    "type": "outlet",
-    "name": "gazetteer",
-    "config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
-}
+    "gazetteer": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
+    },
+    "qgis_regions": {
+        "name": "qgis_regions",
+        "asset_type": "outlet",
+        "fetch_type": "qgis_regions",
+        "interaction": "interface",
+        "data_type": "geopdf",
+        "page_size": "A4",
+        "page_orientation": "Portrait",
+        "dpi": 300,
+        "attribution": {
+            "url": "https://www.scvfd.fireatlas.org",
+            "description": "QGIS-generated GeoPDF region maps with layer structure retained.",
+            "license": "https://www.scvfd.fireatlas.org",
+            "citation": "https://www.scvfd.fireatlas.org"
+        }
+    }
+    
 }

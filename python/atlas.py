@@ -24,6 +24,7 @@ import geojson
 # Our imports
 import utils
 import outlets
+import outlets_qgis
 import vector_inlets
 import raster_inlets
 import eddies
@@ -50,7 +51,7 @@ DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
 
 DEFAULT_SHARED_DIR = Path('/root/data')
 
-DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods
+DEFAULT_MATERIALIZERS =  outlets_qgis.asset_methods | outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods
 
 
 def discover_versions(swale_path: Path) -> List[str]:

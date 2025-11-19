@@ -190,5 +190,12 @@
 	"type": "outlet",
 	"name": "gazetteer",
 	"config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
+    },
+    "qgis_runbook": {
+	"type": "outlet",
+	"name": "qgis_regions",
+	"access": ["internal", "admin"],
+	"config_def": "qgis_regions",
+	"in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
     }
 }

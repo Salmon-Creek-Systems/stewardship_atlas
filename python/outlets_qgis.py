@@ -466,6 +466,10 @@ def outlet_regions_qgis(config, outlet_name, regions=[], regions_html=[],
         pass
 
 
+
+asset_methods = {
+    'qgis_regions': outlet_regions_qgis
+    }
 if __name__ == "__main__":
     # Basic test
     print("QGIS outlets module loaded successfully")
