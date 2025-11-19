@@ -582,8 +582,12 @@ def outlet_runbook_qgis(config, outlet_name='runbook', skips=[], start_at=0, lim
     Returns:
         List of processed regions
     """
-    # Get regions GeoJSON path
-    regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
+    
+    # get regions layer from asset config
+    regions_layer_name = config['assets'][outlet_name].get('regions_layer', 'regions')
+
+# Get regions GeoJSON path
+    regions_path = versioning.atlas_path(config, "layers") / regions_layer_name / f"{regions_layer_name}.geojson"
     
     if not regions_path.exists():
         logger.error(f"Regions layer not found: {regions_path}")

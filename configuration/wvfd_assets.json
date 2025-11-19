@@ -196,6 +196,7 @@
 	"name": "qgis_regions",
 	"access": ["internal", "admin"],
 	"config_def": "qgis_regions",
+    "regions_layer": "regions",
 	"in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
     }
 }
