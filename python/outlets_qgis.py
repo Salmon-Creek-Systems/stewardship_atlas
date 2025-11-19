@@ -102,8 +102,12 @@ def load_regions_from_geojson(geojson_path, first_n=0):
     
     regions = []
     
-    with open(geojson_path, 'r') as f:
-        geojson_data = json.load(f)
+    try:
+        with open(geojson_path, 'r') as f:
+            geojson_data = json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse regions GeoJSON: {e}")
+        return []
     
     features = geojson_data.get('features', [])
     logger.info(f"Found {len(features)} feature(s) in regions GeoJSON")
@@ -114,29 +118,34 @@ def load_regions_from_geojson(geojson_path, first_n=0):
             logger.info(f"Reached limit of {first_n} regions, stopping")
             break
         
-        # Extract bbox from geometry coordinates
-        coords = feature['geometry']['coordinates'][0]
-        bbox = utils.geojson_to_bbox(coords)
-        
-        # Get properties
-        props = feature.get('properties', {})
-        default_name = f"Region_{i}"
-        name = props.get('name', props.get('Description', default_name))
-        caption = props.get('caption', props.get('Description', default_name))
-        
-        region = {
-            'name': utils.canonicalize_name(name),
-            'caption': caption,
-            'text': props.get('text', caption),
-            'bbox': bbox,
-            'neighbors': props.get('neighbors'),
-            'vectors': [],
-            'raster': '',
-            'properties': props  # Keep all properties for reference
-        }
-        
-        regions.append(region)
-        logger.debug(f"Loaded region {i}: {region['name']}")
+        try:
+            # Extract bbox from geometry coordinates
+            coords = feature['geometry']['coordinates'][0]
+            bbox = utils.geojson_to_bbox(coords)
+            
+            # Get properties
+            props = feature.get('properties', {})
+            default_name = f"Region_{i}"
+            name = props.get('name', props.get('Description', default_name))
+            caption = props.get('caption', props.get('Description', default_name))
+            
+            region = {
+                'name': utils.canonicalize_name(name),
+                'caption': caption,
+                'text': props.get('text', caption),
+                'bbox': bbox,
+                'neighbors': props.get('neighbors'),
+                'vectors': [],
+                'raster': '',
+                'properties': props  # Keep all properties for reference
+            }
+            
+            regions.append(region)
+            logger.debug(f"Loaded region {i}: {region['name']}")
+            
+        except (KeyError, IndexError, TypeError) as e:
+            logger.warning(f"Skipping malformed region feature {i}: {e}")
+            continue
     
     # Set up neighbor links if not already present
     for i, r in enumerate(regions):
@@ -190,11 +199,25 @@ def load_full_layer(layer_config, config):
         layer_format = 'geojson'
         layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
         
-        layer = QgsVectorLayer(str(layer_path), layer_name, "ogr")
+        # Try loading with explicit options to handle problematic fid fields
+        options = QgsVectorLayer.LayerOptions()
+        options.loadDefaultStyle = False
+        
+        # Try with AUTODETECT_TYPE=YES to handle mixed field types
+        layer_uri = f"{layer_path}|option:AUTODETECT_TYPE=YES"
+        layer = QgsVectorLayer(layer_uri, layer_name, "ogr", options)
+        
+        if not layer.isValid():
+            # If that failed, try without the option
+            logger.debug(f"Retrying layer load without AUTODETECT_TYPE option")
+            layer = QgsVectorLayer(str(layer_path), layer_name, "ogr", options)
+            
         if not layer.isValid():
             logger.warning(f"Failed to load vector layer: {layer_name} from {layer_path}")
+            logger.warning(f"Layer error: {layer.error().message()}")
             return None
-        logger.info(f"Loaded vector layer: {layer_name}")
+        
+        logger.info(f"Loaded vector layer: {layer_name} ({layer.featureCount()} features)")
         return layer
 
 
@@ -487,27 +510,35 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
  
         for layer_config in config['dataswale']['layers']:
             layer_name = layer_config['name']
-            logger.info(f"Processing layer: {layer_name}...")
             
             # Skip if not in outlet's in_layers
             if layer_name not in in_layers:
                 logger.debug(f"Skipping {layer_name} - not in outlet's in_layers")
                 continue
             
-            # Load layer
-            layer = load_full_layer(layer_config, config)
-            if layer is None:
-                logger.warning(f"Skipping layer {layer_name} - failed to load")
+            logger.info(f"Processing layer: {layer_name}...")
+            
+            try:
+                # Load layer
+                layer = load_full_layer(layer_config, config)
+                if layer is None:
+                    logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
+                    continue
+                
+                # Apply styling
+                apply_basic_styling(layer, layer_config)
+                
+                # Add to project
+                project.addMapLayer(layer)
+                loaded_layers[layer_name] = layer
+                
+                logger.info(f"✓ Loaded and styled layer: {layer_name} [{time.time() - t:.2f}s]")
+                
+            except Exception as e:
+                logger.error(f"✗ Error loading layer {layer_name}: {e}")
+                logger.debug(f"Layer config: {layer_config}")
+                # Continue with other layers
                 continue
-            
-            # Apply styling
-            apply_basic_styling(layer, layer_config)
-            
-            # Add to project
-            project.addMapLayer(layer)
-            loaded_layers[layer_name] = layer
-            
-            logger.info(f"✓ Loaded and styled layer: {layer_name} [{time.time() - t:.2f}s]")
         
         logger.info(f"Loaded {len(loaded_layers)} layer(s) total")
         
