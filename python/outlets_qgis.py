@@ -314,24 +314,32 @@ def apply_basic_styling(layer, layer_config):
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
         
-        # Check if width should come from feature attribute
+        # Check if width should come from per-feature attribute
+        # If 'vector_width' key exists in config (any value), use feature's vector_width attribute
         if 'vector_width' in layer_config:
-            # Use data-defined width from vector_width attribute
-            width = layer_config.get('constant_width', 2)
-            symbol.setWidth(width * 0.1)  # Default/fallback width
-            
-            # Set data-defined property for width
-            symbol_layer = symbol.symbolLayer(0)
-            if symbol_layer:
-                # Width from 'vector_width' attribute, scaled to mm
-                # PropertyWidth = 0 for line symbol layers
-                symbol_layer.setDataDefinedProperty(
-                    QgsSymbolLayer.PropertyStrokeWidth,
-                    QgsProperty.fromExpression('"vector_width" * 0.1')
-                )
-                logger.debug(f"Using data-defined width for {layer.name()}")
+            # Check if the layer actually has a vector_width field
+            fields = layer.fields()
+            if fields.indexOf('vector_width') >= 0:
+                # Use data-defined width from each feature's vector_width attribute
+                width = layer_config.get('constant_width', 2)
+                symbol.setWidth(width * 0.1)  # Default/fallback width
+                
+                # Set data-defined property to read from feature attribute
+                symbol_layer = symbol.symbolLayer(0)
+                if symbol_layer:
+                    # Width from 'vector_width' attribute in feature properties, scaled to mm
+                    symbol_layer.setDataDefinedProperty(
+                        QgsSymbolLayer.PropertyStrokeWidth,
+                        QgsProperty.fromExpression('"vector_width" * 0.1')
+                    )
+                    logger.debug(f"Using per-feature vector_width attribute for {layer.name()}")
+            else:
+                logger.warning(f"Layer {layer.name()} config has 'vector_width' but features don't have that attribute")
+                # Fall back to constant width
+                width = layer_config.get('constant_width', 2)
+                symbol.setWidth(width * 0.1)
         else:
-            # Use constant width
+            # Use constant width from config
             width = layer_config.get('constant_width', 2)
             symbol.setWidth(width * 0.1)  # Scale to mm
         
