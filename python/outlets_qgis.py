@@ -38,6 +38,7 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsSymbol,
+    QgsSymbolLayer,
     QgsRendererCategory,
     QgsCategorizedSymbolRenderer,
     QgsSingleSymbolRenderer,
@@ -312,8 +313,27 @@ def apply_basic_styling(layer, layer_config):
     elif geometry_type == 'linestring':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
-        width = layer_config.get('constant_width', 2)
-        symbol.setWidth(width * 0.1)  # Scale to mm
+        
+        # Check if width should come from feature attribute
+        if 'vector_width' in layer_config:
+            # Use data-defined width from vector_width attribute
+            width = layer_config.get('constant_width', 2)
+            symbol.setWidth(width * 0.1)  # Default/fallback width
+            
+            # Set data-defined property for width
+            symbol_layer = symbol.symbolLayer(0)
+            if symbol_layer:
+                # Width from 'vector_width' attribute, scaled to mm
+                # PropertyWidth = 0 for line symbol layers
+                symbol_layer.setDataDefinedProperty(
+                    QgsSymbolLayer.PropertyStrokeWidth,
+                    QgsProperty.fromExpression('"vector_width" * 0.1')
+                )
+                logger.debug(f"Using data-defined width for {layer.name()}")
+        else:
+            # Use constant width
+            width = layer_config.get('constant_width', 2)
+            symbol.setWidth(width * 0.1)  # Scale to mm
         
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -356,6 +376,19 @@ def apply_basic_styling(layer, layer_config):
             font.setPointSize(10)
             text_format.setFont(font)
             pal_settings.setFormat(text_format)
+            
+            # For linestrings, enable curved placement along the line
+            if geometry_type == 'linestring':
+                # Curved placement follows the line geometry
+                pal_settings.placement = QgsPalLayerSettings.Line  
+                # Get line settings for curved placement
+                line_settings = pal_settings.lineSettings()
+                line_settings.setPlacementFlags(QgsPalLayerSettings.AboveLine)
+                # Repeat labels along long lines
+                pal_settings.repeatDistance = 200  # repeat every 200 map units
+                pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
+                pal_settings.dist = 2.0  # Distance above line
+                logger.debug(f"Enabled curved labels for {layer.name()}")
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
