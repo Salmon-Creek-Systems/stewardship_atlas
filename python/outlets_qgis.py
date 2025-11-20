@@ -15,6 +15,7 @@ import sys
 import json
 import time
 import logging
+import tempfile
 from pathlib import Path
 
 # Set Qt to use offscreen platform for headless operation
@@ -170,6 +171,53 @@ def qgis_cleanup():
         logger.info("QGIS cleanup requested (skipping exitQgis)")
 
 
+def clean_grass_geojson(geojson_path, temp_path):
+    """
+    Remove GRASS-generated fields that cause GDAL/QGIS issues.
+    
+    GRASS's v.out.ogr adds 'id' at feature level and 'cat' in properties,
+    which can cause "Wrong field type for fid" errors in QGIS.
+    
+    Args:
+        geojson_path: Path to original GeoJSON file
+        temp_path: Path to write cleaned GeoJSON
+        
+    Returns:
+        True if cleaning was successful, False otherwise
+    """
+    try:
+        with open(geojson_path, 'r') as f:
+            data = json.load(f)
+        
+        # Clean each feature
+        cleaned_features = []
+        for feature in data.get('features', []):
+            # Remove 'id' at feature level (GRASS adds this)
+            if 'id' in feature:
+                del feature['id']
+            
+            # Remove GRASS-specific fields from properties
+            props = feature.get('properties', {})
+            grass_fields = ['cat', 'fid', 'ogc_fid', 'gml_id']
+            for field in grass_fields:
+                if field in props:
+                    del props[field]
+            
+            cleaned_features.append(feature)
+        
+        # Write cleaned version
+        data['features'] = cleaned_features
+        with open(temp_path, 'w') as f:
+            json.dump(data, f)
+        
+        logger.debug(f"Cleaned {len(cleaned_features)} features, removed GRASS metadata")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to clean GeoJSON: {e}")
+        return False
+
+
 def load_full_layer(layer_config, config):
     """
     Load a full layer (vector or raster) from staging area.
@@ -199,30 +247,27 @@ def load_full_layer(layer_config, config):
         layer_format = 'geojson'
         layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
         
-        # Try loading with explicit options to handle problematic fid fields from GRASS
+        # Create cleaned temporary GeoJSON (remove GRASS metadata that confuses GDAL)
+        temp_dir = Path(tempfile.gettempdir()) / "stewardship_atlas_qgis"
+        temp_dir.mkdir(exist_ok=True)
+        temp_path = temp_dir / f"{layer_name}_clean.geojson"
+        
+        if not clean_grass_geojson(layer_path, temp_path):
+            logger.warning(f"Failed to clean GeoJSON for {layer_name}, trying original")
+            load_path = layer_path
+        else:
+            load_path = temp_path
+            logger.debug(f"Using cleaned GeoJSON: {temp_path}")
+        
+        # Load the cleaned GeoJSON
         options = QgsVectorLayer.LayerOptions()
         options.loadDefaultStyle = False
         
-        # Build URI with multiple GDAL options to handle fid issues:
-        # - AUTODETECT_TYPE=YES: handle mixed field types
-        # - FLATTEN_NESTED_ATTRIBUTES=YES: simplify complex attributes
-        # - ARRAY_AS_STRING=YES: convert arrays to strings
-        gdal_opts = [
-            "AUTODETECT_TYPE=YES",
-            "FLATTEN_NESTED_ATTRIBUTES=YES"
-        ]
-        layer_uri = f"{layer_path}|" + "|".join(f"option:{opt}" for opt in gdal_opts)
-        
-        logger.debug(f"Loading {layer_name} with URI: {layer_uri}")
-        layer = QgsVectorLayer(layer_uri, layer_name, "ogr", options)
-        
-        if not layer.isValid():
-            # If that failed, try with basic URI
-            logger.debug(f"Retrying layer load with basic URI")
-            layer = QgsVectorLayer(str(layer_path), layer_name, "ogr", options)
+        logger.debug(f"Loading {layer_name} from: {load_path}")
+        layer = QgsVectorLayer(str(load_path), layer_name, "ogr", options)
             
         if not layer.isValid():
-            logger.warning(f"Failed to load vector layer: {layer_name} from {layer_path}")
+            logger.warning(f"Failed to load vector layer: {layer_name}")
             logger.warning(f"Layer error: {layer.error().message()}")
             return None
         
@@ -464,23 +509,24 @@ def export_region_geopdf(layout, output_path):
     result = exporter.exportToPdf(str(output_path), settings)
     
     if result == QgsLayoutExporter.Success:
-        logger.info(f"Successfully exported GeoPDF to: {output_path}")
+        logger.info(f"✓ Successfully exported GeoPDF to: {output_path}")
         return True
     else:
         error_name = error_codes.get(result, f"Unknown({result})")
-        logger.error(f"Failed to export PDF: {error_name} (code {result})")
+        logger.error(f"Failed to export GeoPDF: {error_name} (code {result})")
         
-        # Try simpler export without GeoPDF features
-        logger.info("Retrying with simplified settings (non-GeoPDF)...")
+        # Try simpler export without GeoPDF features (fallback)
+        logger.info("Retrying with rasterized fallback (non-GeoPDF)...")
         settings.writeGeoPdf = False
         settings.rasterizeWholeImage = True  # Rasterize to avoid vector issues
         
         result2 = exporter.exportToPdf(str(output_path), settings)
         if result2 == QgsLayoutExporter.Success:
-            logger.warning(f"✓ Exported as rasterized PDF (not GeoPDF) to: {output_path}")
+            logger.warning(f"⚠ Exported as rasterized PDF (not GeoPDF) to: {output_path}")
+            logger.warning(f"  (GeoPDF failed - check layer data for issues)")
             return True
         else:
-            logger.error(f"✗ Simplified export also failed with code: {result2}")
+            logger.error(f"✗ Rasterized export also failed with code: {result2}")
             return False
 
 
