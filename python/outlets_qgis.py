@@ -381,7 +381,13 @@ def apply_basic_styling(layer, layer_config):
             # Text format
             text_format = QgsTextFormat()
             text_format.setSize(10)
-            text_format.setColor(qcolor)
+            
+            # For linestrings, use white labels; otherwise use layer color
+            if geometry_type == 'linestring':
+                text_format.setColor(QColor(255, 255, 255))  # White labels for linestrings
+            else:
+                text_format.setColor(qcolor)
+            
             font = QFont()
             font.setPointSize(10)
             text_format.setFont(font)
@@ -390,12 +396,12 @@ def apply_basic_styling(layer, layer_config):
             # For linestrings, enable curved placement along the line
             if geometry_type == 'linestring':
                 # Curved placement follows the line geometry
-                pal_settings.placement = QgsPalLayerSettings.Line  
+                pal_settings.placement = QgsPalLayerSettings.Curved  # Align with line curves
                 # Repeat labels along long lines
                 pal_settings.repeatDistance = 200  # repeat every 200 map units
                 pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
                 pal_settings.dist = 2.0  # Distance above line
-                logger.debug(f"Enabled curved labels for {layer.name()}")
+                logger.debug(f"Enabled curved white labels for {layer.name()}")
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
