@@ -378,15 +378,22 @@ def apply_basic_styling(layer, layer_config):
             pal_settings.fieldName = label_attr
             pal_settings.enabled = True
             
+            # Force display of all labels (don't hide on collision)
+            pal_settings.displayAll = True
+            
+            # Disable obstacle avoidance - show labels even if they overlap features
+            pal_settings.obstacleSettings().setIsObstacle(False)
+            
             # Text format
             text_format = QgsTextFormat()
             
             # For linestrings, use larger white labels; otherwise use layer color
             if geometry_type == 'linestring':
                 text_format.setSize(14)  # Larger size for linestrings
-                text_format.setColor(QColor(255, 5, 5))  # White labels for linestrings
+                text_format.setColor(QColor(255, 255, 255))  # White labels for linestrings
                 font = QFont()
                 font.setPointSize(14)
+                font.setBold(True)  # Make labels bold for better visibility
             else:
                 text_format.setSize(10)
                 text_format.setColor(qcolor)
