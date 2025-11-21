@@ -384,7 +384,7 @@ def apply_basic_styling(layer, layer_config):
             # For linestrings, use larger white labels; otherwise use layer color
             if geometry_type == 'linestring':
                 text_format.setSize(14)  # Larger size for linestrings
-                text_format.setColor(QColor(255, 255, 255))  # White labels for linestrings
+                text_format.setColor(QColor(255, 5, 5))  # White labels for linestrings
                 font = QFont()
                 font.setPointSize(14)
             else:
