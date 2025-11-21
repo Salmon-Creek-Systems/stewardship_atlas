@@ -322,15 +322,17 @@ def apply_basic_styling(layer, layer_config):
             if fields.indexOf('vector_width') >= 0:
                 # Use data-defined width from each feature's vector_width attribute
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * 0.1)  # Default/fallback width
+                symbol.setWidth(width )  # Default/fallback width
+                logger.info(f"set constant width: {width}")
                 
                 # Set data-defined property to read from feature attribute
                 symbol_layer = symbol.symbolLayer(0)
                 if symbol_layer:
+                    logger.info(f"using feature vector_width")
                     # Width from 'vector_width' attribute in feature properties, scaled to mm
                     symbol_layer.setDataDefinedProperty(
                         QgsSymbolLayer.PropertyStrokeWidth,
-                        QgsProperty.fromExpression('"vector_width" * 0.1')
+                        QgsProperty.fromExpression('"vector_width"')
                     )
                     logger.debug(f"Using per-feature vector_width attribute for {layer.name()}")
             else:

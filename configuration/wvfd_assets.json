@@ -197,6 +197,6 @@
 	"access": ["internal", "admin"],
 	"config_def": "qgis_runbook",
 	"regions_layer": "regions",
-	"in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
+	"in_layers": ["basemap", "tsunami","contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural"]
     }
 }
