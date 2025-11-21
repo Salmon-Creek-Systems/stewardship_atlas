@@ -389,9 +389,6 @@ def apply_basic_styling(layer, layer_config):
             if geometry_type == 'linestring':
                 # Curved placement follows the line geometry
                 pal_settings.placement = QgsPalLayerSettings.Line  
-                # Get line settings for curved placement
-                line_settings = pal_settings.lineSettings()
-                line_settings.setPlacementFlags(QgsPalLayerSettings.AboveLine)
                 # Repeat labels along long lines
                 pal_settings.repeatDistance = 200  # repeat every 200 map units
                 pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
