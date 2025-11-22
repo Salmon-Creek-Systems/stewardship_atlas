@@ -407,9 +407,13 @@ def apply_basic_styling(layer, layer_config):
             if geometry_type == 'linestring':
                 # Curved placement follows the line geometry
                 pal_settings.placement = QgsPalLayerSettings.Curved  # Align with line curves
-                # Repeat labels along long lines
-                pal_settings.repeatDistance = 200  # repeat every 200 map units
-                pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
+                
+                # Optional: Repeat labels along long lines (off by default)
+                repeat_distance = layer_config.get('label_repeat_distance', 0)
+                if repeat_distance > 0:
+                    pal_settings.repeatDistance = repeat_distance
+                    pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
+                    logger.debug(f"Label repeat enabled: {repeat_distance} map units")
                 
                 # Use negative distance to place below line, which centers better
                 # A small negative value shifts the label's baseline down
