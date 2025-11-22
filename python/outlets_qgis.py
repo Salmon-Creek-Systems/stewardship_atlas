@@ -405,13 +405,8 @@ def apply_basic_styling(layer, layer_config):
             
             # For linestrings, enable curved placement along the line
             if geometry_type == 'linestring':
-                # Try Line placement which often works better with repeats than Curved
-                pal_settings.placement = QgsPalLayerSettings.Line
-                
-                # Set line anchor to use percentage along line (helps with repeat alignment)
-                pal_settings.lineSettings().setLineAnchorPercent(0.5)  # Center of segment
-                pal_settings.lineSettings().setAnchorType(1)  # HintOnly mode
-                
+                # Curved placement follows the line geometry
+                pal_settings.placement = QgsPalLayerSettings.Curved  # Align with line curves
                 # Repeat labels along long lines
                 pal_settings.repeatDistance = 200  # repeat every 200 map units
                 pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
@@ -421,11 +416,11 @@ def apply_basic_styling(layer, layer_config):
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
                 
-                # Try offset in points
+                # Alternative: try offset in points
                 pal_settings.yOffset = -5.0
                 pal_settings.offsetUnits = QgsUnitTypes.RenderPoints
                 
-                logger.debug(f"Enabled line-following labels centered on line for {layer.name()}")
+                logger.debug(f"Enabled curved white labels centered on line for {layer.name()}")
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
