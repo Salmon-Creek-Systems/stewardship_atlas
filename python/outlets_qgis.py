@@ -384,15 +384,7 @@ def apply_basic_styling(layer, layer_config):
             # Disable obstacle avoidance - show labels even if they overlap features
             pal_settings.obstacleSettings().setIsObstacle(False)
             
-            # Deduplicate labels: only show label on first feature with each unique label value
-            # This ensures each label text appears only once per layer (per region when filtered)
-            pal_settings.dataDefinedProperties().setProperty(
-                QgsPalLayerSettings.Show,
-                QgsProperty.fromExpression(f'$id = minimum($id, group_by:="{label_attr}")')
-            )
-            logger.debug(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
-            
-            # Text format
+            # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
             
             # For linestrings, use larger white labels; otherwise use layer color
@@ -414,7 +406,7 @@ def apply_basic_styling(layer, layer_config):
             # For linestrings, enable curved placement along the line
             if geometry_type == 'linestring':
                 # Curved placement follows the line geometry
-                pal_settings.placement = QgsPalLayerSettings.Curved  # Align with line curves
+                pal_settings.placement = QgsPalLayerSettings.Curved
                 
                 # Optional: Repeat labels along long lines (off by default)
                 repeat_distance = layer_config.get('label_repeat_distance', 0)
@@ -432,7 +424,27 @@ def apply_basic_styling(layer, layer_config):
                 pal_settings.yOffset = -5.0
                 pal_settings.offsetUnits = QgsUnitTypes.RenderPoints
                 
-                logger.debug(f"Enabled curved white labels centered on line for {layer.name()}")
+                logger.info(f"Configured curved placement for {layer.name()}, placement mode: {pal_settings.placement}")
+            
+            # Deduplicate labels: only show label on first feature with each unique label value
+            # This ensures each label text appears only once per layer (per region when filtered)
+            # Can be disabled per-layer with 'deduplicate_labels': false
+            if layer_config.get('deduplicate_labels', True):
+                # Only apply if the label attribute is not NULL/empty
+                dedup_expr = f'("{label_attr}" IS NOT NULL AND "{label_attr}" != \'\') AND ($id = minimum($id, group_by:="{label_attr}"))'
+                pal_settings.dataDefinedProperties().setProperty(
+                    QgsPalLayerSettings.Show,
+                    QgsProperty.fromExpression(dedup_expr)
+                )
+                logger.debug(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
+            else:
+                # Just check for non-empty labels
+                show_expr = f'"{label_attr}" IS NOT NULL AND "{label_attr}" != \'\''
+                pal_settings.dataDefinedProperties().setProperty(
+                    QgsPalLayerSettings.Show,
+                    QgsProperty.fromExpression(show_expr)
+                )
+                logger.debug(f"Label deduplication disabled for {layer.name()}, showing all non-empty labels")
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
@@ -727,7 +739,8 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
                     # Use st_intersects with the bbox geometry
                     filter_expr = f"intersects($geometry, geom_from_wkt('{bbox_wkt}'))"
                     layer.setSubsetString(filter_expr)
-                    logger.debug(f"Applied spatial filter to {layer_name} for region {region['name']}")
+                    feature_count = layer.featureCount()
+                    logger.info(f"Applied spatial filter to {layer_name}: {feature_count} features in region {region['name']}")
                 elif isinstance(layer, QgsVectorLayer):
                     # Clear filter for invisible layers (though they won't be rendered anyway)
                     layer.setSubsetString("")
