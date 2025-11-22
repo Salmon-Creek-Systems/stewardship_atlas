@@ -384,6 +384,14 @@ def apply_basic_styling(layer, layer_config):
             # Disable obstacle avoidance - show labels even if they overlap features
             pal_settings.obstacleSettings().setIsObstacle(False)
             
+            # Deduplicate labels: only show label on first feature with each unique label value
+            # This ensures each label text appears only once per layer (per region when filtered)
+            pal_settings.dataDefinedProperties().setProperty(
+                QgsPalLayerSettings.Show,
+                QgsProperty.fromExpression(f'$id = minimum($id, group_by:="{label_attr}")')
+            )
+            logger.debug(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
+            
             # Text format
             text_format = QgsTextFormat()
             
@@ -705,12 +713,24 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
             # Check if this region has custom in_layers
             region_in_layers = region.get('in_layers', in_layers)
             
-            # Temporarily hide layers not in this region's config
-            layer_visibility = {}
+            # Get region bbox for spatial filtering
+            bbox = region['bbox']
+            bbox_wkt = f"POLYGON(({bbox['west']} {bbox['south']}, {bbox['east']} {bbox['south']}, {bbox['east']} {bbox['north']}, {bbox['west']} {bbox['north']}, {bbox['west']} {bbox['south']}))"
+            
+            # Apply spatial filter to each layer for this region
+            # This ensures labels are deduplicated per-region (not globally)
             for layer_name, layer in loaded_layers.items():
                 visible = layer_name in region_in_layers
-                layer_visibility[layer_name] = visible
-                # Note: Layer visibility is controlled via the layer tree in the layout
+                
+                if visible and isinstance(layer, QgsVectorLayer):
+                    # Filter to only show features that intersect this region's bbox
+                    # Use st_intersects with the bbox geometry
+                    filter_expr = f"intersects($geometry, geom_from_wkt('{bbox_wkt}'))"
+                    layer.setSubsetString(filter_expr)
+                    logger.debug(f"Applied spatial filter to {layer_name} for region {region['name']}")
+                elif isinstance(layer, QgsVectorLayer):
+                    # Clear filter for invisible layers (though they won't be rendered anyway)
+                    layer.setSubsetString("")
             
             # Create layout for region
             layout = create_region_layout(region, project, config, outlet_name)
@@ -742,6 +762,12 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
                 logger.info(f"✓ Completed region {region['name']} [{time.time() - t:.2f}s]")
             else:
                 logger.error(f"✗ Failed to export region {region['name']}")
+        
+        # Clear spatial filters from all layers (cleanup)
+        for layer_name, layer in loaded_layers.items():
+            if isinstance(layer, QgsVectorLayer):
+                layer.setSubsetString("")
+        logger.debug("Cleared spatial filters from all layers")
         
         # Save regions config as JSON
         if first_n == 0:
