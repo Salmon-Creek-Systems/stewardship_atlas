@@ -1,5 +1,5 @@
 
-import logging, subprocess, json
+import logging, subprocess, json, copy
 import gspread, geojson
 
 # Configure logging
@@ -259,3 +259,47 @@ def deduplicate_json(json_list, key_fields=None):
             seen.add(key)
             result.append(item)
     return result
+
+def json_leaf(root, path):
+    #print(f"{path} <--  {list(root.keys())[:3]}")
+    this_key = path.pop(0)
+    #print(f"{this_key} in {list(root.keys())[:3]}")
+    if this_key not in root:
+        #print("Done!")
+        return None
+    if path:
+        #print(f"recursing with {path}")
+        return json_leaf(root[this_key], path)
+    else:
+        #print(f"found it at {this_key}")
+        return root[this_key]
+    
+    #print("Huh")
+    return None
+
+#import traceback
+
+def extract_field_across_layers(field_spec_original):
+    
+    for l in c['dataswale']['layers']:
+        
+        layer_name = l['name']
+        #stdout = f"{layer"}
+        res = {}
+        try:
+            field_spec = copy.deepcopy(field_spec_original)
+            #print(f"Field spec: {field_spec}")
+            f = dataswale_geojson.layer_as_featurecollection(c, layer_name)['features'][0]
+            # field_spec = field_spec_original.copy()
+            for k in field_spec:
+                orig_k = copy.deepcopy(k)
+                if (v := json_leaf(f, k)) is not None:
+                    
+                    res[str(orig_k)] = v
+            print(f"{layer_name}: {res}")
+            #print(f"{layer_name}| root id: {f.get('id','')}  props - cat: {f['properties'].get('cat','')}" \
+            #      + f"id: {f['properties'].get('id','')} id: {f['properties'].get('ogc_fid','')}" )
+                #print(dataswale_geojson.layer_as_featurecollection(c, layer_name)['features'][0].get('fid','NA'))
+        except Exception as e:
+            print(f"Cannot read layer {layer_name}")
+            #traceback.print_exc()

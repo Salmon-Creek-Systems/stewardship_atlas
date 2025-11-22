@@ -413,7 +413,7 @@ def apply_basic_styling(layer, layer_config):
                 
                 # Use negative distance to place below line, which centers better
                 # A small negative value shifts the label's baseline down
-                pal_settings.dist = -2.5  # Negative to shift down for vertical centering
+                pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
                 
                 # Alternative: try offset in points
