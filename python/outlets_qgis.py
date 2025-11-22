@@ -49,7 +49,8 @@ from qgis.core import (
     QgsVectorLayerSimpleLabeling,
     QgsPalLayerSettings,
     QgsProperty,
-    QgsLayerTreeLayer
+    QgsLayerTreeLayer,
+    QgsLabeling
 )
 from qgis.PyQt.QtGui import QColor, QFont
 from qgis.PyQt.QtCore import QSizeF
@@ -403,10 +404,14 @@ def apply_basic_styling(layer, layer_config):
             text_format.setFont(font)
             pal_settings.setFormat(text_format)
             
-            # For linestrings, enable curved placement along the line
+            # For linestrings, enable placement along the line
             if geometry_type == 'linestring':
-                # Curved placement follows the line geometry
-                pal_settings.placement = QgsPalLayerSettings.Curved
+                # Line placement with proper orientation flags
+                pal_settings.placement = QgsPalLayerSettings.Line
+                
+                # Set placement flags to follow line orientation
+                # OnLine = place on the line, MapOrientation = follow the line's angle
+                pal_settings.lineSettings().setPlacementFlags(QgsLabeling.LinePlacementFlag.OnLine | QgsLabeling.LinePlacementFlag.MapOrientation)
                 
                 # Optional: Repeat labels along long lines (off by default)
                 repeat_distance = layer_config.get('label_repeat_distance', 0)
@@ -420,11 +425,7 @@ def apply_basic_styling(layer, layer_config):
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
                 
-                # Alternative: try offset in points
-                pal_settings.yOffset = -5.0
-                pal_settings.offsetUnits = QgsUnitTypes.RenderPoints
-                
-                logger.info(f"Configured curved placement for {layer.name()}, placement mode: {pal_settings.placement}")
+                logger.info(f"Configured line placement with MapOrientation for {layer.name()}")
             
             # Deduplicate labels: only show label on first feature with each unique label value
             # This ensures each label text appears only once per layer (per region when filtered)
