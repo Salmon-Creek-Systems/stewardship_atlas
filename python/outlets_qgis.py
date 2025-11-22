@@ -410,12 +410,15 @@ def apply_basic_styling(layer, layer_config):
                 # Repeat labels along long lines
                 pal_settings.repeatDistance = 200  # repeat every 200 map units
                 pal_settings.repeatDistanceUnit = QgsUnitTypes.RenderMapUnits
-                pal_settings.dist = 0.0  # Place on centerline (no offset)
                 
-                # Shift label down so center of text (not baseline) aligns with centerline
-                # For 14pt font, shift down by ~5pt to center vertically
+                # Use negative distance to place below line, which centers better
+                # A small negative value shifts the label's baseline down
+                pal_settings.dist = -2.5  # Negative to shift down for vertical centering
+                pal_settings.distUnits = QgsUnitTypes.RenderPoints
+                
+                # Alternative: try offset in points
                 pal_settings.yOffset = -5.0
-                pal_settings.offsetType = QgsPalLayerSettings.FromPoint
+                pal_settings.offsetUnits = QgsUnitTypes.RenderPoints
                 
                 logger.debug(f"Enabled curved white labels centered on line for {layer.name()}")
             
