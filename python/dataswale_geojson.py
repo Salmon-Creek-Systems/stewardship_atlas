@@ -71,7 +71,7 @@ def add_webmap_urls(config, layer_name, fc, zoom=14):
             centroid = geom.centroid
             
             # Construct webmap URL
-            webmap_url = f"{base_url}/outlets/webmap/map.html?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
+            webmap_url = f"{base_url}/staging/outlets/webmap/?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
             
             # Add to properties
             if 'properties' not in feature:
