@@ -44,6 +44,49 @@ def clear_vector_layer(config, name, delta_queue_builder=DQB):
     # refresh_document_layer(config, name, delta_queue_builder)
 
 
+def add_webmap_urls(config, layer_name, fc, zoom=14):
+    """
+    Add webmap_url property to each feature in the feature collection.
+    
+    Args:
+        config: Atlas configuration dict
+        layer_name: Name of the layer
+        fc: GeoJSON FeatureCollection
+        zoom: Zoom level for the webmap link (default: 14)
+    
+    Returns:
+        Modified FeatureCollection with webmap_url in each feature's properties
+    """
+    from shapely.geometry import shape
+    
+    base_url = config.get('base_url', '')
+    if not base_url:
+        logger.warning(f"No base_url in config, webmap_url will be relative")
+    
+    feature_count = 0
+    for feature in fc.get('features', []):
+        try:
+            # Get geometry and calculate centroid
+            geom = shape(feature['geometry'])
+            centroid = geom.centroid
+            
+            # Construct webmap URL
+            webmap_url = f"{base_url}/outlets/webmap/map.html?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
+            
+            # Add to properties
+            if 'properties' not in feature:
+                feature['properties'] = {}
+            feature['properties']['webmap_url'] = webmap_url
+            feature_count += 1
+            
+        except Exception as e:
+            logger.warning(f"Failed to add webmap_url to feature in {layer_name}: {e}")
+            continue
+    
+    logger.info(f"Added webmap_url to {feature_count} features in {layer_name}")
+    return fc
+
+
 def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     """
     Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.
@@ -52,6 +95,10 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
 
     fc = delta_queue_builder(config, name)
+    
+    # Add webmap URLs to each feature
+    fc = add_webmap_urls(config, name, fc)
+    
     logger.debug(f"Writing to {layer_path} FC: {fc}")
     logger.info(f"Writing to {layer_path}")
     
