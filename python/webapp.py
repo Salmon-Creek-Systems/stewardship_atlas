@@ -159,7 +159,7 @@ async def import_sheet_endpoint(swalename: str, layer_name: str):
         delta_paths = vector_inlets.import_sheet(ac, layer_name)
         
         # Refresh the layer to overwrite with new data
-        res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
+        res = dataswale_geojson.refresh_vector_layer(ac, layer_name, deltas_geojson.apply_deltas_overwrite)
         
         return {
             "status": "success",

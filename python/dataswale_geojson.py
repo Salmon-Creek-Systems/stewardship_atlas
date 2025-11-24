@@ -44,7 +44,7 @@ def clear_vector_layer(config, name, delta_queue_builder=DQB):
     # refresh_document_layer(config, name, delta_queue_builder)
 
 
-def add_webmap_urls(config, layer_name, fc, zoom=14):
+def add_webmap_urls(config, layer_name, fc, zoom=17):
     """
     Add webmap_url property to each feature in the feature collection.
     
