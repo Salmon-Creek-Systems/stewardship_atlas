@@ -73,15 +73,17 @@
             {"name": "name", "type": "string", "default": "Road" }]},
     {"name": "campgrounds", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,"add_labels": true,
      "symbol": {"png": "tent.png", "icon": "basic/triangle"},
+     "vis": {"minzoom": 17, "maxzoom": 22},
      "icon-size": 0.05,
      "interaction": "interface",
      "editable_columns": [
          {"name": "name", "type": "string", "default": "Road" }]},
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": true,
+          "vis": {"minzoom": 13, "maxzoom": 22},
         "symbol" : {"png": "milemarker.png", "icon": "basic/marker"},
         "icon-size": 0.15, "icon-anchor": "bottom","vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
-     "vis" : {"minzoom": 13, "maxzoom": 22}, 
+     "vis" : {"minzoom": 14, "maxzoom": 22}, 
      "editable_columns": [
          {"name": "name", "type": "string", "default": "Road" }],
         "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
@@ -90,7 +92,7 @@
             {"name": "name", "type": "string", "default": "Incident" }],
         "symbol": {"png": "incident.png", "icon": "basic/pushpin"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
     {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], 
-        "vis" : {"minzoom": 12, "maxzoom": 22}, "add_labels": true,
+        "vis" : {"minzoom": 15, "maxzoom": 22}, "add_labels": true,
         "symbol": {"png": "hydrant.png", "icon": "custom/hydrant"},
         "icon-size": 3.0,
         "interaction": "interface",
@@ -100,10 +102,10 @@
      "icon-size": 0.05,
      "interaction": "interface"},    
     {"name": "buildings", "geometry_type": "polygon", 
-        "color": [0, 0, 0], "fill_color": [100,100,100], 
-        "add_labels": true, "interaction": "interface",
-        "minzoom": 12, "maxzoom": 22,
-                "editable_columns": [   
+     "color": [0, 0, 0], "fill_color": [100,100,100], 
+     "add_labels": true, "interaction": "interface",
+     "vis" : {"minzoom": 14, "maxzoom": 22},
+     "editable_columns": [   
             {"name": "name", "type": "string", "default": "Road" }]},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}

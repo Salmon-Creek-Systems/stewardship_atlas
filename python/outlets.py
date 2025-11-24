@@ -93,8 +93,8 @@ def webmap_json(config, name, sprite_json=None):
             map_layer.update({
                 'type': 'raster',
                 'paint' : {
-                "raster-opacity": 0.3,
-                "raster-contrast": 0.3}})
+                "raster-opacity": 0.8,
+                    "raster-contrast": 0.0}})
                               
         elif layer['geometry_type'] == 'polygon':
             #map_layer['paint'] = {
