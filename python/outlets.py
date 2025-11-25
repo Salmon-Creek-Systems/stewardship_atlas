@@ -277,8 +277,9 @@ def webmap_json(config, name, sprite_json=None):
             
             # Don't add label layer to legend targets - let the plugin handle it
             
-            # Find the label layer to check for icon info
+            # Find the label layer to check for icon info and symbol_source
             label_layer_icon = None
+            label_layer_symbol_source = None
             for label_layer in map_layers:
                 if label_layer.get('id') == label_layer_id:
                     # Check if label layer has icon info we should copy to primary
@@ -286,6 +287,9 @@ def webmap_json(config, name, sprite_json=None):
                     label_legend = label_metadata.get('legend', {})
                     if 'icon' in label_legend:
                         label_layer_icon = label_legend.get('icon')
+                    # Also check for symbol_source (PNG filename for legend display)
+                    if 'symbol_source' in label_layer:
+                        label_layer_symbol_source = label_layer['symbol_source']
                     break
             
             # Preserve existing metadata if present, otherwise add basic legend properties
@@ -309,6 +313,10 @@ def webmap_json(config, name, sprite_json=None):
                 if 'legend' not in layer['metadata']:
                     layer['metadata']['legend'] = {}
                 layer['metadata']['legend']['icon'] = label_layer_icon
+            
+            # If label layer has a symbol_source, copy it to primary layer for legend display
+            if label_layer_symbol_source:
+                layer['symbol_source'] = label_layer_symbol_source
             
             # Find and update the label layer
             for label_layer in map_layers:
