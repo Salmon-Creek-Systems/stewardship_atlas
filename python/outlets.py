@@ -277,39 +277,62 @@ def webmap_json(config, name, sprite_json=None):
             
             # Don't add label layer to legend targets - let the plugin handle it
             
-            # Add basic legend properties and group metadata
-            layer['metadata'] = {
-                'legend': {
-                    'name': layer_name,
-                    'type': 'symbol'  # or 'line', 'fill' based on layer type
-                },
-                'group': layer_name  # Group primary and label layers together
-            }
+            # Preserve existing metadata if present, otherwise add basic legend properties
+            existing_metadata = layer.get('metadata', {})
+            if not existing_metadata:
+                # Add basic legend properties and group metadata
+                layer['metadata'] = {
+                    'legend': {
+                        'name': layer_name,
+                        'type': 'symbol'  # or 'line', 'fill' based on layer type
+                    },
+                    'group': layer_name  # Group primary and label layers together
+                }
+            else:
+                # Update existing metadata to add group if not present
+                if 'group' not in existing_metadata:
+                    layer['metadata']['group'] = layer_name
             
             # Find and update the label layer
             for label_layer in map_layers:
                 if label_layer.get('id') == label_layer_id:
+                    # Preserve existing metadata (especially icon info) if present
+                    existing_metadata = label_layer.get('metadata', {})
+                    existing_legend = existing_metadata.get('legend', {})
+                    
+                    # Merge with new metadata, preserving icon if it exists
                     label_layer['metadata'] = {
                         'legend': {
                             'name': f"{layer_name} Labels",
                             'type': 'symbol',
-                            'hidden': True
+                            'hidden': True,
+                            # Preserve icon and label if they were set earlier
+                            **{k: v for k, v in existing_legend.items() if k in ['icon', 'label']}
                         },
-                        'group': layer_name  # Same group as primary layer
+                        'group': layer_name,  # Same group as primary layer
+                        # Preserve any other top-level metadata fields
+                        **{k: v for k, v in existing_metadata.items() if k not in ['legend', 'group']}
                     }
                     break
         else:
             # Standalone layer - add normally
             legend_targets[layer_id] = layer_name
             
-            # Add basic legend properties
-            layer['metadata'] = {
-                'legend': {
-                    'name': layer_name,
-                    'type': 'symbol'  # or 'line', 'fill' based on layer type
-                },
-                'group': layer_name  # Standalone layers get their own group
-            }
+            # Preserve existing metadata if present, otherwise add basic legend properties
+            existing_metadata = layer.get('metadata', {})
+            if not existing_metadata:
+                # Add basic legend properties
+                layer['metadata'] = {
+                    'legend': {
+                        'name': layer_name,
+                        'type': 'symbol'  # or 'line', 'fill' based on layer type
+                    },
+                    'group': layer_name  # Standalone layers get their own group
+                }
+            else:
+                # Update existing metadata to add group if not present
+                if 'group' not in existing_metadata:
+                    layer['metadata']['group'] = layer_name
     
     # Log the final map configuration for debugging
     logger.info(f"Map style layers: {[layer.get('id', 'no-id') for layer in map_layers]}")
