@@ -133,7 +133,7 @@
         "name": "internal_webmap",
         "in_layers": ["basemap", "regions",  "roads_primary", "roads_secondary"],
         "config_def": "webmap",
-        "access": ["admin"]
+        "access": ["technical"]
     },
 "runbook": {
         "type": "outlet",
@@ -194,7 +194,7 @@
     "qgis_runbook": {
 	"type": "outlet",
 	"name": "qgis_runbook",
-	"access": ["internal", "admin"],
+	"access": ["technical"],
 	"config_def": "qgis_runbook",
 	"regions_layer": "regions",
 	"in_layers": ["basemap", "tsunami","contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural"]
