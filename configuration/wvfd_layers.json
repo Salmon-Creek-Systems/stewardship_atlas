@@ -81,7 +81,7 @@
     {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": true,
           "vis": {"minzoom": 13, "maxzoom": 22},
         "symbol" : {"png": "milemarker.png", "icon": "basic/marker"},
-        "icon-size": 0.15, "icon-anchor": "bottom","vis" : {"minzoom": 14, "maxzoom": 22}},
+        "icon-size": 3.0, "icon-anchor": "bottom","vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
      "vis" : {"minzoom": 14, "maxzoom": 22}, 
      "editable_columns": [
