@@ -123,9 +123,18 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
            feature_collection: Dict[str, Any] = None) -> None:
     """
     Create a new version of the stewardship atlas and a config file.
+
+    create core config in /staging, built from args here and metadata.json
+    populate with default layers and assets
+    create directories for each layer
+    add htpasswds to new directories
+    set processed layers and assets in config
+    store initial feature collection in /layers/regions
+    save config to /staging/atlas_config.json
+    return config
     """
 
-    # create core config in /staging, built from args here and metadata.json
+    # 
     if feature_collection:
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
@@ -155,6 +164,10 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     # Discover existing versions in the swale directory
     config['dataswale']['versions'] = discover_versions(p)
 
+    # ### Load layers and assets definitions, 
+    # which will be used to build the config 
+    # from the core definitions and the local definitions
+
     if layers_path is not None:
         layers = json.load(open(layers_path))
     else:
@@ -167,18 +180,18 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         assets = assets or DEFAULT_ASSETS
     
     # Don't set layers/assets in config yet - we'll process them first
-
     config['spreadsheets'] = {}
     
-    # Load all config files
-    inlets_config = json.load(open("../configuration/inlets_config.json"))
-    eddies_config = json.load(open("../configuration/default_eddies.json"))
-    outlets_config = json.load(open("../configuration/default_outlets.json"))
-    default_layers_config = json.load(open("../configuration/default_layers.json"))
+    # Load asset and layer core/shared definitions
+    inlets_config = json.load(open("../configuration/shared_inlets_config.json"))
+    eddies_config = json.load(open("../configuration/shared_eddies_config.json"))
+    outlets_config = json.load(open("../configuration/shared_outlets_config.json"))
+    default_layers_config = json.load(open("../configuration/shared_layers_config.json"))
     
-    # Combine all configs into one lookup
+    # Combine all asset configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}
     
+    # for definitions of assets and layers assemble atlas_config from all_configs
     for asset_name, asset in assets.items():
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
@@ -191,7 +204,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
         if asset['type'] == 'inlet':
             (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
             if asset.get('access',['public']).count('public') == 0:
-                # add htpasswrd to new directory
+                # add htpasswrd to new directory unless public
                 add_htpasswds(config, p / 'staging' / 'deltas' / asset['out_layer'], asset['accsss'])
         elif asset['type'] == 'outlet':
             (p / 'staging' / 'outlets' / asset_name / 'work' ).mkdir(parents=True, exist_ok=True)
