@@ -25,9 +25,51 @@ function showSuccessNotification(message, duration = 2000) {
     }, duration);
 }
 
-// Function to parse degrees format coordinates
-function parseDegreesFormat(input) {
+// Function to parse degrees format coordinates (async to handle URL dereferencing)
+async function parseDegreesFormat(input) {
     console.log('Parsing input:', input);
+    
+    // Check if input looks like a URL (starts with http:// or https://)
+    const urlPattern = /^https?:\/\//i;
+    if (urlPattern.test(input.trim())) {
+        // Check if it's a shortened Google Maps URL
+        const shortenedPattern = /goo\.gl|maps\.app\.goo\.gl/i;
+        if (shortenedPattern.test(input)) {
+            console.log('Detected shortened Google Maps URL, dereferencing...');
+            try {
+                // Call backend to dereference the URL
+                const response = await fetch('/dereference_url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: input.trim() })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Error dereferencing URL:', error);
+                    return null;
+                }
+                
+                const data = await response.json();
+                console.log('Dereferenced URL, extracted coordinates:', data);
+                return { lat: data.lat, lng: data.lng };
+            } catch (error) {
+                console.error('Failed to dereference URL:', error);
+                return null;
+            }
+        }
+        
+        // Try to parse regular Google Maps link directly
+        const googlePattern = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const googleMatch = input.trim().match(googlePattern);
+        if (googleMatch) {
+            const [, lat, lng] = googleMatch;
+            console.log('Parsed Google Maps format:', { lat: parseFloat(lat), lng: parseFloat(lng) });
+            return { lat: parseFloat(lat), lng: parseFloat(lng) };
+        }
+    }
     
     // Try to parse degrees format: "40°14′18″ N  123°57′39″ W"
     const degreesPattern = /(\d+)°(\d+)′(\d+)″\s*([NS])\s*(\d+)°(\d+)′(\d+)″\s*([EW])/;
@@ -57,15 +99,6 @@ function parseDegreesFormat(input) {
         }
     } catch (e) {
         console.log('Not JSON format');
-    }
-    
-    // Try to parse Google Maps link
-    const googlePattern = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const googleMatch = input.trim().match(googlePattern);
-    if (googleMatch) {
-        const [, lat, lng] = googleMatch;
-        console.log('Parsed Google Maps format:', { lat: parseFloat(lat), lng: parseFloat(lng) });
-        return { lat: parseFloat(lat), lng: parseFloat(lng) };
     }
     
     // Try to parse plain comma-separated coordinates

@@ -89,7 +89,7 @@ map.on('load', () => {
         <ul>
             <li>Degrees: 40°14′18″ N 123°57′39″ W</li>
             <li>JSON: {"latitude": 37.7749, "longitude": -122.4194}</li>
-            <li>Google Maps: https://maps.google.com/...</li>
+            <li>Google Maps: https://maps.google.com/... (including shortened goo.gl links)</li>
             <li>Plain: 37.7749, -122.4194</li>
         </ul>
     `;
@@ -101,16 +101,16 @@ map.on('load', () => {
     
     if (goBtn && locationInput) {
         // Function to go to location
-        function goToLocation() {
+        async function goToLocation() {
             const input = locationInput.value.trim();
             if (!input) {
                 showErrorPopup('Please enter a location to go to.');
                 return;
             }
             
-            const coords = parseDegreesFormat(input);
+            const coords = await parseDegreesFormat(input);
             if (!coords) {
-                showErrorPopup(`Cannot parse location: "${input}"<br><br>Supported formats:<br>• Degrees: 40°14′18″ N 123°57′39″ W<br>• JSON: {"latitude": 37.7749, "longitude": -122.4194}<br>• Google Maps: https://maps.google.com/...<br>• Plain: 37.7749, -122.4194`);
+                showErrorPopup(`Cannot parse location: "${input}"<br><br>Supported formats:<br>• Degrees: 40°14′18″ N 123°57′39″ W<br>• JSON: {"latitude": 37.7749, "longitude": -122.4194}<br>• Google Maps: https://maps.google.com/... (including shortened goo.gl links)<br>• Plain: 37.7749, -122.4194`);
                 return;
             }
             

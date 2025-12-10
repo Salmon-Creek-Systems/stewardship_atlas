@@ -99,6 +99,47 @@ async def get_status():
         "filename": "None",
         "path": "none"}
 
+@app.post("/dereference_url")
+async def dereference_url(payload: dict):
+    """
+    Dereference a shortened Google Maps URL and extract coordinates.
+    Accepts: {"url": "https://goo.gl/maps/..."}
+    Returns: {"lat": 37.7749, "lng": -122.4194, "full_url": "https://..."}
+    """
+    try:
+        url = payload.get('url', '').strip()
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+        
+        # Check if it's a shortened URL
+        if 'goo.gl' not in url and 'maps.app.goo.gl' not in url:
+            # Not a shortened URL, try to extract coordinates directly
+            lat, lon = extract_coordinates_from_url(url)
+            return {
+                "status": "success",
+                "lat": lat,
+                "lng": lon,
+                "full_url": url
+            }
+        
+        # Follow redirects for shortened URLs
+        response = requests.get(url, allow_redirects=True, timeout=10)
+        full_url = response.url
+        
+        # Extract coordinates from the full URL
+        lat, lon = extract_coordinates_from_url(full_url)
+        
+        return {
+            "status": "success",
+            "lat": lat,
+            "lng": lon,
+            "full_url": full_url
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error dereferencing URL: {str(e)}")
+
     
 @app.post("/import_gsheet/{swalename}/{layer_name}")
 async def import_gsheet(swalename: str, layer_name: str):
