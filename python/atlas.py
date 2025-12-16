@@ -37,15 +37,15 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 from typing import List, Dict, Tuple, Any
 
-DEFAULT_LAYERS = json.load(open("../configuration/layers.json"))
+#DEFAULT_LAYERS = json.load(open("../configuration/layers.json"))
 
 
 
-DEFAULT_CONFIG = json.load(open("../configuration/config.json"))
-DEFAULT_ASSETS = json.load(open("../configuration/assets.json"))
+DEFAULT_CONFIG = json.load(open("../configuration/default_atlas_config.json"))
+#DEFAULT_ASSETS = json.load(open("../configuration/assets.json"))
 DEFAULT_DATA_ROOT = "/root/swales"
 
-DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
+#DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
 
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
 
@@ -111,15 +111,15 @@ def add_htpasswds(config, path, access):
 
 
 def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
-           layers: List[Dict[str, Any]] = DEFAULT_LAYERS, 
+           layers: List[Dict[str, Any]] = None, 
            layers_path: str = None,
-           assets: Dict[str, Any] = DEFAULT_ASSETS, 
+           assets: Dict[str, Any] = None, 
            assets_path: str = None,
            data_root: str = DEFAULT_DATA_ROOT,
            shared_dir: Path = DEFAULT_SHARED_DIR,
            name: str = "Nameless",
            admin_emails = [],
-           bbox: Dict[str, Any] = DEFAULT_BBOX,
+           bbox: Dict[str, Any] = None,
            feature_collection: Dict[str, Any] = None) -> None:
     """
     Create a new version of the stewardship atlas and a config file.

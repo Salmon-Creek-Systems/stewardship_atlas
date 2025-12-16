@@ -16,11 +16,6 @@
         "out_layer": "basemap",
         "config_def": "derived_hillshade"
     },
-    "local_hillshade": {
-        "type": "inlet",
-        "out_layer": "lidar_basemap",
-        "config_def": "local_hillshade"
-    },
     "spreadsheet_export" : {
 	"type": "outlet",
 	"name": "spreadsheet_export",
@@ -117,7 +112,7 @@
 "webmap" : {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": ["lidar_basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural", "burns", "burns_index", "creeks_index", "roads_index"],
+    "in_layers": ["basemap", "parcels", "contours", "roads", "creeks", "buildings", "natural", "burns", "burns_index", "creeks_index", "roads_index"],
     "config_def": "webmap",
     "access": ["internal", "admin"]
 },
@@ -162,6 +157,6 @@
 	"num_rows": 5,
 	"num_cols": 6,
 	"config_def": "gazetteer",
-	"in_layers":  ["lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings"]
+	"in_layers":  ["basemap", "ponds", "contours", "roads", "creeks", "buildings"]
     }
 }
