@@ -5,7 +5,7 @@
      "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "documents", "geometry_type": "document"},
-    {"name": "lidar_basemap", "geometry_type": "raster"},
+
     {"name": "roads", "geometry_type": "linestring", 
         "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
@@ -32,12 +32,15 @@
      "symbol": {"png": "hydrant.png", "icon": "extra/half-circle"},
      "icon-size": 1.0,
      "interaction": "interface"},
-    {"name": "ponds", "geometry_type": "polygon", "fill_color": [50, 50, 250],
+    {"name": "ponds", "geometry_type": "polygon", "fill_color": [50, 50, 250]},
     {
         "name": "conservation_piles", "geometry_type": "point", 
         "color": [50, 255, 100], "add_labels": false, "access": [ "public"],
         "symbol": {"png": "conservation_pile.png", "icon": "custom/octy"},
-        "interaction": "interface"
+        "interaction": "interface",
+	"editable_columns": [
+            {"name": "name", "type": "string", "default": "Incident" }]
+
     },
     {"name": "natural", "geometry_type": "point", "color": [0, 200, 55], "add_labels": true,
      "symbol": {"png": "pin.png", "icon": "custom/octy"},

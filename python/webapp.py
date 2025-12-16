@@ -15,7 +15,7 @@ from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 
 import sys
-sys.path.insert(0, "/root/stewardship_atlas/python")
+sys.path.insert(0, "/root/atlas_dev/python")
 
 # Boring Imports
 import sys, os, subprocess, time, json, string, random, math
