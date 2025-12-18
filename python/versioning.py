@@ -21,6 +21,7 @@ def atlas_path(config=None, local_path='', version='staging'):
     logger.debug(f"Atlas path: {atlas_path}")
     return atlas_path
 
+
 def atlas_file(p, mode='rt'):
     d = p.parent
     d.mkdir(parents=True, exist_ok=True)

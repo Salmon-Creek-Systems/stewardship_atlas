@@ -21,7 +21,7 @@ sys.path.insert(0, "/root/atlas_dev/python")
 import sys, os, subprocess, time, json, string, random, math
 
 
-SWALES_ROOT = "/root/swales"
+SWALES_ROOT = "/root/swales_dev"
 
 
 # our Imports|

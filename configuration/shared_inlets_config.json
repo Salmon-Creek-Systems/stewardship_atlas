@@ -1,0 +1,596 @@
+{
+    "overture_addresses": {
+        "name": "addresses",
+        "asset_type": "inlet",
+        "fetch_type": "overture_duckdb",
+        "interaction": "interface",
+        "alterations": {
+            "canonicalize": [
+                {
+                    "concat": " ",
+                    "from": [
+                        "number"
+                    ],
+                    "to": "name"
+                }
+            ]
+        },
+	"data_type": "geojson",
+	 "inpath_template": "SET s3_region='us-west-2'; SELECT  * EXCLUDE geometry, ST_AsGeoJSON(ST_MakeEnvelope(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax)) as geom FROM   read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=addresses/type=*/*', filename=true, hive_partitioning=1) WHERE  bbox.xmin > {west}  AND bbox.xmax < {east}  AND bbox.ymin > {south}  AND bbox.ymax < {north}  AND street != 'NONE';",
+	"attribution": {
+        "url": "https://portal.opentopography.org/api/terms",
+            "description": "Overture", 
+            "license": "https://portal.opentopography.org/api/terms",
+            "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "overture_buildings": {
+        "name": "raw_buildings",
+	"asset_type": "inlet",
+        "fetch_type": "overture_duckdb",
+        "interaction": "interface",
+	"alterations": {
+            "canonicalize": [
+		{
+                    "to": "name",
+                    "from": []}
+            ],
+	    "vector_width": {
+		"default": 5
+            }
+	},	
+	"data_type": "geojson",
+	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry,  ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-10-22.0/theme=buildings/type=building/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+      "outpath_template": "/staging/raw_buildings.geojson",
+	"attribution": {
+        "url": "https://portal.opentopography.org/api/terms",
+            "description": "Overture", 
+            "license": "https://portal.opentopography.org/api/terms",
+            "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "osm_poi": {
+        "name": "poi",
+        "asset_type": "inlet",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "add_labels": true,
+        "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
+        "fetch_type": "fetch_osm"
+    },
+
+    "local_ponds": {
+        "name": "ponds",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+	"inpath_template": "ponds_scvfd.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+        },
+	"alterations": {
+            "canonicalize": [
+		{
+                    "to": "name",
+                    "from": [],
+		    "default": ""
+		}
+            ],
+	    "vector_width": {
+		"default": 5
+            }
+	}
+    },    
+    
+    "local_humboldt_parcels": {
+        "name": "parcels",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+		"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+		"inpath_template": "humboldt_parcels.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },    
+    "local_parcels": {
+        "name": "parcels",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+		"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+		"inpath_template": "mendocino_parcels.geojson",
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+	"local_burns": {
+		"name": "burns",
+		"asset_type": "inlet",
+		"interaction": "download",
+		"fetch_type": "local_ogr",
+		"geometry": "dataswale",
+		"data_type": "geojson",
+		"feature_type": "polygon",
+		"inpath_template": "mineralkinsey_burns.geojson",
+		"attribution": {
+			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+			"description": "Open Addresses",
+			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+		}
+	},
+"local_documents": {
+		"name": "documents",
+		"asset_type": "inlet",
+		"interaction": "download",
+		"fetch_type": "local_ogr",
+		"geometry": "dataswale",
+		"data_type": "document",
+		"feature_type": "document",
+		"inpath_template": "documents.zip",
+		"attribution": {
+			"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+			"description": "Open Addresses",
+			"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+			"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+		}
+	},
+	"local_lpss": {
+	    "name": "lpss",
+	    "asset_type": "inlet",
+	    "interaction": "download",
+	    "fetch_type": "local_ogr",
+	    "geometry": "dataswale",
+	    "data_type": "geojson",
+	    "feature_type": "point",
+	    "inpath_template": "lpss.geojson",
+	    
+	    "alterations": {
+		"canonicalize":  [{"to": "name", "from":["TownshipRange"], "default": "Township/Range"}]
+            },
+	    
+	    "attribution": {
+		"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+		"description": "Open Addresses",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+	    }
+	},
+    "local_tsunami": {
+        "name": "tsunami",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "polygon",
+	"inpath_template": "tsunami.geojson",
+	 "alterations": {
+	     "vector_width": {
+		 "default": 5
+	     },
+	     "canonicalize": [{"to": "name", "from":[], "default": "Tsunami Risk Zone"}]
+	 },
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+    "humtrans_roads" : {
+	"name": "roads",
+        "asset_type": "inlet", 
+        "interaction": "download",
+        "fetch_type": "local_ogr",
+	"geometry": "dataswale",
+        "data_type": "geojson",
+	"feature_type": "line",
+	"alterations": {
+            "canonicalize": [
+		{
+		    "to": "REMOVE",
+		    "from": [
+			"ID"
+		    ],
+		    "remove_prefix": []
+		},
+		{
+		    "to": "name",
+		    "from": [
+			"FULLRDNAME"
+		    ],
+		    "remove_prefix": [
+			"PRIVATE",
+			"UNN",
+			"GATED"
+		    ]
+		},
+		{
+		    "to": "STREETTYPE",
+		    "from": [
+			"STREETTYPE"
+		    ],
+		    "remove_prefix": []
+		}
+            ],
+            "vector_width": {
+		"attribute": "STREETTYPE",
+		"map": {
+		    "RD": 6,
+		    "DR": 3
+		},
+		"default": 1
+            }
+	},
+	"inpath_template": "humtranssp27.shp",
+	"attribution": {
+            "url": "https://www.humantrans.com/humantrans-data-downloads",
+            "description": "Human Transporation Systems's public road vector data",
+            "license": "https://www.humantrans.com/humantrans-data-downloads",
+            "citation": "https://www.humantrans.com/humantrans-data-downloads"
+	}
+    },
+    "internal_roads": {
+        "name": "internal_roads",
+        "asset_type": "inlet",
+	"access": ["internal", "admin"],
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+		"geometry": "dataswale",
+        "data_type": "geojson",
+        "feature_type": "line",
+	    "inpath_template": "westport_lidar_roads.geojson",
+	    "alterations": {
+			"vector_width": {"default": 5}
+	    },
+        "attribution": {
+            "url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+            "description": "Open Addresses",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+
+	"local_milemarkers": {
+            "name": "milemarkers",
+            "asset_type": "inlet", 
+            "interaction": "download",
+            "fetch_type": "local_ogr",
+	    "geometry": "dataswale",
+            "data_type": "geojson",
+            "feature_type": "point",
+	    "inpath_template": "postmiles_tenth.geojson",
+            "attribution": {
+		"url": "https://batch.openaddresses.io/job/611646#map=8.86/39.7393/-123.8213",
+		"description": "Open Addresses",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+            },
+	    "alterations": {	
+		"canonicalize": [
+		    {
+			"to": "name",
+			"from": ["PMc"],
+			"remove_prefix": []
+		    }
+		],
+		"vector_width": {
+		    "default": 3
+		},
+		"filter":  [
+		    ["endswith", "name", ["0.0", "5.0"]]
+		],
+		"equals": [
+		    ["91.0", "Callbox #911 mm 91.08"],
+		    ["89.6","Callbox #896 mm 89.63"],
+		    ["87.1","Callbox #878 mm 87.15"],
+		    ["85.7","Callbox #860 mm 85.74"],
+		    ["84.0","Callbox #840 mm 84.0"],
+		    ["81.6","Callbox #817 mm 81.62"],
+		    ["79.1","Callbox #790 mm 79.12"],
+		    ["76.5","Callbox #768 mm 76.57"],
+		    ["71.8","Callbox #714 mm 71.84"]
+		]
+		
+		
+			}
+		},	
+    "local_helilandings": {
+        "name": "helilandings_delta",
+        "asset_type": "inlet", 
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "alterations": {
+            "vector_width": {
+		"default": 10
+            }
+        },
+	    "inpath_template": "westport_helilandings.geojson",
+        "outpath_template": "/helilandings_delta",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+    "local_incidents": {
+        "name": "incidents_delta",
+        "asset_type": "inlet", 
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "alterations": {
+            "vector_width": {
+		"default": 10
+            }
+        },
+	    "inpath_template": "westport_incidents.geojson",
+        "outpath_template": "/incidents_delta",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "Local incident data",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+    "local_hydrants": {
+        "name": "hydrants",
+        "asset_type": "inlet", 
+		"symbol": "extra/half-circle",
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+		"inpath_template": "westport_hydrants.geojson",
+        "alterations": {
+	    "canonicalize": [
+		{"to": "name", "from": ["label"], "default": "hydrant"}
+	    ],
+            "vector_width": {
+		"default": 5
+            }
+        },
+
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+        "local_kennedy_hydrants": {
+            "name": "hydrants",
+            "asset_type": "inlet", 
+	    "symbol": "custom/octy",
+            "interaction": "interface",
+            "fetch_type": "local_ogr",
+            "data_type": "geojson",
+            "feature_type": "point",
+	    "inpath_template": "local_kennedy_hydrants.geojson",
+            "alterations": {
+		"canonicalize": [{"to": "name", "from":["CampNumber"], "default": "hydrant"}],
+		"vector_width": {
+		    "default": 5
+		}
+            },
+	    
+            "attribution": {
+		"url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+		"description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+            }
+	},
+
+        "local_watertanks": {
+            "name": "watertanks",
+            "asset_type": "inlet", 
+	    "symbol": "custom/octy",
+            "interaction": "interface",
+            "fetch_type": "local_ogr",
+            "data_type": "geojson",
+            "feature_type": "point",
+	    "inpath_template": "scvfd_watertanks.geojson",
+            "alterations": {
+		"canonicalize": [{"to": "name", "from":["CampNumber"], "default": "water tank"}],
+		"vector_width": {
+		    "default": 5
+		}
+            },
+	    
+            "attribution": {
+		"url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+		"description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+            }
+	},
+
+
+    
+    "local_campgrounds": {
+        "name": "campgrounds",
+        "asset_type": "inlet", 
+	"symbol": {"png": "tent.png"},
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+	"inpath_template": "westport_campsites.geojson",
+	 "alterations": {
+	     "vector_width": {
+		 "default": 5
+	     },
+	     "canonicalize": [{"to": "name", "from":["CampNumber"], "default": "?"}]
+	 },
+	
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+        }
+    },
+
+    "local_turnouts": {
+        "name": "turnouts",
+        "asset_type": "inlet", 
+	"symbol": "extra/half-circle",
+        "interaction": "interface",
+        "fetch_type": "local_ogr",
+        "data_type": "geojson",
+        "feature_type": "point",
+	"inpath_template": "westport_turnouts.geojson",
+        "attribution": {
+            "url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
+            "description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
+            "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
+            "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+          }
+    },
+    "opentopo_dem":  {
+	"asset_type": "inlet",
+	"fetch_type": "fetch_url",
+	"interaction": "import",
+	"data_type": "tiff",
+	"inpath_template": "https://portal.opentopography.org/API/globaldem?demtype=COP30&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff&API_Key=b53534ba23d967feedbae2c7f85bfc4b",
+	"outpath_template": "/staging/dem.tiff",
+	"attribution": {
+            "url": "https://portal.opentopography.org/api/terms",
+            "description": "Open Topography's Global DEM",
+            "license": "https://portal.opentopography.org/api/terms",
+            "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "dem": {
+	"name": "dem",
+	"asset_type": "inlet",
+	"fetch_type": "fetch_url",
+	"interaction": "import",
+	"data_type": "tiff",
+	"inpath_template": "https://portal.opentopography.org/API/globaldem?demtype=COP30&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff&API_Key=b53534ba23d967feedbae2c7f85bfc4b",
+	"outpath_template": "/staging/dem.tiff",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "overture_roads":  {
+	"asset_type": "inlet",
+	"fetch_type": "overture_duckdb",
+	"interaction": "import",
+	"data_type": "geojson",
+	"out_layer": "roads_secondary",
+	"color": [110, 110, 255],
+	"inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2025-04-23.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+	"outpath_template": "overture_roads.geojson",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+	},
+	"alterations": {
+	    "canonicalize": [
+		{
+		    "to": "name",
+		    "from": [
+			"primary_name",
+			"FULLRDNAME"
+		    ],
+		    "remove_prefix": []
+		}
+	    ],
+	    "vector_width": {
+		"attribute": "class",
+		"map": {
+		    "primary": 15,
+		    "secondary": 11,
+		    "tertiary": 9
+		},
+		"default": 7
+	    }
+	}
+    },			
+    "local_hillshade":  {
+	"asset_type": "inlet",
+	"fetch_type": "local_raster",
+	"interaction": "import",
+	"data_type": "tiff",	
+	"out_layer": "lidar_basemap",
+	"lame_inpath_template": "westport_dem_2m_hillshade.tiff",
+	"inpath_template": "hillshade.tiff",
+	"attribution": {
+	    "url": "https://portal.opentopography.org/api/terms",
+	    "description": "Open Topography's Global DEM",
+	    "license": "https://portal.opentopography.org/api/terms",
+	    "citation": "https://portal.opentopography.org/api/terms"
+	}
+    },
+    "nhd_creeks":  {
+	"asset_type": "inlet",
+	"fetch_type": "local_ogr",
+	"interaction": "import",
+	"data_type": "geojson",
+	"name": "nhd_creeks",
+	"description": "External creek vector source",
+	"feature_type": "linestring",
+	"color": [110, 110, 255],
+	"layer": "NHDFlowline",
+	"inpath_template": "NHD_H_California_State_GPKG.gpkg",
+	"geometry": "dataswale",
+	"alterations": {
+	    "canonicalize": [
+			{
+				"to": "name",
+				"from": [
+				"gnis_name"
+				],
+				"remove_prefix": []
+			}],
+		"vector_width": {
+			"attribute": "fcode_description",
+			"map": {
+				"Stream/River: Hydrographic Category = Ephemeral": 2,
+				"Stream/River: Hydrographic Category = Perennial": 3,
+				"Stream/River: Hydrographic Category = Intermittent": 1,
+				"Artificial Path": 1
+			},
+			"default": 1
+			},
+			"filter": [
+				["remove", "fcode_description", []]
+			]
+	},
+	"attribution": {
+	    "url": "https://www.usgs.gov/nhd",
+	    "description": "USGS National Hydrography Dataset",
+	    "license": "https://www.usgs.gov/nhd/license",
+	    "citation": "USGS NHD"
+	} 
+    }
+}
