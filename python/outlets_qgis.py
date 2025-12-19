@@ -33,6 +33,7 @@ from qgis.core import (
     QgsLayoutItemScaleBar,
     QgsLayoutItemLabel,
     QgsLayoutItemShape,
+    QgsLayoutItemPicture,
     QgsLayoutItemPage,
     QgsLayoutPoint,
     QgsLayoutSize,
@@ -592,6 +593,16 @@ def create_region_layout(region, project, config, outlet_name):
         # Calculate collar position (below map)
         collar_y = 5 + map_height + 2  # 2mm gap between map and collar
         
+        # Add white background for collar
+        collar_bg = QgsLayoutItemShape(layout)
+        collar_bg.setShapeType(QgsLayoutItemShape.Rectangle)
+        collar_bg.attemptMove(QgsLayoutPoint(5, collar_y, QgsUnitTypes.LayoutMillimeters))
+        collar_bg.attemptResize(QgsLayoutSize(map_width, collar_height, QgsUnitTypes.LayoutMillimeters))
+        collar_bg.setFrameEnabled(False)
+        collar_bg.setBackgroundEnabled(True)
+        collar_bg.setBackgroundColor(QColor(255, 255, 255))  # White background
+        layout.addLayoutItem(collar_bg)
+        
         # Add separator line
         separator = QgsLayoutItemShape(layout)
         separator.setShapeType(QgsLayoutItemShape.Rectangle)
@@ -614,6 +625,15 @@ def create_region_layout(region, project, config, outlet_name):
         legend.setSymbolWidth(4)
         legend.setSymbolHeight(3)
         legend.setLineSpacing(0.5)
+        
+        # Filter out basemap from legend
+        root = legend.model().rootGroup()
+        for layer in root.children():
+            if isinstance(layer, QgsLayerTreeLayer):
+                layer_name = layer.name().lower()
+                if 'basemap' in layer_name:
+                    root.removeChildNode(layer)
+        
         layout.addLayoutItem(legend)
         
         # MIDDLE SECTION (30%): Scale Bar
@@ -688,6 +708,27 @@ def create_region_layout(region, project, config, outlet_name):
         date_label.adjustSizeToText()
         date_label.setFrameEnabled(False)
         layout.addLayoutItem(date_label)
+        
+        # Add North Arrow / Compass Rose
+        north_arrow = QgsLayoutItemPicture(layout)
+        north_arrow.setLinkedMap(map_item)  # Link to map for rotation
+        north_arrow.setPictureRotationEnabled(True)  # Rotate with map
+        north_arrow.setNorthMode(QgsLayoutItemPicture.GridNorth)  # Use grid north
+        
+        # Use QGIS built-in north arrow (simple arrow style)
+        # QGIS has several built-in north arrows in its svg library
+        north_arrow.setPicturePath(':/images/north_arrows/layout_default_north_arrow.svg')
+        
+        # Position in upper right of map area
+        arrow_size = 15  # mm
+        arrow_x = 5 + map_width - arrow_size - 5  # 5mm from right edge
+        arrow_y = 10  # 10mm from top
+        north_arrow.attemptMove(QgsLayoutPoint(arrow_x, arrow_y, QgsUnitTypes.LayoutMillimeters))
+        north_arrow.attemptResize(QgsLayoutSize(arrow_size, arrow_size, QgsUnitTypes.LayoutMillimeters))
+        north_arrow.setFrameEnabled(False)
+        north_arrow.setBackgroundEnabled(True)
+        north_arrow.setBackgroundColor(QColor(255, 255, 255, 200))  # Semi-transparent white
+        layout.addLayoutItem(north_arrow)
         
     else:
         # No collar - use traditional legend position
