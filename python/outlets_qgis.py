@@ -17,6 +17,7 @@ import time
 import logging
 import tempfile
 from pathlib import Path
+from datetime import datetime
 
 # Set Qt to use offscreen platform for headless operation
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -29,10 +30,15 @@ from qgis.core import (
     QgsLayoutExporter,
     QgsLayoutItemMap,
     QgsLayoutItemLegend,
+    QgsLayoutItemScaleBar,
+    QgsLayoutItemLabel,
+    QgsLayoutItemShape,
     QgsLayoutItemPage,
     QgsLayoutPoint,
     QgsLayoutSize,
+    QgsLayoutMeasurement,
     QgsPrintLayout,
+    QgsScaleBarSettings,
     QgsUnitTypes,
     QgsRectangle,
     QgsCoordinateReferenceSystem,
@@ -461,6 +467,38 @@ def apply_basic_styling(layer, layer_config):
     layer.triggerRepaint()
 
 
+def collect_layer_attributions(config, outlet_config):
+    """
+    Collect attribution information from all layers in the outlet.
+    
+    Args:
+        config: Atlas configuration dict
+        outlet_config: Outlet configuration dict
+        
+    Returns:
+        List of unique attribution descriptions
+    """
+    attributions = set()
+    in_layers = outlet_config.get('in_layers', [])
+    
+    # For each layer, find its source asset and get attribution
+    for layer_name in in_layers:
+        # Find assets that output to this layer
+        for asset_name, asset_config in config.get('assets', {}).items():
+            if asset_config.get('out_layer') == layer_name:
+                # Get the inlet config definition
+                config_def = asset_config.get('config_def')
+                if config_def:
+                    # Look up in inlets config
+                    inlet_config = config.get('inlets', {}).get(config_def, {})
+                    attribution = inlet_config.get('attribution', {})
+                    description = attribution.get('description', '')
+                    if description:
+                        attributions.add(description)
+    
+    return sorted(list(attributions))
+
+
 def create_region_layout(region, project, config, outlet_name):
     """
     Create a print layout for a region.
@@ -500,16 +538,24 @@ def create_region_layout(region, project, config, outlet_name):
         else:
             page.setPageSize('Letter')
     
+    # Check if map collar is enabled (default True)
+    enable_collar = outlet_config.get('map_collar', True)
+    collar_height = 25  # mm
+    
     # Add map item
     map_item = QgsLayoutItemMap(layout)
     
-    # Position and size (leave margins for legend)
+    # Position and size (adjust for collar if enabled)
     if page_orientation == 'Landscape':
+        map_width = 240
+        map_height = 180 - (collar_height if enable_collar else 0)
         map_item.attemptMove(QgsLayoutPoint(5, 5, QgsUnitTypes.LayoutMillimeters))
-        map_item.attemptResize(QgsLayoutSize(240, 180, QgsUnitTypes.LayoutMillimeters))
+        map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
     else:
+        map_width = 200
+        map_height = 240 - (collar_height if enable_collar else 0)
         map_item.attemptMove(QgsLayoutPoint(5, 5, QgsUnitTypes.LayoutMillimeters))
-        map_item.attemptResize(QgsLayoutSize(200, 240, QgsUnitTypes.LayoutMillimeters))
+        map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
     
     # Set extent to region bbox
     bbox = region['bbox']
@@ -542,22 +588,124 @@ def create_region_layout(region, project, config, outlet_name):
     map_item.setCrs(layer_crs)
     layout.addLayoutItem(map_item)
     
-    # Add legend
-    legend = QgsLayoutItemLegend(layout)
-    legend.setTitle("Legend")
-    legend.setLinkedMap(map_item)
-    
-    # Position legend in lower right
-    if page_orientation == 'Landscape':
-        legend.attemptMove(QgsLayoutPoint(250, 150, QgsUnitTypes.LayoutMillimeters))
+    if enable_collar:
+        # Calculate collar position (below map)
+        collar_y = 5 + map_height + 2  # 2mm gap between map and collar
+        
+        # Add separator line
+        separator = QgsLayoutItemShape(layout)
+        separator.setShapeType(QgsLayoutItemShape.Rectangle)
+        separator.attemptMove(QgsLayoutPoint(5, collar_y, QgsUnitTypes.LayoutMillimeters))
+        separator.attemptResize(QgsLayoutSize(map_width, 0.5, QgsUnitTypes.LayoutMillimeters))
+        separator.setFrameEnabled(True)
+        separator.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
+        layout.addLayoutItem(separator)
+        
+        collar_content_y = collar_y + 2  # Start content below separator
+        
+        # LEFT SECTION (40%): Legend
+        legend = QgsLayoutItemLegend(layout)
+        legend.setTitle("")  # No title, save space
+        legend.setLinkedMap(map_item)
+        legend.attemptMove(QgsLayoutPoint(5, collar_content_y, QgsUnitTypes.LayoutMillimeters))
+        legend.setFrameEnabled(False)
+        legend.setAutoUpdateModel(True)
+        # Make legend compact
+        legend.setSymbolWidth(4)
+        legend.setSymbolHeight(3)
+        legend.setLineSpacing(0.5)
+        layout.addLayoutItem(legend)
+        
+        # MIDDLE SECTION (30%): Scale Bar
+        scale_bar = QgsLayoutItemScaleBar(layout)
+        scale_bar.setLinkedMap(map_item)
+        scale_bar.setNumberOfSegments(4)
+        scale_bar.setNumberOfSegmentsLeft(0)
+        scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
+        scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+        scale_bar.setMaximumBarWidth(50)  # mm
+        
+        # Set to double box style (USGS traditional)
+        scale_bar.setStyle('Double Box')
+        
+        # Position in middle section
+        scale_x = 5 + (map_width * 0.40) + 5
+        scale_bar.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 2, QgsUnitTypes.LayoutMillimeters))
+        scale_bar.setFrameEnabled(False)
+        layout.addLayoutItem(scale_bar)
+        
+        # Add metric scale bar below imperial
+        scale_bar_metric = QgsLayoutItemScaleBar(layout)
+        scale_bar_metric.setLinkedMap(map_item)
+        scale_bar_metric.setNumberOfSegments(4)
+        scale_bar_metric.setNumberOfSegmentsLeft(0)
+        scale_bar_metric.setUnitsPerSegment(1)
+        scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+        scale_bar_metric.setMaximumBarWidth(50)
+        scale_bar_metric.setStyle('Double Box')
+        scale_bar_metric.setUnitLabel('km')
+        scale_bar_metric.setUnits(QgsUnitTypes.DistanceKilometers)
+        scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 10, QgsUnitTypes.LayoutMillimeters))
+        scale_bar_metric.setFrameEnabled(False)
+        layout.addLayoutItem(scale_bar_metric)
+        
+        # RIGHT SECTION (30%): CRS and Attribution
+        info_x = 5 + (map_width * 0.70) + 5
+        
+        # CRS Label
+        crs_label = QgsLayoutItemLabel(layout)
+        crs_text = f"<b>Projection:</b> {layer_crs.description()}<br>({layer_crs.authid()})"
+        crs_label.setText(crs_text)
+        crs_label.setFont(QFont("Arial", 7))
+        crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
+        crs_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y, QgsUnitTypes.LayoutMillimeters))
+        crs_label.adjustSizeToText()
+        crs_label.setFrameEnabled(False)
+        layout.addLayoutItem(crs_label)
+        
+        # Attribution Label
+        attributions = collect_layer_attributions(config, outlet_config)
+        if attributions:
+            attr_label = QgsLayoutItemLabel(layout)
+            attr_text = f"<b>Data Sources:</b><br>{', '.join(attributions)}"
+            attr_label.setText(attr_text)
+            attr_label.setFont(QFont("Arial", 6))
+            attr_label.setMode(QgsLayoutItemLabel.ModeHtml)
+            attr_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y + 8, QgsUnitTypes.LayoutMillimeters))
+            attr_label.adjustSizeToText()
+            attr_label.setFrameEnabled(False)
+            layout.addLayoutItem(attr_label)
+        
+        # Generation Date Label
+        date_label = QgsLayoutItemLabel(layout)
+        atlas_name = config.get('name', 'Atlas')
+        gen_date = datetime.now().strftime('%Y-%m-%d')
+        date_text = f"<b>{atlas_name}</b><br>Generated: {gen_date}"
+        date_label.setText(date_text)
+        date_label.setFont(QFont("Arial", 6))
+        date_label.setMode(QgsLayoutItemLabel.ModeHtml)
+        date_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y + 15, QgsUnitTypes.LayoutMillimeters))
+        date_label.adjustSizeToText()
+        date_label.setFrameEnabled(False)
+        layout.addLayoutItem(date_label)
+        
     else:
-        legend.attemptMove(QgsLayoutPoint(5, 250, QgsUnitTypes.LayoutMillimeters))
+        # No collar - use traditional legend position
+        legend = QgsLayoutItemLegend(layout)
+        legend.setTitle("Legend")
+        legend.setLinkedMap(map_item)
+        
+        # Position legend in lower right
+        if page_orientation == 'Landscape':
+            legend.attemptMove(QgsLayoutPoint(250, 150, QgsUnitTypes.LayoutMillimeters))
+        else:
+            legend.attemptMove(QgsLayoutPoint(5, 250, QgsUnitTypes.LayoutMillimeters))
+        
+        legend.setFrameEnabled(True)
+        legend.setAutoUpdateModel(True)
+        layout.addLayoutItem(legend)
     
-    legend.setFrameEnabled(True)
-    legend.setAutoUpdateModel(True)
-    layout.addLayoutItem(legend)
-    
-    logger.info(f"Created layout for region: {region['name']}")
+    logger.info(f"Created layout for region: {region['name']} (collar: {enable_collar})")
     return layout
 
 
