@@ -56,7 +56,10 @@ from qgis.core import (
     QgsPalLayerSettings,
     QgsProperty,
     QgsLayerTreeLayer,
-    QgsLabeling
+    QgsLabeling,
+    QgsGeometry,
+    QgsPointXY,
+    QgsMapClippingRegion
 )
 from qgis.PyQt.QtGui import QColor, QFont
 from qgis.PyQt.QtCore import QSizeF
@@ -605,6 +608,9 @@ def create_region_layout(region, project, config, outlet_name):
         transform = QgsCoordinateTransform(wgs84, layer_crs, project)
         bbox_rect = transform.transformBoundingBox(bbox_rect)
     
+    # Keep original bbox for clipping
+    original_bbox_rect = QgsRectangle(bbox_rect)
+    
     # Calculate map frame aspect ratio
     frame_aspect = map_width / map_height
     
@@ -629,6 +635,29 @@ def create_region_layout(region, project, config, outlet_name):
     
     map_item.setExtent(bbox_rect)
     map_item.setCrs(layer_crs)
+    
+    # Create a clipping region for the map item to clip features to original bbox
+    # Create a polygon geometry from the original bbox corners
+    clip_points = [
+        QgsPointXY(original_bbox_rect.xMinimum(), original_bbox_rect.yMinimum()),
+        QgsPointXY(original_bbox_rect.xMaximum(), original_bbox_rect.yMinimum()),
+        QgsPointXY(original_bbox_rect.xMaximum(), original_bbox_rect.yMaximum()),
+        QgsPointXY(original_bbox_rect.xMinimum(), original_bbox_rect.yMaximum())
+    ]
+    clip_geometry = QgsGeometry.fromPolygonXY([clip_points])
+    
+    # Create clipping region
+    clipping_region = QgsMapClippingRegion(clip_geometry)
+    clipping_region.setFeatureClip(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
+    
+    # Apply clipping to the map item
+    try:
+        map_item.addClippingRegion(clipping_region)
+        logger.info(f"Applied clipping region to map for bbox: {original_bbox_rect}")
+    except AttributeError:
+        # If addClippingRegion doesn't exist, try alternative method
+        logger.warning("Map clipping not available in this QGIS version")
+    
     layout.addLayoutItem(map_item)
     
     if enable_collar:
