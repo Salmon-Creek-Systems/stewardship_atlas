@@ -711,13 +711,14 @@ def create_region_layout(region, project, config, outlet_name):
         
         # Add North Arrow / Compass Rose
         north_arrow = QgsLayoutItemPicture(layout)
-        north_arrow.setLinkedMap(map_item)  # Link to map for rotation
-        north_arrow.setPictureRotationEnabled(True)  # Rotate with map
-        north_arrow.setNorthMode(QgsLayoutItemPicture.GridNorth)  # Use grid north
         
         # Use QGIS built-in north arrow (simple arrow style)
         # QGIS has several built-in north arrows in its svg library
         north_arrow.setPicturePath(':/images/north_arrows/layout_default_north_arrow.svg')
+        
+        # Link to map and enable north rotation
+        north_arrow.setLinkedMap(map_item)  # Link to map for rotation
+        north_arrow.setNorthMode(QgsLayoutItemPicture.GridNorth)  # Rotate to show grid north
         
         # Position in upper right of map area
         arrow_size = 15  # mm
