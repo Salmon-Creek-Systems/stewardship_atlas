@@ -33,7 +33,6 @@ from qgis.core import (
     QgsLayoutItemScaleBar,
     QgsLayoutItemLabel,
     QgsLayoutItemShape,
-    QgsLayoutItemPicture,
     QgsLayoutItemPage,
     QgsLayoutPoint,
     QgsLayoutSize,
@@ -543,20 +542,34 @@ def create_region_layout(region, project, config, outlet_name):
     enable_collar = outlet_config.get('map_collar', True)
     collar_height = 25  # mm
     
+    # Get page dimensions
+    if page_size == 'A4':
+        if page_orientation == 'Landscape':
+            page_width = 297  # mm
+            page_height = 210  # mm
+        else:
+            page_width = 210  # mm
+            page_height = 297  # mm
+    elif page_size == 'Letter':
+        if page_orientation == 'Landscape':
+            page_width = 279.4  # mm (11 inches)
+            page_height = 215.9  # mm (8.5 inches)
+        else:
+            page_width = 215.9  # mm
+            page_height = 279.4  # mm
+    
     # Add map item
     map_item = QgsLayoutItemMap(layout)
     
     # Position and size (adjust for collar if enabled)
-    if page_orientation == 'Landscape':
-        map_width = 240
-        map_height = 180 - (collar_height if enable_collar else 0)
-        map_item.attemptMove(QgsLayoutPoint(5, 5, QgsUnitTypes.LayoutMillimeters))
-        map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
-    else:
-        map_width = 200
-        map_height = 240 - (collar_height if enable_collar else 0)
-        map_item.attemptMove(QgsLayoutPoint(5, 5, QgsUnitTypes.LayoutMillimeters))
-        map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
+    margin = 5  # mm
+    map_x = margin
+    map_y = margin
+    map_width = page_width - (2 * margin)
+    map_height = page_height - (2 * margin) - (collar_height if enable_collar else 0)
+    
+    map_item.attemptMove(QgsLayoutPoint(map_x, map_y, QgsUnitTypes.LayoutMillimeters))
+    map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
     
     # Set extent to region bbox
     bbox = region['bbox']
@@ -590,13 +603,13 @@ def create_region_layout(region, project, config, outlet_name):
     layout.addLayoutItem(map_item)
     
     if enable_collar:
-        # Calculate collar position (below map)
-        collar_y = 5 + map_height + 2  # 2mm gap between map and collar
+        # Calculate collar position (flush at bottom of page)
+        collar_y = page_height - collar_height - margin
         
         # Add white background for collar
         collar_bg = QgsLayoutItemShape(layout)
         collar_bg.setShapeType(QgsLayoutItemShape.Rectangle)
-        collar_bg.attemptMove(QgsLayoutPoint(5, collar_y, QgsUnitTypes.LayoutMillimeters))
+        collar_bg.attemptMove(QgsLayoutPoint(margin, collar_y, QgsUnitTypes.LayoutMillimeters))
         collar_bg.attemptResize(QgsLayoutSize(map_width, collar_height, QgsUnitTypes.LayoutMillimeters))
         collar_bg.setFrameEnabled(False)
         collar_bg.setBackgroundEnabled(True)
@@ -606,7 +619,7 @@ def create_region_layout(region, project, config, outlet_name):
         # Add separator line
         separator = QgsLayoutItemShape(layout)
         separator.setShapeType(QgsLayoutItemShape.Rectangle)
-        separator.attemptMove(QgsLayoutPoint(5, collar_y, QgsUnitTypes.LayoutMillimeters))
+        separator.attemptMove(QgsLayoutPoint(margin, collar_y, QgsUnitTypes.LayoutMillimeters))
         separator.attemptResize(QgsLayoutSize(map_width, 0.5, QgsUnitTypes.LayoutMillimeters))
         separator.setFrameEnabled(True)
         separator.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
@@ -614,11 +627,11 @@ def create_region_layout(region, project, config, outlet_name):
         
         collar_content_y = collar_y + 2  # Start content below separator
         
-        # LEFT SECTION (40%): Legend
+        # LEFT SECTION (35%): Legend
         legend = QgsLayoutItemLegend(layout)
         legend.setTitle("")  # No title, save space
         legend.setLinkedMap(map_item)
-        legend.attemptMove(QgsLayoutPoint(5, collar_content_y, QgsUnitTypes.LayoutMillimeters))
+        legend.attemptMove(QgsLayoutPoint(margin, collar_content_y, QgsUnitTypes.LayoutMillimeters))
         legend.setFrameEnabled(False)
         legend.setAutoUpdateModel(True)
         # Make legend compact
@@ -636,41 +649,60 @@ def create_region_layout(region, project, config, outlet_name):
         
         layout.addLayoutItem(legend)
         
-        # MIDDLE SECTION (30%): Scale Bar
+        # MIDDLE SECTION (25%): Scale Bar with North Indicator
+        scale_x = margin + (map_width * 0.35) + 5
+        
+        # North Indicator (simple text)
+        north_label = QgsLayoutItemLabel(layout)
+        north_label.setText("↑ N")  # Up arrow + N
+        north_font = QFont("Arial", 10, QFont.Bold)
+        north_label.setFont(north_font)
+        north_label.setHAlign(1)  # Center align
+        north_label.attemptMove(QgsLayoutPoint(scale_x, collar_content_y, QgsUnitTypes.LayoutMillimeters))
+        north_label.adjustSizeToText()
+        north_label.setFrameEnabled(False)
+        layout.addLayoutItem(north_label)
+        
+        # Scale Bar (imperial)
         scale_bar = QgsLayoutItemScaleBar(layout)
         scale_bar.setLinkedMap(map_item)
-        scale_bar.setNumberOfSegments(4)
+        scale_bar.setNumberOfSegments(3)  # Fewer segments to reduce clutter
         scale_bar.setNumberOfSegmentsLeft(0)
         scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
         scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar.setMaximumBarWidth(50)  # mm
+        scale_bar.setMaximumBarWidth(45)  # mm
         
         # Set to double box style (USGS traditional)
         scale_bar.setStyle('Double Box')
         
+        # Make text smaller to prevent overlap
+        scale_font = QFont("Arial", 6)
+        scale_bar.setFont(scale_font)
+        scale_bar.setNumberOfSegmentsLeft(0)
+        
         # Position in middle section
-        scale_x = 5 + (map_width * 0.40) + 5
-        scale_bar.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 2, QgsUnitTypes.LayoutMillimeters))
+        scale_bar.attemptMove(QgsLayoutPoint(scale_x + 15, collar_content_y + 2, QgsUnitTypes.LayoutMillimeters))
         scale_bar.setFrameEnabled(False)
         layout.addLayoutItem(scale_bar)
         
         # Add metric scale bar below imperial
         scale_bar_metric = QgsLayoutItemScaleBar(layout)
         scale_bar_metric.setLinkedMap(map_item)
-        scale_bar_metric.setNumberOfSegments(4)
+        scale_bar_metric.setNumberOfSegments(3)  # Fewer segments
         scale_bar_metric.setNumberOfSegmentsLeft(0)
         scale_bar_metric.setUnitsPerSegment(1)
         scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar_metric.setMaximumBarWidth(50)
+        scale_bar_metric.setMaximumBarWidth(45)
         scale_bar_metric.setStyle('Double Box')
         scale_bar_metric.setUnitLabel('km')
         scale_bar_metric.setUnits(QgsUnitTypes.DistanceKilometers)
-        scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 10, QgsUnitTypes.LayoutMillimeters))
+        scale_bar_metric.setFont(scale_font)  # Same small font
+        scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x + 15, collar_content_y + 10, QgsUnitTypes.LayoutMillimeters))
         scale_bar_metric.setFrameEnabled(False)
         layout.addLayoutItem(scale_bar_metric)
         
-        # RIGHT SECTION (30%): CRS and Attribution
-        info_x = 5 + (map_width * 0.70) + 5
+        # RIGHT SECTION (40%): CRS and Attribution
+        info_x = margin + (map_width * 0.60) + 5
         
         # CRS Label
         crs_label = QgsLayoutItemLabel(layout)
@@ -709,28 +741,6 @@ def create_region_layout(region, project, config, outlet_name):
         date_label.setFrameEnabled(False)
         layout.addLayoutItem(date_label)
         
-        # Add North Arrow / Compass Rose
-        north_arrow = QgsLayoutItemPicture(layout)
-        
-        # Use QGIS built-in north arrow (simple arrow style)
-        # QGIS has several built-in north arrows in its svg library
-        north_arrow.setPicturePath(':/images/north_arrows/layout_default_north_arrow.svg')
-        
-        # Link to map and enable north rotation
-        north_arrow.setLinkedMap(map_item)  # Link to map for rotation
-        north_arrow.setNorthMode(QgsLayoutItemPicture.GridNorth)  # Rotate to show grid north
-        
-        # Position in upper right of map area
-        arrow_size = 15  # mm
-        arrow_x = 5 + map_width - arrow_size - 5  # 5mm from right edge
-        arrow_y = 10  # 10mm from top
-        north_arrow.attemptMove(QgsLayoutPoint(arrow_x, arrow_y, QgsUnitTypes.LayoutMillimeters))
-        north_arrow.attemptResize(QgsLayoutSize(arrow_size, arrow_size, QgsUnitTypes.LayoutMillimeters))
-        north_arrow.setFrameEnabled(False)
-        north_arrow.setBackgroundEnabled(True)
-        north_arrow.setBackgroundColor(QColor(255, 255, 255, 200))  # Semi-transparent white
-        layout.addLayoutItem(north_arrow)
-        
     else:
         # No collar - use traditional legend position
         legend = QgsLayoutItemLegend(layout)
@@ -738,10 +748,9 @@ def create_region_layout(region, project, config, outlet_name):
         legend.setLinkedMap(map_item)
         
         # Position legend in lower right
-        if page_orientation == 'Landscape':
-            legend.attemptMove(QgsLayoutPoint(250, 150, QgsUnitTypes.LayoutMillimeters))
-        else:
-            legend.attemptMove(QgsLayoutPoint(5, 250, QgsUnitTypes.LayoutMillimeters))
+        legend_x = page_width - 60  # 60mm from right edge
+        legend_y = page_height - 60  # 60mm from bottom
+        legend.attemptMove(QgsLayoutPoint(legend_x, legend_y, QgsUnitTypes.LayoutMillimeters))
         
         legend.setFrameEnabled(True)
         legend.setAutoUpdateModel(True)
