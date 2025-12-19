@@ -411,7 +411,10 @@ def apply_basic_styling(layer, layer_config):
                 
                 # Set placement flags to follow line orientation
                 # OnLine = place on the line, MapOrientation = follow the line's angle
-                pal_settings.lineSettings().setPlacementFlags(QgsLabeling.LinePlacementFlag.OnLine | QgsLabeling.LinePlacementFlag.MapOrientation)
+                flags = QgsLabeling.LinePlacementFlags()
+                flags |= QgsLabeling.LinePlacementFlag.OnLine
+                flags |= QgsLabeling.LinePlacementFlag.MapOrientation
+                pal_settings.lineSettings().setPlacementFlags(flags)
                 
                 # Optional: Repeat labels along long lines (off by default)
                 repeat_distance = layer_config.get('label_repeat_distance', 0)
