@@ -557,6 +557,10 @@ def create_region_layout(region, project, config, outlet_name):
         else:
             page_width = 215.9  # mm
             page_height = 279.4  # mm
+    else:
+        # Default to A4 portrait
+        page_width = 210  # mm
+        page_height = 297  # mm
     
     # Add map item
     map_item = QgsLayoutItemMap(layout)
@@ -633,19 +637,30 @@ def create_region_layout(region, project, config, outlet_name):
         legend.setLinkedMap(map_item)
         legend.attemptMove(QgsLayoutPoint(margin, collar_content_y, QgsUnitTypes.LayoutMillimeters))
         legend.setFrameEnabled(False)
+        
+        # First set auto-update to populate the legend
         legend.setAutoUpdateModel(True)
+        
         # Make legend compact
         legend.setSymbolWidth(4)
         legend.setSymbolHeight(3)
         legend.setLineSpacing(0.5)
         
-        # Filter out basemap from legend
+        # Now disable auto-update so we can filter without affecting the map
+        legend.setAutoUpdateModel(False)
+        
+        # Filter out basemap from legend (only affects legend display, not map)
         root = legend.model().rootGroup()
+        layers_to_remove = []
         for layer in root.children():
             if isinstance(layer, QgsLayerTreeLayer):
                 layer_name = layer.name().lower()
                 if 'basemap' in layer_name:
-                    root.removeChildNode(layer)
+                    layers_to_remove.append(layer)
+        
+        # Remove the collected layers
+        for layer in layers_to_remove:
+            root.removeChildNode(layer)
         
         layout.addLayoutItem(legend)
         
@@ -746,12 +761,12 @@ def create_region_layout(region, project, config, outlet_name):
         legend = QgsLayoutItemLegend(layout)
         legend.setTitle("Legend")
         legend.setLinkedMap(map_item)
-        
+    
         # Position legend in lower right
         legend_x = page_width - 60  # 60mm from right edge
         legend_y = page_height - 60  # 60mm from bottom
         legend.attemptMove(QgsLayoutPoint(legend_x, legend_y, QgsUnitTypes.LayoutMillimeters))
-        
+    
         legend.setFrameEnabled(True)
         legend.setAutoUpdateModel(True)
         layout.addLayoutItem(legend)
