@@ -566,7 +566,7 @@ def create_region_layout(region, project, config, outlet_name):
     map_item = QgsLayoutItemMap(layout)
     
     # Position and size (adjust for collar if enabled)
-    margin = 5  # mm
+    margin = 2  # mm - small margin to avoid cutting off content at edges
     map_x = margin
     map_y = margin
     map_width = page_width - (2 * margin)
@@ -574,6 +574,9 @@ def create_region_layout(region, project, config, outlet_name):
     
     map_item.attemptMove(QgsLayoutPoint(map_x, map_y, QgsUnitTypes.LayoutMillimeters))
     map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
+    
+    # Set to NOT keep scale - allows map to fill the frame
+    map_item.setKeepLayerSet(True)  # Keep the same layers visible
     
     # Set extent to region bbox
     bbox = region['bbox']
@@ -601,6 +604,28 @@ def create_region_layout(region, project, config, outlet_name):
     if layer_crs != wgs84:
         transform = QgsCoordinateTransform(wgs84, layer_crs, project)
         bbox_rect = transform.transformBoundingBox(bbox_rect)
+    
+    # Calculate map frame aspect ratio
+    frame_aspect = map_width / map_height
+    
+    # Calculate bbox aspect ratio
+    bbox_width = bbox_rect.width()
+    bbox_height = bbox_rect.height()
+    bbox_aspect = bbox_width / bbox_height
+    
+    # Adjust bbox to match frame aspect ratio (expand to fill frame)
+    if bbox_aspect < frame_aspect:
+        # Bbox is too tall, expand width
+        new_width = bbox_height * frame_aspect
+        width_diff = new_width - bbox_width
+        bbox_rect.setXMinimum(bbox_rect.xMinimum() - width_diff / 2)
+        bbox_rect.setXMaximum(bbox_rect.xMaximum() + width_diff / 2)
+    else:
+        # Bbox is too wide, expand height
+        new_height = bbox_width / frame_aspect
+        height_diff = new_height - bbox_height
+        bbox_rect.setYMinimum(bbox_rect.yMinimum() - height_diff / 2)
+        bbox_rect.setYMaximum(bbox_rect.yMaximum() + height_diff / 2)
     
     map_item.setExtent(bbox_rect)
     map_item.setCrs(layer_crs)
