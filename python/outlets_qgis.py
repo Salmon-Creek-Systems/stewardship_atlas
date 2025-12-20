@@ -645,21 +645,25 @@ def create_region_layout(region, project, config, outlet_name):
     ]
     clip_geometry = QgsGeometry.fromPolygonXY([clip_points])
     
-    # Try to use QgsMapClippingRegion for layout item clipping (QGIS 3.16+)
+    # Try to use item clipping for layout item (QGIS 3.16+)
     try:
         from qgis.core import QgsMapClippingRegion
+        
+        # Create clipping region for map rendering
         clipping_region = QgsMapClippingRegion(clip_geometry)
         clipping_region.setFeatureClip(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
         
-        # Don't restrict to specific layers - apply to all layers
-        # Leaving restrictedLayers empty means it applies to all layers
+        # Get the item's clipping settings and apply our region
+        clipping_settings = map_item.itemClippingSettings()
+        clipping_settings.setEnabled(True)
+        clipping_settings.setGeometry(clip_geometry)
+        clipping_settings.setFeatureClip(True)
+        map_item.setItemClippingSettings(clipping_settings)
         
-        # Add clipping region to map item
-        map_item.addClippingRegion(clipping_region)
-        logger.info(f"Applied layout clipping region for bbox: {original_bbox_rect}")
+        logger.info(f"Applied layout item clipping for bbox: {original_bbox_rect}")
         
     except (ImportError, AttributeError, TypeError) as e:
-        logger.warning(f"Layout clipping not available (QGIS 3.16+ required): {e}")
+        logger.warning(f"Layout clipping not available: {e}")
         logger.warning("Features may extend beyond region boundary")
     
     layout.addLayoutItem(map_item)
