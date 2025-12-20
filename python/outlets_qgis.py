@@ -58,8 +58,7 @@ from qgis.core import (
     QgsLayerTreeLayer,
     QgsLabeling,
     QgsGeometry,
-    QgsPointXY,
-    QgsMapClippingRegion
+    QgsPointXY
 )
 from qgis.PyQt.QtGui import QColor, QFont
 from qgis.PyQt.QtCore import QSizeF
@@ -636,8 +635,8 @@ def create_region_layout(region, project, config, outlet_name):
     map_item.setExtent(bbox_rect)
     map_item.setCrs(layer_crs)
     
-    # Create a clipping region for the map item to clip features to original bbox
-    # Create a polygon geometry from the original bbox corners
+    # Apply layout-specific clipping to the original bbox region
+    # This clips features at render time for the layout only
     clip_points = [
         QgsPointXY(original_bbox_rect.xMinimum(), original_bbox_rect.yMinimum()),
         QgsPointXY(original_bbox_rect.xMaximum(), original_bbox_rect.yMinimum()),
@@ -646,17 +645,24 @@ def create_region_layout(region, project, config, outlet_name):
     ]
     clip_geometry = QgsGeometry.fromPolygonXY([clip_points])
     
-    # Create clipping region
-    clipping_region = QgsMapClippingRegion(clip_geometry)
-    clipping_region.setFeatureClip(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
-    
-    # Apply clipping to the map item
+    # Try to use QgsMapClippingRegion for layout item clipping (QGIS 3.16+)
     try:
+        from qgis.core import QgsMapClippingRegion
+        clipping_region = QgsMapClippingRegion(clip_geometry)
+        clipping_region.setFeatureClip(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
+        
+        # Apply to all layers in the map
+        layer_ids = [layer.id() for layer in project.mapLayers().values()]
+        for layer_id in layer_ids:
+            clipping_region.setRestrictedLayers([layer_id])
+        
+        # Add clipping region to map item
         map_item.addClippingRegion(clipping_region)
-        logger.info(f"Applied clipping region to map for bbox: {original_bbox_rect}")
-    except AttributeError:
-        # If addClippingRegion doesn't exist, try alternative method
-        logger.warning("Map clipping not available in this QGIS version")
+        logger.info(f"Applied layout clipping region for bbox: {original_bbox_rect}")
+        
+    except (ImportError, AttributeError) as e:
+        logger.warning(f"Layout clipping not available (QGIS 3.16+ required): {e}")
+        logger.warning("Features may extend beyond region boundary")
     
     layout.addLayoutItem(map_item)
     
