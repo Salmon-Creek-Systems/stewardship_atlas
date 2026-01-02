@@ -82,8 +82,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name):
     outlet_config = config['assets'][outlet_name]
     
     # Get paths
-    swale_path = versioning.atlas_path(config, "")
-    regions_path = swale_path / "staging" / "regions.geojson"
+    swale_path = versioning.atlas_path(config, "layers")
+    regions_path = swale_path / "regions" / "regions.geojson"
     
     if not regions_path.exists():
         raise FileNotFoundError(f"Regions file not found: {regions_path}")
@@ -99,8 +99,34 @@ def outlet_runbook_qgis_atlas(config, outlet_name):
         
         logger.info(f"Loading layers for atlas generation...")
         
-        # Load all data layers using existing function
-        outlets_qgis.load_layers_for_project(project, config, outlet_config)
+        # Load all data layers
+        in_layers = outlet_config.get('in_layers', [])
+        layers_config = config.get('layers', {})
+        
+        for layer_name in in_layers:
+            if layer_name not in layers_config:
+                logger.warning(f"⚠ Layer {layer_name} not found in config")
+                continue
+            
+            layer_config = layers_config[layer_name]
+            
+            try:
+                # Load layer using outlets_qgis function
+                layer = outlets_qgis.load_full_layer(layer_config, config)
+                if layer is None:
+                    logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
+                    continue
+                
+                # Apply styling
+                outlets_qgis.apply_basic_styling(layer, layer_config)
+                
+                # Add to project
+                project.addMapLayer(layer)
+                logger.info(f"✓ Loaded layer: {layer_name}")
+                
+            except Exception as e:
+                logger.error(f"✗ Error loading layer {layer_name}: {e}")
+                continue
         
         # Load regions as coverage layer
         regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
