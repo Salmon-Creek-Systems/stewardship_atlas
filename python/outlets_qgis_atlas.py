@@ -491,7 +491,14 @@ def export_atlas(layout, output_dir, atlas_name):
     while atlas.next():
         page_num += 1
         feature = atlas.layout().reportContext().feature()
-        region_name = feature.attribute('name') if feature.hasAttribute('name') else f"region_{page_num}"
+        
+        # Get region name from feature
+        try:
+            region_name = feature.attribute('name')
+            if not region_name or region_name == '':
+                region_name = f"region_{page_num}"
+        except:
+            region_name = f"region_{page_num}"
         
         # Clean region name for filename
         safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
