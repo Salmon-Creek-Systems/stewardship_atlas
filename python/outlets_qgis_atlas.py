@@ -251,10 +251,11 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     map_item.setCrs(layer_crs)
     
     # Enable atlas clipping - this clips features to the current coverage feature!
+    # The atlasClippingSettings() returns a reference, so we just modify it directly
     atlas_clipping = map_item.atlasClippingSettings()
     atlas_clipping.setEnabled(True)
     atlas_clipping.setFeatureClippingType(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
-    map_item.setAtlasClippingSettings(atlas_clipping)
+    # No setter needed - the reference is already connected to the map item
     
     layout.addLayoutItem(map_item)
     
