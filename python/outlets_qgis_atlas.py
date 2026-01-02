@@ -101,11 +101,12 @@ def outlet_runbook_qgis_atlas(config, outlet_name):
         
         # Load all data layers
         in_layers = outlet_config.get('in_layers', [])
-        layers_config = config.get('layers', {})
+        layers_config = {x['name']: x for x in config['dataswale']['layers']}
+        # layers_config = config['dataswale']['layers']
         
         for layer_name in in_layers:
             if layer_name not in layers_config:
-                logger.warning(f"⚠ Layer {layer_name} not found in config")
+                logger.warning(f"⚠ Layer {layer_name} not found in config {layers_config.keys()}")
                 continue
             
             layer_config = layers_config[layer_name]
