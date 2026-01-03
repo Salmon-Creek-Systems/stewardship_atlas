@@ -255,7 +255,15 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     atlas_clipping = map_item.atlasClippingSettings()
     atlas_clipping.setEnabled(True)
     atlas_clipping.setFeatureClippingType(QgsMapClippingRegion.FeatureClippingType.ClipToIntersection)
-    # No setter needed - the reference is already connected to the map item
+    
+    # Explicitly set which layers to clip (all vector layers)
+    layers_to_clip = [layer.id() for layer in project.mapLayers().values() 
+                      if isinstance(layer, QgsVectorLayer)]
+    atlas_clipping.setLayersToClip(layers_to_clip)
+    
+    logger.info(f"Atlas clipping enabled: {atlas_clipping.enabled()}")
+    logger.info(f"Atlas clipping type: {atlas_clipping.featureClippingType()}")
+    logger.info(f"Atlas layers to clip: {len(layers_to_clip)} layers")
     
     layout.addLayoutItem(map_item)
     
