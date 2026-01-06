@@ -232,9 +232,10 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     map_item.attemptMove(QgsLayoutPoint(map_x, map_y, QgsUnitTypes.LayoutMillimeters))
     map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
     
-    # Don't use atlas-driven extent (which might zoom to fit rendered content)
-    # We'll manually set extent per page based on coverage feature only
-    map_item.setAtlasDriven(False)
+    # Configure atlas-driven map
+    map_item.setAtlasDriven(True)
+    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
+    map_item.setAtlasMargin(0.05)  # 5% margin
     
     # Get layer CRS
     layer_crs = None
@@ -459,10 +460,9 @@ def export_atlas(layout, output_dir, atlas_name):
     
     results = {
         'status': 'success',
-        'multi_page_pdf': None,  # Will be combined from individual pages if needed
+        'multi_page_pdf': None,
         'individual_pdfs': [],
-        'total_pages': 0,
-        'note': 'Individual PDFs exported with manually controlled extents. Combine externally if multi-page PDF needed.'
+        'total_pages': 0
     }
     
     # PDF export settings
@@ -472,23 +472,25 @@ def export_atlas(layout, output_dir, atlas_name):
     pdf_settings.forceVectorOutput = True
     pdf_settings.exportMetadata = True
     
-    # Note: We can't use the atlas auto-export because we need to manually
-    # set the extent per page. So we'll export individual PDFs and note that
-    # users can combine them if needed.
-    logger.info(f"Exporting pages with manually controlled extents...")
+    # Export multi-page PDF
+    multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
+    logger.info(f"Exporting multi-page PDF to: {multi_pdf_path}")
+    
+    result = exporter.exportToPdf(atlas, str(multi_pdf_path), pdf_settings)
+    
+    if result == QgsLayoutExporter.Success:
+        results['multi_page_pdf'] = str(multi_pdf_path)
+        logger.info(f"✓ Multi-page PDF exported successfully")
+    else:
+        error_msg = get_export_error_message(result)
+        logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
+        results['status'] = 'partial'
     
     # Export individual PDFs per region
     individual_dir = output_dir / "individual_pages"
     individual_dir.mkdir(exist_ok=True)
     
     logger.info(f"Exporting individual PDFs to: {individual_dir}")
-    
-    # Get the map item to manually control extent
-    map_items = [item for item in layout.items() if isinstance(item, QgsLayoutItemMap)]
-    if not map_items:
-        logger.error("No map item found in layout!")
-        return results
-    map_item = map_items[0]
     
     # Iterate through atlas features
     atlas.beginRender()
@@ -505,27 +507,6 @@ def export_atlas(layout, output_dir, atlas_name):
                 region_name = f"region_{page_num}"
         except:
             region_name = f"region_{page_num}"
-        
-        # Manually set map extent to coverage feature geometry (ignoring layer content)
-        feature_geom = feature.geometry()
-        if feature_geom and not feature_geom.isEmpty():
-            bbox = feature_geom.boundingBox()
-            
-            # Add 10% margin
-            margin_factor = 0.10
-            x_margin = bbox.width() * margin_factor
-            y_margin = bbox.height() * margin_factor
-            
-            bbox_with_margin = QgsRectangle(
-                bbox.xMinimum() - x_margin,
-                bbox.yMinimum() - y_margin,
-                bbox.xMaximum() + x_margin,
-                bbox.yMaximum() + y_margin
-            )
-            
-            # Set map extent to exactly this box (not to rendered features)
-            map_item.setExtent(bbox_with_margin)
-            logger.debug(f"Set map extent for {region_name}: {bbox_with_margin}")
         
         # Clean region name for filename
         safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
