@@ -290,13 +290,14 @@ def load_full_layer(layer_config, config):
         return layer
 
 
-def apply_basic_styling(layer, layer_config):
+def apply_basic_styling(layer, layer_config, config=None):
     """
     Apply basic styling to a QGIS layer based on configuration.
     
     Args:
         layer: QgsVectorLayer or QgsRasterLayer
         layer_config: Layer configuration dict with color, width, labels, etc.
+        config: Optional atlas configuration (needed for loading custom icon PNG files)
     """
     if isinstance(layer, QgsRasterLayer):
         # Raster styling - just set opacity if configured
@@ -315,9 +316,51 @@ def apply_basic_styling(layer, layer_config):
     
     # Create symbol based on geometry type
     if geometry_type == 'point':
-        symbol = QgsSymbol.defaultSymbol(layer.geometryType())
-        symbol.setColor(qcolor)
-        symbol.setSize(3)  # Basic point size
+        # Check if layer has custom PNG icon
+        symbol_config = layer_config.get('symbol', {})
+        png_icon = symbol_config.get('png')
+        
+        if png_icon and config:
+            # Try to load custom PNG icon
+            try:
+                from qgis.core import QgsRasterMarkerSymbolLayer
+                local_path = versioning.atlas_path(config, "local")
+                icon_path = local_path / png_icon
+                
+                if icon_path.exists():
+                    # Create symbol with raster marker
+                    symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+                    
+                    # Create raster marker layer
+                    raster_marker = QgsRasterMarkerSymbolLayer(str(icon_path))
+                    
+                    # Set size from config (icon-size, defaults to 1.0)
+                    icon_size = layer_config.get('icon-size', 1.0)
+                    # Convert to mm for print output (scale factor)
+                    size_mm = icon_size * 5  # Base size of 5mm scaled by icon-size
+                    raster_marker.setSize(size_mm)
+                    raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
+                    
+                    # Replace the default symbol layer
+                    symbol.deleteSymbolLayer(0)
+                    symbol.appendSymbolLayer(raster_marker)
+                    
+                    logger.info(f"✓ Applied custom PNG icon: {png_icon} for {layer.name()}")
+                else:
+                    logger.warning(f"PNG icon not found: {icon_path}, using default circle")
+                    symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+                    symbol.setColor(qcolor)
+                    symbol.setSize(3)
+            except Exception as e:
+                logger.warning(f"Failed to load PNG icon {png_icon}: {e}, using default circle")
+                symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+                symbol.setColor(qcolor)
+                symbol.setSize(3)
+        else:
+            # No custom icon, use default
+            symbol = QgsSymbol.defaultSymbol(layer.geometryType())
+            symbol.setColor(qcolor)
+            symbol.setSize(3)  # Basic point size
         
     elif geometry_type == 'linestring':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -981,8 +1024,8 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
                     logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
                     continue
                 
-                # Apply styling
-                apply_basic_styling(layer, layer_config)
+                # Apply styling (pass config for custom icons)
+                apply_basic_styling(layer, layer_config, config)
                 
                 # Add to project
                 project.addMapLayer(layer)
