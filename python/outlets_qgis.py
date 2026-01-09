@@ -290,7 +290,7 @@ def load_full_layer(layer_config, config):
         return layer
 
 
-def apply_basic_styling(layer, layer_config, config=None):
+def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
     """
     Apply basic styling to a QGIS layer based on configuration.
     
@@ -298,6 +298,7 @@ def apply_basic_styling(layer, layer_config, config=None):
         layer: QgsVectorLayer or QgsRasterLayer
         layer_config: Layer configuration dict with color, width, labels, etc.
         config: Optional atlas configuration (needed for loading custom icon PNG files)
+        feature_scale: Scale factor for feature sizes (default 1.0)
     """
     if isinstance(layer, QgsRasterLayer):
         # Raster styling - just set opacity if configured
@@ -337,7 +338,7 @@ def apply_basic_styling(layer, layer_config, config=None):
                     # Set size from config (icon-size, defaults to 1.0)
                     icon_size = layer_config.get('icon-size', 1.0)
                     # Convert to mm for print output (scale factor)
-                    size_mm = icon_size * 5  # Base size of 5mm scaled by icon-size
+                    size_mm = icon_size * 5 * feature_scale  # Base size of 5mm scaled by icon-size and feature_scale
                     raster_marker.setSize(size_mm)
                     raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
                     
@@ -350,17 +351,17 @@ def apply_basic_styling(layer, layer_config, config=None):
                     logger.warning(f"PNG icon not found: {icon_path}, using default circle")
                     symbol = QgsSymbol.defaultSymbol(layer.geometryType())
                     symbol.setColor(qcolor)
-                    symbol.setSize(3)
+                    symbol.setSize(3 * feature_scale)
             except Exception as e:
                 logger.warning(f"Failed to load PNG icon {png_icon}: {e}, using default circle")
                 symbol = QgsSymbol.defaultSymbol(layer.geometryType())
                 symbol.setColor(qcolor)
-                symbol.setSize(3)
+                symbol.setSize(3 * feature_scale)
         else:
             # No custom icon, use default
             symbol = QgsSymbol.defaultSymbol(layer.geometryType())
             symbol.setColor(qcolor)
-            symbol.setSize(3)  # Basic point size
+            symbol.setSize(3 * feature_scale)  # Basic point size scaled by feature_scale
         
     elif geometry_type == 'linestring':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -374,8 +375,8 @@ def apply_basic_styling(layer, layer_config, config=None):
             if fields.indexOf('vector_width') >= 0:
                 # Use data-defined width from each feature's vector_width attribute
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width )  # Default/fallback width
-                logger.info(f"set constant width: {width}")
+                symbol.setWidth(width * feature_scale)  # Default/fallback width scaled by feature_scale
+                logger.info(f"set constant width: {width * feature_scale}")
                 
                 # Set data-defined property to read from feature attribute
                 symbol_layer = symbol.symbolLayer(0)
@@ -391,11 +392,11 @@ def apply_basic_styling(layer, layer_config, config=None):
                 logger.warning(f"Layer {layer.name()} config has 'vector_width' but features don't have that attribute")
                 # Fall back to constant width
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * 0.1)
+                symbol.setWidth(width * 0.1 * feature_scale)
         else:
             # Use constant width from config
             width = layer_config.get('constant_width', 2)
-            symbol.setWidth(width * 0.1)  # Scale to mm
+            symbol.setWidth(width * 0.1 * feature_scale)  # Scale to mm with feature_scale
         
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -413,7 +414,7 @@ def apply_basic_styling(layer, layer_config, config=None):
         if isinstance(symbol_layer, QgsSimpleFillSymbolLayer):
             symbol_layer.setFillColor(qfill_color)
             symbol_layer.setStrokeColor(qcolor)
-            symbol_layer.setStrokeWidth(0.3)
+            symbol_layer.setStrokeWidth(0.3 * feature_scale)  # Stroke width scaled by feature_scale
     
     # Apply symbol renderer
     renderer = QgsSingleSymbolRenderer(symbol)
@@ -866,12 +867,12 @@ def create_region_layout(region, project, config, outlet_name):
         legend = QgsLayoutItemLegend(layout)
         legend.setTitle("Legend")
         legend.setLinkedMap(map_item)
-    
+        
         # Position legend in lower right
         legend_x = page_width - 60  # 60mm from right edge
         legend_y = page_height - 60  # 60mm from bottom
         legend.attemptMove(QgsLayoutPoint(legend_x, legend_y, QgsUnitTypes.LayoutMillimeters))
-    
+        
         legend.setFrameEnabled(True)
         legend.setAutoUpdateModel(True)
         layout.addLayoutItem(legend)
@@ -1024,8 +1025,9 @@ def outlet_regions_qgis(config, outlet_name, regions_geojson_path=None, regions=
                     logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
                     continue
                 
-                # Apply styling (pass config for custom icons)
-                apply_basic_styling(layer, layer_config, config)
+                # Apply styling (pass config for custom icons and feature_scale)
+                feature_scale = outlet_config.get('feature_scale', 1.0)
+                apply_basic_styling(layer, layer_config, config, feature_scale)
                 
                 # Add to project
                 project.addMapLayer(layer)

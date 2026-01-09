@@ -118,8 +118,9 @@ def outlet_runbook_qgis_atlas(config, outlet_name):
                     logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
                     continue
                 
-                # Apply styling (pass config for custom icons)
-                outlets_qgis.apply_basic_styling(layer, layer_config, config)
+                # Apply styling (pass config for custom icons and feature_scale)
+                feature_scale = outlet_config.get('feature_scale', 1.0)
+                outlets_qgis.apply_basic_styling(layer, layer_config, config, feature_scale)
                 
                 # Add to project
                 project.addMapLayer(layer)
