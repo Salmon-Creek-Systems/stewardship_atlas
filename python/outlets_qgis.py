@@ -433,11 +433,11 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             pal_settings.fieldName = label_attr
             pal_settings.enabled = True
             
-            # Force display of all labels (don't hide on collision)
-            pal_settings.displayAll = True
+            # Enable collision avoidance (hide overlapping labels for cleaner output)
+            pal_settings.displayAll = False
             
-            # Disable obstacle avoidance - show labels even if they overlap features
-            pal_settings.obstacleSettings().setIsObstacle(False)
+            # Enable obstacle avoidance - avoid placing labels on top of features
+            pal_settings.obstacleSettings().setIsObstacle(True)
             
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
@@ -460,8 +460,8 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             
             # For linestrings, enable placement along the line
             if geometry_type == 'linestring':
-                # Line placement with proper orientation flags
-                pal_settings.placement = QgsPalLayerSettings.Line
+                # Curved line placement to follow the path
+                pal_settings.placement = QgsPalLayerSettings.Curved
                 
                 # Set placement flags to follow line orientation
                 # OnLine = place on the line, MapOrientation = follow the line's angle
@@ -482,7 +482,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
                 
-                logger.info(f"Configured line placement with MapOrientation for {layer.name()}")
+                logger.info(f"Configured curved line placement for {layer.name()}")
             
             # Deduplicate labels: only show label on first feature with each unique label value
             # This ensures each label text appears only once per layer (per region when filtered)
