@@ -141,7 +141,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             # Build SQL-like filter expression: "name" IN ('region1', 'region2', ...)
             # Escape single quotes in region names for safety
             escaped_names = [name.replace("'", "''") for name in only_generate]
-            filter_expr = f'"name" IN (\'{"\', \'".join(escaped_names)}\')'
+            quoted_names = "', '".join(escaped_names)
+            filter_expr = f'"name" IN (\'{quoted_names}\')'
             regions_layer.setSubsetString(filter_expr)
             logger.info(f"Filtered to {len(only_generate)} specified regions: {only_generate}")
             logger.info(f"Filter expression: {filter_expr}")
