@@ -433,11 +433,15 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             pal_settings.fieldName = label_attr
             pal_settings.enabled = True
             
-            # Enable collision avoidance (hide overlapping labels for cleaner output)
-            pal_settings.displayAll = False
+            # Label-label collision avoidance (can be disabled per-layer with 'avoid_label_collisions': false)
+            avoid_label_collisions = layer_config.get('avoid_label_collisions', True)
+            pal_settings.displayAll = not avoid_label_collisions  # displayAll=True means show all (no collision avoidance)
+            logger.debug(f"Label-label collision avoidance: {avoid_label_collisions}")
             
-            # Enable obstacle avoidance - avoid placing labels on top of features
-            pal_settings.obstacleSettings().setIsObstacle(True)
+            # Label-feature collision avoidance (can be enabled per-layer with 'labels_avoid_features': true)
+            labels_avoid_features = layer_config.get('labels_avoid_features', False)
+            pal_settings.obstacleSettings().setIsObstacle(labels_avoid_features)
+            logger.debug(f"Label-feature collision avoidance: {labels_avoid_features}")
             
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
