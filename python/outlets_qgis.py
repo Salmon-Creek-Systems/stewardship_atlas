@@ -433,11 +433,11 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             pal_settings.fieldName = label_attr
             pal_settings.enabled = True
             
-            # TEMPORARY: Force display all labels for debugging
-            pal_settings.displayAll = True
+            # Enable collision avoidance (hide overlapping labels for cleaner output)
+            pal_settings.displayAll = False
             
-            # TEMPORARY: Disable obstacle avoidance for debugging
-            pal_settings.obstacleSettings().setIsObstacle(False)
+            # Enable obstacle avoidance - avoid placing labels on top of features
+            pal_settings.obstacleSettings().setIsObstacle(True)
             
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
@@ -460,17 +460,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             
             # For linestrings, enable placement along the line
             if geometry_type == 'linestring':
-                # TEMPORARY: Use simple Line placement instead of Curved for debugging
+                # Use Line placement - labels rotate to follow line direction but remain straight
+                # (as opposed to Curved placement where individual characters curve)
                 pal_settings.placement = QgsPalLayerSettings.Line
                 
-                # TEMPORARY: Commented out curved settings for debugging
-                # # Allow characters to rotate more to follow curves (default is ~25 degrees)
-                # # Higher values (up to 90) allow labels to follow sharper curves
-                # pal_settings.maxCurvedCharAngleIn = 40.0  # Angle into the curve
-                # pal_settings.maxCurvedCharAngleOut = -40.0  # Angle out of the curve
-                
-                # Set placement flags to follow line orientation
-                # OnLine = place on the line, MapOrientation = follow the line's angle
+                # Set placement flags to rotate labels along line orientation
+                # OnLine = place on the line, MapOrientation = rotate entire label to follow line angle
                 flags = QgsLabeling.LinePlacementFlags()
                 flags |= QgsLabeling.LinePlacementFlag.OnLine
                 flags |= QgsLabeling.LinePlacementFlag.MapOrientation
@@ -488,12 +483,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
                 
-                logger.info(f"Configured line placement for {layer.name()}")
+                logger.info(f"Configured line placement with rotation for {layer.name()}")
             
             # Deduplicate labels: only show label on first feature with each unique label value
             # This ensures each label text appears only once per layer (per region when filtered)
-            # Can be disabled per-layer with 'deduplicate_labels': false
-            if layer_config.get('deduplicate_labels', True):
+            # Can be enabled per-layer with 'deduplicate_labels': true
+            if layer_config.get('deduplicate_labels', False):
                 # Only apply if the label attribute is not NULL/empty
                 dedup_expr = f'("{label_attr}" IS NOT NULL AND "{label_attr}" != \'\') AND ($id = minimum($id, group_by:="{label_attr}"))'
                 pal_settings.dataDefinedProperties().setProperty(
