@@ -489,7 +489,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             # This ensures each label text appears only once per layer (per region when filtered)
             # Can be enabled per-layer with 'deduplicate_labels': true
             if layer_config.get('deduplicate_labels', False):
-                # Only apply if the label attribute is not NULL/empty
+                # Only apply if the label attribute is not NULL/empty, and deduplicate
                 dedup_expr = f'("{label_attr}" IS NOT NULL AND "{label_attr}" != \'\') AND ($id = minimum($id, group_by:="{label_attr}"))'
                 pal_settings.dataDefinedProperties().setProperty(
                     QgsPalLayerSettings.Show,
@@ -497,13 +497,13 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 )
                 logger.debug(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
             else:
-                # Just check for non-empty labels
+                # Just check for non-empty labels (no deduplication)
                 show_expr = f'"{label_attr}" IS NOT NULL AND "{label_attr}" != \'\''
                 pal_settings.dataDefinedProperties().setProperty(
                     QgsPalLayerSettings.Show,
                     QgsProperty.fromExpression(show_expr)
                 )
-                logger.debug(f"Label deduplication disabled for {layer.name()}, showing all non-empty labels")
+                logger.debug(f"Showing all non-empty labels for {layer.name()} (no deduplication)")
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
