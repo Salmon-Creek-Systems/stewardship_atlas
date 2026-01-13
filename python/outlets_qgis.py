@@ -458,18 +458,26 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             text_format.setFont(font)
             pal_settings.setFormat(text_format)
             
-            # For linestrings, enable placement along the line
+            # For linestrings, configure label placement
             if geometry_type == 'linestring':
-                # Use Line placement - labels rotate to follow line direction but remain straight
-                # (as opposed to Curved placement where individual characters curve)
+                # Use Line placement for linestrings
                 pal_settings.placement = QgsPalLayerSettings.Line
                 
-                # Set placement flags to rotate labels along line orientation
-                # OnLine = place on the line, MapOrientation = rotate entire label to follow line angle
-                flags = QgsLabeling.LinePlacementFlags()
-                flags |= QgsLabeling.LinePlacementFlag.OnLine
-                flags |= QgsLabeling.LinePlacementFlag.MapOrientation
-                pal_settings.lineSettings().setPlacementFlags(flags)
+                # Optional rotation: can be enabled per-layer with 'rotate_labels': true
+                if layer_config.get('rotate_labels', False):
+                    # Set placement flags to rotate labels along line orientation
+                    # OnLine = place on the line, MapOrientation = rotate entire label to follow line angle
+                    flags = QgsLabeling.LinePlacementFlags()
+                    flags |= QgsLabeling.LinePlacementFlag.OnLine
+                    flags |= QgsLabeling.LinePlacementFlag.MapOrientation
+                    pal_settings.lineSettings().setPlacementFlags(flags)
+                    logger.info(f"Configured line placement with rotation for {layer.name()}")
+                else:
+                    # No rotation - labels stay horizontal
+                    flags = QgsLabeling.LinePlacementFlags()
+                    flags |= QgsLabeling.LinePlacementFlag.OnLine
+                    pal_settings.lineSettings().setPlacementFlags(flags)
+                    logger.info(f"Configured line placement (horizontal) for {layer.name()}")
                 
                 # Optional: Repeat labels along long lines (off by default)
                 repeat_distance = layer_config.get('label_repeat_distance', 0)
@@ -482,8 +490,6 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 # A small negative value shifts the label's baseline down
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
-                
-                logger.info(f"Configured line placement with rotation for {layer.name()}")
             
             # Deduplicate labels: only show label on first feature with each unique label value
             # This ensures each label text appears only once per layer (per region when filtered)
