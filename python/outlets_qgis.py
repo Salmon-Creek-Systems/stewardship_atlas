@@ -505,7 +505,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     QgsPalLayerSettings.Show,
                     QgsProperty.fromExpression(dedup_expr)
                 )
-                logger.debug(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
+                logger.info(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
             else:
                 # Just check for non-empty labels (no deduplication)
                 show_expr = f'"{label_attr}" IS NOT NULL AND "{label_attr}" != \'\''
@@ -513,7 +513,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     QgsPalLayerSettings.Show,
                     QgsProperty.fromExpression(show_expr)
                 )
-                logger.debug(f"Showing all non-empty labels for {layer.name()} (no deduplication)")
+
+                logger.info(f"Label deduplication disabled for {layer.name()}, showing all non-empty labels")
+
             
             # Apply labeling
             labeling = QgsVectorLayerSimpleLabeling(pal_settings)
