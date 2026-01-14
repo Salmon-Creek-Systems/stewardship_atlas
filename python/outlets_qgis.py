@@ -469,17 +469,18 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 
                 # Optional rotation: can be enabled per-layer with 'rotate_labels': true
                 if layer_config.get('rotate_labels', False):
-                    # Set placement flags to rotate labels along line orientation
-                    # OnLine = place on the line, MapOrientation = rotate entire label to follow line angle
+                    # Rotate labels to follow line direction - use OnLine flag ONLY
+                    # (MapOrientation actually PREVENTS rotation, keeping labels horizontal)
                     flags = QgsLabeling.LinePlacementFlags()
                     flags |= QgsLabeling.LinePlacementFlag.OnLine
-                    flags |= QgsLabeling.LinePlacementFlag.MapOrientation
                     pal_settings.lineSettings().setPlacementFlags(flags)
                     logger.info(f"Configured line placement with rotation for {layer.name()}")
                 else:
-                    # No rotation - labels stay horizontal
+                    # Keep labels horizontal - use MapOrientation flag
+                    # MapOrientation = keep labels aligned with map coordinates (horizontal)
                     flags = QgsLabeling.LinePlacementFlags()
                     flags |= QgsLabeling.LinePlacementFlag.OnLine
+                    flags |= QgsLabeling.LinePlacementFlag.MapOrientation
                     pal_settings.lineSettings().setPlacementFlags(flags)
                     logger.info(f"Configured line placement (horizontal) for {layer.name()}")
                 
