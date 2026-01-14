@@ -1,0 +1,205 @@
+{
+    "dem": {
+        "type": "inlet",
+        "out_layer": "elevation",
+        "config_def": "opentopo_dem"
+    },
+    "gdal_contours": {
+        "type": "eddy",            
+        "in_layer": "elevation",
+        "out_layer": "contours",
+        "config_def": "gdal_contours"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "elevation",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+"public_buildings" : {
+    "type": "inlet",
+    "out_layer": "buildings",
+    "config_def": "overture_buildings"
+    },
+"public_addresses" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "overture_addresses"
+},
+"oa_parcels" : {
+    "type": "inlet",
+    "out_layer": "parcels",
+    "config_def": "local_parcels"
+},
+"local_tsunami" : {
+    "type": "inlet",
+    "out_layer": "tsunami",
+    "config_def": "local_tsunami"
+},
+
+    "public_roads" : {
+        "type": "inlet",
+        "out_layer": "roads_secondary",
+        "config_def": "overture_roads"
+    },
+    "internal_roads_primary" : {
+        "type": "inlet",
+        "inpath_template": "westport_primary_roads.geojson",
+        "out_layer": "roads_primary",
+        "config_def": "internal_roads"
+    },
+    "internal_roads_secondary" : {
+        "type": "inlet",
+        "out_layer": "roads_secondary",
+        "config_def": "internal_roads"
+    },
+    "internal_roads_tertiary" : {
+        "type": "inlet",
+        "out_layer": "roads_tertiary",
+        "config_def": "internal_roads"
+    },
+
+"public_creeks" : {
+        "type": "inlet",
+        "out_layer": "creeks",
+        "config_def": "nhd_creeks",
+        "filter": [
+            ["require", "fcode_description", ["Stream/River: Hydrographic Category = Perennial"]]
+        ]
+    },
+    "local_hillshade" : {
+        "type": "inlet",
+        "out_layer": "lidar_basemap",
+        "config_def": "local_hillshade"
+    },
+    "opentopo_dem" : {
+        "type": "inlet",
+        "out_layer": "basemap",
+        "config_def": "opentopo_dem"
+    },
+"local_helilandings" : {
+    "type": "inlet",
+    "out_layer": "helilandings",
+    "config_def": "local_helilandings"
+},
+"local_incidents" : {
+    "type": "inlet",
+    "out_layer": "incidents",
+    "config_def": "local_incidents"
+},
+    "local_hydrants" : {
+        "type": "inlet",
+        "out_layer": "hydrants",
+        "config_def": "local_hydrants"
+    },
+"local_campgrounds" : {
+    "type": "inlet",
+    "out_layer": "campgrounds",
+    "config_def": "local_campgrounds"
+    },
+
+    "local_turnouts" : {
+        "type": "inlet",
+        "out_layer": "turnouts",
+        "config_def": "local_turnouts"
+    },
+"local_milemarkers" : {
+    "type": "inlet",
+    "out_layer": "milemarkers",
+    "config_def": "local_milemarkers"
+},
+"webmap" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "sites", "tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural", "helilandings", "incidents", "hydrants", "campgrounds"],
+    "config_def": "webmap",
+    "access": ["internal", "admin"]
+},
+"webedit" : {
+    "type": "outlet",
+    "name": "webmap",
+    "in_layers": ["basemap", "regions", "tsunami", "parcels", "contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural", "campgrounds"],
+    "config_def": "webedit"
+},
+    "config_edit" : {
+	"type": "outlet",
+	"name": "config_edit",
+	"access": ["technical"],
+	"interaction": "interface",
+	"config_def": "config_editor"
+},
+"internal_webmap" : {
+        "type": "outlet",
+        "name": "internal_webmap",
+        "in_layers": ["basemap", "regions",  "roads_primary", "roads_secondary"],
+        "config_def": "webmap",
+        "access": ["technical"]
+    },
+"runbook": {
+        "type": "outlet",
+        "name": "runbook",
+        "in_layers": ["basemap", "contours", "roads_primary", 
+        "creeks", "buildings",  "helilandings", "milemarkers", "hydrants", 
+        "campgrounds", "roads_secondary", "roads_tertiary"],
+        "access": ["internal", "admin"],
+    "config_def": "runbook",
+    "feature_scale": 0.2,
+    "blend_percent": 50,
+         "regions" : [
+            {"bbox": {
+                "east": -121.19978063408502,
+                "west": -121.20391109005016,
+                "south": 39.23863749098538,
+                "north": 39.24416744687048},
+            "name": "RockLoop",
+            "caption": "Double loop with Ginger and big rocks.",
+            "vectors": [],
+            "raster": "",
+            "text": "Hwy20 to the County Lnie"},
+            {"bbox": {
+                "east": -121.19978063408502,
+                "west": -121.20391109005016,
+                "south": 39.23863749098538,
+                "north": 39.24416744687048},
+            "name": "GolfCourses",
+            "caption": "Golf Courses",
+            "vectors": [],
+            "raster": "",
+            "text": "Golf Courses"}]
+
+},
+"html": {
+        "type": "outlet",
+        "name": "html",
+         "config_def": "static_html"},
+"sqldb": {
+    "type": "outlet",
+    "name": "sqldb",
+    "layers": ["basemap", "roads_secondary", "creeks"]
+},
+"sqlquery": {
+    "type": "outlet",
+    "name": "sqlquery",
+    "config_def": "sqlquery",
+    "access": ["technical"]
+},
+    "spreadsheet_export" : {
+	"type": "outlet",
+	"name": "spreadsheet_export",
+	"config_def": "gsheet_export",
+	"in_layers": ["helilandings", "hydrants", "milemarkers"]
+    },
+    "gazetteer": {
+	"type": "outlet",
+	"name": "gazetteer",
+	"config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
+    },
+    "qgis_runbook": {
+	"type": "outlet",
+	"name": "qgis_runbook",
+	"access": ["technical"],
+	"config_def": "qgis_runbook",
+	"regions_layer": "regions",
+	"in_layers": ["basemap", "tsunami","contours", "roads_primary", "roads_secondary", "roads_tertiary", "milemarkers", "creeks", "buildings", "natural"]
+    }
+}

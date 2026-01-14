@@ -1,0 +1,122 @@
+[
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"],
+     "fill_opacity": 0.2,
+    "editable_columns": [
+        {"name": "name", "type": "string", "default": "unique name" },
+        {"name": "description", "type": "string", "default": "Text describing the region" },
+        {"name": "caption", "type": "string", "default": "Displayed Title" }
+    ]   
+},
+    {"name": "sites", "geometry_type": "polygon", "color": [0, 150, 255], "interaction": "interface", "access": ["admin"],
+     "fill_opacity": 0.2,
+    "editable_columns": [
+        {"name": "name", "type": "string", "default": "unique name" },
+        {"name": "description", "type": "string", "default": "Text describing the region" },
+        {"name": "caption", "type": "string", "default": "Displayed Title" },
+        {"name": "URL", "type": "string", "default": "" }
+    ]   
+},
+    {"name": "tsunami_fillcolor", "geometry_type": "polygon", "color": [0,0,255], "fill_color": "none", "fill_opacity": 0.15},
+    {"name": "tsunami", "geometry_type": "polygon", "fill_color": [0, 0, 250], "fill_opacity": 0.2},
+    {"name": "elevation", "geometry_type": "raster"},
+    {"name": "contours", "geometry_type": "linestring", "color": [50, 200, 50],
+        "vis" : {"minzoom": 14, "maxzoom": 22}},
+    {"name": "basemap", "geometry_type": "raster"},
+    {"name": "lidar_basemap", "geometry_type": "raster"},
+    {"name": "roads_primary", "geometry_type": "linestring", 
+        "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+     "vis": {"minzoom": 10, "maxzoom": 22},
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" },
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [ 
+                    {"STREETTYPE": "RD", "vector_width": 10},
+                    {"STREETTYPE": "ST", "vector_width": 10},
+                    {"STREETTYPE": "Other", "vector_width": 10}
+                ],
+              "default": {"STREETTYPE": "RD", "vector_width": 8}
+            }]},
+    {"name": "roads_secondary", "geometry_type": "linestring", 
+        "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+     "vis": {"minzoom": 13, "maxzoom": 22},
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" },
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [ 
+                    {"STREETTYPE": "RD", "vector_width": 7},
+                    {"STREETTYPE": "ST", "vector_width": 7},
+                    {"STREETTYPE": "Other", "vector_width": 7}
+                ],
+              "default": {"STREETTYPE": "RD", "vector_width": 7}
+            }]},
+    {"name": "roads_tertiary", "geometry_type": "linestring", 
+        "color": [100, 55, 50], "add_labels": true, "interaction": "interface", "vector_width":true,
+     "vis": {"minzoom": 16, "maxzoom": 22},
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" },
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [ 
+                    {"STREETTYPE": "RD", "vector_width": 5},
+                    {"STREETTYPE": "ST", "vector_width": 5},
+                    {"STREETTYPE": "Other", "vector_width": 5}
+                ],
+              "default": {"STREETTYPE": "RD", "vector_width": 5}
+            }]},
+    {"name": "creeks", 
+    "geometry_type": "linestring", 
+    "add_labels": true, 
+    "color": [50, 50, 200], 
+    "interaction": "interface", 
+    "vector_width":true,
+    "label_repeat_distance": 1000,
+    "deduplicate_labels": true,
+    "rotate_labels": false,
+    "labels_avoid_features": false,
+    "avoid_label_collisions": true,
+            "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" }]},
+    {"name": "campgrounds", "geometry_type": "point", "color": [0, 0, 255], "add_labels": true,"add_labels": true,
+     "symbol": {"png": "tent.png", "icon": "basic/triangle"},
+     "vis": {"minzoom": 17, "maxzoom": 22},
+     "icon-size": 0.05,
+     "interaction": "interface",
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "Road" }]},
+    {"name": "milemarkers", "geometry_type": "point", "color": [0, 200, 0], "add_labels": true,
+          "vis": {"minzoom": 13, "maxzoom": 22},
+        "symbol" : {"png": "milemarker.png", "icon": "basic/marker"},
+        "icon-size": 3.0, "icon-anchor": "bottom","vis" : {"minzoom": 14, "maxzoom": 22}},
+    {"name": "helilandings", "geometry_type": "point", "color": [0, 255, 0], "add_labels": true,
+     "vis" : {"minzoom": 14, "maxzoom": 22}, 
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "Road" }],
+        "symbol": {"png": "helipad.png", "icon": "custom/helipad"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
+    {"name": "incidents", "geometry_type": "point", "color": [255, 100, 0], "add_labels": true,
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Incident" }],
+        "symbol": {"png": "incident.png", "icon": "basic/pushpin"}, "icon-size": 3.0, "access": [ "internal", "admin"], "interaction": "interface"},
+    {"name": "hydrants", "geometry_type": "point", "color": [0, 0, 255], 
+        "vis" : {"minzoom": 15, "maxzoom": 22}, "add_labels": true,
+        "symbol": {"png": "hydrant.png", "icon": "custom/hydrant"},
+        "icon-size": 3.0,
+        "interaction": "interface",
+                    "editable_columns": [
+                {"name": "name", "type": "string", "default": "Road" }]},
+    {"name": "natural", "geometry_type": "point", "color": [0, 200, 55], "add_labels": true,
+     "icon-size": 0.05,
+     "interaction": "interface"},    
+    {"name": "buildings", "geometry_type": "polygon", 
+     "color": [0, 0, 0], "fill_color": [100,100,100], 
+     "add_labels": true, "interaction": "interface",
+     "vis" : {"minzoom": 14, "maxzoom": 22},
+     "editable_columns": [   
+            {"name": "name", "type": "string", "default": "Road" }]},
+    {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
+    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
+]
