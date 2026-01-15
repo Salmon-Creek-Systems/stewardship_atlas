@@ -510,14 +510,15 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             
             # Add spatial filtering if max_labels is set (ensures even distribution)
             if max_labels is not None:
-                # Use spatial grid hash to deterministically sample features across the map
-                # This prevents clustering by spreading selection based on coordinates
-                grid_size = 100  # Map units - creates spatial grid for sampling
-                spatial_hash = f'(abs(to_int($x / {grid_size}) * 73856093 + to_int($y / {grid_size}) * 19349663) % 100)'
-                # Show labels where spatial hash is less than threshold (adjusts sampling density)
-                sampling_percent = 20  # Show roughly 20% of features - adjust as needed
-                show_expr_parts.append(f'({spatial_hash} < {sampling_percent})')
-                logger.info(f"Applied spatial grid sampling to {layer.name()} for even distribution")
+                # Use feature ID-based sampling instead of spatial grid
+                # This is simpler and works regardless of coordinate system
+                # Spreads selection by using modulo of feature ID
+                # Adjust the modulo divisor to control sampling rate
+                # For ~20% sampling: show where ($id % 5) = 0
+                # For ~10% sampling: show where ($id % 10) = 0
+                sampling_rate = 5  # Show every 5th feature (~20%)
+                show_expr_parts.append(f'($id % {sampling_rate} = 0)')
+                logger.info(f"Applied ID-based sampling (1 in {sampling_rate}) to {layer.name()} for distribution")
             
             # Add deduplication if enabled
             if layer_config.get('deduplicate_labels', False):
