@@ -501,13 +501,31 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
         overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
         
-        # Set extent to show all regions (coverage layer extent)
-        overview_map.setExtent(coverage_layer.extent())
+        # Set extent to show all regions (coverage layer extent with 10% buffer)
+        extent = coverage_layer.extent()
+        extent.scale(1.1)  # Add 10% buffer around all regions
+        overview_map.setExtent(extent)
         overview_map.setCrs(map_item.crs())  # Use same CRS as main map
         
-        # Keep layer set same as main map but could filter to just show regions/basemap
-        overview_map.setKeepLayerSet(True)
-        overview_map.setLayers(map_item.layers())  # Same layers as main map
+        # Get project to access layers
+        project = layout.project()
+        
+        # Set layers for overview - show basemap and regions only (simpler view)
+        overview_layers = []
+        for layer in project.mapLayers().values():
+            layer_name = layer.name().lower()
+            # Only show basemap and regions layer in overview
+            if 'basemap' in layer_name or 'region' in layer_name:
+                overview_layers.append(layer)
+        
+        if overview_layers:
+            overview_map.setKeepLayerSet(True)
+            overview_map.setLayers(overview_layers)
+            logger.info(f"Overview map showing {len(overview_layers)} layers: {[l.name() for l in overview_layers]}")
+        else:
+            # Fallback: show all layers if we can't find basemap/regions
+            overview_map.setKeepLayerSet(False)
+            logger.warning("Could not find basemap/regions for overview, showing all layers")
         
         # Add border to overview map
         overview_map.setFrameEnabled(True)
@@ -522,27 +540,30 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             overview_stack = overview_map.overviews()
             
             # Add a new overview
-            overview = overview_stack.addOverview("Current Region")
+            overview_item = overview_stack.addOverview("Current Region")
             
-            # Link to the main detail map
-            overview.setLinkedMap(map_item)
+            # Link to the main detail map (so it shows detail map's extent)
+            overview_item.setLinkedMap(map_item)
             
-            # Enable and configure the overview
-            overview.setEnabled(True)
+            # Enable the overview
+            overview_item.setEnabled(True)
             
             # Style the extent frame - red outline to show current region
-            overview.setFrameSymbol(QgsFillSymbol.createSimple({
-                'color': '255,0,0,0',  # Transparent fill
-                'outline_color': '255,0,0,255',  # Red outline
-                'outline_width': '0.5',
+            # Use simple symbol properties
+            fill_symbol = QgsFillSymbol.createSimple({
+                'color': '255,0,0,50',  # Semi-transparent red fill
+                'outline_color': '255,0,0,255',  # Solid red outline
+                'outline_width': '0.8',
                 'outline_style': 'solid'
-            }))
+            })
+            overview_item.setFrameSymbol(fill_symbol)
             
-            logger.info("Added overview map to collar showing current page location")
+            logger.info("Added overview map to collar with extent indicator")
             
         except Exception as e:
             logger.warning(f"Could not add overview frame: {e}")
-            # Overview map will still show, just without the extent indicator
+            import traceback
+            logger.warning(traceback.format_exc())
 
 
 def export_atlas(layout, output_dir, atlas_name):
