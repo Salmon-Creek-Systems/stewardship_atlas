@@ -539,8 +539,8 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             # Access the overview stack for this map
             overview_stack = overview_map.overviews()
             
-            # Add a new overview
-            overview_item = overview_stack.addOverview("Current Region")
+            # Add a new overview (no arguments - returns a new QgsLayoutItemMapOverview)
+            overview_item = overview_stack.addOverview()
             
             # Link to the main detail map (so it shows detail map's extent)
             overview_item.setLinkedMap(map_item)
