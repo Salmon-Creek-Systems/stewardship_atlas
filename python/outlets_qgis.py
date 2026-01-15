@@ -443,6 +443,14 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             pal_settings.obstacleSettings().setIsObstacle(labels_avoid_features)
             logger.debug(f"Label-feature collision avoidance: {labels_avoid_features}")
             
+            # Limit number of labels (useful for dense point layers like milemarkers)
+            # Can be set per-layer with 'max_labels': <number>
+            max_labels = layer_config.get('max_labels', None)
+            if max_labels is not None:
+                pal_settings.limitNumLabels = True
+                pal_settings.maxNumLabels = int(max_labels)
+                logger.info(f"Limited {layer.name()} to maximum {max_labels} labels")
+            
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
             
