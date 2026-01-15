@@ -449,18 +449,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             if max_labels is not None:
                 pal_settings.limitNumLabels = True
                 pal_settings.maxNumLabels = int(max_labels)
-                
-                # Use spatial-based priority to encourage even distribution
-                # This creates a pseudo-random priority based on coordinates so labels
-                # are sampled evenly across the map rather than all from one area
-                # Using modulo of a spatial hash to create values between 0-10
-                priority_expr = '(abs(to_int($x * 1000) + to_int($y * 1000)) % 10000) / 1000.0'
-                pal_settings.dataDefinedProperties().setProperty(
-                    QgsPalLayerSettings.Priority,
-                    QgsProperty.fromExpression(priority_expr)
-                )
-                
-                logger.info(f"Limited {layer.name()} to maximum {max_labels} labels with spatial distribution")
+                logger.info(f"Limited {layer.name()} to maximum {max_labels} labels")
             
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
@@ -515,26 +504,35 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 pal_settings.dist = -5  # Negative to shift down for vertical centering
                 pal_settings.distUnits = QgsUnitTypes.RenderPoints
             
-            # Deduplicate labels: only show label on first feature with each unique label value
-            # This ensures each label text appears only once per layer (per region when filtered)
-            # Can be enabled per-layer with 'deduplicate_labels': true
+            # Build Show expression (controls which labels are displayed)
+            # Start with base expression: label attribute is not NULL/empty
+            show_expr_parts = [f'"{label_attr}" IS NOT NULL AND "{label_attr}" != \'\'']
+            
+            # Add spatial filtering if max_labels is set (ensures even distribution)
+            if max_labels is not None:
+                # Use spatial grid hash to deterministically sample features across the map
+                # This prevents clustering by spreading selection based on coordinates
+                grid_size = 100  # Map units - creates spatial grid for sampling
+                spatial_hash = f'(abs(to_int($x / {grid_size}) * 73856093 + to_int($y / {grid_size}) * 19349663) % 100)'
+                # Show labels where spatial hash is less than threshold (adjusts sampling density)
+                sampling_percent = 20  # Show roughly 20% of features - adjust as needed
+                show_expr_parts.append(f'({spatial_hash} < {sampling_percent})')
+                logger.info(f"Applied spatial grid sampling to {layer.name()} for even distribution")
+            
+            # Add deduplication if enabled
             if layer_config.get('deduplicate_labels', False):
-                # Only apply if the label attribute is not NULL/empty, and deduplicate
-                dedup_expr = f'("{label_attr}" IS NOT NULL AND "{label_attr}" != \'\') AND ($id = minimum($id, group_by:="{label_attr}"))'
-                pal_settings.dataDefinedProperties().setProperty(
-                    QgsPalLayerSettings.Show,
-                    QgsProperty.fromExpression(dedup_expr)
-                )
+                # Only show first occurrence of each unique label value
+                show_expr_parts.append(f'($id = minimum($id, group_by:="{label_attr}"))')
                 logger.info(f"Enabled label deduplication for {layer.name()} on attribute: {label_attr}")
             else:
-                # Just check for non-empty labels (no deduplication)
-                show_expr = f'"{label_attr}" IS NOT NULL AND "{label_attr}" != \'\''
-                pal_settings.dataDefinedProperties().setProperty(
-                    QgsPalLayerSettings.Show,
-                    QgsProperty.fromExpression(show_expr)
-                )
-
                 logger.info(f"Label deduplication disabled for {layer.name()}, showing all non-empty labels")
+            
+            # Combine all conditions with AND
+            show_expr = ' AND '.join(show_expr_parts)
+            pal_settings.dataDefinedProperties().setProperty(
+                QgsPalLayerSettings.Show,
+                QgsProperty.fromExpression(show_expr)
+            )
 
             
             # Apply labeling
