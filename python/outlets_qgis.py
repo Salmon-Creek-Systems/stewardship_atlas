@@ -449,7 +449,18 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             if max_labels is not None:
                 pal_settings.limitNumLabels = True
                 pal_settings.maxNumLabels = int(max_labels)
-                logger.info(f"Limited {layer.name()} to maximum {max_labels} labels")
+                
+                # Use spatial-based priority to encourage even distribution
+                # This creates a pseudo-random priority based on coordinates so labels
+                # are sampled evenly across the map rather than all from one area
+                # Using modulo of a spatial hash to create values between 0-10
+                priority_expr = '(abs(to_int($x * 1000) + to_int($y * 1000)) % 10000) / 1000.0'
+                pal_settings.dataDefinedProperties().setProperty(
+                    QgsPalLayerSettings.Priority,
+                    QgsProperty.fromExpression(priority_expr)
+                )
+                
+                logger.info(f"Limited {layer.name()} to maximum {max_labels} labels with spatial distribution")
             
             # Text format - MUST be set before placement settings
             text_format = QgsTextFormat()
