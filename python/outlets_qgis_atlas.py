@@ -497,6 +497,9 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_x = page_width - margin - overview_size - 2
         overview_y = collar_content_y
         
+        # Get project from layout
+        project = layout.project()
+        
         # Create overview map item
         overview_map = QgsLayoutItemMap(layout)
         overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
@@ -518,9 +521,6 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_map.setCrs(render_crs)  # Use same CRS as main map
         
         logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
-        
-        # Get project to access layers
-        project = layout.project()
         
         # Set layers for overview - show basemap and regions only (simpler view)
         overview_layers = []
