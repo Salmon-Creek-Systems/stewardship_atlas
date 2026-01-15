@@ -503,10 +503,21 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
         
         # Set extent to show all regions (coverage layer extent with 10% buffer)
+        # Transform extent to match the rendering CRS if needed
         extent = coverage_layer.extent()
+        coverage_crs = coverage_layer.crs()
+        render_crs = map_item.crs()
+        
+        if coverage_crs != render_crs:
+            transform = QgsCoordinateTransform(coverage_crs, render_crs, project)
+            extent = transform.transformBoundingBox(extent)
+            logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
+        
         extent.scale(1.1)  # Add 10% buffer around all regions
         overview_map.setExtent(extent)
-        overview_map.setCrs(map_item.crs())  # Use same CRS as main map
+        overview_map.setCrs(render_crs)  # Use same CRS as main map
+        
+        logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
         
         # Get project to access layers
         project = layout.project()
@@ -523,17 +534,29 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             overview_map.setKeepLayerSet(True)
             overview_map.setLayers(overview_layers)
             logger.info(f"Overview map showing {len(overview_layers)} layers: {[l.name() for l in overview_layers]}")
+            # Check if layers are valid
+            for layer in overview_layers:
+                logger.info(f"  - {layer.name()}: valid={layer.isValid()}, extent={layer.extent().toString()}")
         else:
             # Fallback: show all layers if we can't find basemap/regions
             overview_map.setKeepLayerSet(False)
             logger.warning("Could not find basemap/regions for overview, showing all layers")
+        
+        # Ensure the map draws content
+        overview_map.setDrawAnnotations(False)  # Don't draw annotations in overview
+        overview_map.setBackgroundEnabled(True)
+        overview_map.setBackgroundColor(QColor(255, 255, 255))  # White background
         
         # Add border to overview map
         overview_map.setFrameEnabled(True)
         overview_map.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
         overview_map.setFrameStrokeColor(QColor(100, 100, 100))
         
+        # Add to layout first
         layout.addLayoutItem(overview_map)
+        
+        # Force refresh to ensure it renders
+        overview_map.refresh()
         
         # Add overview frame showing current atlas extent on the overview map
         try:
