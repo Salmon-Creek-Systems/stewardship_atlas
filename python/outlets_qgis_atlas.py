@@ -27,6 +27,7 @@ from qgis.core import (
     QgsProject,
     QgsLayoutExporter,
     QgsLayoutItemMap,
+    QgsLayoutItemMapOverview,
     QgsLayoutItemLegend,
     QgsLayoutItemScaleBar,
     QgsLayoutItemLabel,
@@ -536,11 +537,12 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         # Add overview frame showing current atlas extent on the overview map
         try:
-            # Access the overview stack for this map
-            overview_stack = overview_map.overviews()
+            # Create a new overview object
+            overview_item = QgsLayoutItemMapOverview("Current Region", overview_map)
             
-            # Add a new overview (no arguments - returns a new QgsLayoutItemMapOverview)
-            overview_item = overview_stack.addOverview()
+            # Access the overview stack and add the overview
+            overview_stack = overview_map.overviews()
+            overview_stack.addOverview(overview_item)
             
             # Link to the main detail map (so it shows detail map's extent)
             overview_item.setLinkedMap(map_item)
