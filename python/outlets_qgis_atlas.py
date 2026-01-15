@@ -45,7 +45,8 @@ from qgis.core import (
     QgsTextFormat,
     QgsLayerTreeLayer,
     QgsGeometry,
-    QgsPointXY
+    QgsPointXY,
+    QgsFillSymbol
 )
 from qgis.PyQt.QtGui import QColor, QFont
 
@@ -293,20 +294,20 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     
     if enable_collar:
         add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                       margin, collar_height, render_crs)
+                       margin, collar_height, render_crs, coverage_layer)
     
     logger.info(f"Created atlas layout with {coverage_layer.featureCount()} pages")
     return layout
 
 
 def add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                   margin, collar_height, layer_crs):
+                   margin, collar_height, layer_crs, coverage_layer=None):
     """
-    Add map collar with legend, scale bar, CRS info, and region name.
+    Add map collar with legend, scale bar, CRS info, region name, and overview map.
     
     Args:
         layout: QgsPrintLayout
-        map_item: QgsLayoutItemMap
+        map_item: QgsLayoutItemMap (atlas-controlled detail map)
         config: Atlas configuration
         outlet_config: Outlet configuration
         page_width: Page width in mm
@@ -314,6 +315,7 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         margin: Page margin in mm
         collar_height: Collar height in mm
         layer_crs: Map CRS
+        coverage_layer: QgsVectorLayer - regions layer for overview extent (optional)
     """
     map_height = page_height - (2 * margin) - collar_height
     map_width = page_width - (2 * margin)
@@ -487,6 +489,60 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     date_label.adjustSizeToText()
     date_label.setFrameEnabled(False)
     layout.addLayoutItem(date_label)
+    
+    # OVERVIEW MAP (far right): Small map showing location of current page
+    if coverage_layer is not None:
+        overview_size = 20  # mm - square overview map
+        overview_x = page_width - margin - overview_size - 2
+        overview_y = collar_content_y
+        
+        # Create overview map item
+        overview_map = QgsLayoutItemMap(layout)
+        overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
+        overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
+        
+        # Set extent to show all regions (coverage layer extent)
+        overview_map.setExtent(coverage_layer.extent())
+        overview_map.setCrs(map_item.crs())  # Use same CRS as main map
+        
+        # Keep layer set same as main map but could filter to just show regions/basemap
+        overview_map.setKeepLayerSet(True)
+        overview_map.setLayers(map_item.layers())  # Same layers as main map
+        
+        # Add border to overview map
+        overview_map.setFrameEnabled(True)
+        overview_map.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
+        overview_map.setFrameStrokeColor(QColor(100, 100, 100))
+        
+        layout.addLayoutItem(overview_map)
+        
+        # Add overview frame showing current atlas extent on the overview map
+        try:
+            # Access the overview stack for this map
+            overview_stack = overview_map.overviews()
+            
+            # Add a new overview
+            overview = overview_stack.addOverview("Current Region")
+            
+            # Link to the main detail map
+            overview.setLinkedMap(map_item)
+            
+            # Enable and configure the overview
+            overview.setEnabled(True)
+            
+            # Style the extent frame - red outline to show current region
+            overview.setFrameSymbol(QgsFillSymbol.createSimple({
+                'color': '255,0,0,0',  # Transparent fill
+                'outline_color': '255,0,0,255',  # Red outline
+                'outline_width': '0.5',
+                'outline_style': 'solid'
+            }))
+            
+            logger.info("Added overview map to collar showing current page location")
+            
+        except Exception as e:
+            logger.warning(f"Could not add overview frame: {e}")
+            # Overview map will still show, just without the extent indicator
 
 
 def export_atlas(layout, output_dir, atlas_name):
