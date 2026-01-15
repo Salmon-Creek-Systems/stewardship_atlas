@@ -667,7 +667,18 @@ def create_region_layout(region, project, config, outlet_name):
         transform = QgsCoordinateTransform(wgs84, layer_crs, project)
         bbox_rect = transform.transformBoundingBox(bbox_rect)
     
-    # Keep original bbox for clipping
+    # Determine the best CRS for rendering (needed for accurate scale bars)
+    # If layer_crs is geographic (degrees), we need to use a projected CRS
+    render_crs = layer_crs
+    if layer_crs.isGeographic():
+        # Use Web Mercator for rendering - it's a good general-purpose projected CRS
+        render_crs = QgsCoordinateReferenceSystem("EPSG:3857")
+        logger.info(f"Layer CRS {layer_crs.authid()} is geographic, using EPSG:3857 for rendering")
+        # Transform bbox to the rendering CRS
+        transform = QgsCoordinateTransform(layer_crs, render_crs, project)
+        bbox_rect = transform.transformBoundingBox(bbox_rect)
+    
+    # Keep original bbox for clipping (in render_crs)
     original_bbox_rect = QgsRectangle(bbox_rect)
     
     # Calculate map frame aspect ratio
@@ -693,7 +704,7 @@ def create_region_layout(region, project, config, outlet_name):
         bbox_rect.setYMaximum(bbox_rect.yMaximum() + height_diff / 2)
     
     map_item.setExtent(bbox_rect)
-    map_item.setCrs(layer_crs)
+    map_item.setCrs(render_crs)
     
     # Apply layout-specific clipping to the original bbox region
     # This clips features at render time for the layout only
@@ -763,26 +774,40 @@ def create_region_layout(region, project, config, outlet_name):
         # First set auto-update to populate the legend
         legend.setAutoUpdateModel(True)
         
-        # Make legend compact
+        # Make legend compact with 2 columns
         legend.setSymbolWidth(4)
         legend.setSymbolHeight(3)
         legend.setLineSpacing(0.5)
+        legend.setColumnCount(2)  # Use 2 columns to save vertical space
+        legend.setColumnSpace(5)  # Space between columns in mm
         
         # Now disable auto-update so we can filter without affecting the map
         legend.setAutoUpdateModel(False)
         
-        # Filter out basemap from legend (only affects legend display, not map)
+        # Filter out basemap and group road layers
         root = legend.model().rootGroup()
         layers_to_remove = []
+        road_layers = []
+        
         for layer in root.children():
             if isinstance(layer, QgsLayerTreeLayer):
                 layer_name = layer.name().lower()
                 if 'basemap' in layer_name:
                     layers_to_remove.append(layer)
+                elif layer_name.startswith('roads_'):
+                    road_layers.append(layer)
         
-        # Remove the collected layers
+        # Remove basemap layers
         for layer in layers_to_remove:
             root.removeChildNode(layer)
+        
+        # Group road layers under a single "Roads" entry (keep only first road layer as representative)
+        if road_layers:
+            # Keep the first road layer and rename it to "Roads"
+            road_layers[0].setName("Roads")
+            # Remove other road layers
+            for layer in road_layers[1:]:
+                root.removeChildNode(layer)
         
         layout.addLayoutItem(legend)
         
@@ -800,14 +825,16 @@ def create_region_layout(region, project, config, outlet_name):
         north_label.setFrameEnabled(False)
         layout.addLayoutItem(north_label)
         
-        # Scale Bar (imperial)
+        # Scale Bar (imperial - feet/miles)
         scale_bar = QgsLayoutItemScaleBar(layout)
         scale_bar.setLinkedMap(map_item)
-        scale_bar.setNumberOfSegments(3)  # Fewer segments to reduce clutter
+        scale_bar.setUnits(QgsUnitTypes.DistanceFeet)  # Explicit imperial units
+        scale_bar.setNumberOfSegments(2)  # Fewer segments to reduce clutter
         scale_bar.setNumberOfSegmentsLeft(0)
         scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
         scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar.setMaximumBarWidth(45)  # mm
+        scale_bar.setMaximumBarWidth(40)  # mm
+        scale_bar.setMinimumBarWidth(20)  # mm
         
         # Set to double box style (USGS traditional)
         scale_bar.setStyle('Double Box')
@@ -815,7 +842,7 @@ def create_region_layout(region, project, config, outlet_name):
         # Make text smaller to prevent overlap
         scale_font = QFont("Arial", 6)
         scale_bar.setFont(scale_font)
-        scale_bar.setNumberOfSegmentsLeft(0)
+        scale_bar.setUnitLabel('ft')  # Show "ft" label
         
         # Position in middle section
         scale_bar.attemptMove(QgsLayoutPoint(scale_x + 15, collar_content_y + 2, QgsUnitTypes.LayoutMillimeters))
@@ -825,14 +852,15 @@ def create_region_layout(region, project, config, outlet_name):
         # Add metric scale bar below imperial
         scale_bar_metric = QgsLayoutItemScaleBar(layout)
         scale_bar_metric.setLinkedMap(map_item)
-        scale_bar_metric.setNumberOfSegments(3)  # Fewer segments
+        scale_bar_metric.setUnits(QgsUnitTypes.DistanceMeters)  # Explicit metric units
+        scale_bar_metric.setNumberOfSegments(2)  # Fewer segments
         scale_bar_metric.setNumberOfSegmentsLeft(0)
-        scale_bar_metric.setUnitsPerSegment(1)
+        scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
         scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar_metric.setMaximumBarWidth(45)
+        scale_bar_metric.setMaximumBarWidth(40)
+        scale_bar_metric.setMinimumBarWidth(20)
         scale_bar_metric.setStyle('Double Box')
-        scale_bar_metric.setUnitLabel('km')
-        scale_bar_metric.setUnits(QgsUnitTypes.DistanceKilometers)
+        scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
         scale_bar_metric.setFont(scale_font)  # Same small font
         scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x + 15, collar_content_y + 10, QgsUnitTypes.LayoutMillimeters))
         scale_bar_metric.setFrameEnabled(False)
@@ -841,9 +869,9 @@ def create_region_layout(region, project, config, outlet_name):
         # RIGHT SECTION (40%): CRS and Attribution
         info_x = margin + (map_width * 0.60) + 5
         
-        # CRS Label
+        # CRS Label (show the rendering CRS, not the source layer CRS)
         crs_label = QgsLayoutItemLabel(layout)
-        crs_text = f"<b>Projection:</b> {layer_crs.description()}<br>({layer_crs.authid()})"
+        crs_text = f"<b>Projection:</b> {render_crs.description()}<br>({render_crs.authid()})"
         crs_label.setText(crs_text)
         crs_label.setFont(QFont("Arial", 7))
         crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
