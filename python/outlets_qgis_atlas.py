@@ -42,12 +42,14 @@ from qgis.core import (
     QgsRectangle,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
+    QgsCoordinateTransformContext,
     QgsMapClippingRegion,
     QgsTextFormat,
     QgsLayerTreeLayer,
     QgsGeometry,
     QgsPointXY,
-    QgsFillSymbol
+    QgsFillSymbol,
+    QgsVectorFileWriter
 )
 from qgis.PyQt.QtGui import QColor, QFont
 
@@ -156,7 +158,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         logger.info(f"Loaded {regions_layer.featureCount()} regions as coverage layer")
         
         # Convert regions to square geometries for better fitting
-        # This ensures they fit nicely in the nearly-square map frame
+        # Use largest dimension and extend the shorter side equally on both sides
+        # This ensures they fit nicely in the nearly-square map frame without cropping
         regions_layer.startEditing()
         for feature in regions_layer.getFeatures():
             bbox = feature.geometry().boundingBox()
@@ -165,8 +168,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             width = bbox.width()
             height = bbox.height()
             
-            # Use the smaller dimension as the square size
-            size = min(width, height)
+            # Use the LARGER dimension as the square size (expands to include everything)
+            size = max(width, height)
             
             # Calculate center
             center_x = bbox.xMinimum() + width / 2
@@ -189,6 +192,25 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         
         regions_layer.commitChanges()
         logger.info(f"Converted {regions_layer.featureCount()} regions to square geometries")
+        
+        # Save squared regions to a new file
+        squared_regions_path = regions_path.parent / "squared_regions.geojson"
+        
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "GeoJSON"
+        options.fileEncoding = "UTF-8"
+        
+        error = QgsVectorFileWriter.writeAsVectorFormatV3(
+            regions_layer,
+            str(squared_regions_path),
+            QgsCoordinateTransformContext(),
+            options
+        )
+        
+        if error[0] == QgsVectorFileWriter.NoError:
+            logger.info(f"✓ Saved squared regions to: {squared_regions_path}")
+        else:
+            logger.warning(f"Could not save squared regions: {error[1]}")
         
         # Create atlas layout
         layout = create_atlas_layout(project, regions_layer, config, outlet_name)
