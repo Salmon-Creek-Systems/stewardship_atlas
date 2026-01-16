@@ -218,6 +218,45 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         else:
             logger.info(f"Regions CRS matches rendering CRS, no reprojection needed")
         
+        # Convert regions to square geometries for better fitting in map frame
+        # Now that regions are in EPSG:3857, squares will be true map-space squares
+        regions_layer.startEditing()
+        
+        for feature in regions_layer.getFeatures():
+            fid = feature.id()
+            bbox = feature.geometry().boundingBox()
+            
+            # Get dimensions (now in meters since we're in EPSG:3857)
+            width = bbox.width()
+            height = bbox.height()
+            
+            # Use the LARGER dimension as the square size (expands to include everything)
+            size = max(width, height)
+            
+            # Calculate center
+            center_x = bbox.xMinimum() + width / 2
+            center_y = bbox.yMinimum() + height / 2
+            
+            # Create square extent centered on the region
+            square_bbox = QgsRectangle(
+                center_x - size / 2,
+                center_y - size / 2,
+                center_x + size / 2,
+                center_y + size / 2
+            )
+            
+            # Create square geometry from the rectangle
+            square_geom = QgsGeometry.fromRect(square_bbox)
+            
+            # Update the feature geometry in the layer
+            regions_layer.changeGeometry(fid, square_geom)
+            
+            region_name = feature.attribute('name') if feature.attribute('name') else f"region_{fid}"
+            logger.info(f"Region '{region_name}': {width:.0f}m x {height:.0f}m -> {size:.0f}m x {size:.0f}m (square)")
+        
+        regions_layer.commitChanges()
+        logger.info(f"✓ Converted {regions_layer.featureCount()} regions to true map-space squares")
+        
         # Create atlas layout
         layout = create_atlas_layout(project, regions_layer, config, outlet_name)
         
