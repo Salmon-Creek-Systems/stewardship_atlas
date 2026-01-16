@@ -457,7 +457,36 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     collar_content_y = collar_y + 2  # 2mm padding from top
     current_y = collar_content_y  # Track vertical position as we add elements
     
-    # LEGEND (top of collar)
+    # REGION NAME (top of collar)
+    region_x = collar_content_x
+    
+    # Region name (using atlas expression)
+    region_label = QgsLayoutItemLabel(layout)
+    region_label.setText("[% attribute(@atlas_feature, 'name') %]")
+    region_font = QFont("Arial", 11, QFont.Bold)
+    region_label.setFont(region_font)
+    region_label.setHAlign(1)  # Center
+    region_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    region_label.attemptResize(QgsLayoutSize(collar_width - 4, 10, QgsUnitTypes.LayoutMillimeters))
+    region_label.setFrameEnabled(False)
+    layout.addLayoutItem(region_label)
+    
+    current_y += 8
+    
+    # North indicator
+    north_label = QgsLayoutItemLabel(layout)
+    north_label.setText("↑ N")
+    north_font = QFont("Arial", 9, QFont.Bold)
+    north_label.setFont(north_font)
+    north_label.setHAlign(1)  # Center
+    north_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    north_label.attemptResize(QgsLayoutSize(collar_width - 4, 8, QgsUnitTypes.LayoutMillimeters))
+    north_label.setFrameEnabled(False)
+    layout.addLayoutItem(north_label)
+    
+    current_y += 10
+    
+    # LEGEND
     legend = QgsLayoutItemLegend(layout)
     legend.setTitle("")
     legend.setLinkedMap(map_item)
@@ -499,37 +528,8 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     layout.addLayoutItem(legend)
     
-    # Move down past legend (estimate ~40mm for legend height)
-    current_y += 40
-    
-    # REGION NAME
-    region_x = collar_content_x
-    
-    # Region name (using atlas expression)
-    region_label = QgsLayoutItemLabel(layout)
-    region_label.setText("[% attribute(@atlas_feature, 'name') %]")
-    region_font = QFont("Arial", 11, QFont.Bold)
-    region_label.setFont(region_font)
-    region_label.setHAlign(1)  # Center
-    region_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    region_label.attemptResize(QgsLayoutSize(collar_width - 4, 10, QgsUnitTypes.LayoutMillimeters))
-    region_label.setFrameEnabled(False)
-    layout.addLayoutItem(region_label)
-    
-    current_y += 8
-    
-    # North indicator
-    north_label = QgsLayoutItemLabel(layout)
-    north_label.setText("↑ N")
-    north_font = QFont("Arial", 9, QFont.Bold)
-    north_label.setFont(north_font)
-    north_label.setHAlign(1)  # Center
-    north_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    north_label.attemptResize(QgsLayoutSize(collar_width - 4, 8, QgsUnitTypes.LayoutMillimeters))
-    north_label.setFrameEnabled(False)
-    layout.addLayoutItem(north_label)
-    
-    current_y += 10
+    # Move down past legend (estimate ~35mm for legend height)
+    current_y += 35
     
     # SCALE BARS (stacked vertically)
     scale_x = collar_content_x
@@ -643,8 +643,8 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             extent = transform.transformBoundingBox(extent)
             logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
         
-        # Add significant buffer (30%) to ensure everything fits and looks good
-        extent.scale(1.3)
+        # Add generous buffer (80%) to show full atlas context
+        extent.scale(1.8)
         
         # Adjust extent to be square (match the square overview map item)
         # This prevents distortion
