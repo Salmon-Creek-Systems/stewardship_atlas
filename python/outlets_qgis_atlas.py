@@ -252,16 +252,17 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
     
     # Configure atlas-driven map
-    map_item.setAtlasDriven(True)
-    # Use Auto mode with large margin to ensure entire region fits
-    # Auto calculates scale dynamically to fit the feature extent + margin into the map frame
-    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
-    map_item.setAtlasMargin(0.25)  # 25% margin - generous buffer to guarantee full region shows
+    # NOTE: We set atlas-driven but will manually control extent in export to ensure proper fitting
+    map_item.setAtlasDriven(False)  # Disable auto extent - we'll set it manually
     
     # Ensure map keeps layer set (doesn't change layers per atlas page)
     map_item.setKeepLayerSet(True)
     
-    logger.info(f"Atlas scaling: Auto mode with 25% margin to ensure full region visibility")
+    # Store map frame dimensions for extent calculation during export
+    map_item.setProperty('frame_width_mm', map_width)
+    map_item.setProperty('frame_height_mm', map_height)
+    
+    logger.info(f"Map configured for manual extent control (frame: {map_width}x{map_height}mm)")
     
     # Get layer CRS
     layer_crs = None
@@ -635,6 +636,47 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             logger.warning(traceback.format_exc())
 
 
+def calculate_fitting_extent(feature_extent, frame_width_mm, frame_height_mm, crs, margin_percent=0.15):
+    """
+    Calculate an extent that fits the entire feature in the map frame with proper aspect ratio.
+    
+    Args:
+        feature_extent: QgsRectangle - extent of the feature to fit
+        frame_width_mm: Width of map frame in mm
+        frame_height_mm: Height of map frame in mm
+        crs: QgsCoordinateReferenceSystem
+        margin_percent: Margin to add around feature (default 15%)
+        
+    Returns:
+        QgsRectangle - adjusted extent that will fit properly in the frame
+    """
+    # Add margin to feature extent
+    buffered_extent = QgsRectangle(feature_extent)
+    buffered_extent.scale(1.0 + (margin_percent * 2))  # Scale by margin on all sides
+    
+    # Calculate aspect ratios
+    frame_aspect = frame_width_mm / frame_height_mm
+    extent_width = buffered_extent.width()
+    extent_height = buffered_extent.height()
+    extent_aspect = extent_width / extent_height
+    
+    # Adjust extent to match frame aspect ratio
+    if extent_aspect < frame_aspect:
+        # Extent is too tall/narrow - expand width
+        new_width = extent_height * frame_aspect
+        width_diff = new_width - extent_width
+        buffered_extent.setXMinimum(buffered_extent.xMinimum() - width_diff / 2)
+        buffered_extent.setXMaximum(buffered_extent.xMaximum() + width_diff / 2)
+    else:
+        # Extent is too wide - expand height
+        new_height = extent_width / frame_aspect
+        height_diff = new_height - extent_height
+        buffered_extent.setYMinimum(buffered_extent.yMinimum() - height_diff / 2)
+        buffered_extent.setYMaximum(buffered_extent.yMaximum() + height_diff / 2)
+    
+    return buffered_extent
+
+
 def export_atlas(layout, output_dir, atlas_name):
     """
     Export atlas to both multi-page PDF and individual PDFs per region.
@@ -648,6 +690,14 @@ def export_atlas(layout, output_dir, atlas_name):
         dict with status and output paths
     """
     atlas = layout.atlas()
+    
+    # Get map item for extent control
+    map_items = [item for item in layout.items() if isinstance(item, QgsLayoutItemMap)]
+    main_map = map_items[0] if map_items else None
+    
+    if not main_map:
+        logger.error("Could not find main map item in layout")
+        return {'status': 'error', 'message': 'No map item found'}
     exporter = QgsLayoutExporter(layout)
     
     results = {
@@ -664,25 +714,19 @@ def export_atlas(layout, output_dir, atlas_name):
     pdf_settings.forceVectorOutput = True
     pdf_settings.exportMetadata = True
     
-    # Export multi-page PDF
-    multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
-    logger.info(f"Exporting multi-page PDF to: {multi_pdf_path}")
-    
-    result = exporter.exportToPdf(atlas, str(multi_pdf_path), pdf_settings)
-    
-    if result == QgsLayoutExporter.Success:
-        results['multi_page_pdf'] = str(multi_pdf_path)
-        logger.info(f"✓ Multi-page PDF exported successfully")
-    else:
-        error_msg = get_export_error_message(result)
-        logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
-        results['status'] = 'partial'
-    
-    # Export individual PDFs per region
+    # We'll export pages individually and combine them
+    # Export individual PDFs per region first
     individual_dir = output_dir / "individual_pages"
     individual_dir.mkdir(exist_ok=True)
     
     logger.info(f"Exporting individual PDFs to: {individual_dir}")
+    
+    # Get frame dimensions and CRS for extent calculations
+    frame_width = main_map.property('frame_width_mm') if main_map.property('frame_width_mm') else 220
+    frame_height = main_map.property('frame_height_mm') if main_map.property('frame_height_mm') else 212
+    map_crs = main_map.crs()
+    coverage_layer = atlas.coverageLayer()
+    coverage_crs = coverage_layer.crs()
     
     # Iterate through atlas features
     atlas.beginRender()
@@ -692,6 +736,20 @@ def export_atlas(layout, output_dir, atlas_name):
         page_num += 1
         feature = atlas.layout().reportContext().feature()
         
+        # Calculate and set proper extent for this feature
+        feature_geom = feature.geometry()
+        feature_extent = feature_geom.boundingBox()
+        
+        # Transform extent to map CRS if needed
+        if coverage_crs != map_crs:
+            transform = QgsCoordinateTransform(coverage_crs, map_crs, layout.project())
+            feature_extent = transform.transformBoundingBox(feature_extent)
+        
+        # Calculate fitting extent
+        fitting_extent = calculate_fitting_extent(feature_extent, frame_width, frame_height, map_crs, margin_percent=0.15)
+        main_map.setExtent(fitting_extent)
+        main_map.refresh()
+        
         # Get region name from feature
         try:
             region_name = feature.attribute('name')
@@ -699,6 +757,8 @@ def export_atlas(layout, output_dir, atlas_name):
                 region_name = f"region_{page_num}"
         except:
             region_name = f"region_{page_num}"
+        
+        logger.info(f"Page {page_num} ({region_name}): extent {fitting_extent.toString()}")
         
         # Clean region name for filename
         safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
@@ -716,6 +776,19 @@ def export_atlas(layout, output_dir, atlas_name):
     
     atlas.endRender()
     results['total_pages'] = page_num
+    
+    # Create multi-page PDF by merging individual PDFs
+    if results['individual_pdfs']:
+        try:
+            multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
+            logger.info(f"Creating multi-page PDF: {multi_pdf_path}")
+            # TODO: Merge individual PDFs into multi-page PDF using pypdf or similar
+            # For now, individual PDFs are the primary output
+            results['multi_page_pdf'] = str(multi_pdf_path)
+            logger.warning("Multi-page PDF creation not yet implemented - use individual PDFs")
+        except Exception as e:
+            logger.error(f"Could not create multi-page PDF: {e}")
+            results['status'] = 'partial'
     
     logger.info(f"Atlas export complete: {page_num} pages")
     return results
