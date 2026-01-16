@@ -66,6 +66,15 @@ a:hover {
     font-size: 1.2em;
 } 
 
+/* Current version highlighting */
+.current-version {
+    font-weight: bold;
+    color: #2563eb;
+    background-color: #eff6ff;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
 /* Help page styling */
 .help-header {
     display: flex;

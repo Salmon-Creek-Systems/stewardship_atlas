@@ -507,3 +507,58 @@ async def save_config(swalename: str, payload: JSONPayload):
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         logging.error(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/set-current-version/{swalename}")
+async def set_current_version(swalename: str):
+    """
+    Update the CURRENT symlink to point to the second most recent version (rollback).
+    
+    Returns information about the version that was set as current.
+    """
+    try:
+        # Load config from staging
+        config_path = f"/root/swales/{swalename}/staging/atlas_config.json"
+        with open(config_path) as f:
+            config = json.load(f)
+        
+        # Get versions list, excluding 'staging'
+        versions = [v for v in config['dataswale']['versions'] if v != 'staging']
+        
+        if len(versions) < 2:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Not enough versions to rollback. Found {len(versions)} version(s), need at least 2."
+            )
+        
+        # Get second most recent version (rollback target)
+        rollback_version = versions[-2]
+        
+        # Get paths using versioning.atlas_path
+        current_path = versioning.atlas_path(config, version='CURRENT')
+        rollback_path = versioning.atlas_path(config, version=rollback_version)
+        
+        # Remove existing CURRENT symlink if it exists
+        # Check is_symlink() first because broken symlinks return False for exists()
+        if current_path.is_symlink() or current_path.exists():
+            current_path.unlink()
+            logging.info(f"Removed existing CURRENT symlink at {current_path}")
+        
+        # Create new symlink with absolute path
+        current_path.symlink_to(rollback_path, target_is_directory=True)
+        logging.info(f"Created CURRENT symlink: {current_path} -> {rollback_path}")
+        
+        return {
+            "status": "success",
+            "current_version": rollback_version,
+            "current_path": str(current_path),
+            "target_path": str(rollback_path),
+            "message": f"CURRENT now points to {rollback_version}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error setting current version: {str(e)}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))

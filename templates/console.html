@@ -132,6 +132,13 @@
                     const a = document.createElement('a');
                     a.href = `/${item}/outlets/html/admin`;
                     a.textContent = item;
+                    
+                    // Highlight the current version
+                    if (item === data.version_string) {
+                        a.classList.add('current-version');
+                        a.textContent = item + ' (CURRENT)';
+                    }
+                    
                     li.appendChild(a);
                     versionsList.appendChild(li);
                 });
