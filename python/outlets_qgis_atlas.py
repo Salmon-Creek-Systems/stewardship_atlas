@@ -253,15 +253,15 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     
     # Configure atlas-driven map
     map_item.setAtlasDriven(True)
-    # Use Fixed scaling mode with margin - guarantees entire feature extent is shown
-    # This is more reliable than Auto mode which can crop features
-    map_item.setAtlasScalingMode(QgsLayoutItemMap.Fixed)
-    map_item.setAtlasMargin(0.15)  # 15% margin around region for context
+    # Use Auto mode with large margin to ensure entire region fits
+    # Auto calculates scale dynamically to fit the feature extent + margin into the map frame
+    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
+    map_item.setAtlasMargin(0.25)  # 25% margin - generous buffer to guarantee full region shows
     
     # Ensure map keeps layer set (doesn't change layers per atlas page)
     map_item.setKeepLayerSet(True)
     
-    logger.info(f"Atlas scaling: Fixed mode with 15% margin to guarantee full region visibility")
+    logger.info(f"Atlas scaling: Auto mode with 25% margin to ensure full region visibility")
     
     # Get layer CRS
     layer_crs = None
@@ -566,12 +566,12 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
         
-        # Set layers for overview - show basemap and regions only (simpler view)
+        # Set layers for overview - show only basemap (not the coverage layer)
         overview_layers = []
         for layer in project.mapLayers().values():
             layer_name = layer.name().lower()
-            # Only show basemap and regions layer in overview
-            if 'basemap' in layer_name or 'region' in layer_name:
+            # Only show basemap - exclude the coverage/regions layer
+            if 'basemap' in layer_name:
                 overview_layers.append(layer)
         
         if overview_layers:
@@ -582,9 +582,9 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             for layer in overview_layers:
                 logger.info(f"  - {layer.name()}: valid={layer.isValid()}, extent={layer.extent().toString()}")
         else:
-            # Fallback: show all layers if we can't find basemap/regions
+            # Fallback: show all layers if we can't find basemap
             overview_map.setKeepLayerSet(False)
-            logger.warning("Could not find basemap/regions for overview, showing all layers")
+            logger.warning("Could not find basemap for overview, showing all layers")
         
         # Ensure the map draws content
         overview_map.setDrawAnnotations(False)  # Don't draw annotations in overview
