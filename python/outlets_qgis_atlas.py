@@ -190,7 +190,7 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     page_size = outlet_config.get('page_size', 'Letter')
     page_orientation = outlet_config.get('page_orientation', 'Landscape')
     enable_collar = outlet_config.get('map_collar', True)
-    collar_height = 25  # mm
+    collar_width = 55  # mm - vertical collar on right side
     
     # Get page dimensions
     if page_size == 'A4':
@@ -236,16 +236,17 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     atlas = layout.atlas()
     atlas.setCoverageLayer(coverage_layer)
     atlas.setEnabled(True)
+    atlas.setHideCoverage(True)  # Don't show the coverage layer boundaries in the detail map
     
     # Add map item
     map_item = QgsLayoutItemMap(layout)
     
-    # Position and size
+    # Position and size (collar on right side now)
     margin = 2  # mm
     map_x = margin
     map_y = margin
-    map_width = page_width - (2 * margin)
-    map_height = page_height - (2 * margin) - (collar_height if enable_collar else 0)
+    map_width = page_width - (2 * margin) - (collar_width if enable_collar else 0)
+    map_height = page_height - (2 * margin)
     
     map_item.attemptMove(QgsLayoutPoint(map_x, map_y, QgsUnitTypes.LayoutMillimeters))
     map_item.attemptResize(QgsLayoutSize(map_width, map_height, QgsUnitTypes.LayoutMillimeters))
@@ -253,7 +254,7 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     # Configure atlas-driven map
     map_item.setAtlasDriven(True)
     map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
-    map_item.setAtlasMargin(0.05)  # 5% margin
+    map_item.setAtlasMargin(0.10)  # 10% margin - increased to ensure full region shows
     
     # Get layer CRS
     layer_crs = None
@@ -295,16 +296,16 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     
     if enable_collar:
         add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                       margin, collar_height, render_crs, coverage_layer)
+                       margin, collar_width, render_crs, coverage_layer)
     
     logger.info(f"Created atlas layout with {coverage_layer.featureCount()} pages")
     return layout
 
 
 def add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                   margin, collar_height, layer_crs, coverage_layer=None):
+                   margin, collar_width, layer_crs, coverage_layer=None):
     """
-    Add map collar with legend, scale bar, CRS info, region name, and overview map.
+    Add vertical map collar on right side with legend, scale bar, CRS info, region name, and overview map.
     
     Args:
         layout: QgsPrintLayout
@@ -314,51 +315,54 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         page_width: Page width in mm
         page_height: Page height in mm
         margin: Page margin in mm
-        collar_height: Collar height in mm
+        collar_width: Collar width in mm (vertical collar on right)
         layer_crs: Map CRS
         coverage_layer: QgsVectorLayer - regions layer for overview extent (optional)
     """
-    map_height = page_height - (2 * margin) - collar_height
-    map_width = page_width - (2 * margin)
+    map_width = page_width - (2 * margin) - collar_width
+    map_height = page_height - (2 * margin)
     
-    # Calculate collar position (flush at bottom of page)
-    collar_y = page_height - collar_height - margin
+    # Calculate collar position (vertical collar on right side)
+    collar_x = page_width - collar_width - margin
+    collar_y = margin
     
     # Add white background for collar
     collar_bg = QgsLayoutItemShape(layout)
     collar_bg.setShapeType(QgsLayoutItemShape.Rectangle)
-    collar_bg.attemptMove(QgsLayoutPoint(margin, collar_y, QgsUnitTypes.LayoutMillimeters))
-    collar_bg.attemptResize(QgsLayoutSize(map_width, collar_height, QgsUnitTypes.LayoutMillimeters))
+    collar_bg.attemptMove(QgsLayoutPoint(collar_x, collar_y, QgsUnitTypes.LayoutMillimeters))
+    collar_bg.attemptResize(QgsLayoutSize(collar_width, map_height, QgsUnitTypes.LayoutMillimeters))
     collar_bg.setFrameEnabled(False)
     collar_bg.setBackgroundEnabled(True)
     collar_bg.setBackgroundColor(QColor(255, 255, 255))
     layout.addLayoutItem(collar_bg)
     
-    # Add separator line
+    # Add separator line (vertical)
     separator = QgsLayoutItemShape(layout)
     separator.setShapeType(QgsLayoutItemShape.Rectangle)
-    separator.attemptMove(QgsLayoutPoint(margin, collar_y, QgsUnitTypes.LayoutMillimeters))
-    separator.attemptResize(QgsLayoutSize(map_width, 0.5, QgsUnitTypes.LayoutMillimeters))
+    separator.attemptMove(QgsLayoutPoint(collar_x, collar_y, QgsUnitTypes.LayoutMillimeters))
+    separator.attemptResize(QgsLayoutSize(0.5, map_height, QgsUnitTypes.LayoutMillimeters))
     separator.setFrameEnabled(True)
     separator.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, QgsUnitTypes.LayoutMillimeters))
     layout.addLayoutItem(separator)
     
-    collar_content_y = collar_y + 2
+    # Start content positioning from top of collar
+    collar_content_x = collar_x + 2  # 2mm padding from left edge of collar
+    collar_content_y = collar_y + 2  # 2mm padding from top
+    current_y = collar_content_y  # Track vertical position as we add elements
     
-    # LEFT SECTION (30%): Legend
+    # LEGEND (top of collar)
     legend = QgsLayoutItemLegend(layout)
     legend.setTitle("")
     legend.setLinkedMap(map_item)
-    legend.attemptMove(QgsLayoutPoint(margin, collar_content_y, QgsUnitTypes.LayoutMillimeters))
+    legend.attemptMove(QgsLayoutPoint(collar_content_x, current_y, QgsUnitTypes.LayoutMillimeters))
     legend.setFrameEnabled(False)
     legend.setAutoUpdateModel(True)
     
-    # Make legend compact with 2 columns
-    legend.setSymbolWidth(4)
-    legend.setSymbolHeight(3)
-    legend.setLineSpacing(0.5)
-    legend.setColumnCount(2)  # Use 2 columns to save vertical space
-    legend.setColumnSpace(5)  # Space between columns in mm
+    # Make legend compact - use 1 column for vertical collar
+    legend.setSymbolWidth(3)
+    legend.setSymbolHeight(2)
+    legend.setLineSpacing(0.3)
+    legend.setColumnCount(1)  # Single column for narrow vertical collar
     
     # Filter out basemap and regions, and group road layers
     legend.setAutoUpdateModel(False)
@@ -388,33 +392,40 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     layout.addLayoutItem(legend)
     
-    # MIDDLE SECTION (25%): Region Name and North Indicator
-    region_x = margin + (map_width * 0.30) + 5
+    # Move down past legend (estimate ~40mm for legend height)
+    current_y += 40
+    
+    # REGION NAME
+    region_x = collar_content_x
     
     # Region name (using atlas expression)
     region_label = QgsLayoutItemLabel(layout)
     region_label.setText("[% attribute(@atlas_feature, 'name') %]")
-    region_font = QFont("Arial", 12, QFont.Bold)
+    region_font = QFont("Arial", 11, QFont.Bold)
     region_label.setFont(region_font)
     region_label.setHAlign(1)  # Center
-    region_label.attemptMove(QgsLayoutPoint(region_x, collar_content_y, QgsUnitTypes.LayoutMillimeters))
-    region_label.adjustSizeToText()
+    region_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    region_label.attemptResize(QgsLayoutSize(collar_width - 4, 10, QgsUnitTypes.LayoutMillimeters))
     region_label.setFrameEnabled(False)
     layout.addLayoutItem(region_label)
+    
+    current_y += 8
     
     # North indicator
     north_label = QgsLayoutItemLabel(layout)
     north_label.setText("↑ N")
-    north_font = QFont("Arial", 10, QFont.Bold)
+    north_font = QFont("Arial", 9, QFont.Bold)
     north_label.setFont(north_font)
-    north_label.setHAlign(1)
-    north_label.attemptMove(QgsLayoutPoint(region_x, collar_content_y + 7, QgsUnitTypes.LayoutMillimeters))
-    north_label.adjustSizeToText()
+    north_label.setHAlign(1)  # Center
+    north_label.attemptMove(QgsLayoutPoint(region_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    north_label.attemptResize(QgsLayoutSize(collar_width - 4, 8, QgsUnitTypes.LayoutMillimeters))
     north_label.setFrameEnabled(False)
     layout.addLayoutItem(north_label)
     
-    # Scale bars
-    scale_x = region_x + 20
+    current_y += 10
+    
+    # SCALE BARS (stacked vertically)
+    scale_x = collar_content_x
     
     # Imperial scale bar (feet/miles)
     scale_bar = QgsLayoutItemScaleBar(layout)
@@ -424,14 +435,16 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     scale_bar.setNumberOfSegmentsLeft(0)
     scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
     scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-    scale_bar.setMaximumBarWidth(40)  # mm
+    scale_bar.setMaximumBarWidth(collar_width - 6)  # Fit within collar
     scale_bar.setMinimumBarWidth(20)  # mm
     scale_bar.setStyle('Double Box')
     scale_bar.setUnitLabel('ft')  # Show "ft" label
     scale_bar.setFont(QFont("Arial", 6))
-    scale_bar.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 2, QgsUnitTypes.LayoutMillimeters))
+    scale_bar.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
     scale_bar.setFrameEnabled(False)
     layout.addLayoutItem(scale_bar)
+    
+    current_y += 8
     
     # Metric scale bar
     scale_bar_metric = QgsLayoutItemScaleBar(layout)
@@ -441,44 +454,49 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     scale_bar_metric.setNumberOfSegmentsLeft(0)
     scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
     scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-    scale_bar_metric.setMaximumBarWidth(40)
+    scale_bar_metric.setMaximumBarWidth(collar_width - 6)
     scale_bar_metric.setMinimumBarWidth(20)
     scale_bar_metric.setStyle('Double Box')
     scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
     scale_bar_metric.setFont(QFont("Arial", 6))
-    scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, collar_content_y + 10, QgsUnitTypes.LayoutMillimeters))
+    scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
     scale_bar_metric.setFrameEnabled(False)
     layout.addLayoutItem(scale_bar_metric)
     
-    # RIGHT SECTION (45%): CRS and Attribution
-    info_x = margin + (map_width * 0.55) + 5
+    current_y += 10
+    
+    # CRS LABEL
+    info_x = collar_content_x
     
     # CRS Label (show the rendering CRS)
     crs_label = QgsLayoutItemLabel(layout)
     render_crs = map_item.crs()  # Get the actual CRS being used by the map
-    crs_text = f"<b>Projection:</b> {render_crs.description()}<br>({render_crs.authid()})"
+    crs_text = f"<b>Projection:</b><br>{render_crs.description()}<br>({render_crs.authid()})"
     crs_label.setText(crs_text)
-    crs_label.setFont(QFont("Arial", 7))
+    crs_label.setFont(QFont("Arial", 6))
     crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    crs_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y, QgsUnitTypes.LayoutMillimeters))
-    crs_label.adjustSizeToText()
+    crs_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    crs_label.attemptResize(QgsLayoutSize(collar_width - 4, 15, QgsUnitTypes.LayoutMillimeters))
     crs_label.setFrameEnabled(False)
     layout.addLayoutItem(crs_label)
     
-    # Attribution
+    current_y += 18
+    
+    # ATTRIBUTION
     attributions = outlets_qgis.collect_layer_attributions(config, outlet_config)
     if attributions:
         attr_label = QgsLayoutItemLabel(layout)
         attr_text = f"<b>Data Sources:</b><br>{', '.join(attributions)}"
         attr_label.setText(attr_text)
-        attr_label.setFont(QFont("Arial", 6))
+        attr_label.setFont(QFont("Arial", 5))
         attr_label.setMode(QgsLayoutItemLabel.ModeHtml)
-        attr_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y + 8, QgsUnitTypes.LayoutMillimeters))
-        attr_label.adjustSizeToText()
+        attr_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+        attr_label.attemptResize(QgsLayoutSize(collar_width - 4, 20, QgsUnitTypes.LayoutMillimeters))
         attr_label.setFrameEnabled(False)
         layout.addLayoutItem(attr_label)
+        current_y += 22
     
-    # Generation date
+    # GENERATION DATE
     date_label = QgsLayoutItemLabel(layout)
     atlas_name = config.get('name', 'Atlas')
     gen_date = datetime.now().strftime('%Y-%m-%d')
@@ -486,16 +504,18 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     date_label.setText(date_text)
     date_label.setFont(QFont("Arial", 6))
     date_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    date_label.attemptMove(QgsLayoutPoint(info_x, collar_content_y + 15, QgsUnitTypes.LayoutMillimeters))
-    date_label.adjustSizeToText()
+    date_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    date_label.attemptResize(QgsLayoutSize(collar_width - 4, 12, QgsUnitTypes.LayoutMillimeters))
     date_label.setFrameEnabled(False)
     layout.addLayoutItem(date_label)
     
-    # OVERVIEW MAP (far right): Small map showing location of current page
+    current_y += 14
+    
+    # OVERVIEW MAP (bottom of collar): Small map showing location of current page
     if coverage_layer is not None:
-        overview_size = 20  # mm - square overview map
-        overview_x = page_width - margin - overview_size - 2
-        overview_y = collar_content_y
+        overview_size = collar_width - 6  # Make it almost full width of collar
+        overview_x = collar_content_x
+        overview_y = current_y
         
         # Get project from layout
         project = layout.project()
