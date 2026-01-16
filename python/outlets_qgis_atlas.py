@@ -607,7 +607,12 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         scale_bar.setStyle('Double Box')
         scale_bar.setUnitLabel('ft')  # Show "ft" label
         scale_bar.setFont(QFont("Arial", 6))
-        scale_bar.setNumberOfDecimalPlaces(1)  # Round to 1 decimal place
+        
+        # Set number format to 1 decimal place
+        num_format = scale_bar.numericFormat()
+        num_format.setNumberDecimalPlaces(1)
+        scale_bar.setNumericFormat(num_format)
+        
         scale_bar.attemptMove(QgsLayoutPoint(scale_x, scale_y_imperial, QgsUnitTypes.LayoutMillimeters))
         scale_bar.setFrameEnabled(False)
         layout.addLayoutItem(scale_bar)
@@ -625,7 +630,12 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         scale_bar_metric.setStyle('Double Box')
         scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
         scale_bar_metric.setFont(QFont("Arial", 6))
-        scale_bar_metric.setNumberOfDecimalPlaces(1)  # Round to 1 decimal place
+        
+        # Set number format to 1 decimal place
+        num_format_metric = scale_bar_metric.numericFormat()
+        num_format_metric.setNumberDecimalPlaces(1)
+        scale_bar_metric.setNumericFormat(num_format_metric)
+        
         scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, scale_y_metric, QgsUnitTypes.LayoutMillimeters))
         scale_bar_metric.setFrameEnabled(False)
         layout.addLayoutItem(scale_bar_metric)
