@@ -161,7 +161,9 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         # Use largest dimension and extend the shorter side equally on both sides
         # This ensures they fit nicely in the nearly-square map frame without cropping
         regions_layer.startEditing()
+        
         for feature in regions_layer.getFeatures():
+            fid = feature.id()
             bbox = feature.geometry().boundingBox()
             
             # Get dimensions
@@ -183,12 +185,14 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
                 center_y + size / 2
             )
             
-            # Create square geometry
+            # Create square geometry from the rectangle
             square_geom = QgsGeometry.fromRect(square_bbox)
-            feature.setGeometry(square_geom)
-            regions_layer.updateFeature(feature)
             
-            logger.info(f"Region '{feature.attribute('name')}': {width:.0f}x{height:.0f} -> {size:.0f}x{size:.0f} (square)")
+            # Update the feature geometry in the layer
+            regions_layer.changeGeometry(fid, square_geom)
+            
+            region_name = feature.attribute('name') if feature.attribute('name') else f"region_{fid}"
+            logger.info(f"Region '{region_name}': {width:.0f}x{height:.0f} -> {size:.0f}x{size:.0f} (square)")
         
         regions_layer.commitChanges()
         logger.info(f"Converted {regions_layer.featureCount()} regions to square geometries")
