@@ -92,46 +92,52 @@ def squarify_feature(feature):
         feature: GeoJSON feature dict
         
     Returns:
-        Modified feature with square geometry
+        New feature with square geometry
     """
-    geometry = feature.get('geometry', {})
+    import copy
+    
+    # Create a deep copy to avoid modifying the original
+    new_feature = copy.deepcopy(feature)
+    
+    geometry = new_feature.get('geometry', {})
     geom_type = geometry.get('type', '')
     
     if geom_type not in ['Polygon', 'MultiPolygon']:
-        # Not a polygon, return as-is
-        return feature
+        # Not a polygon, return copy as-is
+        return new_feature
     
     coordinates = geometry.get('coordinates', [])
     bbox = get_bbox(coordinates)
     
     if bbox is None:
-        # Invalid geometry, return as-is
-        return feature
+        # Invalid geometry, return copy as-is
+        return new_feature
     
-    # Create square
-    square_coords = create_square_from_bbox(bbox)
-    
-    # Update geometry to a simple Polygon (square)
-    feature['geometry'] = {
-        'type': 'Polygon',
-        'coordinates': [square_coords]  # Single ring
-    }
-    
-    # Add metadata about the transformation
-    if 'properties' not in feature:
-        feature['properties'] = {}
-    
+    # Calculate dimensions for logging
     min_x, min_y, max_x, max_y = bbox
     width = max_x - min_x
     height = max_y - min_y
     size = max(width, height)
     
-    feature['properties']['_squarified'] = True
-    feature['properties']['_original_width'] = width
-    feature['properties']['_original_height'] = height
-    feature['properties']['_square_size'] = size
+    # Create square coordinates
+    square_coords = create_square_from_bbox(bbox)
     
-    return feature
+    # Replace geometry with a simple Polygon (square)
+    new_feature['geometry'] = {
+        'type': 'Polygon',
+        'coordinates': [square_coords]  # Single ring
+    }
+    
+    # Add metadata about the transformation
+    if 'properties' not in new_feature:
+        new_feature['properties'] = {}
+    
+    new_feature['properties']['_squarified'] = True
+    new_feature['properties']['_original_width'] = width
+    new_feature['properties']['_original_height'] = height
+    new_feature['properties']['_square_size'] = size
+    
+    return new_feature
 
 
 def squarify_geojson(input_path):
@@ -159,6 +165,7 @@ def squarify_geojson(input_path):
         features = geojson_data.get('features', [])
         print(f"Processing {len(features)} features...")
         
+        squared_features = []
         for i, feature in enumerate(features):
             geom_type = feature.get('geometry', {}).get('type', '')
             name = feature.get('properties', {}).get('name', f"feature_{i}")
@@ -170,14 +177,27 @@ def squarify_geojson(input_path):
                     orig_width = max_x - min_x
                     orig_height = max_y - min_y
                     
-                    features[i] = squarify_feature(feature)
+                    squared_feature = squarify_feature(feature)
+                    squared_features.append(squared_feature)
                     
                     size = max(orig_width, orig_height)
-                    print(f"  {name}: {orig_width:.1f} x {orig_height:.1f} -> {size:.1f} x {size:.1f}")
+                    # Verify the square was created
+                    new_bbox = get_bbox(squared_feature['geometry']['coordinates'])
+                    if new_bbox:
+                        new_width = new_bbox[2] - new_bbox[0]
+                        new_height = new_bbox[3] - new_bbox[1]
+                        print(f"  {name}: {orig_width:.1f} x {orig_height:.1f} -> {new_width:.1f} x {new_height:.1f} ✓")
+                    else:
+                        print(f"  {name}: {orig_width:.1f} x {orig_height:.1f} -> ERROR")
+                else:
+                    # Invalid bbox, keep original
+                    squared_features.append(feature)
             else:
+                # Not a polygon, keep original
                 print(f"  {name}: {geom_type} (skipped)")
+                squared_features.append(feature)
         
-        geojson_data['features'] = features
+        geojson_data['features'] = squared_features
     else:
         raise ValueError(f"Unexpected GeoJSON type: {geojson_data.get('type')}")
     
@@ -189,7 +209,8 @@ def squarify_geojson(input_path):
     with open(output_path, 'w') as f:
         json.dump(geojson_data, f, indent=2)
     
-    print(f"✓ Done! Created {len(features)} squared features")
+    output_feature_count = len(geojson_data['features'])
+    print(f"✓ Done! Created {output_feature_count} squared features")
     
     return output_path
 
