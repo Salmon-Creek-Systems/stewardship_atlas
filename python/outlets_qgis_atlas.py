@@ -505,7 +505,7 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
         overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
         
-        # Set extent to show all regions (coverage layer extent with 10% buffer)
+        # Set extent to show all regions (coverage layer extent with larger buffer)
         # Transform extent to match the rendering CRS if needed
         extent = coverage_layer.extent()
         coverage_crs = coverage_layer.crs()
@@ -516,7 +516,24 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             extent = transform.transformBoundingBox(extent)
             logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
         
-        extent.scale(1.1)  # Add 10% buffer around all regions
+        # Add significant buffer (30%) to ensure everything fits and looks good
+        extent.scale(1.3)
+        
+        # Adjust extent to be square (match the square overview map item)
+        # This prevents distortion
+        width = extent.width()
+        height = extent.height()
+        if width > height:
+            # Expand height to match width
+            diff = width - height
+            extent.setYMinimum(extent.yMinimum() - diff / 2)
+            extent.setYMaximum(extent.yMaximum() + diff / 2)
+        else:
+            # Expand width to match height
+            diff = height - width
+            extent.setXMinimum(extent.xMinimum() - diff / 2)
+            extent.setXMaximum(extent.xMaximum() + diff / 2)
+        
         overview_map.setExtent(extent)
         overview_map.setCrs(render_crs)  # Use same CRS as main map
         
