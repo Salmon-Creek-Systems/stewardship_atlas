@@ -49,7 +49,8 @@ from qgis.core import (
     QgsGeometry,
     QgsPointXY,
     QgsFillSymbol,
-    QgsVectorFileWriter
+    QgsVectorFileWriter,
+    QgsFeature
 )
 from qgis.PyQt.QtGui import QColor, QFont
 
@@ -156,65 +157,66 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         
         project.addMapLayer(regions_layer, False)  # False = don't add to legend
         logger.info(f"Loaded {regions_layer.featureCount()} regions as coverage layer")
+        logger.info(f"Regions CRS: {regions_layer.crs().authid()}")
         
-        # Convert regions to square geometries for better fitting
-        # Use largest dimension and extend the shorter side equally on both sides
-        # This ensures they fit nicely in the nearly-square map frame without cropping
-        regions_layer.startEditing()
+        # Determine rendering CRS (same logic as in create_atlas_layout)
+        # Get first layer's CRS
+        layer_crs = None
+        for layer in project.mapLayers().values():
+            if hasattr(layer, 'crs') and layer.name() != 'regions':
+                layer_crs = layer.crs()
+                break
         
-        for feature in regions_layer.getFeatures():
-            fid = feature.id()
-            bbox = feature.geometry().boundingBox()
+        if layer_crs is None:
+            layer_crs = QgsCoordinateReferenceSystem("EPSG:4326")
+        
+        # Use projected CRS for rendering if layer CRS is geographic
+        render_crs = layer_crs
+        if layer_crs.isGeographic():
+            render_crs = QgsCoordinateReferenceSystem("EPSG:3857")
+            logger.info(f"Layer CRS {layer_crs.authid()} is geographic, will use EPSG:3857 for rendering")
+        
+        # Reproject regions to match rendering CRS for correct aspect ratios
+        if regions_layer.crs() != render_crs:
+            logger.info(f"Reprojecting regions from {regions_layer.crs().authid()} to {render_crs.authid()} for correct atlas geometry")
             
-            # Get dimensions
-            width = bbox.width()
-            height = bbox.height()
+            # Create transformation context
+            transform_context = QgsCoordinateTransformContext()
             
-            # Use the LARGER dimension as the square size (expands to include everything)
-            size = max(width, height)
-            
-            # Calculate center
-            center_x = bbox.xMinimum() + width / 2
-            center_y = bbox.yMinimum() + height / 2
-            
-            # Create square extent centered on the region
-            square_bbox = QgsRectangle(
-                center_x - size / 2,
-                center_y - size / 2,
-                center_x + size / 2,
-                center_y + size / 2
+            # Create a new in-memory layer with the target CRS
+            reprojected_layer = QgsVectorLayer(
+                f"Polygon?crs={render_crs.authid()}", 
+                "regions_reprojected", 
+                "memory"
             )
+            reprojected_provider = reprojected_layer.dataProvider()
             
-            # Create square geometry from the rectangle
-            square_geom = QgsGeometry.fromRect(square_bbox)
+            # Copy fields from original layer
+            reprojected_provider.addAttributes(regions_layer.fields())
+            reprojected_layer.updateFields()
             
-            # Update the feature geometry in the layer
-            regions_layer.changeGeometry(fid, square_geom)
+            # Transform and copy features
+            transform = QgsCoordinateTransform(regions_layer.crs(), render_crs, transform_context)
+            reprojected_features = []
             
-            region_name = feature.attribute('name') if feature.attribute('name') else f"region_{fid}"
-            logger.info(f"Region '{region_name}': {width:.0f}x{height:.0f} -> {size:.0f}x{size:.0f} (square)")
-        
-        regions_layer.commitChanges()
-        logger.info(f"Converted {regions_layer.featureCount()} regions to square geometries")
-        
-        # Save squared regions to a new file
-        squared_regions_path = regions_path.parent / "squared_regions.geojson"
-        
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = "GeoJSON"
-        options.fileEncoding = "UTF-8"
-        
-        error = QgsVectorFileWriter.writeAsVectorFormatV3(
-            regions_layer,
-            str(squared_regions_path),
-            QgsCoordinateTransformContext(),
-            options
-        )
-        
-        if error[0] == QgsVectorFileWriter.NoError:
-            logger.info(f"✓ Saved squared regions to: {squared_regions_path}")
+            for feature in regions_layer.getFeatures():
+                new_feature = QgsFeature(feature)
+                geom = feature.geometry()
+                geom.transform(transform)
+                new_feature.setGeometry(geom)
+                reprojected_features.append(new_feature)
+            
+            reprojected_provider.addFeatures(reprojected_features)
+            reprojected_layer.updateExtents()
+            
+            # Replace regions layer with reprojected version
+            project.removeMapLayer(regions_layer)
+            project.addMapLayer(reprojected_layer, False)
+            regions_layer = reprojected_layer
+            
+            logger.info(f"✓ Reprojected {regions_layer.featureCount()} regions to {render_crs.authid()}")
         else:
-            logger.warning(f"Could not save squared regions: {error[1]}")
+            logger.info(f"Regions CRS matches rendering CRS, no reprojection needed")
         
         # Create atlas layout
         layout = create_atlas_layout(project, regions_layer, config, outlet_name)
