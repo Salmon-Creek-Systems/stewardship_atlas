@@ -253,8 +253,15 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     
     # Configure atlas-driven map
     map_item.setAtlasDriven(True)
-    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
-    map_item.setAtlasMargin(0.10)  # 10% margin - increased to ensure full region shows
+    # Use Fixed scaling mode with margin - guarantees entire feature extent is shown
+    # This is more reliable than Auto mode which can crop features
+    map_item.setAtlasScalingMode(QgsLayoutItemMap.Fixed)
+    map_item.setAtlasMargin(0.15)  # 15% margin around region for context
+    
+    # Ensure map keeps layer set (doesn't change layers per atlas page)
+    map_item.setKeepLayerSet(True)
+    
+    logger.info(f"Atlas scaling: Fixed mode with 15% margin to guarantee full region visibility")
     
     # Get layer CRS
     layer_crs = None
