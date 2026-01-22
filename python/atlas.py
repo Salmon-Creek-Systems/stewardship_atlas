@@ -37,20 +37,26 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 from typing import List, Dict, Tuple, Any
 
-#DEFAULT_LAYERS = json.load(open("../configuration/layers.json"))
+# These are instance specific and shouldn't have defaults
+# DEFAULT_DATA_ROOT = "/root/swales"
+# DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
+# DEFAULT_SHARED_DIR = Path('/root/data')
 
-
-
-DEFAULT_CONFIG = json.load(open("../configuration/default_atlas_config.json"))
-#DEFAULT_ASSETS = json.load(open("../configuration/assets.json"))
-DEFAULT_DATA_ROOT = "/root/swales"
-
-#DEFAULT_BBOX = {"north": 0, "south": 0, "east": 0, "west": 0}
-
+# Load general defaults and building blocks
+#DEFAULT_CONFIG = json.load(open("../configuration/default_atlas_config.json"))
+DEFAULT_CONFIG = {
+    "data_root": "/root/swales",
+    "name": "Nameless",
+    "description": "Underscripted",
+    "logo": "/local/scs-smallgrass1.png",
+    "dataswale": {
+        "crs": "EPSG:4269",     
+        "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
+        "versions": ["staging"],
+        "layers": []   
+    }
+}
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
-
-DEFAULT_SHARED_DIR = Path('/root/data')
-
 DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods # |  outlets_qgis.asset_methods 
 
 
@@ -115,8 +121,8 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
            layers_path: str = None,
            assets: Dict[str, Any] = None, 
            assets_path: str = None,
-           data_root: str = DEFAULT_DATA_ROOT,
-           shared_dir: Path = DEFAULT_SHARED_DIR,
+           data_root: str = None,
+           shared_dir: Path = None,
            name: str = "Nameless",
            admin_emails = [],
            bbox: Dict[str, Any] = None,
@@ -146,6 +152,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     
     p = Path(data_root) / name
     p.mkdir(parents=True, exist_ok=True)
+
 
     if not ( p / 'local').is_symlink():
         (p / 'local').symlink_to(shared_dir, target_is_directory=True)
@@ -183,10 +190,11 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     config['spreadsheets'] = {}
     
     # Load asset and layer core/shared definitions
-    inlets_config = json.load(open("../configuration/shared_inlets_config.json"))
-    eddies_config = json.load(open("../configuration/shared_eddies_config.json"))
-    outlets_config = json.load(open("../configuration/shared_outlets_config.json"))
-    default_layers_config = json.load(open("../configuration/shared_layers_config.json"))
+    shared_config_dir = p / 'app' / 'configuration'
+    inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
+    eddies_config = json.load(open(shared_config_dir / "shared_eddies_config.json"))
+    outlets_config = json.load(open(shared_config_dir / "shared_outlets_config.json"))
+    default_layers_config = json.load(open(shared_config_dir / "shared_layers_config.json"))
     
     # Combine all asset configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}

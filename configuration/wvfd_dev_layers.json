@@ -120,7 +120,8 @@
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [255, 0, 0, 0.3]},
     {"name": "private_notes", "geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255], "add_labels": true,
-    "editable_columns": [
-        {"name": "name", "type": "string", "default": "Notes and Comments go here." }],
-    "symbol": {"png": "pushpin.png", "icon": "basic/pushpin"}, "icon-size": 2.0, "access": [ "admin"], "interaction": "interface"},
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "Notes and Comments go here." }],
+     "symbol": {"png": "pushpin.png", "icon": "basic/pushpin"}, "icon-size": 2.0, "access": [ "admin"], "interaction": "interface"
+    }
 ]
