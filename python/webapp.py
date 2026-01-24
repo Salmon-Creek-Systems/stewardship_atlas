@@ -15,7 +15,10 @@ from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 
 import sys
-sys.path.insert(0, "/root/atlas_dev/python")
+#webapp_conf = json.load(open("webapp_conf.json"))
+DATASWALE_PATH = os.environ['DATASWALE_PATH']
+print(f"Loading dataswale in {DATASWALE_PATH}")
+sys.path.insert(0, f"{DATASWALE_PATH}/app/python")
 
 # Boring Imports
 import sys, os, subprocess, time, json, string, random, math

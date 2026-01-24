@@ -134,7 +134,13 @@
         "in_layers": ["basemap", "regions",  "roads_primary", "roads_secondary"],
         "config_def": "webmap",
         "access": ["technical"]
-    },
+},
+"notebook" : {
+        "type": "outlet",
+        "name": "notebook",
+        "config_def": "jupyter_notebook",
+        "access": ["technical"]
+    },    
 "runbook": {
         "type": "outlet",
         "name": "runbook",

@@ -29,7 +29,7 @@
     "jupyter_notebook": {
         "asset_type": "outlet",
         "name": "notebook",
-        "fetch_type": "outlet_notebook_jupyter",
+        "fetch_type": "jupyter_notebook",
         "interaction": "interface",
         "attribution": {
             "url": "https://portal.opentopography.org/api/terms",
