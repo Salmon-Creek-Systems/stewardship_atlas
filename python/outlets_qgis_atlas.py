@@ -403,14 +403,14 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     
     if enable_collar:
         add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                       margin, collar_width, render_crs, coverage_layer, project)
+                       margin, collar_width, render_crs, coverage_layer)
     
     logger.info(f"Created atlas layout with {coverage_layer.featureCount()} pages")
     return layout
 
 
 def add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
-                   margin, collar_width, layer_crs, coverage_layer=None, project=None):
+                   margin, collar_width, layer_crs, coverage_layer=None):
     """
     Add vertical map collar on right side with legend, scale bar, CRS info, region name, and overview map.
     
@@ -425,7 +425,6 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         collar_width: Collar width in mm (vertical collar on right)
         layer_crs: Map CRS
         coverage_layer: QgsVectorLayer - regions layer for overview extent (optional)
-        project: QgsProject instance (optional)
     """
     map_width = page_width - (2 * margin) - collar_width
     map_height = page_height - (2 * margin)
@@ -487,14 +486,11 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     current_y += 10
     
-    # LEGEND (centered)
+    # LEGEND
     legend = QgsLayoutItemLegend(layout)
     legend.setTitle("")
     legend.setLinkedMap(map_item)
-    # Position legend - will be centered by adjusting after we know its size
-    legend_width = collar_width - 4
-    legend_x = collar_x + (collar_width - legend_width) / 2
-    legend.attemptMove(QgsLayoutPoint(legend_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    legend.attemptMove(QgsLayoutPoint(collar_content_x, current_y, QgsUnitTypes.LayoutMillimeters))
     legend.setFrameEnabled(False)
     legend.setAutoUpdateModel(True)
     
@@ -532,12 +528,68 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     layout.addLayoutItem(legend)
     
-    # Move down past legend with generous spacing to avoid overlap (60mm)
-    current_y += 60
+    # Move down past legend (estimate ~35mm for legend height)
+    current_y += 35
     
+    # SCALE BARS (stacked vertically)
+    scale_x = collar_content_x
+    
+    # Imperial scale bar (feet/miles)
+    scale_bar = QgsLayoutItemScaleBar(layout)
+    scale_bar.setLinkedMap(map_item)
+    scale_bar.setUnits(QgsUnitTypes.DistanceFeet)  # Explicit imperial units
+    scale_bar.setNumberOfSegments(2)  # Fewer segments to reduce clutter
+    scale_bar.setNumberOfSegmentsLeft(0)
+    scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
+    scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+    scale_bar.setMaximumBarWidth(collar_width - 6)  # Fit within collar
+    scale_bar.setMinimumBarWidth(20)  # mm
+    scale_bar.setStyle('Double Box')
+    scale_bar.setUnitLabel('ft')  # Show "ft" label
+    scale_bar.setFont(QFont("Arial", 6))
+    scale_bar.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    scale_bar.setFrameEnabled(False)
+    layout.addLayoutItem(scale_bar)
+    
+    current_y += 8
+    
+    # Metric scale bar
+    scale_bar_metric = QgsLayoutItemScaleBar(layout)
+    scale_bar_metric.setLinkedMap(map_item)
+    scale_bar_metric.setUnits(QgsUnitTypes.DistanceMeters)  # Explicit metric units
+    scale_bar_metric.setNumberOfSegments(2)  # Fewer segments
+    scale_bar_metric.setNumberOfSegmentsLeft(0)
+    scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
+    scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+    scale_bar_metric.setMaximumBarWidth(collar_width - 6)
+    scale_bar_metric.setMinimumBarWidth(20)
+    scale_bar_metric.setStyle('Double Box')
+    scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
+    scale_bar_metric.setFont(QFont("Arial", 6))
+    scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    scale_bar_metric.setFrameEnabled(False)
+    layout.addLayoutItem(scale_bar_metric)
+    
+    current_y += 10
+    
+    # CRS LABEL
     info_x = collar_content_x
     
-    # ATTRIBUTION (centered)
+    # CRS Label (show the rendering CRS)
+    crs_label = QgsLayoutItemLabel(layout)
+    render_crs = map_item.crs()  # Get the actual CRS being used by the map
+    crs_text = f"<b>Projection:</b><br>{render_crs.description()}<br>({render_crs.authid()})"
+    crs_label.setText(crs_text)
+    crs_label.setFont(QFont("Arial", 6))
+    crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
+    crs_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    crs_label.attemptResize(QgsLayoutSize(collar_width - 4, 15, QgsUnitTypes.LayoutMillimeters))
+    crs_label.setFrameEnabled(False)
+    layout.addLayoutItem(crs_label)
+    
+    current_y += 18
+    
+    # ATTRIBUTION
     attributions = outlets_qgis.collect_layer_attributions(config, outlet_config)
     if attributions:
         attr_label = QgsLayoutItemLabel(layout)
@@ -545,14 +597,13 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         attr_label.setText(attr_text)
         attr_label.setFont(QFont("Arial", 5))
         attr_label.setMode(QgsLayoutItemLabel.ModeHtml)
-        attr_label.setHAlign(1)  # Center horizontally
         attr_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
         attr_label.attemptResize(QgsLayoutSize(collar_width - 4, 20, QgsUnitTypes.LayoutMillimeters))
         attr_label.setFrameEnabled(False)
         layout.addLayoutItem(attr_label)
         current_y += 22
     
-    # ATLAS NAME AND GENERATION DATE (centered)
+    # GENERATION DATE
     date_label = QgsLayoutItemLabel(layout)
     atlas_name = config.get('name', 'Atlas')
     gen_date = datetime.now().strftime('%Y-%m-%d')
@@ -560,7 +611,6 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     date_label.setText(date_text)
     date_label.setFont(QFont("Arial", 6))
     date_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    date_label.setHAlign(1)  # Center horizontally
     date_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
     date_label.attemptResize(QgsLayoutSize(collar_width - 4, 12, QgsUnitTypes.LayoutMillimeters))
     date_label.setFrameEnabled(False)
@@ -568,108 +618,33 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     current_y += 14
     
-    # CRS/PROJECTION LABEL (below atlas name and date, centered)
-    crs_label = QgsLayoutItemLabel(layout)
-    render_crs = map_item.crs()  # Get the actual CRS being used by the map
-    crs_text = f"<b>Projection:</b><br>{render_crs.description()}<br>({render_crs.authid()})"
-    crs_label.setText(crs_text)
-    crs_label.setFont(QFont("Arial", 6))
-    crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    crs_label.setHAlign(1)  # Center horizontally
-    crs_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    crs_label.attemptResize(QgsLayoutSize(collar_width - 4, 15, QgsUnitTypes.LayoutMillimeters))
-    crs_label.setFrameEnabled(False)
-    layout.addLayoutItem(crs_label)
-    
-    # Calculate positions from bottom for overview map and scale bars
-    # OVERVIEW MAP at the very bottom of collar
+    # OVERVIEW MAP (bottom of collar): Small map showing location of current page
     if coverage_layer is not None:
         overview_size = collar_width - 6  # Make it almost full width of collar
-        overview_x = collar_x + (collar_width - overview_size) / 2  # Center horizontally
-        overview_y = collar_y + map_height - overview_size - 2  # 2mm padding from bottom
+        overview_x = collar_content_x
+        overview_y = current_y
         
-        # SCALE BARS positioned just above overview map (centered)
-        scale_bar_width = collar_width - 6
-        scale_x = collar_x + (collar_width - scale_bar_width) / 2  # Center horizontally
-        scale_y_metric = overview_y - 10  # 10mm above overview map
-        scale_y_imperial = scale_y_metric - 8  # 8mm above metric scale bar
-        
-        # Imperial scale bar (feet/miles)
-        scale_bar = QgsLayoutItemScaleBar(layout)
-        scale_bar.setLinkedMap(map_item)
-        scale_bar.setUnits(QgsUnitTypes.DistanceFeet)  # Explicit imperial units
-        scale_bar.setNumberOfSegments(2)  # Fewer segments to reduce clutter
-        scale_bar.setNumberOfSegmentsLeft(0)
-        scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
-        scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar.setMaximumBarWidth(scale_bar_width)  # Fit within collar
-        scale_bar.setMinimumBarWidth(20)  # mm
-        scale_bar.setStyle('Double Box')
-        scale_bar.setUnitLabel('ft')  # Show "ft" label
-        scale_bar.setFont(QFont("Arial", 6))
-        
-        # Set number format to 1 decimal place
-        num_format = scale_bar.numericFormat()
-        num_format.setNumberDecimalPlaces(1)
-        scale_bar.setNumericFormat(num_format)
-        
-        scale_bar.attemptMove(QgsLayoutPoint(scale_x, scale_y_imperial, QgsUnitTypes.LayoutMillimeters))
-        scale_bar.setFrameEnabled(False)
-        layout.addLayoutItem(scale_bar)
-        
-        # Metric scale bar
-        scale_bar_metric = QgsLayoutItemScaleBar(layout)
-        scale_bar_metric.setLinkedMap(map_item)
-        scale_bar_metric.setUnits(QgsUnitTypes.DistanceMeters)  # Explicit metric units
-        scale_bar_metric.setNumberOfSegments(2)  # Fewer segments
-        scale_bar_metric.setNumberOfSegmentsLeft(0)
-        scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
-        scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-        scale_bar_metric.setMaximumBarWidth(scale_bar_width)
-        scale_bar_metric.setMinimumBarWidth(20)
-        scale_bar_metric.setStyle('Double Box')
-        scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
-        scale_bar_metric.setFont(QFont("Arial", 6))
-        
-        # Set number format to 1 decimal place
-        num_format_metric = scale_bar_metric.numericFormat()
-        num_format_metric.setNumberDecimalPlaces(1)
-        scale_bar_metric.setNumericFormat(num_format_metric)
-        
-        scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, scale_y_metric, QgsUnitTypes.LayoutMillimeters))
-        scale_bar_metric.setFrameEnabled(False)
-        layout.addLayoutItem(scale_bar_metric)
-        
-        # Get project from layout if not provided
-        if project is None:
-            project = layout.project()
+        # Get project from layout
+        project = layout.project()
         
         # Create overview map item
         overview_map = QgsLayoutItemMap(layout)
         overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
         overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
         
-        # Use the full atlas bbox from config instead of coverage layer extent
-        # This shows the entire atlas area, not just the regions
-        atlas_bbox = config['dataswale']['bbox']
-        extent = QgsRectangle(
-            atlas_bbox['west'],
-            atlas_bbox['south'],
-            atlas_bbox['east'],
-            atlas_bbox['north']
-        )
-        
-        # Transform from EPSG:4269 (config bbox) to render CRS if needed
-        bbox_crs = QgsCoordinateReferenceSystem("EPSG:4269")
+        # Set extent to show all regions (coverage layer extent with larger buffer)
+        # Transform extent to match the rendering CRS if needed
+        extent = coverage_layer.extent()
+        coverage_crs = coverage_layer.crs()
         render_crs = map_item.crs()
         
-        if bbox_crs != render_crs:
-            transform = QgsCoordinateTransform(bbox_crs, render_crs, project)
+        if coverage_crs != render_crs:
+            transform = QgsCoordinateTransform(coverage_crs, render_crs, project)
             extent = transform.transformBoundingBox(extent)
-            logger.info(f"Transformed overview extent from {bbox_crs.authid()} to {render_crs.authid()}")
+            logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
         
-        # Add small buffer (10%) for visual padding
-        extent.scale(1.1)
+        # Add generous buffer (80%) to show full atlas context
+        extent.scale(1.8)
         
         # Adjust extent to be square (match the square overview map item)
         # This prevents distortion
@@ -691,11 +666,11 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
         
-        # Set layers for overview - show only basemap for clean context
+        # Set layers for overview - show only basemap (not the coverage layer)
         overview_layers = []
         for layer in project.mapLayers().values():
             layer_name = layer.name().lower()
-            # Show only basemap - exclude the coverage/regions layer and other detail layers
+            # Only show basemap - exclude the coverage/regions layer
             if 'basemap' in layer_name:
                 overview_layers.append(layer)
         
@@ -758,50 +733,6 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             logger.warning(f"Could not add overview frame: {e}")
             import traceback
             logger.warning(traceback.format_exc())
-        
-        # Add coordinate grid to overview map
-        try:
-            from qgis.core import QgsLayoutItemMapGrid
-            
-            grid = overview_map.grid()
-            grid.setEnabled(True)
-            
-            # Set grid style to show only frame annotations (coordinates on border)
-            grid.setStyle(QgsLayoutItemMapGrid.FrameAnnotationsOnly)
-            
-            # Set grid interval based on map extent
-            map_extent = overview_map.extent()
-            # Use ~5 divisions across the width
-            interval = map_extent.width() / 5
-            grid.setIntervalX(interval)
-            grid.setIntervalY(interval)
-            
-            # Configure frame style - exterior ticks
-            grid.setFrameStyle(QgsLayoutItemMapGrid.ExteriorTicks)
-            grid.setFrameWidth(2)  # Width in mm
-            grid.setFramePenSize(0.3)
-            
-            # Enable coordinate annotations
-            grid.setAnnotationEnabled(True)
-            grid.setAnnotationFont(QFont("Arial", 5))  # Small font
-            grid.setAnnotationPrecision(2)  # 2 decimal places
-            
-            # Position annotations outside the frame on all sides
-            grid.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, QgsLayoutItemMapGrid.Left)
-            grid.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, QgsLayoutItemMapGrid.Right)
-            grid.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, QgsLayoutItemMapGrid.Top)
-            grid.setAnnotationPosition(QgsLayoutItemMapGrid.OutsideMapFrame, QgsLayoutItemMapGrid.Bottom)
-            
-            # Set annotation direction
-            grid.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Left)
-            grid.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Right)
-            grid.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Top)
-            grid.setAnnotationDirection(QgsLayoutItemMapGrid.Horizontal, QgsLayoutItemMapGrid.Bottom)
-            
-            logger.info("Added coordinate grid to overview map")
-            
-        except Exception as e:
-            logger.warning(f"Could not add grid to overview map: {e}")
 
 
 def export_atlas(layout, output_dir, atlas_name):
