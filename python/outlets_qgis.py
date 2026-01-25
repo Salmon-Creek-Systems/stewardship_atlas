@@ -52,6 +52,7 @@ from qgis.core import (
     QgsSimpleFillSymbolLayer,
     QgsSimpleMarkerSymbolLayer,
     QgsTextFormat,
+    QgsTextBackgroundSettings,
     QgsVectorLayerSimpleLabeling,
     QgsPalLayerSettings,
     QgsProperty,
@@ -468,6 +469,20 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 font.setPointSize(10)
             
             text_format.setFont(font)
+            
+            # Add white background box if configured (useful for notes/annotations)
+            if layer_config.get('label_background', False):
+                background = QgsTextBackgroundSettings()
+                background.setEnabled(True)
+                background.setType(QgsTextBackgroundSettings.ShapeRectangle)
+                background.setFillColor(QColor(255, 255, 255))  # White fill
+                background.setStrokeColor(QColor(0, 0, 0))  # Black border
+                background.setStrokeWidth(0.3)
+                background.setSizeType(QgsTextBackgroundSettings.SizeBuffer)
+                background.setSize(QSizeF(1.0, 0.5))  # Buffer around text in mm
+                text_format.setBackground(background)
+                logger.info(f"Added white background box to labels for {layer.name()}")
+            
             pal_settings.setFormat(text_format)
             
             # For linestrings, configure label placement

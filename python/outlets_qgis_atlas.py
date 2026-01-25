@@ -412,7 +412,8 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
 def add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
                    margin, collar_width, layer_crs, coverage_layer=None):
     """
-    Add vertical map collar on right side with legend, scale bar, CRS info, region name, and overview map.
+    Add vertical map collar on right side with region name, overview map, scale bars, 
+    projection info, and legend (at bottom since it varies in size).
     
     Args:
         layout: QgsPrintLayout
@@ -457,10 +458,12 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     collar_content_y = collar_y + 2  # 2mm padding from top
     current_y = collar_content_y  # Track vertical position as we add elements
     
+    # ============================================================
+    # TOP SECTION: Title, North indicator, Overview map
+    # ============================================================
+    
     # REGION NAME (top of collar)
     region_x = collar_content_x
-    
-    # Region name (using atlas expression)
     region_label = QgsLayoutItemLabel(layout)
     region_label.setText("[% attribute(@atlas_feature, 'name') %]")
     region_font = QFont("Arial", 11, QFont.Bold)
@@ -486,139 +489,7 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     
     current_y += 10
     
-    # LEGEND
-    legend = QgsLayoutItemLegend(layout)
-    legend.setTitle("")
-    legend.setLinkedMap(map_item)
-    legend.attemptMove(QgsLayoutPoint(collar_content_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    legend.setFrameEnabled(False)
-    legend.setAutoUpdateModel(True)
-    
-    # Make legend compact - use 1 column for vertical collar
-    legend.setSymbolWidth(3)
-    legend.setSymbolHeight(2)
-    legend.setLineSpacing(0.3)
-    legend.setColumnCount(1)  # Single column for narrow vertical collar
-    
-    # Filter out basemap and regions, and group road layers
-    legend.setAutoUpdateModel(False)
-    root = legend.model().rootGroup()
-    layers_to_remove = []
-    road_layers = []
-    
-    for layer in root.children():
-        if isinstance(layer, QgsLayerTreeLayer):
-            layer_name = layer.name().lower()
-            if 'basemap' in layer_name or 'regions' in layer_name:
-                layers_to_remove.append(layer)
-            elif layer_name.startswith('roads_'):
-                road_layers.append(layer)
-    
-    # Remove basemap and regions layers
-    for layer in layers_to_remove:
-        root.removeChildNode(layer)
-    
-    # Group road layers under a single "Roads" entry (keep only first road layer as representative)
-    if road_layers:
-        # Keep the first road layer and rename it to "Roads"
-        road_layers[0].setName("Roads")
-        # Remove other road layers
-        for layer in road_layers[1:]:
-            root.removeChildNode(layer)
-    
-    layout.addLayoutItem(legend)
-    
-    # Move down past legend (estimate ~35mm for legend height)
-    current_y += 35
-    
-    # SCALE BARS (stacked vertically)
-    scale_x = collar_content_x
-    
-    # Imperial scale bar (feet/miles)
-    scale_bar = QgsLayoutItemScaleBar(layout)
-    scale_bar.setLinkedMap(map_item)
-    scale_bar.setUnits(QgsUnitTypes.DistanceFeet)  # Explicit imperial units
-    scale_bar.setNumberOfSegments(2)  # Fewer segments to reduce clutter
-    scale_bar.setNumberOfSegmentsLeft(0)
-    scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
-    scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-    scale_bar.setMaximumBarWidth(collar_width - 6)  # Fit within collar
-    scale_bar.setMinimumBarWidth(20)  # mm
-    scale_bar.setStyle('Double Box')
-    scale_bar.setUnitLabel('ft')  # Show "ft" label
-    scale_bar.setFont(QFont("Arial", 6))
-    scale_bar.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    scale_bar.setFrameEnabled(False)
-    layout.addLayoutItem(scale_bar)
-    
-    current_y += 8
-    
-    # Metric scale bar
-    scale_bar_metric = QgsLayoutItemScaleBar(layout)
-    scale_bar_metric.setLinkedMap(map_item)
-    scale_bar_metric.setUnits(QgsUnitTypes.DistanceMeters)  # Explicit metric units
-    scale_bar_metric.setNumberOfSegments(2)  # Fewer segments
-    scale_bar_metric.setNumberOfSegmentsLeft(0)
-    scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
-    scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
-    scale_bar_metric.setMaximumBarWidth(collar_width - 6)
-    scale_bar_metric.setMinimumBarWidth(20)
-    scale_bar_metric.setStyle('Double Box')
-    scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
-    scale_bar_metric.setFont(QFont("Arial", 6))
-    scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    scale_bar_metric.setFrameEnabled(False)
-    layout.addLayoutItem(scale_bar_metric)
-    
-    current_y += 10
-    
-    # CRS LABEL
-    info_x = collar_content_x
-    
-    # CRS Label (show the rendering CRS)
-    crs_label = QgsLayoutItemLabel(layout)
-    render_crs = map_item.crs()  # Get the actual CRS being used by the map
-    crs_text = f"<b>Projection:</b><br>{render_crs.description()}<br>({render_crs.authid()})"
-    crs_label.setText(crs_text)
-    crs_label.setFont(QFont("Arial", 6))
-    crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    crs_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    crs_label.attemptResize(QgsLayoutSize(collar_width - 4, 15, QgsUnitTypes.LayoutMillimeters))
-    crs_label.setFrameEnabled(False)
-    layout.addLayoutItem(crs_label)
-    
-    current_y += 18
-    
-    # ATTRIBUTION
-    attributions = outlets_qgis.collect_layer_attributions(config, outlet_config)
-    if attributions:
-        attr_label = QgsLayoutItemLabel(layout)
-        attr_text = f"<b>Data Sources:</b><br>{', '.join(attributions)}"
-        attr_label.setText(attr_text)
-        attr_label.setFont(QFont("Arial", 5))
-        attr_label.setMode(QgsLayoutItemLabel.ModeHtml)
-        attr_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
-        attr_label.attemptResize(QgsLayoutSize(collar_width - 4, 20, QgsUnitTypes.LayoutMillimeters))
-        attr_label.setFrameEnabled(False)
-        layout.addLayoutItem(attr_label)
-        current_y += 22
-    
-    # GENERATION DATE
-    date_label = QgsLayoutItemLabel(layout)
-    atlas_name = config.get('name', 'Atlas')
-    gen_date = datetime.now().strftime('%Y-%m-%d')
-    date_text = f"<b>{atlas_name}</b><br>Generated: {gen_date}"
-    date_label.setText(date_text)
-    date_label.setFont(QFont("Arial", 6))
-    date_label.setMode(QgsLayoutItemLabel.ModeHtml)
-    date_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
-    date_label.attemptResize(QgsLayoutSize(collar_width - 4, 12, QgsUnitTypes.LayoutMillimeters))
-    date_label.setFrameEnabled(False)
-    layout.addLayoutItem(date_label)
-    
-    current_y += 14
-    
-    # OVERVIEW MAP (bottom of collar): Small map showing location of current page
+    # OVERVIEW MAP (after title - shows location context)
     if coverage_layer is not None:
         overview_size = collar_width - 6  # Make it almost full width of collar
         overview_x = collar_content_x
@@ -718,7 +589,6 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             overview_item.setEnabled(True)
             
             # Style the extent frame - red outline to show current region
-            # Use simple symbol properties
             fill_symbol = QgsFillSymbol.createSimple({
                 'color': '255,0,0,50',  # Semi-transparent red fill
                 'outline_color': '255,0,0,255',  # Solid red outline
@@ -733,6 +603,143 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             logger.warning(f"Could not add overview frame: {e}")
             import traceback
             logger.warning(traceback.format_exc())
+        
+        current_y += overview_size + 4  # Move past overview map with small gap
+    
+    # ============================================================
+    # MIDDLE SECTION: Scale bars, Projection, Attribution, Date
+    # ============================================================
+    
+    # SCALE BARS (stacked vertically)
+    scale_x = collar_content_x
+    
+    # Imperial scale bar (feet/miles)
+    scale_bar = QgsLayoutItemScaleBar(layout)
+    scale_bar.setLinkedMap(map_item)
+    scale_bar.setUnits(QgsUnitTypes.DistanceFeet)  # Explicit imperial units
+    scale_bar.setNumberOfSegments(2)  # Fewer segments to reduce clutter
+    scale_bar.setNumberOfSegmentsLeft(0)
+    scale_bar.setUnitsPerSegment(1000)  # Will auto-adjust based on map scale
+    scale_bar.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+    scale_bar.setMaximumBarWidth(collar_width - 6)  # Fit within collar
+    scale_bar.setMinimumBarWidth(20)  # mm
+    scale_bar.setStyle('Double Box')
+    scale_bar.setUnitLabel('ft')  # Show "ft" label
+    scale_bar.setFont(QFont("Arial", 6))
+    scale_bar.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    scale_bar.setFrameEnabled(False)
+    layout.addLayoutItem(scale_bar)
+    
+    current_y += 8
+    
+    # Metric scale bar
+    scale_bar_metric = QgsLayoutItemScaleBar(layout)
+    scale_bar_metric.setLinkedMap(map_item)
+    scale_bar_metric.setUnits(QgsUnitTypes.DistanceMeters)  # Explicit metric units
+    scale_bar_metric.setNumberOfSegments(2)  # Fewer segments
+    scale_bar_metric.setNumberOfSegmentsLeft(0)
+    scale_bar_metric.setUnitsPerSegment(100)  # Start with 100m
+    scale_bar_metric.setSegmentSizeMode(QgsScaleBarSettings.SegmentSizeMode.SegmentSizeFitWidth)
+    scale_bar_metric.setMaximumBarWidth(collar_width - 6)
+    scale_bar_metric.setMinimumBarWidth(20)
+    scale_bar_metric.setStyle('Double Box')
+    scale_bar_metric.setUnitLabel('m')  # Show "m" label (will auto-convert to km if large)
+    scale_bar_metric.setFont(QFont("Arial", 6))
+    scale_bar_metric.attemptMove(QgsLayoutPoint(scale_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    scale_bar_metric.setFrameEnabled(False)
+    layout.addLayoutItem(scale_bar_metric)
+    
+    current_y += 10
+    
+    # CRS LABEL
+    info_x = collar_content_x
+    crs_label = QgsLayoutItemLabel(layout)
+    render_crs = map_item.crs()  # Get the actual CRS being used by the map
+    crs_text = f"<b>Projection:</b><br>{render_crs.description()}<br>({render_crs.authid()})"
+    crs_label.setText(crs_text)
+    crs_label.setFont(QFont("Arial", 6))
+    crs_label.setMode(QgsLayoutItemLabel.ModeHtml)
+    crs_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    crs_label.attemptResize(QgsLayoutSize(collar_width - 4, 15, QgsUnitTypes.LayoutMillimeters))
+    crs_label.setFrameEnabled(False)
+    layout.addLayoutItem(crs_label)
+    
+    current_y += 18
+    
+    # ATTRIBUTION
+    attributions = outlets_qgis.collect_layer_attributions(config, outlet_config)
+    if attributions:
+        attr_label = QgsLayoutItemLabel(layout)
+        attr_text = f"<b>Data Sources:</b><br>{', '.join(attributions)}"
+        attr_label.setText(attr_text)
+        attr_label.setFont(QFont("Arial", 5))
+        attr_label.setMode(QgsLayoutItemLabel.ModeHtml)
+        attr_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+        attr_label.attemptResize(QgsLayoutSize(collar_width - 4, 20, QgsUnitTypes.LayoutMillimeters))
+        attr_label.setFrameEnabled(False)
+        layout.addLayoutItem(attr_label)
+        current_y += 22
+    
+    # GENERATION DATE
+    date_label = QgsLayoutItemLabel(layout)
+    atlas_name = config.get('name', 'Atlas')
+    gen_date = datetime.now().strftime('%Y-%m-%d')
+    date_text = f"<b>{atlas_name}</b><br>Generated: {gen_date}"
+    date_label.setText(date_text)
+    date_label.setFont(QFont("Arial", 6))
+    date_label.setMode(QgsLayoutItemLabel.ModeHtml)
+    date_label.attemptMove(QgsLayoutPoint(info_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    date_label.attemptResize(QgsLayoutSize(collar_width - 4, 12, QgsUnitTypes.LayoutMillimeters))
+    date_label.setFrameEnabled(False)
+    layout.addLayoutItem(date_label)
+    
+    current_y += 14
+    
+    # ============================================================
+    # BOTTOM SECTION: Legend (variable size, so placed at bottom)
+    # ============================================================
+    
+    # LEGEND (at bottom - variable height won't cause overlaps)
+    legend = QgsLayoutItemLegend(layout)
+    legend.setTitle("")
+    legend.setLinkedMap(map_item)
+    legend.attemptMove(QgsLayoutPoint(collar_content_x, current_y, QgsUnitTypes.LayoutMillimeters))
+    legend.setFrameEnabled(False)
+    legend.setAutoUpdateModel(True)
+    
+    # Make legend compact - use 1 column for vertical collar
+    legend.setSymbolWidth(3)
+    legend.setSymbolHeight(2)
+    legend.setLineSpacing(0.3)
+    legend.setColumnCount(1)  # Single column for narrow vertical collar
+    
+    # Filter out basemap and regions, and group road layers
+    legend.setAutoUpdateModel(False)
+    root = legend.model().rootGroup()
+    layers_to_remove = []
+    road_layers = []
+    
+    for layer in root.children():
+        if isinstance(layer, QgsLayerTreeLayer):
+            layer_name = layer.name().lower()
+            if 'basemap' in layer_name or 'regions' in layer_name:
+                layers_to_remove.append(layer)
+            elif layer_name.startswith('roads_'):
+                road_layers.append(layer)
+    
+    # Remove basemap and regions layers
+    for layer in layers_to_remove:
+        root.removeChildNode(layer)
+    
+    # Group road layers under a single "Roads" entry (keep only first road layer as representative)
+    if road_layers:
+        # Keep the first road layer and rename it to "Roads"
+        road_layers[0].setName("Roads")
+        # Remove other road layers
+        for layer in road_layers[1:]:
+            root.removeChildNode(layer)
+    
+    layout.addLayoutItem(legend)
 
 
 def export_atlas(layout, output_dir, atlas_name):
