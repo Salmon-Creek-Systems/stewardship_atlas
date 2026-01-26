@@ -147,7 +147,7 @@
     "qgis_runbook": {
         "name": "qgis_runbook",
         "asset_type": "outlet",
-        "fetch_type": "qgis_runbook",
+        "fetch_type": "outlet_runbook_qgis_atlas",
         "interaction": "interface",
         "data_type": "geopdf",
         "page_size": "A4",

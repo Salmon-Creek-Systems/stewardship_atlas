@@ -200,7 +200,7 @@
 	"name": "gazetteer",
 	"config_def": "gazetteer","in_layers": ["basemap", "tsunami", "parcels", "contours", "roads_secondary", "milemarkers", "creeks", "buildings", "natural"]
     },
-    "qgis_runbook": {
+    "private_runbook": {
 	"type": "outlet",
 	"name": "qgis_runbook",
 	"access": ["technical"],

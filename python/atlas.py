@@ -57,7 +57,7 @@ DEFAULT_CONFIG = {
     }
 }
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
-DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods # |  outlets_qgis.asset_methods 
+DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods 
 
 
 def discover_versions(swale_path: Path) -> List[str]:

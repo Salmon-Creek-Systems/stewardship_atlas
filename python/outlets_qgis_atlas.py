@@ -94,9 +94,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
     if not regions_path.exists():
         raise FileNotFoundError(f"Regions file not found: {regions_path}")
     
-    # Initialize QGIS
-    qgs = QgsApplication([], False)
-    qgs.initQgis()
+    # Initialize QGIS using singleton pattern (safe for repeated calls in notebooks)
+    outlets_qgis.qgis_init()
     
     try:
         # Create project and load layers
@@ -270,7 +269,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         return results
         
     finally:
-        qgs.exitQgis()
+        # Use singleton cleanup (does NOT call exitQgis to avoid crashes on subsequent runs)
+        outlets_qgis.qgis_cleanup()
 
 
 def create_atlas_layout(project, coverage_layer, config, outlet_name):
