@@ -93,7 +93,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
     
     if not regions_path.exists():
         raise FileNotFoundError(f"Regions file not found: {regions_path}")
-    
+
+    logger.info(f"Starting QGIS Atlas. Outlet config: {outlet_config}. Road Layers config: {config['dataswale']['layers']}")
     # Initialize QGIS using singleton pattern (safe for repeated calls in notebooks)
     outlets_qgis.qgis_init()
     

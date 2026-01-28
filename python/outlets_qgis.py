@@ -383,6 +383,11 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 symbol_layer = symbol.symbolLayer(0)
                 if symbol_layer:
                     #logger.info(f"using feature vector_width")
+
+                    if hasattr(symbol_layer, 'setWidthUnit'):
+                        #symbol_layer.setWidthUnit(QgsUnitTypes.RenderMillimeters)
+                        symbol_layer.setWidthUnit(QgsUnitTypes.RenderMapUnits)
+                        
                     logger.info(f"Using per-feature vector_width attribute (scale: {feature_scale}) for {layer.name()}")
                     # Width from 'vector_width' attribute in feature properties, scaled to mm
                     symbol_layer.setDataDefinedProperty(
