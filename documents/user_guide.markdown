@@ -178,13 +178,37 @@ This approach is useful for:
 
 ### Data Versioning
 
-The atlas maintains versions of your data, so you can:
-- Roll back changes if needed
-- Track what changed and when
-- Test edits before publishing
-- Maintain stable "released" versions
+The atlas uses a **staging and publish** model for managing data changes:
 
-Admin users can create new versions and promote them when ready.
+**How It Works:**
+- **Staging**: All edits happen in a working "staging" area. This is your draft workspace.
+- **Published Versions**: When you're ready, you "publish" to create a permanent timestamped snapshot (e.g., `2024-01-15_14-30-00`).
+
+**Why Versioning Matters:**
+- **Safety**: Published versions can't be accidentally modified
+- **History**: Each publish creates a permanent record of your data at that point
+- **Sharing**: Share links to specific versions for consistency
+- **Recovery**: If something goes wrong in staging, published versions remain intact
+
+**The Publishing Workflow:**
+1. Make edits in the staging environment (webmap, edit map, spreadsheet import)
+2. Review changes to ensure they're correct
+3. Click "Publish Atlas" in the Admin Console
+4. A new version is created and becomes available at its own URL
+5. Continue editing in staging for the next set of changes
+
+**Accessing Versions:**
+- Current staging: `/staging/outlets/...`
+- Published version: `/{version-name}/outlets/...`
+- The Admin Console shows all available versions with links
+
+**Best Practices:**
+- Publish after completing a logical set of changes
+- Publish before making risky modifications (as a backup)
+- Use version URLs when sharing data that shouldn't change
+- Review staging changes before publishing
+
+Admin users can create new versions through the Admin Console. See [Publishing Guide](help/publish_version.md) for detailed instructions.
 
 ## Sharing Data
 
@@ -269,6 +293,12 @@ The atlas uses open, standard formats:
 - [Upload new data](help/upload_vector.md)
 - [Hide/show layers](help/hide_layers.md)
 - [Replace layer data](help/replace_layer.md)
+
+**Admin Tasks:**
+- [Publish a new version](help/publish_version.md)
+- [Edit atlas configuration](help/edit_config.md)
+- [Export/import spreadsheets](help/spreadsheet_workflow.md)
+- [Add private notes](help/add_private_note.md)
 
 **Support:**
 Contact your atlas administrator for:
