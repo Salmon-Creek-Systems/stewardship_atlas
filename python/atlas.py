@@ -24,7 +24,7 @@ import geojson
 # Our imports
 import utils
 import outlets
-#import outlets_qgis
+import outlets_qgis_atlas
 import vector_inlets
 import raster_inlets
 import eddies
