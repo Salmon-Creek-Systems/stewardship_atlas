@@ -95,6 +95,7 @@
 
 	    swalename=data.swaleName;
         baseurl=data.baseurl;
+        atlasappport=data.atlasappport;
 	    
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
@@ -258,7 +259,7 @@
                             
                             // Send to server using the same API as upload button
                             var xmlhttp = new XMLHttpRequest();
-                            xmlhttp.open("POST", `${baseurl}:9998/delta_upload/${swalename}`);
+                            xmlhttp.open("POST", `${baseurl}:${atlasappport}/delta_upload/${swalename}`);
                             xmlhttp.setRequestHeader("Content-Type", "application/json");
                             var geojson_data = JSON.stringify({"data": geojson});
                             xmlhttp.send(geojson_data);
@@ -288,7 +289,7 @@
                     refreshLink.textContent = ' (clear) ';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`${baseurl}:9998/clear_layer/${swalename}/${item.name}`)
+                        fetch(`${baseurl}:${atlasappport}/clear_layer/${swalename}/${item.name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
@@ -319,7 +320,7 @@
             publishButton.disabled = true;
             statusDiv.innerHTML = `Processing... ${swalename}`;
             
-            fetch(`${baseurl}:9998/publish?swale=${swalename}`)
+            fetch(`${baseurl}:${atlasappport}/publish?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -338,7 +339,7 @@
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
             
-            fetch(`${baseurl}:9998/publish-status?swale=${swalename}`)
+            fetch(`${baseurl}:${atlasappport}/publish-status?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -365,7 +366,7 @@
             linkElement.textContent = ' (exporting...) ';
             linkElement.style.pointerEvents = 'none';
             
-            fetch(`${baseurl}:9998/export_gsheet/${swalename}/${layerName}`)
+            fetch(`${baseurl}:${atlasappport}/export_gsheet/${swalename}/${layerName}`)
                 .then(response => response.json())
                 .then(data => {
                     console.log('Export response:', data);
@@ -408,7 +409,7 @@
             linkElement.textContent = ' (importing...) ';
             linkElement.style.pointerEvents = 'none';
             
-            fetch(`${baseurl}:9998/import_sheet/${swalename}/${layerName}`, {
+            fetch(`${baseurl}:${atlasappport}/import_sheet/${swalename}/${layerName}`, {
                 method: 'POST'
             })
                 .then(response => response.json())
