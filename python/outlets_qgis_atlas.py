@@ -261,7 +261,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         layout = create_atlas_layout(project, regions_layer, config, outlet_name)
         
         # Export atlas
-        output_dir = versioning.atlas_path(config, outlet_config.get('outpath', 'outputs'))
+        output_dir = versioning.atlas_path(config) / 'outlets' / outlet_name
         output_dir.mkdir(parents=True, exist_ok=True)
         
         results = export_atlas(layout, output_dir, config.get('name', 'atlas'))
