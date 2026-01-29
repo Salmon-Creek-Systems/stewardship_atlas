@@ -102,7 +102,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         # Create project and load layers
         project = QgsProject.instance()
         project.clear()
-        
+        print(f"Loading layers")
         logger.info(f"Loading layers for atlas generation...")
         
         # Load all data layers
@@ -111,6 +111,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         # layers_config = config['dataswale']['layers']
         
         for layer_name in in_layers:
+            print(f"Loading layer: {layer_name}")
             if layer_name not in layers_config:
                 logger.warning(f"⚠ Layer {layer_name} not found in config {layers_config.keys()}")
                 continue
