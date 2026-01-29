@@ -400,7 +400,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
 
                 for outlet_name in ac['dataswale'].get('versioned_outlets', []):
                     print(f"Materializing outlet: {outlet_name}")
-                    logging.info(f"Materializing outlet: {outlet_name}")
+                    logging.info(f"LOG Materializing outlet: {outlet_name}")
                     publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
                     atlas.materialize(ac, outlet_name,outlets.asset_methods)
                     publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])

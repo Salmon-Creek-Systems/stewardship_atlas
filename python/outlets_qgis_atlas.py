@@ -63,11 +63,19 @@ except ImportError:
     import outlets_qgis
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
+# logger = logging.getLogger(__name__)
+
+
+# Configure logging
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
@@ -94,7 +102,9 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
     if not regions_path.exists():
         raise FileNotFoundError(f"Regions file not found: {regions_path}")
 
-    logger.info(f"Starting QGIS Atlas. Outlet config: {outlet_config}. Road Layers config: {config['dataswale']['layers']}")
+    logger.info(f"Starting QGIS Atlas. {config['name']}")
+    logger.info(f"Outlet config: {outlet_config}. Road Layers config: {config['dataswale']['layers']}")
+
     # Initialize QGIS using singleton pattern (safe for repeated calls in notebooks)
     outlets_qgis.qgis_init()
     
