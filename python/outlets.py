@@ -1306,6 +1306,132 @@ def outlet_gazetteer(config, outlet_name, skips=[], first_n=0):
     return res
 
 
+
+def make_regions_index(config, outlet_name, regions):
+    outlet_config = config['assets'][outlet_name]
+    regions_path = versioning.atlas_path(config, "layers") / outlet_config['regions_layer'] / f"{outlet_config['regions_layer']}.geojson"
+    # regions = regions_from_geojson(regions_path)
+    # return regions
+
+    index_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Run Book</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            margin: 20px 0;
+        }
+        
+        h2 {
+            color: #555;
+            margin: 15px 0;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        
+        li {
+            margin: 10px 0;
+            padding: 12px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s;
+        }
+        
+        li:hover {
+            background-color: #f0f0f0;
+            border-color: #ccc;
+            transform: translateX(5px);
+        }
+        
+        a {
+            text-decoration: none;
+            color: #0066cc;
+            font-size: 1.1em;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+            color: #004499;
+        }
+        
+        .main-link {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>""" + config['name'] + " " + outlet_name + """  Index</h1>
+        
+        <div class="section">
+            <h2>Full Book</h2>
+            <p><a href='https://scs-internal.s3.us-west-1.amazonaws.com/collated.pdf' class='main-link'>Download Complete PDF</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Webmap View</h2>
+            <p><a href='../webmap' class='main-link'>Open Interactive Map</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Individual Pages</h2>
+            <ul>"""
+    
+    # new_regions = dataswale_geojson.layer_as_featurecollection(config, 'regions')
+    base_url = outlet_config.get('base_url', f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages")
+    for i,r in enumerate(regions['features']):
+        cname  = r['properties'].get('name', f"region_{i}").replace(" ", "+")
+        url = f"{base_url}/{cname}.pdf"
+        index_html += f"<li><a href='{url}'>{r['properties']['name']}</a></li>\n"
+    
+    index_html += """            </ul>
+        </div>
+    </div>
+</body>
+</html>"""
+    
+    with open(f"{outlet_dir}/index.html", "w") as f:
+        f.write(index_html)
+
+    return f"{outlet_dir}/index.html"
+
+   
+
+
+
 def outlet_runbook( config, outlet_name, skips=[], start_at=0, limit=0):
     """
     For a swale's "regions" layer, generate a runbook. This comprises a series of pages, one per region, linked by the "neighbor" array Property.

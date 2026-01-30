@@ -276,7 +276,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         output_dir.mkdir(parents=True, exist_ok=True)
         
         results = export_atlas(layout, output_dir, config.get('name', 'atlas'))
-        
+        # generate index
+        outlets.make_regions_index(config, outlet_name, regions_layer)
         logger.info(f"Atlas generation complete: {results}")
         return results
         

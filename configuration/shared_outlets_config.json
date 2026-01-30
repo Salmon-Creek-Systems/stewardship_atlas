@@ -149,6 +149,7 @@
         "asset_type": "outlet",
         "fetch_type": "outlet_runbook_qgis_atlas",
         "interaction": "interface",
+        "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/",
         "data_type": "geopdf",
         "page_size": "A4",
         "page_orientation": "Portrait",
