@@ -402,7 +402,7 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                     print(f"Materializing outlet: {outlet_name}")
                     logging.info(f"LOG Materializing outlet: {outlet_name}")
                     publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
-                    atlas.materialize(ac, outlet_name,outlets.asset_methods)
+                    atlas.materialize(ac, outlet_name)
                     publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
                 # res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
@@ -415,11 +415,16 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 # publish_status["log"] = []
                 #logger.info(res_json)
                 # let's always refresh the HTML after all this.
-                atlas.materialize(ac, 'html',outlets.asset_methods)
+                atlas.materialize(ac, 'html')
                 return str(res)
             except Exception as e:
-                print(f"E! {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+                error_msg = f"Error in publish background task: {e}"
+                logging.error(error_msg)
+                logging.error(traceback.format_exc())
+                publish_status["log"].append([(f'ERROR: {e}', datetime.now().isoformat())])
+                publish_status["publishing"] = False
+                publish_status["finished_at"] = datetime.now().isoformat()
+                # Don't raise HTTPException in background task - response already sent
 
 
 
