@@ -132,21 +132,21 @@
   "webedit": {
     "type": "outlet",
     "name": "webmap",
-    "in_layers": [
-      "basemap",
-      "regions",
-      "tsunami",
-      "parcels",
-      "contours",
-      "roads_primary",
-      "roads_secondary",
-      "roads_tertiary",
-      "milemarkers",
-      "creeks",
-      "buildings",
-      "natural",
-      "campgrounds"
-    ],
+      "in_layers": [
+	  "basemap",
+	  "contours",
+	  "roads_primary",
+	  "roads_secondary",
+	  "roads_tertiary",
+	  "milemarkers",
+	  "creeks",
+	  "buildings",
+	  "natural",
+	  "helilandings",
+	  "hydrants",
+	  "campgrounds",
+	  "private_notes"
+      ],
     "config_def": "webedit"
   },
   "config_edit": {
@@ -156,12 +156,29 @@
     "interaction": "interface",
     "config_def": "config_editor"
   },
-  "internal_webmap": {
+  "private_webmap": {
     "type": "outlet",
-    "name": "internal_webmap",
-    "in_layers": ["basemap", "regions", "roads_primary", "roads_secondary"],
+      "name": "private_webmap",
+      "in_layers": [
+	  "basemap",
+	  "sites",
+	  "tsunami",
+	  "parcels",
+	  "contours",
+	  "roads_primary",
+	  "roads_secondary",
+	  "roads_tertiary",
+	  "milemarkers",
+	  "creeks",
+	  "buildings",
+	  "natural",
+	  "helilandings",
+	  "hydrants",
+	  "campgrounds",
+	  "private_notes"
+      ],
     "config_def": "webmap",
-    "access": ["technical"]
+      "access": ["admin", "technical"]
   },
   "notebook": {
     "type": "outlet",
@@ -259,22 +276,22 @@
   },
   "private_runbook": {
     "type": "outlet",
-    "name": "qgis_runbook",
-    "access": ["technical"],
-    "config_def": "qgis_runbook",
-    "regions_layer": "regions",
-    "in_layers": [
-      "lidar_basemap",
-      "tsunami",
-      "contours",
-      "roads_primary",
-      "roads_secondary",
-      "roads_tertiary",
-      "milemarkers",
-      "creeks",
-      "buildings",
-      "natural",
-      "private_notes"
-    ]
+      "name": "private_runbook",
+      "access": ["admin", "technical"],
+      "config_def": "qgis_runbook",
+      "regions_layer": "regions",
+      "in_layers": [
+	  "lidar_basemap",
+	  "tsunami",
+	  "contours",
+	  "roads_primary",
+	  "roads_secondary",
+	  "roads_tertiary",
+	  "milemarkers",
+	  "creeks",
+	  "buildings", "campgrounds",
+	  "natural","hydrants", "helilandings", 
+	  "private_notes"
+      ]
   }
 }

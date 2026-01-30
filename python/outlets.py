@@ -569,7 +569,8 @@ def outlet_webmap(config, name):
 
     template_path = versioning.atlas_path(config, version='app') / 'templates'    
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
-    #subprocess.run(['cp', '../templates/js/map.js', f"{webmap_dir}/js/"])
+    subprocess.run(['cp', '-r', template_path / 'js',  webmap_dir /  "js"])
+
     
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
