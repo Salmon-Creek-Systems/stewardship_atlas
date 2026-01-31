@@ -16,6 +16,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
+import outlets
 
 # Set Qt to use offscreen platform for headless operation
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -78,7 +79,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
+def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdfs=False):
     """
     Generate a runbook PDF using QGIS Atlas functionality.
     
@@ -97,7 +98,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
     
     # Get paths
     swale_path = versioning.atlas_path(config, "layers")
-    regions_path = swale_path / "regions" / "regions.geojson"
+    regions_layer_name = outlet_config['regions_layer']
+    regions_path = swale_path / regions_layer_name / f"{regions_layer_name}.geojson"
     
     if not regions_path.exists():
         raise FileNotFoundError(f"Regions file not found: {regions_path}")
@@ -105,7 +107,16 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
     logger.info(f"Starting QGIS Atlas. {config['name']}")
     logger.info(f"Outlet config: {outlet_config}. Road Layers config: {config['dataswale']['layers']}")
 
+
+    regions = outlets.regions_from_geojson(regions_path, start_at=0, limit=0, label_property = outlet_config['label_property'])
+    outlets.make_regions_index(config, outlet_name, regions)
+    
+    if not refresh_pdfs:
+        logger.info(f"Skipping PDF refresh for {outlet_name}...")
+        return {}
+    
     # Initialize QGIS using singleton pattern (safe for repeated calls in notebooks)
+        
     outlets_qgis.qgis_init()
     
     try:
@@ -146,7 +157,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             except Exception as e:
                 logger.error(f"✗ Error loading layer {layer_name}: {e}")
                 continue
-        
+            
         # Load regions as coverage layer
         regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
         if not regions_layer.isValid():
@@ -165,7 +176,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             
             if regions_layer.featureCount() == 0:
                 raise RuntimeError(f"No regions matched filter: {only_generate}")
-        
+            
         project.addMapLayer(regions_layer, False)  # False = don't add to legend
         logger.info(f"Loaded {regions_layer.featureCount()} regions as coverage layer")
         logger.info(f"Regions CRS: {regions_layer.crs().authid()}")
@@ -177,16 +188,16 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             if hasattr(layer, 'crs') and layer.name() != 'regions':
                 layer_crs = layer.crs()
                 break
-        
+            
         if layer_crs is None:
             layer_crs = QgsCoordinateReferenceSystem("EPSG:4326")
-        
+            
         # Use projected CRS for rendering if layer CRS is geographic
         render_crs = layer_crs
         if layer_crs.isGeographic():
             render_crs = QgsCoordinateReferenceSystem("EPSG:3857")
             logger.info(f"Layer CRS {layer_crs.authid()} is geographic, will use EPSG:3857 for rendering")
-        
+            
         # Reproject regions to match rendering CRS for correct aspect ratios
         if regions_layer.crs() != render_crs:
             logger.info(f"Reprojecting regions from {regions_layer.crs().authid()} to {render_crs.authid()} for correct atlas geometry")
@@ -216,7 +227,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
                 geom.transform(transform)
                 new_feature.setGeometry(geom)
                 reprojected_features.append(new_feature)
-            
+                
             reprojected_provider.addFeatures(reprojected_features)
             reprojected_layer.updateExtents()
             
@@ -228,7 +239,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             logger.info(f"✓ Reprojected {regions_layer.featureCount()} regions to {render_crs.authid()}")
         else:
             logger.info(f"Regions CRS matches rendering CRS, no reprojection needed")
-        
+            
         # Convert regions to square geometries for better fitting in map frame
         # Now that regions are in EPSG:3857, squares will be true map-space squares
         regions_layer.startEditing()
@@ -264,7 +275,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
             
             region_name = feature.attribute('name') if feature.attribute('name') else f"region_{fid}"
             logger.info(f"Region '{region_name}': {width:.0f}m x {height:.0f}m -> {size:.0f}m x {size:.0f}m (square)")
-        
+            
         regions_layer.commitChanges()
         logger.info(f"✓ Converted {regions_layer.featureCount()} regions to true map-space squares")
         
@@ -277,14 +288,17 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[]):
         
         results = export_atlas(layout, output_dir, config.get('name', 'atlas'))
         # generate index
-        outlets.make_regions_index(config, outlet_name, regions_layer)
-        logger.info(f"Atlas generation complete: {results}")
-        return results
-        
+
+        logger.info(f"Atlas PDF generation complete: {results}")
+        #return results
+
+    
     finally:
         # Use singleton cleanup (does NOT call exitQgis to avoid crashes on subsequent runs)
         outlets_qgis.qgis_cleanup()
 
+    logger.info(f"Atlas generation complete: {results}")
+    return results
 
 def create_atlas_layout(project, coverage_layer, config, outlet_name):
     """

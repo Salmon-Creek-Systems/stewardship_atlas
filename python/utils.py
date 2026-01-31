@@ -47,6 +47,20 @@ def geojson_to_bbox(geojson):
         "south": min(vert)
     }
 
+
+def geojson_multipolygon_to_bbox(geojson):
+    """Now supports multipolygons! Maybe!"""
+    
+    horiz = [c[0] for c in geojson[0][0]]    
+    vert = [c[1] for c in geojson[0][0]]
+
+    return {
+        "west": min(horiz),
+        "east": max(horiz),
+        "north": max(vert),
+        "south": min(vert)
+    }
+
 def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
     """Convert TIFF to JPG using versioned paths"""
     # Construct JPG path

@@ -300,7 +300,9 @@
       "name": "sitesbook",
       "access": ["internal", "admin"],
       "config_def": "qgis_runbook",
+      "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/Sites/sites",
       "regions_layer": "sites",
+      "label_property": "SITUS_3",
       "in_layers": [
 	  "lidar_basemap",
 	  "tsunami",

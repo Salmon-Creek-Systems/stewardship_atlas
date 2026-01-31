@@ -1108,7 +1108,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
     
     return regions
 
-def regions_from_geojson(path, start_at=2,limit=3):
+def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description"):
     """Load regions from a GeoJSON file."""
     regions = []
     last_region = None
@@ -1122,10 +1122,14 @@ def regions_from_geojson(path, start_at=2,limit=3):
                 logger.info(f"hit region limit of {limit}, truncating RunBook.")
                 break
             logger.debug(f"Converting region {i} from GJ: {region}")
-            bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
+
+            if region['geometry']['type'] == "MultiPolygon":
+                bbox = utils.geojson_multipolygon_to_bbox(region['geometry']['coordinates'])
+            else:
+                bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
             default_name =  f"Region {i}"
             regions.append({
-                'name': utils.canonicalize_name(region['properties'].get('Description', default_name)),
+                'name': utils.canonicalize_name(region['properties'].get(label_property, default_name)),
                 'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
                 'bbox': bbox,
@@ -1313,7 +1317,7 @@ def make_regions_index(config, outlet_name, regions):
     # regions = regions_from_geojson(regions_path)
     # return regions
 
-    index_html = f"""
+    index_html = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -1412,17 +1416,17 @@ def make_regions_index(config, outlet_name, regions):
     
     # new_regions = dataswale_geojson.layer_as_featurecollection(config, 'regions')
     base_url = outlet_config.get('base_url', f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages")
-    for i,r in enumerate(regions['features']):
-        cname  = r['properties'].get('name', f"region_{i}").replace(" ", "+")
+    for i,r in enumerate(regions):
+        cname  = r.get('name', f"region_{i}").replace(" ", "+")
         url = f"{base_url}/{cname}.pdf"
-        index_html += f"<li><a href='{url}'>{r['properties']['name']}</a></li>\n"
+        index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
     
     index_html += """            </ul>
         </div>
     </div>
 </body>
 </html>"""
-    
+    outlet_dir = versioning.atlas_path(config, "outlets") / outlet_name 
     with open(f"{outlet_dir}/index.html", "w") as f:
         f.write(index_html)
 
