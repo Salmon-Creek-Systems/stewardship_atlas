@@ -218,7 +218,8 @@ function initializeBasemapSwitching(map) {
                 layer.id === 'hillshade-layer' ||
                 layer.id === 'satellite-layer' || 
                 layer.id === 'usgs-layer' || 
-                layer.id === 'terrain-layer') {
+                layer.id === 'terrain-layer' ||
+                layer.id === 'shaded-relief-layer') {
                 map.setLayoutProperty(layer.id, 'visibility', 'none');
             }
         }
@@ -237,6 +238,9 @@ function initializeBasemapSwitching(map) {
                 break;
             case 'terrain':
                 map.setLayoutProperty('terrain-layer', 'visibility', 'visible');
+                break;
+            case 'shaded-relief':
+                map.setLayoutProperty('shaded-relief-layer', 'visibility', 'visible');
                 break;
         }
     });

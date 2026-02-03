@@ -36,12 +36,13 @@ map.on('load', () => {
     const firstLayerId = style.layers[0].id;
 
     // Initialize enhanced progress tracking
-    const updateProgress = initializeProgressTracking(map, 4); // hillshade + 3 basemaps
+    const updateProgress = initializeProgressTracking(map, 5); // hillshade + 4 basemaps
 
     // Add sources
     map.addSource('satellite', SATELLITE_SOURCE);
     map.addSource('usgs', USGS_SOURCE);
     map.addSource('terrain', TERRAIN_SOURCE);
+    map.addSource('shaded-relief', SHADED_RELIEF_SOURCE);
 
     // Add layers before the first existing layer to ensure they're at the bottom
     map.addLayer({
@@ -66,6 +67,15 @@ map.on('load', () => {
         'id': 'terrain-layer',
         'type': 'raster',
         'source': 'terrain',
+        'layout': {
+            'visibility': 'none'
+        }
+    }, firstLayerId);
+
+    map.addLayer({
+        'id': 'shaded-relief-layer',
+        'type': 'raster',
+        'source': 'shaded-relief',
         'layout': {
             'visibility': 'none'
         }

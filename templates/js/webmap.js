@@ -121,11 +121,12 @@ map.on('load', async () => {
     }
 
     // Initialize enhanced progress tracking
-    const updateProgress = initializeProgressTracking(map, 4); // basemap + 3 basemaps
+    const updateProgress = initializeProgressTracking(map, 5); // basemap + 4 basemaps
 
     map.addSource('satellite', SATELLITE_SOURCE);
     map.addSource('usgs', USGS_SOURCE);
     map.addSource('terrain', TERRAIN_SOURCE);
+    map.addSource('shaded-relief', SHADED_RELIEF_SOURCE);
     
     // Add satellite layer before the first existing layer
     map.addLayer({
@@ -157,6 +158,16 @@ map.on('load', async () => {
         }
     }, firstLayerId);
     
+    // Add shaded relief layer before the first existing layer
+    map.addLayer({
+        'id': 'shaded-relief-layer',
+        'type': 'raster',
+        'source': 'shaded-relief',
+        'paint': {
+            'raster-opacity': 0.7
+        }
+    }, firstLayerId);
+    
     // Initialize basemap switching
     initializeBasemapSwitching(map);
 
@@ -164,6 +175,7 @@ map.on('load', async () => {
     map.setLayoutProperty('satellite-layer', 'visibility', 'none');
     map.setLayoutProperty('usgs-layer', 'visibility', 'none');
     map.setLayoutProperty('terrain-layer', 'visibility', 'none');
+    map.setLayoutProperty('shaded-relief-layer', 'visibility', 'none');
     // The default basemap should already be visible from the style
     // layers we need to load dynamically follow:
     // {dynamic_layers}
