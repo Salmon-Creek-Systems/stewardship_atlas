@@ -206,42 +206,67 @@ function initializeProgressTracking(map, totalLayers) {
 // Function to initialize basemap switching
 function initializeBasemapSwitching(map) {
     const basemapSelect = document.getElementById('basemap-select');
-    if (!basemapSelect) return;
+    if (!basemapSelect) {
+        console.warn('Basemap select element not found');
+        return;
+    }
+
+    console.log('Initializing basemap switching');
 
     basemapSelect.addEventListener('change', (event) => {
         const selectedBasemap = event.target.value;
+        console.log('Basemap selection changed to:', selectedBasemap);
+        
+        // Get all layer IDs for debugging
+        const layers = map.getStyle().layers;
+        const layerIds = layers.map(l => l.id);
+        console.log('Available layers:', layerIds);
         
         // Hide all basemap layers first
-        const layers = map.getStyle().layers;
-        for (const layer of layers) {
-            if (layer.id === 'basemap-layer' || 
-                layer.id === 'hillshade-layer' ||
-                layer.id === 'satellite-layer' || 
-                layer.id === 'usgs-layer' || 
-                layer.id === 'terrain-layer' ||
-                layer.id === 'shaded-relief-layer') {
-                map.setLayoutProperty(layer.id, 'visibility', 'none');
+        const basemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer', 
+                                  'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
+        
+        for (const layerId of basemapLayerIds) {
+            if (map.getLayer(layerId)) {
+                try {
+                    map.setLayoutProperty(layerId, 'visibility', 'none');
+                    console.log('Hidden layer:', layerId);
+                } catch (e) {
+                    console.error('Error hiding layer', layerId, e);
+                }
             }
         }
         
         // Show the selected basemap
+        let targetLayer = null;
         switch (selectedBasemap) {
             case 'basemap':
             case 'hillshade':
-                map.setLayoutProperty('basemap-layer', 'visibility', 'visible');
+                targetLayer = 'basemap-layer';
                 break;
             case 'satellite':
-                map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+                targetLayer = 'satellite-layer';
                 break;
             case 'usgs':
-                map.setLayoutProperty('usgs-layer', 'visibility', 'visible');
+                targetLayer = 'usgs-layer';
                 break;
             case 'terrain':
-                map.setLayoutProperty('terrain-layer', 'visibility', 'visible');
+                targetLayer = 'terrain-layer';
                 break;
             case 'shaded-relief':
-                map.setLayoutProperty('shaded-relief-layer', 'visibility', 'visible');
+                targetLayer = 'shaded-relief-layer';
                 break;
+        }
+        
+        if (targetLayer && map.getLayer(targetLayer)) {
+            try {
+                map.setLayoutProperty(targetLayer, 'visibility', 'visible');
+                console.log('Shown layer:', targetLayer);
+            } catch (e) {
+                console.error('Error showing layer', targetLayer, e);
+            }
+        } else {
+            console.warn('Target layer not found:', targetLayer);
         }
     });
 }
