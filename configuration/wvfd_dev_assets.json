@@ -110,9 +110,7 @@
     "name": "webmap",
     "in_layers": [
       "basemap",
-      "sites",
       "tsunami",
-      "parcels",
       "contours",
       "roads_primary",
       "roads_secondary",
@@ -127,7 +125,7 @@
       "campgrounds"
     ],
     "config_def": "webmap",
-    "access": ["internal", "admin"]
+      "access": ["public", "internal", "admin"]
   },
   "webedit": {
     "type": "outlet",
@@ -203,7 +201,7 @@
       "roads_tertiary",
       "private_notes"
     ],
-    "access": ["internal", "admin"],
+      "access": ["public", "internal", "admin"],
     "config_def": "runbook",
     "feature_scale": 0.2,
     "blend_percent": 50,
