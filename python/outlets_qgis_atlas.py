@@ -542,8 +542,8 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
             extent = transform.transformBoundingBox(extent)
             logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
         
-        # Add generous buffer (80%) to show full atlas context
-        extent.scale(1.8)
+        # Add small buffer (10%) around atlas extent
+        extent.scale(1.1)
         
         # Adjust extent to be square (match the square overview map item)
         # This prevents distortion

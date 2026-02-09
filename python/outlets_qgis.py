@@ -376,8 +376,8 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             if fields.indexOf('vector_width') >= 0:
                 # Use data-defined width from each feature's vector_width attribute
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * feature_scale)  # Default/fallback width scaled by feature_scale
-                logger.info(f"set constant width: {width} * {feature_scale}")
+                symbol.setWidth(width)  # Default/fallback width (feature_scale only affects icons)
+                logger.info(f"set constant width: {width}")
                 
                 # Set data-defined property to read from feature attribute
                 symbol_layer = symbol.symbolLayer(0)
@@ -388,24 +388,23 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                         #symbol_layer.setWidthUnit(QgsUnitTypes.RenderMillimeters)
                         symbol_layer.setWidthUnit(QgsUnitTypes.RenderMapUnits)
                         
-                    logger.info(f"Using per-feature vector_width attribute (scale: {feature_scale}) for {layer.name()}")
-                    # Width from 'vector_width' attribute in feature properties, scaled to mm
+                    logger.info(f"Using per-feature vector_width attribute for {layer.name()}")
+                    # Width from 'vector_width' attribute in feature properties (feature_scale only affects icons)
                     symbol_layer.setDataDefinedProperty(
                         QgsSymbolLayer.PropertyStrokeWidth,
-                        QgsProperty.fromExpression(f'"vector_width" * {feature_scale}')
-                        #QgsProperty.fromExpression('"vector_width"')
+                        QgsProperty.fromExpression('"vector_width"')
                     )
 
             else:
                 logger.warning(f"Layer {layer.name()} config has 'vector_width' but features don't have that attribute")
                 # Fall back to constant width
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * 0.1 * feature_scale)
+                symbol.setWidth(width * 0.1)
         else:
             # Use constant width from config
             width = layer_config.get('constant_width', 2)
-            symbol.setWidth(width * 0.1 * feature_scale)  # Scale to mm with feature_scale
-            logger.info(f"DEFAULT constant width: {width} * {feature_scale}")
+            symbol.setWidth(width * 0.1)  # Scale to mm (feature_scale only affects icons)
+            logger.info(f"DEFAULT constant width: {width}")
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
