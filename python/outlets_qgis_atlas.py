@@ -16,7 +16,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-import outlets
+import outlets, utils
 
 # Set Qt to use offscreen platform for headless operation
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -79,7 +79,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdfs=False):
+def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdfs=True):
     """
     Generate a runbook PDF using QGIS Atlas functionality.
     
@@ -108,7 +108,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
     logger.info(f"Outlet config: {outlet_config}. Road Layers config: {config['dataswale']['layers']}")
 
 
-    regions = outlets.regions_from_geojson(regions_path, start_at=0, limit=0, label_property = outlet_config['label_property'])
+    regions = outlets.regions_from_geojson(regions_path, start_at=0, limit=0,
+                                           label_property = outlet_config.get('label_property', 'name'))
     outlets.make_regions_index(config, outlet_name, regions)
     
     if not refresh_pdfs:
@@ -837,7 +838,7 @@ def export_atlas(layout, output_dir, atlas_name):
         logger.info(f"Exporting page {page_num}: {region_name}")
         
         # Clean region name for filename
-        safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
+        safe_name =  utils.canonicalize_name("".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name))
         individual_pdf_path = individual_dir / f"{safe_name}.pdf"
         
         result = exporter.exportToPdf(str(individual_pdf_path), pdf_settings)
