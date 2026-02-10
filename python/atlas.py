@@ -116,55 +116,56 @@ def add_htpasswds(config, path, access):
             logger.debug(f"Added {role} user  to {htpasswd_file}")
 
 
-def create(config: Dict[str, Any] = DEFAULT_CONFIG, 
-           layers: List[Dict[str, Any]] = None, 
-           layers_path: str = None,
-           assets: Dict[str, Any] = None, 
-           assets_path: str = None,
-           data_root: str = None,
-           shared_dir: Path = None,
-           name: str = "Nameless",
-           admin_emails = [],
-           bbox: Dict[str, Any] = None,
-           feature_collection: Dict[str, Any] = None) -> None:
+def create_config(config: Dict[str, Any] = None, 
+                  layers: List[Dict[str, Any]] = None, 
+                  layers_path: str = None,
+                  assets: Dict[str, Any] = None, 
+                  assets_path: str = None,
+                  data_root: str = None,
+                  name: str = "Nameless",
+                  admin_emails: List[str] = None,
+                  bbox: Dict[str, Any] = None,
+                  feature_collection: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Create a new version of the stewardship atlas and a config file.
-
-    create core config in /staging, built from args here and metadata.json
-    populate with default layers and assets
-    create directories for each layer
-    add htpasswds to new directories
-    set processed layers and assets in config
-    store initial feature collection in /layers/regions
-    save config to /staging/atlas_config.json
-    return config
+    Build an atlas configuration dict without creating directories or files.
+    
+    This function processes layers and assets definitions, expands config_def references,
+    and returns a complete atlas configuration dictionary.
+    
+    Args:
+        config: Base config dict to start from (defaults to DEFAULT_CONFIG copy)
+        layers: List of layer definitions (alternative to layers_path)
+        layers_path: Path to layers JSON file
+        assets: Dict of asset definitions (alternative to assets_path)
+        assets_path: Path to assets JSON file
+        data_root: Root directory for atlas data
+        name: Atlas name
+        admin_emails: List of admin email addresses
+        bbox: Bounding box dict (alternative to feature_collection)
+        feature_collection: GeoJSON FeatureCollection with extent and properties
+        
+    Returns:
+        Complete atlas configuration dictionary
     """
-
-    # 
+    if config is None:
+        config = copy.deepcopy(DEFAULT_CONFIG)
+    
+    if admin_emails is None:
+        admin_emails = []
+    
+    # Extract properties from feature_collection if provided
     if feature_collection:
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
         admin_emails = feature['properties']['admin_emails']
         config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
         config['atlasappport'] = feature['properties'].get('atlasappport', 9998)
-
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
-        config['logo'] =  feature['properties'].get('logo', "/local/scs-smallgrass1.png")
+        config['logo'] = feature['properties'].get('logo', "/local/scs-smallgrass1.png")
         config['dataswale']['versioned_outlets'] = feature['properties'].get('versioned_outlets', [])
     
     p = Path(data_root) / name
-    p.mkdir(parents=True, exist_ok=True)
-
-
-    if not ( p / 'local').is_symlink():
-        (p / 'local').symlink_to(shared_dir, target_is_directory=True)
     
-    (p / 'staging').mkdir(parents=True, exist_ok=True)
-    (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
-    (p / 'staging' / 'layers' ).mkdir(parents=True, exist_ok=True)
-    # (p / 'staging').symlink_to(shared_dir)
-    if not ( p / 'staging' / 'local').is_symlink():
-        (p / 'staging' / 'local').symlink_to(shared_dir, target_is_directory=True)
     config['data_root'] = data_root
     config['name'] = name
     config['dataswale']['bbox'] = bbox
@@ -173,22 +174,17 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     # Discover existing versions in the swale directory
     config['dataswale']['versions'] = discover_versions(p)
 
-    # ### Load layers and assets definitions, 
-    # which will be used to build the config 
-    # from the core definitions and the local definitions
-
+    # Load layers and assets definitions
     if layers_path is not None:
         layers = json.load(open(layers_path))
     else:
-        layers = layers or DEFAULT_LAYERS
+        layers = layers or []
     
     if assets_path is not None:
         assets = json.load(open(assets_path))
     else:
-
-        assets = assets or DEFAULT_ASSETS
+        assets = assets or {}
     
-    # Don't set layers/assets in config yet - we'll process them first
     config['spreadsheets'] = {}
     
     # Load asset and layer core/shared definitions
@@ -201,7 +197,7 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
     # Combine all asset configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}
     
-    # for definitions of assets and layers assemble atlas_config from all_configs
+    # Process assets with config_def support
     for asset_name, asset in assets.items():
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
@@ -211,16 +207,6 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
             for key, value in asset.items():
                 if key != 'config':
                     asset['config'][key] = value
-        if asset['type'] == 'inlet':
-            (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
-            if asset.get('access',['public']).count('public') == 0:
-                # add htpasswrd to new directory unless public
-                add_htpasswds(config, p / 'staging' / 'deltas' / asset['out_layer'], asset['accsss'])
-        elif asset['type'] == 'outlet':
-            (p / 'staging' / 'outlets' / asset_name / 'work' ).mkdir(parents=True, exist_ok=True)
-            if asset.get('access',['public']).count('public') == 0:
-                # add htpasswrd to new directory
-                add_htpasswds(config,p / 'staging' / 'outlets' / asset_name, asset['access'])
     
     # Process layers with config_def support
     processed_layers = []
@@ -238,26 +224,114 @@ def create(config: Dict[str, Any] = DEFAULT_CONFIG,
                 layer_config[key] = value
         
         processed_layers.append(layer_config)
-        
-        # Create directories for each layer
-        (p / 'staging' / 'layers' / layer_config['name']).mkdir(parents=True, exist_ok=True)
-        if layer_config.get('access',['public']).count('public') == 0:
-            # add htpasswrd to new directory
-            add_htpasswds(config, p / 'staging' / 'layers' / layer_config['name'], layer_config['access'])
     
     # Set processed layers and assets in config
     config['dataswale']['layers'] = processed_layers
     config['assets'] = assets
+    
+    logger.info(f"Built config for {config['name']}.")
+    logger.debug(f"Config: {config}")
+    
+    return config
 
-    if (p /'staging' / 'layers' / 'regions').exists():
+
+def create(config: Dict[str, Any] = None, 
+           layers: List[Dict[str, Any]] = None, 
+           layers_path: str = None,
+           assets: Dict[str, Any] = None, 
+           assets_path: str = None,
+           data_root: str = None,
+           shared_dir: Path = None,
+           name: str = "Nameless",
+           admin_emails: List[str] = None,
+           bbox: Dict[str, Any] = None,
+           feature_collection: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Create a new stewardship atlas with directory structure and config file.
+
+    This function:
+    1. Builds the config using create_config()
+    2. Creates directory structure (staging/, layers/, outlets/, deltas/)
+    3. Creates symlinks to shared_dir
+    4. Adds htpasswd files for protected directories
+    5. Stores initial feature collection in layers/regions
+    6. Writes atlas_config.json
+    
+    Args:
+        config: Base config dict to start from (defaults to DEFAULT_CONFIG copy)
+        layers: List of layer definitions (alternative to layers_path)
+        layers_path: Path to layers JSON file
+        assets: Dict of asset definitions (alternative to assets_path)
+        assets_path: Path to assets JSON file
+        data_root: Root directory for atlas data
+        shared_dir: Path to shared resources directory
+        name: Atlas name
+        admin_emails: List of admin email addresses
+        bbox: Bounding box dict (alternative to feature_collection)
+        feature_collection: GeoJSON FeatureCollection with extent and properties
+        
+    Returns:
+        Complete atlas configuration dictionary
+    """
+    if admin_emails is None:
+        admin_emails = []
+    
+    # Build the configuration
+    config = create_config(
+        config=config,
+        layers=layers,
+        layers_path=layers_path,
+        assets=assets,
+        assets_path=assets_path,
+        data_root=data_root,
+        name=name,
+        admin_emails=admin_emails,
+        bbox=bbox,
+        feature_collection=feature_collection
+    )
+    
+    # Now create directory structure
+    p = Path(data_root) / config['name']
+    p.mkdir(parents=True, exist_ok=True)
+
+    if not (p / 'local').is_symlink():
+        (p / 'local').symlink_to(shared_dir, target_is_directory=True)
+    
+    (p / 'staging').mkdir(parents=True, exist_ok=True)
+    (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
+    (p / 'staging' / 'layers').mkdir(parents=True, exist_ok=True)
+    
+    if not (p / 'staging' / 'local').is_symlink():
+        (p / 'staging' / 'local').symlink_to(shared_dir, target_is_directory=True)
+    
+    # Create directories and htpasswds for assets
+    for asset_name, asset in config['assets'].items():
+        if asset['type'] == 'inlet':
+            (p / 'staging' / 'deltas' / asset['out_layer'] / 'work').mkdir(parents=True, exist_ok=True)
+            if asset.get('access', ['public']).count('public') == 0:
+                add_htpasswds(config, p / 'staging' / 'deltas' / asset['out_layer'], asset.get('access', []))
+        elif asset['type'] == 'outlet':
+            (p / 'staging' / 'outlets' / asset_name / 'work').mkdir(parents=True, exist_ok=True)
+            if asset.get('access', ['public']).count('public') == 0:
+                add_htpasswds(config, p / 'staging' / 'outlets' / asset_name, asset['access'])
+    
+    # Create directories and htpasswds for layers
+    for layer_config in config['dataswale']['layers']:
+        (p / 'staging' / 'layers' / layer_config['name']).mkdir(parents=True, exist_ok=True)
+        if layer_config.get('access', ['public']).count('public') == 0:
+            add_htpasswds(config, p / 'staging' / 'layers' / layer_config['name'], layer_config['access'])
+    
+    # Store initial feature collection in layers/regions
+    if (p / 'staging' / 'layers' / 'regions').exists():
         if feature_collection:
-            logger.info("Storing initial feature collection in {p /'layers' / 'regions'}...")
-            geojson.dump(feature_collection, open(p /'staging' / 'layers' / 'regions' / 'default_atlas_regions.geojson', "w"))
-
-            
-    logger.info(f"built a config for {config['name']}.")         
-    logger.debug(f"built a config: {config}")
-    json.dump(config, open(p / 'staging' / 'atlas_config.json', 'w'), indent=2)
+            logger.info(f"Storing initial feature collection in {p / 'staging' / 'layers' / 'regions'}...")
+            geojson.dump(feature_collection, open(p / 'staging' / 'layers' / 'regions' / 'default_atlas_regions.geojson', "w"))
+    
+    # Write config file
+    config_path = p / 'staging' / 'atlas_config.json'
+    logger.info(f"Writing config to {config_path}")
+    json.dump(config, open(config_path, 'w'), indent=2)
+    
     return config
 
     # populate

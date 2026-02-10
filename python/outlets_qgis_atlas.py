@@ -531,19 +531,29 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         overview_map.attemptMove(QgsLayoutPoint(overview_x, overview_y, QgsUnitTypes.LayoutMillimeters))
         overview_map.attemptResize(QgsLayoutSize(overview_size, overview_size, QgsUnitTypes.LayoutMillimeters))
         
-        # Set extent to show all regions (coverage layer extent with larger buffer)
-        # Transform extent to match the rendering CRS if needed
-        extent = coverage_layer.extent()
-        coverage_crs = coverage_layer.crs()
+        # Find basemap layer and use its extent (fits tightly to actual map data)
         render_crs = map_item.crs()
+        basemap_layer = None
+        for layer in project.mapLayers().values():
+            if 'basemap' in layer.name().lower():
+                basemap_layer = layer
+                break
         
-        if coverage_crs != render_crs:
-            transform = QgsCoordinateTransform(coverage_crs, render_crs, project)
+        # Use basemap extent if available, otherwise fall back to coverage layer
+        if basemap_layer:
+            extent = basemap_layer.extent()
+            source_crs = basemap_layer.crs()
+            logger.info(f"Using basemap layer extent for overview: {basemap_layer.name()}")
+        else:
+            extent = coverage_layer.extent()
+            source_crs = coverage_layer.crs()
+            logger.info(f"Using coverage layer extent for overview (no basemap found)")
+        
+        # Transform extent to match the rendering CRS if needed
+        if source_crs != render_crs:
+            transform = QgsCoordinateTransform(source_crs, render_crs, project)
             extent = transform.transformBoundingBox(extent)
-            logger.info(f"Transformed overview extent from {coverage_crs.authid()} to {render_crs.authid()}")
-        
-        # Add small buffer (10%) around atlas extent
-        extent.scale(1.1)
+            logger.info(f"Transformed overview extent from {source_crs.authid()} to {render_crs.authid()}")
         
         # Adjust extent to be square (match the square overview map item)
         # This prevents distortion
