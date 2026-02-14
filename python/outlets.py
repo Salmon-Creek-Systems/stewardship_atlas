@@ -649,6 +649,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
     return template.format(
         swale_name=config['name'],
         swalename=config['name'],
+        app_url=config['app_url'],
         action=action,
         edit_layer_name=ea['name'],
         controls_html=controls_html,

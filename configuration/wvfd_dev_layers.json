@@ -124,6 +124,29 @@
     ]
   },
   {
+    "name": "roads_candidates",
+    "geometry_type": "linestring",
+    "color": [196, 107, 72],
+    "add_labels": true,
+    "interaction": "interface",
+    "vector_width": true,
+    "vis": {"minzoom": 16, "maxzoom": 22},
+    "editable_columns": [
+      {"name": "name", "type": "string", "default": "Road"},
+      {
+        "name": "STREETTYPE",
+        "type": "radio",
+        "values": [
+          {"STREETTYPE": "RD", "vector_width": 5},
+          {"STREETTYPE": "ST", "vector_width": 5},
+          {"STREETTYPE": "Other", "vector_width": 5}
+        ],
+        "default": {"STREETTYPE": "RD", "vector_width": 5}
+      }
+    ]
+  },
+
+    {
     "name": "creeks",
     "geometry_type": "linestring",
     "add_labels": true,
