@@ -130,7 +130,7 @@
     "add_labels": true,
     "interaction": "interface",
     "vector_width": true,
-    "vis": {"minzoom": 16, "maxzoom": 22},
+    "vis": {"minzoom": 13, "maxzoom": 22},
     "editable_columns": [
       {"name": "name", "type": "string", "default": "Road"},
       {

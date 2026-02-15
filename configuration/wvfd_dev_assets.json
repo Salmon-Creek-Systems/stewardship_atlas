@@ -120,7 +120,6 @@
       "buildings",
       "natural",
       "helilandings",
-      "incidents",
       "hydrants",
       "campgrounds"
     ],
@@ -161,7 +160,6 @@
 	  "basemap",
 	  "sites",
 	  "tsunami",
-	  "parcels",
 	  "contours",
 	  "roads_primary",
 	  "roads_secondary",
@@ -280,6 +278,7 @@
       "config_def": "qgis_runbook",
       "base_url": "/outlets/private_runbook/individual_pages",
       "regions_layer": "regions",
+      "feature_scale" : 0.2,
       "in_layers": [
 	  "lidar_basemap",
 	  "tsunami",
