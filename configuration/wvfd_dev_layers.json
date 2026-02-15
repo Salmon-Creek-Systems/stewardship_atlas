@@ -268,7 +268,7 @@
     "editable_columns": [
       {"name": "name", "type": "string", "default": "Notes and Comments go here."}
     ],
-    "symbol": {"png": "pushpin.png", "icon": "basic/pushpin"},
+    "symbol": {"png": "incident.png", "icon": "basic/pushpin"},
     "icon-size": 2.0,
     "access": ["admin"],
     "interaction": "interface"
