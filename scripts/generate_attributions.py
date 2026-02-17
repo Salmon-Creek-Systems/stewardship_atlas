@@ -84,6 +84,10 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
     if not layers:
         print("Warning: No layers found in config", file=sys.stderr)
     
+    # Get atlas-level defaults for placeholders
+    atlas_name = config.get('name', 'atlas')
+    atlas_logo = config.get('logo', '')
+    
     # Group layers by their attribution data
     # Key: attribution tuple, Value: list of layer names
     attribution_groups: Dict[Tuple, List[str]] = defaultdict(list)
@@ -92,26 +96,29 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
         layer_name = layer.get('name', 'unknown')
         attr = layer.get('attribution', {})
         
-        # Build attribution dict with defaults for missing fields
-        attribution = {
-            'title': attr.get('title', attr.get('description', f'Source for {layer_name}')[:50]),
-            'description': attr.get('description', ''),
-            'url': attr.get('url', ''),
-            'license': attr.get('license', ''),
-            'citation': attr.get('citation', ''),
-            'logo_url': attr.get('logo_url', '')
-        }
+        # Check if layer has any real attribution data
+        has_attribution = any([attr.get('title'), attr.get('description'), attr.get('url'), 
+                               attr.get('license'), attr.get('citation')])
         
-        # If no attribution data at all, create placeholder
-        if not any([attr.get('title'), attr.get('description'), attr.get('url'), 
-                    attr.get('license'), attr.get('citation')]):
+        if has_attribution:
+            # Build attribution dict from existing data with reasonable defaults
             attribution = {
-                'title': f'Source Unknown: {layer_name}',
-                'description': f'Attribution data not available for {layer_name}',
+                'title': attr.get('title', attr.get('description', f'Source for {layer_name}')[:50]),
+                'description': attr.get('description', 'Derived from atlas data using QGIS, GRASS, and Python.'),
+                'url': attr.get('url', ''),
+                'license': attr.get('license', 'Not Specified'),
+                'citation': attr.get('citation', 'Not Specified'),
+                'logo_url': attr.get('logo_url', atlas_logo)
+            }
+        else:
+            # No attribution data - create placeholder with helpful defaults
+            attribution = {
+                'title': f'Atlas Derived Source: {layer_name}',
+                'description': 'Derived from atlas data using QGIS, GRASS, and Python.',
                 'url': '',
-                'license': '',
-                'citation': '',
-                'logo_url': ''
+                'license': 'Not Specified',
+                'citation': 'Not Specified',
+                'logo_url': atlas_logo
             }
         
         key = attribution_key(attribution)

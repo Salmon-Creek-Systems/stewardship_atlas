@@ -1680,20 +1680,27 @@ def get_attributions_for_layer(config, layer_name):
     Returns:
         List of attribution feature properties dicts
     """
+    # Get atlas-level defaults for placeholders
+    atlas_name = config.get('name', 'atlas')
+    atlas_logo = config.get('logo', '')
+    
+    def make_placeholder():
+        return {
+            'title': f'Atlas Derived Source: {layer_name}',
+            'description': 'Derived from atlas data using QGIS, GRASS, and Python.',
+            'url': '',
+            'license': 'Not Specified',
+            'citation': 'Not Specified',
+            'logo_url': atlas_logo,
+            'layers': [layer_name]
+        }
+    
     attributions_path = versioning.atlas_path(config, "layers") / "attributions" / "attributions.geojson"
     
     if not attributions_path.exists():
         # No attributions layer - return placeholder
         logger.warning(f"Attributions layer not found at {attributions_path}, using placeholder")
-        return [{
-            'title': f'Source Unknown: {layer_name}',
-            'description': f'Attribution data not available for {layer_name}',
-            'url': '',
-            'license': '',
-            'citation': '',
-            'logo_url': '',
-            'layers': [layer_name]
-        }]
+        return [make_placeholder()]
     
     with open(attributions_path) as f:
         attributions_fc = json.load(f)
@@ -1709,15 +1716,7 @@ def get_attributions_for_layer(config, layer_name):
     if not matching:
         # Layer not found in any attribution - return placeholder
         logger.warning(f"No attribution found for layer '{layer_name}', using placeholder")
-        return [{
-            'title': f'Source Unknown: {layer_name}',
-            'description': f'Attribution data not available for {layer_name}',
-            'url': '',
-            'license': '',
-            'citation': '',
-            'logo_url': '',
-            'layers': [layer_name]
-        }]
+        return [make_placeholder()]
     
     return matching
 
