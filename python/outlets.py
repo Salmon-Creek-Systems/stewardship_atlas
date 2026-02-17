@@ -1666,25 +1666,152 @@ def sql_query(config: dict, outlet_name: str, query: str, return_format: str = '
 
 
 
-def make_attribution_html(atlas_config, swale_config, lc):
-    outpath = versioning.atlas_path(atlas_config, "outlets") / swale_config['name'] / f"{lc['name']}"
-
-
+def get_attributions_for_layer(config, layer_name):
+    """
+    Get attribution features that apply to a given layer.
     
-    download_uri = lc.get('inpath_template', 'outpath_template')
+    Reads from the attributions layer GeoJSON and returns all features
+    where the layer_name is in the 'layers' property list.
+    
+    Args:
+        config: Atlas configuration dict
+        layer_name: Name of the layer to get attributions for
+        
+    Returns:
+        List of attribution feature properties dicts
+    """
+    attributions_path = versioning.atlas_path(config, "layers") / "attributions" / "attributions.geojson"
+    
+    if not attributions_path.exists():
+        # No attributions layer - return placeholder
+        logger.warning(f"Attributions layer not found at {attributions_path}, using placeholder")
+        return [{
+            'title': f'Source Unknown: {layer_name}',
+            'description': f'Attribution data not available for {layer_name}',
+            'url': '',
+            'license': '',
+            'citation': '',
+            'logo_url': '',
+            'layers': [layer_name]
+        }]
+    
+    with open(attributions_path) as f:
+        attributions_fc = json.load(f)
+    
+    # Find features where this layer is listed
+    matching = []
+    for feature in attributions_fc.get('features', []):
+        props = feature.get('properties', {})
+        layers_list = props.get('layers', [])
+        if layer_name in layers_list:
+            matching.append(props)
+    
+    if not matching:
+        # Layer not found in any attribution - return placeholder
+        logger.warning(f"No attribution found for layer '{layer_name}', using placeholder")
+        return [{
+            'title': f'Source Unknown: {layer_name}',
+            'description': f'Attribution data not available for {layer_name}',
+            'url': '',
+            'license': '',
+            'citation': '',
+            'logo_url': '',
+            'layers': [layer_name]
+        }]
+    
+    return matching
+
+
+def make_attribution_html(config, layer_name, outlet_name='html'):
+    """
+    Generate an attribution HTML page for a layer.
+    
+    Reads attribution data from the Attributions layer and generates
+    an HTML page with all attributions that apply to the given layer.
+    If multiple attribution features apply, they are shown as separate sections.
+    
+    Args:
+        config: Atlas configuration dict
+        layer_name: Name of the layer to generate attribution for
+        outlet_name: Name of the outlet (for output path)
+    """
+    outpath = versioning.atlas_path(config, "outlets") / outlet_name / layer_name
     os.makedirs(outpath, exist_ok=True)
-    with open(outpath + "/attribution.html", "w") as f:
-        f.write(f"""
+    
+    attributions = get_attributions_for_layer(config, layer_name)
+    
+    # Build HTML sections for each attribution
+    sections_html = ""
+    for attr in attributions:
+        title = attr.get('title', 'Unknown Source')
+        description = attr.get('description', '')
+        url = attr.get('url', '')
+        license_info = attr.get('license', '')
+        citation = attr.get('citation', '')
+        logo_url = attr.get('logo_url', '')
+        
+        section = f"""
+        <div class="attribution-section">
+            <h2>{title}</h2>
+"""
+        if logo_url:
+            section += f'            <img src="{logo_url}" alt="{title}" style="max-height: 80px; margin-bottom: 10px;">\n'
+        if description:
+            section += f'            <p><strong>Description:</strong> {description}</p>\n'
+        if url:
+            section += f'            <p><strong>About:</strong> <a href="{url}">{url}</a></p>\n'
+        if license_info:
+            section += f'            <p><strong>License:</strong> <a href="{license_info}">{license_info}</a></p>\n'
+        if citation:
+            section += f'            <p><strong>Citation:</strong> {citation}</p>\n'
+        
+        section += "        </div>\n"
+        sections_html += section
+    
+    html = f"""<!DOCTYPE html>
 <html>
+<head>
+    <meta charset="utf-8">
+    <title>Attribution: {layer_name}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        h1 {{
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }}
+        .attribution-section {{
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #666;
+        }}
+        .attribution-section h2 {{
+            margin-top: 0;
+            color: #333;
+        }}
+        a {{
+            color: #0066cc;
+        }}
+    </style>
+</head>
 <body>
-<h1>{lc['name']}</h1>
-<p>Description: {lc['attribution']['description']}</p>
-<p>About: {lc['attribution']['url']}</p>
-<p>Source: {download_uri}</p>
-<p>License: {lc['attribution']['license']}</p>
+    <h1>Attribution: {layer_name}</h1>
+    <p>Data sources and attribution information for the <strong>{layer_name}</strong> layer.</p>
+    {sections_html}
 </body>
 </html>
-        """)
+"""
+    
+    with open(outpath / "attribution.html", "w") as f:
+        f.write(html)
+    
+    logger.debug(f"Wrote attribution HTML for {layer_name} to {outpath / 'attribution.html'}")
 
 
 def make_root_html(root_path_str):
@@ -2118,6 +2245,17 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     with open(public_path / "index.html", "w") as f:
         f.write(public_html)
     logger.debug(f"Wrote public view to: {public_path}")
+
+    # Generate attribution HTML pages for all layers
+    for layer in config.get('dataswale', {}).get('layers', []):
+        layer_name = layer.get('name')
+        if layer_name:
+            try:
+                make_attribution_html(config, layer_name, outlet_config.get('name', 'html'))
+            except Exception as e:
+                logger.warning(f"Failed to generate attribution for {layer_name}: {e}")
+    
+    logger.info(f"Generated attribution pages for {len(config.get('dataswale', {}).get('layers', []))} layers")
 
     return outpath
 
