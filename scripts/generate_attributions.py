@@ -88,6 +88,7 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
     # Get atlas-level defaults for placeholders
     atlas_name = config.get('name', 'atlas')
     atlas_logo = config.get('logo', '')
+    atlas_base_url = config.get('base_url', '')
     
     # Group layers by their attribution data
     # Key: attribution tuple, Value: list of layer names
