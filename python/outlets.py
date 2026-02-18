@@ -1683,15 +1683,17 @@ def get_attributions_for_layer(config, layer_name):
     # Get atlas-level defaults for placeholders
     atlas_name = config.get('name', 'atlas')
     atlas_logo = config.get('logo', '')
+    atlas_base_url = config.get('base_url', '')
     
     def make_placeholder():
         return {
             'title': f'Atlas Derived Source: {layer_name}',
             'description': 'Derived from atlas data using QGIS, GRASS, and Python.',
-            'url': '',
+            'url': atlas_base_url,
             'license': 'Not Specified',
             'citation': 'Not Specified',
             'logo_url': atlas_logo,
+            'metadata': '',
             'layers': [layer_name]
         }
     
@@ -1748,6 +1750,7 @@ def make_attribution_html(config, layer_name, outlet_name='html'):
         license_info = attr.get('license', '')
         citation = attr.get('citation', '')
         logo_url = attr.get('logo_url', '')
+        metadata = attr.get('metadata', '')
         
         section = f"""
         <div class="attribution-section">
@@ -1763,6 +1766,8 @@ def make_attribution_html(config, layer_name, outlet_name='html'):
             section += f'            <p><strong>License:</strong> <a href="{license_info}">{license_info}</a></p>\n'
         if citation:
             section += f'            <p><strong>Citation:</strong> {citation}</p>\n'
+        if metadata:
+            section += f'            <p><strong>Metadata:</strong> {metadata}</p>\n'
         
         section += "        </div>\n"
         sections_html += section

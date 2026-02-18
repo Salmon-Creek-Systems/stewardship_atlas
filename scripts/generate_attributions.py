@@ -41,7 +41,7 @@ def bbox_to_polygon_coords(bbox: Dict[str, float]) -> List[List[List[float]]]:
 def attribution_key(attr: Dict[str, Any]) -> Tuple:
     """
     Create a hashable key from attribution data for grouping.
-    Returns a tuple of (title, description, url, license, citation, logo_url).
+    Returns a tuple of (title, description, url, license, citation, logo_url, metadata).
     """
     return (
         attr.get('title', ''),
@@ -49,7 +49,8 @@ def attribution_key(attr: Dict[str, Any]) -> Tuple:
         attr.get('url', ''),
         attr.get('license', ''),
         attr.get('citation', ''),
-        attr.get('logo_url', '')
+        attr.get('logo_url', ''),
+        attr.get('metadata', '')
     )
 
 
@@ -105,20 +106,22 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
             attribution = {
                 'title': attr.get('title', attr.get('description', f'Source for {layer_name}')[:50]),
                 'description': attr.get('description', 'Derived from atlas data using QGIS, GRASS, and Python.'),
-                'url': attr.get('url', ''),
+                'url': attr.get('url', atlas_base_url),
                 'license': attr.get('license', 'Not Specified'),
                 'citation': attr.get('citation', 'Not Specified'),
-                'logo_url': attr.get('logo_url', atlas_logo)
+                'logo_url': attr.get('logo_url', atlas_logo),
+                'metadata': attr.get('metadata', '')
             }
         else:
             # No attribution data - create placeholder with helpful defaults
             attribution = {
                 'title': f'Atlas Derived Source: {layer_name}',
                 'description': 'Derived from atlas data using QGIS, GRASS, and Python.',
-                'url': '',
+                'url': atlas_base_url,
                 'license': 'Not Specified',
                 'citation': 'Not Specified',
-                'logo_url': atlas_logo
+                'logo_url': atlas_logo,
+                'metadata': ''
             }
         
         key = attribution_key(attribution)
@@ -127,7 +130,7 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
     # Build GeoJSON features
     features = []
     for attr_tuple, layer_names in attribution_groups.items():
-        title, description, url, license_url, citation, logo_url = attr_tuple
+        title, description, url, license_url, citation, logo_url, metadata = attr_tuple
         
         feature = {
             "type": "Feature",
@@ -152,6 +155,8 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
             feature["properties"]["citation"] = citation
         if logo_url:
             feature["properties"]["logo_url"] = logo_url
+        if metadata:
+            feature["properties"]["metadata"] = metadata
         
         features.append(feature)
     
