@@ -144,6 +144,7 @@
 	  "campgrounds",
 	  "private_notes"
       ],
+      
     "config_def": "webedit"
   },
   "config_edit": {

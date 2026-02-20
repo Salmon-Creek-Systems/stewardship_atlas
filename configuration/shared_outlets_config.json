@@ -10,8 +10,9 @@
     },
 "config_editor": {
     "type": "outlet",
-    "name": "config_editor",
+    "name": "config_edit",
     "config": {
+        "fetch_type": "config_editor",
         "interaction": "interface"
     },
     "access": ["admin"]
@@ -54,7 +55,8 @@
         "asset_type": "outlet",
         "name": "webedit",
         "fetch_type": "webedit",
-        "interaction": "interface",
+        "access": ["admin"],
+        "interaction": "backend",
         "attribution": {
             "url": "https://portal.opentopography.org/api/terms",
             "description": "Open Topography's Global DEM",
@@ -118,6 +120,7 @@
     "gazetteer": {
         "name": "gazetteer",
         "asset_type": "outlet",
+        "access": ["admin"],
         "interaction": "interface",
         "outlet_type": "gazetteer",
         "fetch_type": "gazetteer",

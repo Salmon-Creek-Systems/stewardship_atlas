@@ -1318,6 +1318,11 @@ def make_regions_index(config, outlet_name, regions):
     # regions = regions_from_geojson(regions_path)
     # return regions
 
+    runbook_filename  = r.get('name', f"region_{i}").replace(" ", "+")
+    runbook_url = f"{base_url}/{runbook_filename}.pdf"
+    #   index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
+
+
     index_html = """
 <!DOCTYPE html>
 <html>
@@ -1403,7 +1408,7 @@ def make_regions_index(config, outlet_name, regions):
         
         <div class="section">
             <h2>Full Book</h2>
-            <p><a href='https://scs-internal.s3.us-west-1.amazonaws.com/collated.pdf' class='main-link'>Download Complete PDF</a></p>
+            <p><a href='""" + runbook_url + """' class='main-link'>Download Complete PDF</a></p>
         </div>
         
         <div class="section">

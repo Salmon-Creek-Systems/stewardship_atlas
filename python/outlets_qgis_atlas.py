@@ -815,11 +815,19 @@ def export_atlas(layout, output_dir, atlas_name):
     
     result = exporter.exportToPdf(atlas, str(multi_pdf_path), pdf_settings)
     
-    if result == QgsLayoutExporter.Success:
+    # Atlas export returns tuple (error_code, error_string), unlike single-page export
+    if isinstance(result, tuple):
+        error_code, error_detail = result
+    else:
+        error_code, error_detail = result, ""
+    
+    if error_code == QgsLayoutExporter.Success:
         results['multi_page_pdf'] = str(multi_pdf_path)
         logger.info(f"✓ Multi-page PDF exported successfully")
     else:
-        error_msg = get_export_error_message(result)
+        error_msg = get_export_error_message(error_code)
+        if error_detail:
+            error_msg = f"{error_msg}: {error_detail}"
         logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
         results['status'] = 'partial'
     
