@@ -18,7 +18,7 @@
     "color": [0, 150, 255],
     "interaction": "interface",
     "access": ["admin"],
-    "fill_opacity": 0.2,
+    "fill_opacity": 0.4,
     "editable_columns": [
       {"name": "name", "type": "string", "default": "unique name"},
       {"name": "description", "type": "string", "default": "Text describing the region"},

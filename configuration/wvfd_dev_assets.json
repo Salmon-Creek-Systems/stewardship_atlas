@@ -298,11 +298,13 @@
   "sitesbook": {
     "type": "outlet",
       "name": "sitesbook",
+      "generate_pdf": false,
       "access": ["internal", "admin"],
       "config_def": "qgis_runbook",
-      "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/Sites/sites",
+      "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/Sites/current_sites",
       "regions_layer": "sites",
-      "label_property": "SITUS_3",
+      "label_property": "SCS_NAME",
+      "index_property": "scs_sites_index",
       "in_layers": [
 	  "lidar_basemap",
 	  "tsunami",

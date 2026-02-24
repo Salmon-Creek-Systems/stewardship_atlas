@@ -109,10 +109,11 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
 
 
     regions = outlets.regions_from_geojson(regions_path, start_at=0, limit=0,
-                                           label_property = outlet_config.get('label_property', 'name'))
+                                           label_property = outlet_config.get('label_property', 'name'),
+                                           index_property = outlet_config.get('index_property', 'name'))
     outlets.make_regions_index(config, outlet_name, regions)
     
-    if not refresh_pdfs:
+    if not outlet_config.get('generate_pdf', True):
         logger.info(f"Skipping PDF refresh for {outlet_name}...")
         return {}
     
@@ -274,7 +275,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
             # Update the feature geometry in the layer
             regions_layer.changeGeometry(fid, square_geom)
             
-            region_name = feature.attribute('name') if feature.attribute('name') else f"region_{fid}"
+            region_name = feature.attribute('SCS_NAME', feature.attribute('name', f"region_{fid}"))
             logger.info(f"Region '{region_name}': {width:.0f}m x {height:.0f}m -> {size:.0f}m x {size:.0f}m (square)")
             
         regions_layer.commitChanges()

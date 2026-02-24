@@ -1109,7 +1109,7 @@ def outlet_regions_grass(config, outlet_name, regions = [], regions_html=[], ski
     
     return regions
 
-def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description"):
+def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description", index_property="scs_index"):
     """Load regions from a GeoJSON file."""
     regions = []
     last_region = None
@@ -1129,8 +1129,10 @@ def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description
             else:
                 bbox = utils.geojson_to_bbox(region['geometry']['coordinates'][0])
             default_name =  f"Region {i}"
+            canonical_name =  utils.canonicalize_name(region['properties'].get(label_property, default_name))
             regions.append({
-                'name': utils.canonicalize_name(region['properties'].get(label_property, default_name)),
+                'name': canonical_name,
+                'index': region['properties'].get(index_property, canonical_name), 
                 'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
                 'bbox': bbox,
@@ -1318,8 +1320,8 @@ def make_regions_index(config, outlet_name, regions):
     # regions = regions_from_geojson(regions_path)
     # return regions
 
-    runbook_filename  = r.get('name', f"region_{i}").replace(" ", "+")
-    runbook_url = f"{base_url}/{runbook_filename}.pdf"
+    runbook_name  = config.get('name', f"combined_{outlet_name}").replace(" ", "+")
+    runbook_url = f"{config['base_url']}/{runbook_name}_{outlet_name}.pdf"
     #   index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
 
 
@@ -1424,7 +1426,8 @@ def make_regions_index(config, outlet_name, regions):
     base_url = outlet_config.get('base_url', f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages")
     for i,r in enumerate(regions):
         cname  = r.get('name', f"region_{i}").replace(" ", "+")
-        url = f"{base_url}/{cname}.pdf"
+        iname  = str(r.get('index', f"region_{i}")).replace(" ", "+")
+        url = f"{base_url}/{iname}.pdf"
         index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
     
     index_html += """            </ul>

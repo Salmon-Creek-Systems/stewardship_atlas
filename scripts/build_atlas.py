@@ -184,12 +184,19 @@ def build_atlas(
 
 def main():
     """CLI entry point - reads GeoJSON and builds atlas."""
-    if len(sys.argv) != 2:
+    if len(sys.argv) == 3:
+        print(f"Generating new config (only)")
+        geojson_path = Path(sys.argv[2])
+        config_only = True
+    
+    elif len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <geojson_path>", file=sys.stderr)
         sys.exit(1)
-    
-    geojson_path = Path(sys.argv[1])
-    
+    else:
+        print(f"Generating new entire atlas)")
+        geojson_path = Path(sys.argv[1])
+        config_only = False
+        
     if not geojson_path.exists():
         print(f"Error: GeoJSON file not found: {geojson_path}", file=sys.stderr)
         sys.exit(1)
