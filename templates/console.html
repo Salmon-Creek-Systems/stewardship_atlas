@@ -70,6 +70,7 @@
                 <div id="versions-section" style="margin: 20px;">
              
                     <button id="publish-button" onclick="startPublish()">Publish Atlas</button>
+                    <button id="rollback-button" onclick="startRollback()">Rollback Version</button>
                     <div id="publish-status" style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #f0f0f0; min-height: 20px;"></div>
 
                 
@@ -355,6 +356,33 @@
                 .catch(error => {
                     statusDiv.innerHTML = 'Error: ' + error;
                     publishButton.disabled = false;
+                });
+        }
+
+        function startRollback() {
+            const statusDiv = document.getElementById('publish-status');
+            const rollbackButton = document.getElementById('rollback-button');
+            
+            if (!confirm('Are you sure you want to rollback to the previous version?')) {
+                return;
+            }
+            
+            rollbackButton.disabled = true;
+            statusDiv.innerHTML = `Rolling back ${swalename}...`;
+            
+            fetch(`${baseurl}:${atlasappport}/set-current-version/${swalename}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusDiv.innerHTML = `Rollback complete! ${data.message}`;
+                    } else {
+                        statusDiv.innerHTML = 'Rollback failed: ' + (data.detail || 'Unknown error');
+                    }
+                    rollbackButton.disabled = false;
+                })
+                .catch(error => {
+                    statusDiv.innerHTML = 'Error: ' + error;
+                    rollbackButton.disabled = false;
                 });
         }
 

@@ -35,10 +35,7 @@ They will appear as pushpin icons on the map with the note text as a label.
 
 ## Editing or Deleting Notes
 
-1. Click on an existing note marker
-2. Click **"Edit"** in the popup
-3. Modify the text or geometry
-4. Click **Save** to update, or **Delete** to remove
+See [Editing Layer Data](editing_layer_data.md) for instructions on modifying or removing existing notes.
 
 ## Best Practices
 
