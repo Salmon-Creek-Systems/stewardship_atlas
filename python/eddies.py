@@ -14,6 +14,7 @@ import versioning
 import utils
 import outlets
 import h3
+from datetime import datetime
 
 import dataswale_geojson as dataswale
 
@@ -184,6 +185,15 @@ def centroid_gdal(config:Dict[str, Any], eddy_name:str):
     
     return out_path
 
+
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+
 def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", anno_in_path: Path = None, updated_properties: List[str] = []):
     #in_layer = eddy['in_layer']
     
@@ -243,12 +253,14 @@ ON ST_Intersects(anno_geom, feat_geom);
             if len(updated_properties) == 0 or k in updated_properties:
                 if v:
                     f['properties'][k] = v
+        #print(f"F: {f}")
         features.append(f)
     logger.info(f"Post merge  RESULT!  {len(features)}")
 
         
     feature_collection = geojson.FeatureCollection(features)
-    geojson.dump(feature_collection, open(feat_in_path, 'w'))
+    #print(f"FC for Anno: {feature_collection} END")
+    geojson.dump(feature_collection, open(feat_in_path, 'w'), default=json_serial)
     logger.info(f"moving consumed delta anno: {anno_in_path} -> {anno_out_path}")
     anno_in_path.rename(anno_out_path)
     return feat_in_path
