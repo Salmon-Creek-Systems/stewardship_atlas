@@ -187,6 +187,9 @@
   "runbook": {
     "type": "outlet",
     "name": "runbook",
+      "config_def": "qgis_runbook",
+      "base_url": "individual_pages",
+      "regions_layer": "regions",
     "in_layers": [
       "lidar_basemap",
       "contours",
@@ -203,7 +206,7 @@
     ],
       "access": ["public", "internal", "admin"],
     "config_def": "runbook",
-    "feature_scale": 0.2,
+    "feature_scale": 0.5,
     "blend_percent": 50,
     "regions": [
       {
