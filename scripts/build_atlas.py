@@ -70,6 +70,7 @@ def build_atlas(
     shared_dir: str,
     admin_emails: List[str],
     base_url: str,
+    app_url: str,
     port: int,
     versioned_outlets: List[str],
     logo_url: str,
@@ -136,6 +137,7 @@ def build_atlas(
                 "name": name,
                 "admin_emails": admin_emails or [],
                 "base_url": base_url,
+                "app_url": app_url,
                 "atlasappport": port,
                 "logo": logo_url,
                 "versioned_outlets": versioned_outlets or []
@@ -239,6 +241,7 @@ def main():
             shared_dir=properties['shared_dir'],
             admin_emails=properties['admin_emails'],
             base_url=properties['base_url'],
+            app_url=properties['app_url'],
             port=properties['port'],
             versioned_outlets=properties['versioned_outlets'],
             logo_url=properties['logo_url'],

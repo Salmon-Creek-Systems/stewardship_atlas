@@ -159,6 +159,7 @@ def create_config(config: Dict[str, Any] = None,
         name = feature['properties']['name']
         admin_emails = feature['properties']['admin_emails']
         config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
+        config['app_url'] = feature['properties'].get('app_url', f"https://{name}.fireatlas.org:9999")
         config['atlasappport'] = feature['properties'].get('atlasappport', 9998)
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] = feature['properties'].get('logo', "/local/scs-smallgrass1.png")

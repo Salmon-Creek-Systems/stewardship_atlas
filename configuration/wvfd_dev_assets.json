@@ -277,9 +277,9 @@
       "name": "private_runbook",
       "access": ["admin", "technical"],
       "config_def": "qgis_runbook",
-      "base_url": "/outlets/private_runbook/individual_pages",
+      "base_url": "individual_pages",
       "regions_layer": "regions",
-      "feature_scale" : 0.2,
+      "feature_scale" : 0.5,
       "in_layers": [
 	  "lidar_basemap",
 	  "tsunami",

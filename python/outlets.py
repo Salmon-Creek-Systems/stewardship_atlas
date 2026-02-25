@@ -1425,8 +1425,8 @@ def make_regions_index(config, outlet_name, regions):
     # new_regions = dataswale_geojson.layer_as_featurecollection(config, 'regions')
     base_url = outlet_config.get('base_url', f"https://scs-internal.s3.us-west-1.amazonaws.com/RB_pages")
     for i,r in enumerate(regions):
-        cname  = r.get('name', f"region_{i}").replace(" ", "+")
-        iname  = str(r.get('index', f"region_{i}")).replace(" ", "+")
+        cname  = utils.canonicalize_name(r.get('name', f"region_{i}"))
+        iname  = utils.canonicalize_name(str(r.get('index', f"region_{i}")))
         url = f"{base_url}/{iname}.pdf"
         index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
     
