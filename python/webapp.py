@@ -526,10 +526,11 @@ async def set_current_version(swalename: str):
     """
     try:
         # Load config from staging
-        config_path = f"/root/swales/{swalename}/staging/atlas_config.json"
+        
+        config_path = f"{SWALES_ROOT}/{swalename}/CURRENT/atlas_config.json"
         with open(config_path) as f:
             config = json.load(f)
-        
+        print(f"Webapp config from: {config_path}")
         # Get versions list, excluding 'staging'
         versions = [v for v in config['dataswale']['versions'] if v != 'staging']
         
@@ -545,7 +546,9 @@ async def set_current_version(swalename: str):
         # Get paths using versioning.atlas_path
         current_path = versioning.atlas_path(config, version='CURRENT')
         rollback_path = versioning.atlas_path(config, version=rollback_version)
-        
+
+
+        print(f"Rolling back. Current: {current_path} Selected: {rollback_path} from {rollback_version} in  {versions}")
         # Remove existing CURRENT symlink if it exists
         # Check is_symlink() first because broken symlinks return False for exists()
         if current_path.is_symlink() or current_path.exists():
