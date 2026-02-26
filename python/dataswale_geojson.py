@@ -99,6 +99,8 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     for feature in fc['features']:
         if len(feature['geometry']['coordinates']) < 1:
             logger.warning(f"Feature {feature} has no coordinates")
+        elif feature['geometry']['type'] in ['LineString', 'Polygon', 'MultiLineString'] and len(feature['geometry']['coordinates'][0]) < 2:
+            logger.warning(f"Feature {feature} has insufficient  coordinates")
         else:
             new_features.append(feature)
     fc['features'] = new_features
