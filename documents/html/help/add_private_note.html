@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/local/css/console.css">
+    <link rel="stylesheet" href="/local/css/shared_controls.css">
+    <title>Add Private Notes - westport Help</title>
+</head>
+<body>
+    <div class="help-header">
+        <h1>Fire Atlas Help</h1>
+        <a href="../../../staging/outlets/html/admin" class="button link-button">HOME</a>
+    </div>
+    <div class="help-content">
+        <h1>Add Private Notes</h1>
+<p>Private notes allow administrators to add location-specific comments, reminders, or annotations that are only visible to admin users. These are useful for:</p>
+<ul>
+<li>Recording observations from field visits</li>
+<li>Marking areas needing follow-up</li>
+<li>Adding context that shouldn't be public</li>
+<li>Coordinating between administrators</li>
+</ul>
+<h2>Adding a Private Note</h2>
+<h3>From the Edit Map Interface</h3>
+<ol>
+<li>Go to the <strong>Edit Map</strong> (Admin access required)</li>
+<li>In the layer selector, choose <strong>"private_notes"</strong></li>
+<li>Click the <strong>Draw Point</strong> tool</li>
+<li>Click on the map where you want to place the note</li>
+<li>In the popup form, enter your note text in the <strong>"name"</strong> field</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<h3>Note Properties</h3>
+<p>Private notes support the following properties:
+- <strong>name</strong>: The note text (required) - this will display as a label on the map
+- <strong>geometry</strong>: Point location where the note appears</p>
+<h2>Viewing Private Notes</h2>
+<p>Private notes are only visible when:
+- You are logged in as an admin user
+- The <code>private_notes</code> layer is enabled in the layer list
+- You are viewing an admin-level interface</p>
+<p>They will appear as pushpin icons on the map with the note text as a label.</p>
+<h2>Editing or Deleting Notes</h2>
+<p>See <a href="editing_layer_data.md">Editing Layer Data</a> for instructions on modifying or removing existing notes.</p>
+<h2>Best Practices</h2>
+<ul>
+<li>Keep notes concise but informative</li>
+<li>Include dates if time-sensitive</li>
+<li>Use for temporary annotations that don't belong in permanent data</li>
+<li>Review and clean up old notes periodically</li>
+</ul>
+<h2>Access Control</h2>
+<p>The <code>private_notes</code> layer is configured with <code>"access": ["admin"]</code>, meaning:
+- Only admin users can view these notes
+- They do not appear on public or internal maps
+- They are excluded from public exports</p>
+    </div>
+</body>
+</html>
