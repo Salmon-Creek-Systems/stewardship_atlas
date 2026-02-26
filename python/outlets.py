@@ -398,12 +398,18 @@ void await map.loadImage('{im_uri}',
 
 """.format(**locals())
     
+    # Build app URL for API calls
+    base_url = config.get('base_url', 'http://localhost')
+    app_port = config.get('atlasappport', 9997)
+    app_url = f"{base_url}:{app_port}"
+    
     processed_template = template.format(
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
-            webmap_help=help_html)
+            webmap_help=help_html,
+            app_url=app_url)
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)

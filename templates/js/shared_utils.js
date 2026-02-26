@@ -38,7 +38,10 @@ async function parseDegreesFormat(input) {
             console.log('Detected shortened Google Maps URL, dereferencing...');
             try {
                 // Call backend to dereference the URL
-                const response = await fetch('/dereference_url', {
+                // Use API_URL if defined (webmap), EDIT_CONFIG.appUrl (edit_map), or fall back to relative path
+                const apiBase = (typeof API_URL !== 'undefined' && API_URL) ? API_URL : 
+                                (typeof EDIT_CONFIG !== 'undefined' && EDIT_CONFIG.appUrl) ? EDIT_CONFIG.appUrl : '';
+                const response = await fetch(`${apiBase}/dereference_url`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
