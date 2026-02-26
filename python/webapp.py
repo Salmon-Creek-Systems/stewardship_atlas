@@ -64,33 +64,64 @@ class SQLQueryPayload(BaseModel):
 
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
+    import re
     try:
         # Handle short URLs by following redirects
         if 'goo.gl' in url or 'maps.app.goo.gl' in url:
             response = requests.get(url, allow_redirects=True)
             url = response.url
+            logging.info(f"Dereferenced URL to: {url}")
 
         # Parse the URL
         parsed = urlparse(url)
+        logging.info(f"Parsing URL - netloc: {parsed.netloc}, path: {parsed.path}")
+        
         # Handle both old maps.google.com and new www.google.com/maps formats
         if 'google.com' in parsed.netloc and ('/maps' in parsed.path or 'maps.google.com' in parsed.netloc):
-            # Handle different URL formats
+            
+            # Try multiple extraction methods
+            
+            # Method 1: @lat,lng format (most common after redirect)
             if '@' in url:
                 # Format: https://www.google.com/maps/@37.7749,-122.4194,15z
-                coords = url.split('@')[1].split(',')
+                # or: https://www.google.com/maps/place/Name/@37.7749,-122.4194,15z
+                match = re.search(r'@(-?\d+\.?\d*),(-?\d+\.?\d*)', url)
+                if match:
+                    lat, lon = float(match.group(1)), float(match.group(2))
+                    logging.info(f"Extracted from @ format: {lat}, {lon}")
+                    return lat, lon
+            
+            # Method 2: ?q=lat,lng format
+            query = parse_qs(parsed.query)
+            if 'q' in query:
+                q_value = query['q'][0]
+                # Try to parse as coordinates
+                coord_match = re.match(r'(-?\d+\.?\d*),\s*(-?\d+\.?\d*)', q_value)
+                if coord_match:
+                    lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
+                    logging.info(f"Extracted from ?q= format: {lat}, {lon}")
+                    return lat, lon
+            
+            # Method 3: /place/lat,lng format or coordinates in path
+            path_match = re.search(r'/(-?\d+\.?\d*),(-?\d+\.?\d*)', parsed.path)
+            if path_match:
+                lat, lon = float(path_match.group(1)), float(path_match.group(2))
+                logging.info(f"Extracted from path: {lat}, {lon}")
+                return lat, lon
+            
+            # Method 4: ll= parameter
+            if 'll' in query:
+                coords = query['ll'][0].split(',')
                 lat, lon = float(coords[0]), float(coords[1])
-            else:
-                # Format: https://www.google.com/maps?q=37.7749,-122.4194
-                query = parse_qs(parsed.query)
-                if 'q' in query:
-                    coords = query['q'][0].split(',')
-                    lat, lon = float(coords[0]), float(coords[1])
-                else:
-                    raise ValueError("Could not find coordinates in URL")
+                logging.info(f"Extracted from ll= format: {lat}, {lon}")
+                return lat, lon
+            
+            raise ValueError(f"Could not find coordinates in URL: {url}")
         else:
-            raise ValueError("Not a valid Google Maps URL")
+            raise ValueError(f"Not a valid Google Maps URL: {url}")
 
-        return lat, lon
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error extracting coordinates: {str(e)}")
 
