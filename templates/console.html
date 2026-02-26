@@ -71,6 +71,7 @@
              
                     <button id="publish-button" onclick="startPublish()">Publish Atlas</button>
                     <button id="rollback-button" onclick="startRollback()">Rollback Version</button>
+                    <button id="reset-staging-button" onclick="startResetStaging()">Reset Staging</button>
                     <div id="publish-status" style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #f0f0f0; min-height: 20px;"></div>
 
                 
@@ -383,6 +384,33 @@
                 .catch(error => {
                     statusDiv.innerHTML = 'Error: ' + error;
                     rollbackButton.disabled = false;
+                });
+        }
+
+        function startResetStaging() {
+            const statusDiv = document.getElementById('publish-status');
+            const resetButton = document.getElementById('reset-staging-button');
+            
+            if (!confirm('Are you sure you want to reset staging? This will:\n\n• Backup current staging to staging-backup-{timestamp}\n• Replace staging with the CURRENT published version\n\nAny uncommitted changes in staging will be moved to the backup.')) {
+                return;
+            }
+            
+            resetButton.disabled = true;
+            statusDiv.innerHTML = `Resetting staging for ${swalename}...`;
+            
+            fetch(`${baseurl}:${atlasappport}/reset-staging/${swalename}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusDiv.innerHTML = `Staging reset complete! Reset from ${data.source_version}. Backup saved to ${data.backup_path}`;
+                    } else {
+                        statusDiv.innerHTML = 'Reset failed: ' + (data.detail || 'Unknown error');
+                    }
+                    resetButton.disabled = false;
+                })
+                .catch(error => {
+                    statusDiv.innerHTML = 'Error: ' + error;
+                    resetButton.disabled = false;
                 });
         }
 

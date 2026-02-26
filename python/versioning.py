@@ -79,3 +79,42 @@ def publish_new_version(config, version=None):
     #atlas_root.symlink_to(atlas_path)
 
     return version_path
+
+
+def reset_staging(config):
+    """
+    Reset staging to match CURRENT version.
+    Backs up existing staging before replacing.
+    
+    Returns dict with status and paths.
+    """
+    staging_path = atlas_path(config, version='staging')
+    current_path = atlas_path(config, version='CURRENT')
+    
+    # Resolve CURRENT symlink to get actual version
+    if not current_path.is_symlink():
+        raise ValueError("CURRENT is not a symlink - cannot determine current version")
+    
+    current_target = current_path.resolve()
+    current_version = current_target.name
+    logger.info(f"Resetting staging from CURRENT ({current_version})")
+    
+    # Backup staging
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    backup_path = staging_path.parent / f"staging-backup-{timestamp}"
+    
+    logger.info(f"Backing up staging to {backup_path}")
+    shutil.move(str(staging_path), str(backup_path))
+    
+    # Copy CURRENT to staging
+    logger.info(f"Copying {current_target} to {staging_path}")
+    shutil.copytree(current_target, staging_path, symlinks=True)
+    
+    logger.info(f"Staging reset complete")
+    
+    return {
+        "status": "success",
+        "source_version": current_version,
+        "backup_path": str(backup_path),
+        "staging_path": str(staging_path)
+    }

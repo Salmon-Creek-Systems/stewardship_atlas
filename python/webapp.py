@@ -607,3 +607,31 @@ async def set_current_version(swalename: str):
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         logging.error(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/reset-staging/{swalename}")
+async def reset_staging(swalename: str):
+    """
+    Reset staging to match CURRENT version.
+    Backs up existing staging before replacing.
+    """
+    try:
+        # Load config from CURRENT
+        config_path = f"{SWALES_ROOT}/{swalename}/CURRENT/atlas_config.json"
+        with open(config_path) as f:
+            config = json.load(f)
+        
+        print(f"Resetting staging for {swalename}")
+        
+        # Call versioning function
+        result = versioning.reset_staging(config)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error resetting staging: {str(e)}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
