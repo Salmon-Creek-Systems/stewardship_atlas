@@ -72,7 +72,8 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
 
         # Parse the URL
         parsed = urlparse(url)
-        if 'maps.google.com' in parsed.netloc:
+        # Handle both old maps.google.com and new www.google.com/maps formats
+        if 'google.com' in parsed.netloc and ('/maps' in parsed.path or 'maps.google.com' in parsed.netloc):
             # Handle different URL formats
             if '@' in url:
                 # Format: https://www.google.com/maps/@37.7749,-122.4194,15z

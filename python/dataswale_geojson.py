@@ -95,7 +95,13 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     layer_path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
 
     fc = delta_queue_builder(config, name)
-    
+    new_features = []
+    for feature in fc['features']:
+        if len(feature['geometry']['coordinates']) < 1:
+            logger.warning(f"Feature {feature} has no coordinates")
+        else:
+            new_features.append(feature)
+    fc['features'] = new_features
     # Add webmap URLs to each feature
     fc = add_webmap_urls(config, name, fc)
     

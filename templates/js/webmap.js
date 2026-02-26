@@ -341,8 +341,8 @@ map.on('load', async () => {
 
         if (format === 'json') {
             textToCopy = JSON.stringify(coords, null, 2);
-        } else if (format === 'google') { // Google Maps link
-            textToCopy = `https://www.google.com/maps/@${lngLat.lat},${lngLat.lng},15z`;
+        } else if (format === 'google') { // Google Maps link with pin
+            textToCopy = `https://www.google.com/maps?q=${lngLat.lat},${lngLat.lng}`;
         } else if (format === 'internal') { // Internal map link
             textToCopy = `https://${window.location.hostname}${window.location.pathname}?lat=${lngLat.lat}&lng=${lngLat.lng}&zoom=${map.getZoom()}`;
         }
