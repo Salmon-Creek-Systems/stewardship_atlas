@@ -70,11 +70,11 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
         if 'goo.gl' in url or 'maps.app.goo.gl' in url:
             response = requests.get(url, allow_redirects=True)
             url = response.url
-            logging.info(f"Dereferenced URL to: {url}")
+            print(f"Dereferenced URL to: {url}")
 
         # Parse the URL
         parsed = urlparse(url)
-        logging.info(f"Parsing URL - netloc: {parsed.netloc}, path: {parsed.path}")
+        print(f"Parsing URL - netloc: {parsed.netloc}, path: {parsed.path}, query: {parsed.query}")
         
         # Handle both old maps.google.com and new www.google.com/maps formats
         if 'google.com' in parsed.netloc and ('/maps' in parsed.path or 'maps.google.com' in parsed.netloc):
@@ -88,7 +88,7 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
                 match = re.search(r'@(-?\d+\.?\d*),(-?\d+\.?\d*)', url)
                 if match:
                     lat, lon = float(match.group(1)), float(match.group(2))
-                    logging.info(f"Extracted from @ format: {lat}, {lon}")
+                    print(f"Extracted from @ format: {lat}, {lon}")
                     return lat, lon
             
             # Method 2: ?q=lat,lng format
@@ -99,21 +99,21 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
                 coord_match = re.match(r'(-?\d+\.?\d*),\s*(-?\d+\.?\d*)', q_value)
                 if coord_match:
                     lat, lon = float(coord_match.group(1)), float(coord_match.group(2))
-                    logging.info(f"Extracted from ?q= format: {lat}, {lon}")
+                    print(f"Extracted from ?q= format: {lat}, {lon}")
                     return lat, lon
             
             # Method 3: /place/lat,lng format or coordinates in path
             path_match = re.search(r'/(-?\d+\.?\d*),(-?\d+\.?\d*)', parsed.path)
             if path_match:
                 lat, lon = float(path_match.group(1)), float(path_match.group(2))
-                logging.info(f"Extracted from path: {lat}, {lon}")
+                print(f"Extracted from path: {lat}, {lon}")
                 return lat, lon
             
             # Method 4: ll= parameter
             if 'll' in query:
                 coords = query['ll'][0].split(',')
                 lat, lon = float(coords[0]), float(coords[1])
-                logging.info(f"Extracted from ll= format: {lat}, {lon}")
+                print(f"Extracted from ll= format: {lat}, {lon}")
                 return lat, lon
             
             raise ValueError(f"Could not find coordinates in URL: {url}")
