@@ -102,8 +102,9 @@ def extract_coordinates_from_url(url: str) -> tuple[float, float]:
                     print(f"Extracted from ?q= format: {lat}, {lon}")
                     return lat, lon
             
-            # Method 3: /place/lat,lng format or coordinates in path
-            path_match = re.search(r'/(-?\d+\.?\d*),(-?\d+\.?\d*)', parsed.path)
+            # Method 3: /place/lat,lng or /search/lat,lng format (coordinates in path)
+            # Handle optional + or space before longitude
+            path_match = re.search(r'/(-?\d+\.?\d*),\+?(-?\d+\.?\d*)', parsed.path)
             if path_match:
                 lat, lon = float(path_match.group(1)), float(path_match.group(2))
                 print(f"Extracted from path: {lat}, {lon}")
