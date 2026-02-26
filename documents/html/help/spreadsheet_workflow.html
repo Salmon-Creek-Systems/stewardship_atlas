@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/local/css/console.css">
+    <link rel="stylesheet" href="/local/css/shared_controls.css">
+    <title>Export, Edit, and Import Spreadsheets - westport Help</title>
+</head>
+<body>
+    <div class="help-header">
+        <h1>Fire Atlas Help</h1>
+        <a href="../../../staging/outlets/html/admin" class="button link-button">HOME</a>
+    </div>
+    <div class="help-content">
+        <h1>Export, Edit, and Import Spreadsheets</h1>
+<p>The spreadsheet workflow allows you to edit layer attributes in Google Sheets, making bulk edits easier than using the map interface. This is ideal for:</p>
+<ul>
+<li>Updating many feature attributes at once</li>
+<li>Collaborative data review</li>
+<li>Working with tabular data in a familiar interface</li>
+<li>Bulk corrections or additions</li>
+</ul>
+<h2>Overview</h2>
+<p>The workflow has three steps:
+1. <strong>Export</strong> layer data to Google Sheets
+2. <strong>Edit</strong> the data in the spreadsheet
+3. <strong>Import</strong> changes back to the atlas</p>
+<h2>Step 1: Export to Google Sheets</h2>
+<ol>
+<li>Go to the <strong>Admin Console</strong> (<code>/staging/outlets/html/admin</code>)</li>
+<li>Find your layer in the <strong>Layer Operations</strong> panel</li>
+<li>Click <strong>"(export sheet)"</strong> next to the layer name</li>
+<li>Wait for the export to complete (status shows "exporting...")</li>
+<li>A new browser tab opens with the Google Sheet</li>
+</ol>
+<p>The exported sheet contains:
+- All features from the layer
+- All attribute columns
+- Geometry data (as WKT or coordinates)
+- A unique feature ID for each row</p>
+<h2>Step 2: Edit in Google Sheets</h2>
+<h3>What You Can Edit</h3>
+<ul>
+<li>Any attribute values (names, descriptions, categories, etc.)</li>
+<li>Add new rows for new features (if geometry is provided)</li>
+<li>Modify existing values</li>
+</ul>
+<h3>What to Preserve</h3>
+<ul>
+<li><strong>Do not delete</strong> the ID column or change ID values</li>
+<li><strong>Do not modify</strong> the geometry column unless you know WKT format</li>
+<li><strong>Keep column headers</strong> exactly as they are</li>
+</ul>
+<h3>Tips for Editing</h3>
+<ul>
+<li>Use filters and sorting to find specific features</li>
+<li>Use find/replace for bulk text changes</li>
+<li>Add comments for team coordination</li>
+<li>Save frequently (Google Sheets auto-saves)</li>
+</ul>
+<h3>Adding New Features</h3>
+<p>To add a new feature via spreadsheet:
+1. Add a new row at the bottom
+2. Leave the ID column empty (a new ID will be assigned)
+3. Fill in all required attribute columns
+4. Provide geometry in WKT format (e.g., <code>POINT(-122.5 38.0)</code>)</p>
+<h2>Step 3: Import from Google Sheets</h2>
+<ol>
+<li>Return to the <strong>Admin Console</strong></li>
+<li>Find the same layer in the Layer Operations panel</li>
+<li>Click <strong>"(import sheet)"</strong> next to the layer name</li>
+<li>Wait for the import to complete</li>
+<li>Confirm the success message</li>
+</ol>
+<h3>What Happens During Import</h3>
+<ul>
+<li>Changed rows are updated in the atlas</li>
+<li>New rows are added as new features</li>
+<li>Deleted rows are <strong>not</strong> automatically removed (for safety)</li>
+<li>A delta file is created recording the changes</li>
+</ul>
+<h2>Important Notes</h2>
+<h3>Access Control</h3>
+<ul>
+<li>Export/import requires Admin access</li>
+<li>The Google Sheet is created in your connected Google account</li>
+<li>Share the sheet carefully - it may contain sensitive data</li>
+</ul>
+<h3>Data Safety</h3>
+<ul>
+<li>Always export before making major edits (as a backup)</li>
+<li>Import creates change records (deltas) that can be reviewed</li>
+<li>Test with a small batch of changes first</li>
+</ul>
+<h3>Geometry Handling</h3>
+<ul>
+<li>Geometry is exported as WKT (Well-Known Text)</li>
+<li>Format examples:</li>
+<li>Point: <code>POINT(-122.5 38.0)</code></li>
+<li>Line: <code>LINESTRING(-122.5 38.0, -122.4 38.1)</code></li>
+<li>Polygon: <code>POLYGON((-122.5 38.0, -122.4 38.0, -122.4 38.1, -122.5 38.1, -122.5 38.0))</code></li>
+<li>Malformed geometry will cause import errors for that row</li>
+</ul>
+<h3>Troubleshooting</h3>
+<p><strong>Export fails:</strong>
+- Check your network connection
+- Ensure you have Google account access configured
+- Try refreshing the page and exporting again</p>
+<p><strong>Import fails:</strong>
+- Check for malformed data in the spreadsheet
+- Verify column headers haven't been changed
+- Look for invalid geometry in new rows</p>
+<p><strong>Changes not appearing:</strong>
+- Refresh the webmap or edit map
+- Clear browser cache
+- Check that import completed successfully</p>
+<h2>Alternative: Direct Upload</h2>
+<p>For data from other sources (not Google Sheets), use the <strong>(upload)</strong> link:
+1. Prepare a GeoJSON file with your features
+2. Click <strong>(upload)</strong> next to the layer
+3. Select your GeoJSON file
+4. Features will be added to the layer</p>
+<p>This is useful for:
+- GPS data exports
+- Data from other GIS software
+- Automated data pipelines</p>
+    </div>
+</body>
+</html>

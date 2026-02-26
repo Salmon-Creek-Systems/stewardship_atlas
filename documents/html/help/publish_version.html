@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/local/css/console.css">
+    <link rel="stylesheet" href="/local/css/shared_controls.css">
+    <title>Publish a New Version - westport Help</title>
+</head>
+<body>
+    <div class="help-header">
+        <h1>Fire Atlas Help</h1>
+        <a href="../../../staging/outlets/html/admin" class="button link-button">HOME</a>
+    </div>
+    <div class="help-content">
+        <h1>Publish a New Version</h1>
+<p>Publishing creates a permanent snapshot of your atlas data that can be referenced and shared. This is how you release changes from the staging environment to production.</p>
+<h2>Understanding Versions</h2>
+<p>Your atlas has two types of data states:</p>
+<ul>
+<li><strong>Staging</strong>: The working copy where all edits happen. Always changing.</li>
+<li><strong>Published Versions</strong>: Permanent snapshots (e.g., <code>2024-01-15_10-30-00</code>). Never change once created.</li>
+</ul>
+<h2>When to Publish</h2>
+<p>Publish a new version when:
+- You've completed a set of edits and want to preserve them
+- You need a stable reference point for sharing
+- You want to make changes available to public/internal users
+- Before making major changes (as a backup point)</p>
+<h2>How to Publish</h2>
+<h3>From the Admin Console</h3>
+<ol>
+<li>Go to the <strong>Admin Console</strong> (<code>/staging/outlets/html/admin</code>)</li>
+<li>Scroll to the <strong>VERSIONS</strong> section</li>
+<li>Click <strong>"Publish Atlas"</strong></li>
+<li>Wait for the publishing process to complete</li>
+<li>Status updates will appear showing progress</li>
+<li>This may take a few minutes depending on data size</li>
+</ol>
+<h3>What Happens During Publishing</h3>
+<ol>
+<li>A new version is created with a timestamp name (e.g., <code>2024-01-15_14-30-00</code>)</li>
+<li>All staging data is copied to the new version folder</li>
+<li>The version is added to the configuration's version list</li>
+<li>The staging <code>/work</code> directories are cleared for new changes</li>
+<li>The new version becomes accessible at its own URL path</li>
+</ol>
+<h2>After Publishing</h2>
+<ul>
+<li>The new version appears in the VERSIONS list on the Admin Console</li>
+<li>Each version has its own URL: <code>/{version}/outlets/html/admin</code></li>
+<li>You can switch between versions to compare data</li>
+<li>The staging area is ready for new edits</li>
+</ul>
+<h2>Version URLs</h2>
+<p>Published versions are accessible at:
+- Admin console: <code>/{version}/outlets/html/admin</code>
+- Webmap: <code>/{version}/outlets/webmap/</code>
+- Downloads: <code>/{version}/outlets/{outlet_name}/</code></p>
+<h2>Important Notes</h2>
+<ul>
+<li>⚠️ <strong>Published versions cannot be modified</strong> - they are permanent snapshots</li>
+<li>Publishing does not delete or change the staging data</li>
+<li>You can continue editing in staging immediately after publishing</li>
+<li>There is no automatic rollback - treat publishing as permanent</li>
+<li>Store the version name if you need to reference it later</li>
+</ul>
+<h2>Troubleshooting</h2>
+<p><strong>Publishing seems stuck:</strong>
+- Check the status messages for progress
+- Large datasets may take several minutes
+- Refresh the page and check the versions list</p>
+<p><strong>Version not appearing:</strong>
+- Refresh the Admin Console page
+- Check that publishing completed without errors
+- Verify the version appears in the versions list</p>
+<p><strong>Need to undo a publish:</strong>
+- You cannot delete published versions through the interface
+- Continue editing in staging and publish a corrected version
+- Contact your system administrator for manual cleanup if needed</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/local/css/console.css">
+    <link rel="stylesheet" href="/local/css/shared_controls.css">
+    <title>Editing Layer Data - westport Help</title>
+</head>
+<body>
+    <div class="help-header">
+        <h1>Fire Atlas Help</h1>
+        <a href="../../../staging/outlets/html/admin" class="button link-button">HOME</a>
+    </div>
+    <div class="help-content">
+        <h1>Editing Layer Data</h1>
+<p>There are two approaches to modifying existing layer data: using the Edit Map interface or the spreadsheet export/import workflow.</p>
+<h2>Method 1: Using the Edit Map (Annotate)</h2>
+<p>This is the quickest way to update individual features:</p>
+<ol>
+<li>From the Admin Console, click the <strong>"annotate"</strong> link for the layer you want to edit</li>
+<li>This opens the Edit Map interface for that layer</li>
+<li><strong>Draw the updated geometry</strong> (point, line, or polygon depending on the layer type)</li>
+<li><strong>Fill in the property values</strong> in the control fields - use the same identifying values as the feature you're replacing</li>
+<li>Click <strong>Save</strong> to submit</li>
+</ol>
+<p>The new feature will be processed as an update to the existing data.</p>
+<p><strong>Best for:</strong> Quick updates to individual features, geometry corrections, adding new features</p>
+<h2>Method 2: Using Spreadsheet Export/Import</h2>
+<p>For bulk edits or when you need to modify many features at once:</p>
+<ol>
+<li><strong>Export the layer data</strong></li>
+<li>From the Admin Console, find the layer in the "Layers" section</li>
+<li>
+<p>Click the <strong>"Export to Sheet"</strong> link to export to Google Sheets</p>
+</li>
+<li>
+<p><strong>Edit the data</strong></p>
+</li>
+<li>Modify property values directly in the spreadsheet cells</li>
+<li>Add new rows for new features</li>
+<li>
+<p>Delete rows to remove features</p>
+</li>
+<li>
+<p><strong>Re-import the data</strong></p>
+</li>
+<li>Use the <strong>"Import from Sheet"</strong> function in the Admin Console</li>
+</ol>
+<p><strong>Best for:</strong> Bulk text changes, fixing typos across many features, deleting multiple features</p>
+<h2>Deleting Features</h2>
+<ul>
+<li><strong>Single feature:</strong> Use the spreadsheet method - export, delete the row, re-import</li>
+<li><strong>Multiple features:</strong> Use the spreadsheet method for efficiency</li>
+<li><strong>Geometry-based deletion:</strong> Edit the GeoJSON directly in QGIS, then upload via Edit Map</li>
+</ul>
+<h2>Tips</h2>
+<ul>
+<li>Always export a backup before making bulk changes</li>
+<li>Changes won't appear on published maps until the atlas is re-published</li>
+<li>For geometry changes that require precision, editing in QGIS and uploading the GeoJSON provides the best tools</li>
+</ul>
+    </div>
+</body>
+</html>

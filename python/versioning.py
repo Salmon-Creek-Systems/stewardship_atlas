@@ -78,6 +78,11 @@ def publish_new_version(config, version=None):
     #atlas_root = Path(config['data_root']) / config['name']
     #atlas_root.symlink_to(atlas_path)
 
+    current_path = atlas_path(config, version='CURRENT')
+    current_path.unlink()
+    current_path.symlink_to(version_path)
+    logger.info(f"Linked {current_path} to {version_path}")
+    print(f"Linked {current_path} to {version_path}")
     return version_path
 
 

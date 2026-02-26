@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/local/css/console.css">
+    <link rel="stylesheet" href="/local/css/shared_controls.css">
+    <title>View and Edit Configuration - westport Help</title>
+</head>
+<body>
+    <div class="help-header">
+        <h1>Fire Atlas Help</h1>
+        <a href="../../../staging/outlets/html/admin" class="button link-button">HOME</a>
+    </div>
+    <div class="help-content">
+        <h1>View and Edit Configuration</h1>
+<p>The Technical Console provides access to your atlas configuration, allowing administrators to view and modify settings directly.</p>
+<h2>Accessing the Configuration Editor</h2>
+<ol>
+<li>Go to the <strong>Admin Console</strong> (typically at <code>/staging/outlets/html/admin</code>)</li>
+<li>Click <strong>"Admin"</strong> or <strong>"Technical"</strong> in the Help and Links section</li>
+<li>Navigate to the <strong>Configuration Editor</strong> link</li>
+</ol>
+<h2>Using the Configuration Editor</h2>
+<p>The editor provides a visual interface for editing your atlas configuration JSON:</p>
+<h3>Navigation Modes</h3>
+<ul>
+<li><strong>Tree View</strong>: Easy navigation through nested configuration. Click to expand/collapse sections.</li>
+<li><strong>Code View</strong>: Direct JSON editing with syntax highlighting</li>
+<li><strong>Text View</strong>: Plain text editing</li>
+<li><strong>Preview</strong>: Read-only formatted view</li>
+</ul>
+<h3>Common Tasks</h3>
+<p><strong>Edit Layer Properties:</strong>
+1. Expand <code>dataswale</code> → <code>layers</code>
+2. Find the layer you want to modify
+3. Edit properties like <code>color</code>, <code>add_labels</code>, <code>editable_columns</code>, etc.</p>
+<p><strong>Modify Asset/Outlet Settings:</strong>
+1. Expand <code>assets</code>
+2. Select the outlet (e.g., <code>runbook</code>, <code>gazetteer</code>)
+3. Adjust properties like <code>in_layers</code>, <code>page_size</code>, <code>feature_scale</code></p>
+<p><strong>Update Bounding Box:</strong>
+1. Expand <code>dataswale</code> → <code>bbox</code>
+2. Modify <code>north</code>, <code>south</code>, <code>east</code>, <code>west</code> coordinates</p>
+<h3>Saving Changes</h3>
+<ol>
+<li>Click <strong>"💾 Save Configuration"</strong> in the toolbar</li>
+<li>Wait for the success message</li>
+<li>Changes are saved to the staging configuration immediately</li>
+</ol>
+<h3>Important Notes</h3>
+<ul>
+<li>⚠️ Changes are saved to <strong>staging only</strong> - they won't affect published versions</li>
+<li>Use <strong>"✓ Validate"</strong> to check for errors before saving</li>
+<li>Use <strong>"🔄 Reload from Server"</strong> to discard unsaved changes</li>
+<li>Invalid JSON will not be saved - fix errors first</li>
+<li>After saving, you may need to <strong>Publish</strong> to see changes in production</li>
+</ul>
+<h3>Configuration Structure</h3>
+<p>Key sections in the configuration:
+- <code>name</code>: Atlas name
+- <code>data_root</code>: Base path for data storage
+- <code>dataswale.bbox</code>: Geographic bounding box
+- <code>dataswale.layers</code>: Layer definitions and styling
+- <code>dataswale.versions</code>: List of published versions
+- <code>assets</code>: Output configurations (runbook, gazetteer, webmap, etc.)</p>
+    </div>
+</body>
+</html>
