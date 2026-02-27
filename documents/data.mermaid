@@ -1,0 +1,208 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5fe', 'secondaryColor': '#fff3e0', 'tertiaryColor': '#e8f5e9'}}}%%
+flowchart TB
+    subgraph legend[" "]
+        direction LR
+        inlet_leg[Inlet]:::inlet
+        eddy_leg[Eddy]:::eddy
+        outlet_leg[Outlet]:::outlet
+        raster_leg[Raster Layer]:::raster
+        vector_leg[Vector Layer]:::vector
+    end
+
+    %% ===== INLETS (Data Sources) =====
+    subgraph inlets["INLETS (Data Sources)"]
+        direction TB
+        dem[dem<br/>OpenTopo DEM]:::inlet
+        opentopo_dem[opentopo_dem<br/>OpenTopo DEM]:::inlet
+        local_hillshade[local_hillshade<br/>LIDAR Hillshade]:::inlet
+        public_buildings[public_buildings<br/>Overture]:::inlet
+        public_addresses[public_addresses<br/>Overture]:::inlet
+        oa_parcels[oa_parcels<br/>Local Parcels]:::inlet
+        local_tsunami[local_tsunami<br/>Tsunami Zones]:::inlet
+        public_roads[public_roads<br/>Overture]:::inlet
+        internal_roads_primary[internal_roads_primary]:::inlet
+        internal_roads_secondary[internal_roads_secondary]:::inlet
+        internal_roads_tertiary[internal_roads_tertiary]:::inlet
+        public_creeks[public_creeks<br/>NHD]:::inlet
+        local_helilandings[local_helilandings]:::inlet
+        local_incidents[local_incidents]:::inlet
+        local_hydrants[local_hydrants]:::inlet
+        local_campgrounds[local_campgrounds]:::inlet
+        local_milemarkers[local_milemarkers]:::inlet
+    end
+
+    %% ===== EDDIES (Transforms) =====
+    subgraph eddies["EDDIES (Transforms)"]
+        direction TB
+        gdal_contours[gdal_contours<br/>GDAL Contour Generator]:::eddy
+        derived_hillshade[derived_hillshade<br/>Hillshade from DEM]:::eddy
+    end
+
+    %% ===== LAYERS =====
+    subgraph layers["LAYERS"]
+        direction TB
+        
+        subgraph raster_layers["Raster Layers"]
+            elevation[elevation]:::raster
+            basemap[basemap]:::raster
+            lidar_basemap[lidar_basemap]:::raster
+        end
+        
+        subgraph vector_layers["Vector Layers"]
+            contours[contours<br/>linestring]:::vector
+            buildings[buildings<br/>polygon]:::vector
+            parcels[parcels<br/>polygon]:::vector
+            tsunami[tsunami<br/>polygon]:::vector
+            roads_primary[roads_primary<br/>linestring]:::vector
+            roads_secondary[roads_secondary<br/>linestring]:::vector
+            roads_tertiary[roads_tertiary<br/>linestring]:::vector
+            creeks[creeks<br/>linestring]:::vector
+            helilandings[helilandings<br/>point]:::vector
+            incidents[incidents<br/>point]:::vector
+            hydrants[hydrants<br/>point]:::vector
+            campgrounds[campgrounds<br/>point]:::vector
+            milemarkers[milemarkers<br/>point]:::vector
+            natural[natural<br/>point]:::vector
+            private_notes[private_notes<br/>point]:::vector
+        end
+    end
+
+    %% ===== OUTLETS (Products) =====
+    subgraph outlets["OUTLETS (Products)"]
+        direction TB
+        webmap[webmap<br/>Public Web Map]:::outlet
+        webedit[webedit<br/>Edit Interface]:::outlet
+        private_webmap[private_webmap<br/>Admin Web Map]:::outlet
+        runbook[runbook<br/>PDF Maps]:::outlet
+        private_runbook[private_runbook<br/>Admin PDF]:::outlet
+        gazetteer[gazetteer<br/>Data Package]:::outlet
+        spreadsheet_export[spreadsheet_export<br/>Google Sheets]:::outlet
+        sqlquery[sqlquery<br/>SQL Interface]:::outlet
+        html[html<br/>Console HTML]:::outlet
+    end
+
+    %% ===== INLET → LAYER CONNECTIONS =====
+    dem --> elevation
+    opentopo_dem --> basemap
+    local_hillshade --> lidar_basemap
+    public_buildings --> buildings
+    public_addresses --> parcels
+    oa_parcels --> parcels
+    local_tsunami --> tsunami
+    public_roads --> roads_secondary
+    internal_roads_primary --> roads_primary
+    internal_roads_secondary --> roads_secondary
+    internal_roads_tertiary --> roads_tertiary
+    public_creeks --> creeks
+    local_helilandings --> helilandings
+    local_incidents --> incidents
+    local_hydrants --> hydrants
+    local_campgrounds --> campgrounds
+    local_milemarkers --> milemarkers
+
+    %% ===== EDDY CONNECTIONS =====
+    elevation --> gdal_contours
+    gdal_contours --> contours
+    elevation --> derived_hillshade
+    derived_hillshade --> basemap
+
+    %% ===== LAYER → OUTLET CONNECTIONS =====
+    basemap --> webmap
+    basemap --> webedit
+    basemap --> private_webmap
+    basemap --> gazetteer
+    
+    lidar_basemap --> runbook
+    lidar_basemap --> private_runbook
+    
+    contours --> webmap
+    contours --> webedit
+    contours --> private_webmap
+    contours --> runbook
+    contours --> private_runbook
+    contours --> gazetteer
+    
+    tsunami --> webmap
+    tsunami --> private_webmap
+    tsunami --> private_runbook
+    tsunami --> gazetteer
+    
+    roads_primary --> webmap
+    roads_primary --> webedit
+    roads_primary --> private_webmap
+    roads_primary --> runbook
+    roads_primary --> private_runbook
+    
+    roads_secondary --> webmap
+    roads_secondary --> webedit
+    roads_secondary --> private_webmap
+    roads_secondary --> runbook
+    roads_secondary --> private_runbook
+    roads_secondary --> gazetteer
+    
+    roads_tertiary --> webmap
+    roads_tertiary --> webedit
+    roads_tertiary --> private_webmap
+    roads_tertiary --> runbook
+    roads_tertiary --> private_runbook
+    
+    creeks --> webmap
+    creeks --> webedit
+    creeks --> private_webmap
+    creeks --> runbook
+    creeks --> private_runbook
+    creeks --> gazetteer
+    
+    buildings --> webmap
+    buildings --> webedit
+    buildings --> private_webmap
+    buildings --> runbook
+    buildings --> private_runbook
+    buildings --> gazetteer
+    
+    helilandings --> webmap
+    helilandings --> webedit
+    helilandings --> private_webmap
+    helilandings --> runbook
+    helilandings --> private_runbook
+    helilandings --> spreadsheet_export
+    
+    hydrants --> webmap
+    hydrants --> webedit
+    hydrants --> private_webmap
+    hydrants --> runbook
+    hydrants --> private_runbook
+    hydrants --> spreadsheet_export
+    
+    campgrounds --> webmap
+    campgrounds --> webedit
+    campgrounds --> private_webmap
+    campgrounds --> runbook
+    campgrounds --> private_runbook
+    
+    milemarkers --> webmap
+    milemarkers --> webedit
+    milemarkers --> private_webmap
+    milemarkers --> runbook
+    milemarkers --> private_runbook
+    milemarkers --> gazetteer
+    milemarkers --> spreadsheet_export
+    
+    natural --> webmap
+    natural --> webedit
+    natural --> private_webmap
+    natural --> gazetteer
+    
+    parcels --> gazetteer
+    
+    private_notes --> webedit
+    private_notes --> private_webmap
+    private_notes --> runbook
+    private_notes --> private_runbook
+
+    %% ===== STYLES =====
+    classDef inlet fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#0d47a1
+    classDef eddy fill:#fff9c4,stroke:#f9a825,stroke-width:2px,color:#f57f17
+    classDef outlet fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    classDef raster fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    classDef vector fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#bf360c
