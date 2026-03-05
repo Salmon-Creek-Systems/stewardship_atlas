@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Stewardship Atlas
 
 A geospatial data management system for creating and maintaining fire safety atlases. Each atlas serves a different customer (fire departments, fire safe councils) with customized layers, styling, and outputs.
@@ -8,6 +12,7 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Technical Architecture**: `documents/atlas_technical_architecture.md` - Core concepts and implementation details
 - **Data Interaction Guide**: `documents/data_interaction_guide.md` - All the ways to view/edit data
 - **QGIS Outlets**: `documents/qgis_outlets.md` - PDF generation with QGIS
+- **Roadmap**: `documents/roadmap.md` - Strategic project roadmap
 
 ## Core Architecture Concepts
 
@@ -24,6 +29,32 @@ The system uses a water/flow metaphor:
 | **Version** | A snapshot of the dataswale; `staging` is the working copy |
 
 Data flows: `INLETS → LAYERS → (EDDIES →) OUTLETS`
+
+### Asset Materialization
+
+`atlas.materialize(config, asset_name)` routes by `fetch_type` (from the resolved config) to a materializer function. The registry is built at startup by merging `asset_methods` dicts from all modules:
+
+```python
+DEFAULT_MATERIALIZERS = (
+    outlets.asset_methods | eddies.asset_methods |
+    vector_inlets.asset_methods | raster_inlets.asset_methods |
+    outlets_qgis_atlas.asset_methods
+)
+```
+
+**Config resolution**: Each asset in `{atlas}_assets.json` has a `config_def` field that references a template in `shared_*.json`. The shared template is loaded first, then per-asset overrides are applied. The merged result lives in `config['assets'][name]` at runtime. Use `atlas.create_config()` to inspect the merged result.
+
+### Deltas
+
+Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Two actions:
+- `"create"` — append new features
+- `"annotate"` — update properties on existing features
+
+Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
+
+### Versioning
+
+`staging/` is the only editable version. Published versions are immutable snapshots created by `versioning.publish_new_version()`, which copies `staging/` to a timestamped directory and updates the `CURRENT` symlink.
 
 ## Project Structure
 
@@ -68,6 +99,18 @@ On the deployed server:
 - Shared data: `/root/data/`
 - Each atlas lives at: `{data_root}/{atlas_name}/`
 - Versions: `{atlas}/staging/`, `{atlas}/CURRENT/` (symlink), `{atlas}/{timestamp}/`
+
+### Web API Key Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /delta_upload/{swalename}` | Store a delta; triggers layer refresh |
+| `GET /refresh?swale={name}&asset={name}` | Re-materialize a single asset |
+| `GET /publish?swale={name}` | Async publish — materializes versioned outlets, creates snapshot, updates `CURRENT` |
+| `GET /publish-status?swale={name}` | Poll publish job progress |
+| `POST /save_config/{swalename}` | Persist config changes |
+| `POST /import_sheet`, `GET /export_gsheet` | Google Sheets import/export |
+| `POST /sql_query` | DuckDB query across layers |
 
 ### Starting the Webapp
 
@@ -151,27 +194,67 @@ atlas.materialize(config, "webmap")
 
 ## Current Atlases
 
-Multiple atlases are maintained for different customers:
-- `wvfd` / `wvfd_dev` - Westport Volunteer Fire Department
-- `scvfd` - Another fire department
-- `MineralKinsey` - Fire safe council
-- `kennedy`, `wildwood` - Other customers
+- `wvfd` / `wvfd_dev` — Westport Volunteer Fire Department. Recent paying contract; significant code, config, and data changes were made here that need to be propagated back to SCVFD.
+- `scvfd` — Original and anchor customer. Personal connection (community VFD where the team grew up). No current funding but important — friendly testers and the target for interesting new features. Treat as the reference implementation.
+- `MineralKinsey` — Fire safe council
+- `kennedy`, `wildwood` — Other customers
 
 Each has corresponding `*_layers.json` and `*_assets.json` in `/configuration`.
+
+## Architecture Notes
+
+**Static-first**: Once generated, outlet files are static and can be viewed offline. The webapp/API is only needed when modifying data or publishing new versions.
+
+**Outlet types customers use directly**:
+- `html` — the interactive console customers use day-to-day
+- webmap outlets — live data interaction
+- `notebook` — advanced code-based interaction
+
+**Actual on-disk layout** (not fully visible in the Python code):
+```
+/data/swales/
+  {atlas}/
+    app/              ← git checkout of repo (code + shared config)
+    CURRENT -> ...    ← symlink to active published version (atlas root level)
+    staging/          ← only editable version
+      atlas_config.json
+      local -> ...    ← symlink to shared local data
+      deltas/, layers/, outlets/
+    2026-02-11/       ← immutable published snapshot
+      atlas_config.json
+      (same subtree as staging)
+```
+
+**Deployment history**: Started with shared code + shared service + per-atlas subdomains (cross-site headaches). Moved to fully self-contained per-atlas with own `app/` copy and own service/port (eliminates cross-site but creates propagation pain). Future direction: container image for code, S3 for data, nginx/DNS handles routing — essentially the original model done right.
+
+**S3 status**: Partially underway. Currently the system points at files served from S3; the goal is to make S3 a proper backend in the data access layer. Key wrinkle: current structure relies on symlinks (`local ->`, `CURRENT ->`); S3 doesn't support symlinks natively. The `app/` tree should not go to S3 — it belongs in a container image.
+
+**Logistics eddy**: Exists as a notebook only — not yet a proper eddy in `eddies.py`. Fuel reduction / biochar logistics modeling; commercially interesting.
+
+**Dagster history**: The system was originally orchestrated with Dagster. The uniform asset method signature and `asset_methods` dict are intentional Dagster scaffolding — preserve this pattern. Old integration code exists in the private repo `Salmon-Creek-Systems/internal`, `python/atlas_dagster.py` (check `__init__.py` there too). When Dagster is restored it will coexist with notebooks (exploration/advanced users) and the web console (user-triggered actions) — it handles recurring maintenance and dependency-driven pipeline orchestration.
+
+## Commands
+
+### Run tests (locally, no QGIS required)
+```bash
+cd python
+python -m pytest tests/            # all tests
+python -m pytest tests/test_foo.py # single file
+```
+Tests are unittest-based. Most can run locally without QGIS or server data paths.
+
+### Atlas CLI
+```bash
+python scripts/build_atlas.py --help
+```
 
 ## Testing
 
 Tests exist in `python/tests/` but haven't been run recently. The testing strategy going forward:
 
-1. **Priority**: Simple unit tests for core modules first
+1. **Priority**: Simple unit tests for core modules first (`utils.py`, `versioning.py`, `deltas_geojson.py`)
 2. **Later**: Integration tests, then system-level tests
-3. **Framework**: Standard pytest (add to requirements if needed)
-
-Run tests with:
-```bash
-cd python
-python -m pytest tests/
-```
+3. **Framework**: unittest (existing) / pytest (preferred going forward)
 
 ## Known Challenges & Gotchas
 
