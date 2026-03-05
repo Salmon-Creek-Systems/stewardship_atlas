@@ -141,5 +141,13 @@
 	"config_def": "gazetteer",
 	"in_layers":  ["contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
 	"blend_percent": 40
+    },
+    "notebook": {
+        "type": "outlet",
+        "name": "notebook",
+        "config_def": "jupyter_notebook",
+        "access": [
+            "technical"
+        ]
     }
 }

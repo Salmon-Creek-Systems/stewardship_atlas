@@ -180,8 +180,10 @@ def build_atlas(
             shared_dir=Path(shared_dir),
             feature_collection=feature_collection
         )
-        # Bootstrap the notebook outlet so it's ready to use immediately
+        # Bootstrap core outlets
         atlas.materialize(config, 'notebook')
+        atlas.materialize(config, 'html')
+        atlas.materialize(config, 'webmap')
 
     return config, config_path
 
