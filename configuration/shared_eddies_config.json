@@ -2,7 +2,7 @@
     "derived_hillshade": {
         "name": "hillshade",
         "asset_type": "eddy",
-        "fetch_type": "hillshade",
+        "fetch_type": "derived_hillshade",
         "data_type": "tiff",
         "resample": 5000,
         "intensity": 0.5,
