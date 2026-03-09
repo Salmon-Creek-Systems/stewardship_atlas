@@ -297,7 +297,10 @@ def create(config: Dict[str, Any] = None,
 
     if not (p / 'local').is_symlink():
         (p / 'local').symlink_to(shared_dir, target_is_directory=True)
-    
+
+    if not (p / 'CURRENT').is_symlink():
+        (p / 'CURRENT').symlink_to(p / 'staging', target_is_directory=True)
+
     (p / 'staging').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'layers').mkdir(parents=True, exist_ok=True)
