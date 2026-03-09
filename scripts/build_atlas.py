@@ -180,7 +180,11 @@ def build_atlas(
             shared_dir=Path(shared_dir),
             feature_collection=feature_collection
         )
-    
+        # Bootstrap core outlets
+        atlas.materialize(config, 'notebook')
+        atlas.materialize(config, 'html')
+        atlas.materialize(config, 'webmap')
+
     return config, config_path
 
 
@@ -246,7 +250,7 @@ def main():
             versioned_outlets=properties['versioned_outlets'],
             logo_url=properties['logo_url'],
             geometry=geometry,
-            config_only=properties.get('config_only', True)
+            config_only=config_only
         )
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)

@@ -2633,9 +2633,10 @@ This is a minimal notebook intended as a starting point for working with a speci
   * sql query
 """))
     
-    notebook.cells.append(nbformat.v4.new_code_cell("""
+    python_path = str(versioning.atlas_path(config, version='app') / 'python')
+    notebook.cells.append(nbformat.v4.new_code_cell(f"""
 import sys, os, subprocess, time, json, string, datetime, random, math
-sys.path.insert(0, "/root/stewardship_atlas/python")
+sys.path.insert(0, "{python_path}")
 import dataswale_geojson as dataswale
 import deltas_geojson as deltas
 import versioning

@@ -591,6 +591,12 @@
 	    "description": "USGS National Hydrography Dataset",
 	    "license": "https://www.usgs.gov/nhd/license",
 	    "citation": "USGS NHD"
-	} 
+	}
+    },
+    "gazetteer_grid": {
+        "name": "gazetteer_grid",
+        "asset_type": "inlet",
+        "fetch_type": "gazetteer_grid",
+        "num_cols": 6
     }
 }
