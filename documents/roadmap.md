@@ -174,7 +174,34 @@ This should be a deliberate pass once the codebase is better tested (don't reorg
 - Deployment automation (CI/CD for server updates)
 - Docker / containerized QGIS for reproducible PDF generation
 - Advanced ML/analytics on atlas data (natural territory for applied math work once LiDAR is in)
-- **Process management**: replace screen sessions for Jupyter and webapp with proper process management (systemd units, supervisor, or similar). Each atlas currently requires manually starting processes in screen which is fragile and hard to monitor. Should include: auto-start on boot, restart on failure, per-atlas process isolation, log management.
+- **Process management**: replace screen sessions for Jupyter and webapp with proper process management (systemd units, supervisor, or similar). Each atlas currently requires manually starting processes in screen which is fragile and hard to monitor. Should include: auto-start on boot, restart on failure, per-atlas process isolation, log management. Also: everything currently runs as root, which is bad practice and should be fixed alongside process management.
+
+### Rethinking the Outlet Concept
+
+Outlets were originally pure data artifacts — static, read-only products of the pipeline. They've evolved into three distinct categories that probably deserve different treatment:
+
+1. **Data artifacts**: webmap tiles, GeoPackage exports, PDFs — genuinely static, version-appropriate, belong in the outlet directory
+2. **Interfaces**: HTML console, webedit, notebook — not artifacts, they're UIs. Questionable whether they belong in the version structure at all.
+3. **Feedback channels**: webedit and notebook both accept input that flows back into the atlas as deltas — making them inlets as much as outlets. The water metaphor breaks down here.
+
+The current model forces all three into the same structure and location. Worth a design conversation about whether to formalize these distinctions — possibly a separate `interfaces/` concept alongside inlets/eddies/outlets, or just acknowledging that some outlets are bidirectional. No action now, but don't design config reform or S3 backend in ways that make this harder to untangle later.
+
+---
+
+### Notebook / Outlet Versioning Tension
+
+Notebooks generated as outlets currently live inside the version directory structure (e.g. `staging/outlets/notebook/`), but notebooks don't really belong there conceptually. Three distinct things have different version-relationship needs:
+
+- **Webapp / API**: must live outside versions — it *switches between* versions, so it can't be inside one
+- **Generated notebooks** (outlet): useful as a pre-loaded starting point for sophisticated users, but ideally you'd want to open a notebook and work across versions or compare between them — being locked inside a version conflicts with that
+- **Hand-crafted notebooks** (exploratory): definitely shouldn't be in a version, more like code artifacts
+
+**History**: notebooks have lived in three places:
+1. `app/notebooks/` — part of the code repo, not version-structured, but wrong when code moves to a container
+2. `{atlas_root}/notebooks/` — outside both app and version directories, which made reasonable sense
+3. Current: `staging/outlets/notebook/` — inside a version, generated as an outlet
+
+**Open question**: the generated outlet notebook is genuinely useful as a bootstrapped starting point. But maybe the right model is: generate it into `{atlas_root}/notebooks/` (or similar) rather than into the version tree, so it's accessible regardless of which version is active. This also survives the code-to-container move better than `app/notebooks/`.
 
 ### Authentication & Authorization (short term: audit; long term: SSO)
 
