@@ -250,7 +250,7 @@ def main():
             versioned_outlets=properties['versioned_outlets'],
             logo_url=properties['logo_url'],
             geometry=geometry,
-            config_only=properties.get('config_only', True)
+            config_only=config_only
         )
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
