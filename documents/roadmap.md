@@ -17,23 +17,22 @@ A living document. Projects are roughly sequenced to unblock later work, with fu
 ## Immediate
 
 ### 1. Testing — stages 1 and 2
-Before touching SCVFD, assess the state of the existing test suite and get it green.
+Assess the state of the existing test suite and get it green.
 
 **Stage 1**: Run existing tests, find out what passes and what doesn't. Fix failures. This is a discovery exercise as much as a fix — we don't know the current state.
 
 **Stage 2**: Wire passing tests into a GitHub Actions CI run so future changes are automatically validated.
 
-**Caveat**: If this looks like it will take significant time, defer it and do project 2 first — getting SCVFD up to date is the more urgent customer need. Reassess after scoping the test work.
+### 2. ~~Propagate WVFD contract changes to SCVFD~~ ✅ DONE
+SCVFD migrated to new deployment with rough feature parity. Not exhaustively tested but all major paths working: html console, webmap, vector edits, QGIS runbook, gazetteer (redesigned as inlet + qgis_runbook outlet), version publishing. Several bugs fixed in the process — see MEMORY.md for details.
 
-### 2. Propagate WVFD contract changes to SCVFD
-Code, config, and data have all been refined during the WVFD engagement. SCVFD needs to come to parity.
-
-Do this as a supervised session — treat it as both a task and a research exercise. Document every step. This will directly inform the configuration reform project by revealing where the real friction is.
-
-**Outputs**: SCVFD updated; a written account of what the propagation process actually involves.
+Remaining known gaps:
+- nginx htpasswd paths still pointing at old `/root/swales/roles/` — needs fixing on server
+- WVFD-specific filenames hardcoded in `shared_inlets_config.json` (`westport_turnouts.geojson`, `westport_dem_2m_hillshade.tiff`)
+- `claudelab` branch not yet PRed to main
 
 ### 3. Testing — stage 3
-Extend test coverage to features added during the WVFD contract. No new test methodology — just fill the gaps using the existing patterns. Informed by the inventory of changes discovered during project 2.
+Extend test coverage to features added during the WVFD contract. The SCVFD migration surfaced several good test candidates — see MEMORY.md bugs list. No new test methodology — just fill the gaps using existing patterns.
 
 ---
 
@@ -121,6 +120,14 @@ Worth doing design thinking on early even while implementation is distant.
 
 ---
 
+### PDF Generation: Unify Per-Region and Combined Output
+
+Currently the system generates per-region individual PDFs and a combined PDF as separate operations. The cleaner model would be: always generate per-region PDFs first, then combine them into a single file — one code path, one pass. Right now generating the whole thing as one big PDF separately from the individual pages is redundant and clunky.
+
+Also: `generate_pdf` flag in `outlet_runbook_qgis_atlas` currently skips all PDF generation. If we want the gazetteer to generate individual pages but not a combined PDF (or vice versa), finer-grained control is needed.
+
+---
+
 ### Spreadsheet Import/Export Type Fidelity
 
 Export sends raw Python values to gspread; Google Sheets auto-interprets types, causing silent corruption (e.g. string IDs like APNs displayed as scientific notation). Import uses `get_all_records()` which guesses types with no schema — `"001"` comes back as `1`, `None` comes back as `""`.
@@ -202,6 +209,14 @@ Notebooks generated as outlets currently live inside the version directory struc
 3. Current: `staging/outlets/notebook/` — inside a version, generated as an outlet
 
 **Open question**: the generated outlet notebook is genuinely useful as a bootstrapped starting point. But maybe the right model is: generate it into `{atlas_root}/notebooks/` (or similar) rather than into the version tree, so it's accessible regardless of which version is active. This also survives the code-to-container move better than `app/notebooks/`.
+
+### Shared Config Contamination
+WVFD-specific filenames (`westport_turnouts.geojson`, `westport_dem_2m_hillshade.tiff`) are hardcoded in `shared_inlets_config.json`. Shared config should have no atlas-specific values. Fix as part of config reform (project 4) or earlier if it causes problems.
+
+### Delta Apply Step UX
+After running an inlet that writes deltas, a separate `refresh_vector_layer()` call is required before the layer is queryable. This is easy to miss and caused confusion during the gazetteer workflow. Consider: should inlets automatically trigger a refresh, or should the workflow be documented more clearly? Related to Dagster dependency tracking.
+
+---
 
 ### Authentication & Authorization (short term: audit; long term: SSO)
 
