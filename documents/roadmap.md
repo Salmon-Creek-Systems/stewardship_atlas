@@ -4,6 +4,26 @@ A living document. Projects are roughly sequenced to unblock later work, with fu
 
 ---
 
+## Current Priorities
+
+Two high-level priorities are driving sequencing right now:
+
+**1. Something visible and cool** — most infrastructure work is invisible to customers. Before the next engagement or demo, add at least one feature that a non-technical person would notice and find compelling. Candidates in priority order:
+- **Geo-tagged photo ingest** — fastest path, self-contained, immediately useful for field crews
+- **Logistics eddy** — more technically interesting, stronger commercial story, more design work required
+- **3D view** — `3dview.py` exists, worth checking how close it is to demo-ready
+- **LiDAR/point cloud** — visually impressive but depends on S3 backend first
+
+**2. Easier atlas generation and refresh** — provisioning a new atlas or propagating changes is too manual. Close the gap between "I have a GeoJSON and config files" and "running atlas." Candidates:
+- **Scripted provisioning** (Issue #10) — near-term, contained, direct follow-on from SCVFD migration
+- **Config reform** — root cause of propagation pain; unblocks everything else
+- **Domain/routing** — wildcard cert + single nginx proxy; new atlas = DNS entry
+- **S3 backend** — enables scale-to-zero and federation
+
+Infrastructure work (testing, auth audit, process management, schema) supports both priorities but isn't directly visible. Weave it in rather than doing it as a block.
+
+---
+
 ## Guiding Principles
 
 - Per-customer deployments are a feature (safety isolation), but the manual process around them is the problem
