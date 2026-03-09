@@ -144,25 +144,22 @@
 	"config_def": "sqlquery",
 	"access": ["admin"]
     },
-    "gazetteer-pretty": {
-	"type": "outlet",
-	"name": "gazetteer",
-	"num_rows": 5,
-	"num_cols": 6,
-	"access": ["internal", "admin"],
-	"config_def": "gazetteer",
-	"in_layers":  ["lidar_basemap","contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
-	"blend_percent": 40
+    "gazetteer_grid": {
+        "type": "inlet",
+        "out_layer": "gazetteer_regions",
+        "config_def": "gazetteer_grid",
+        "num_cols": 6
     },
     "gazetteer": {
-	"type": "outlet",
-	"name": "gazetteer",
-	"num_rows": 5,
-	"num_cols": 6,
-	"access": ["public", "internal", "admin"],
-	"config_def": "gazetteer",
-	"in_layers":  ["contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
-	"blend_percent": 40
+        "type": "outlet",
+        "name": "gazetteer",
+        "config_def": "qgis_runbook",
+        "base_url": "individual_pages",
+        "regions_layer": "gazetteer_regions",
+        "feature_scale": 0.5,
+        "blend_percent": 40,
+        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
+        "access": ["public", "internal", "admin"]
     },
     "notebook": {
         "type": "outlet",

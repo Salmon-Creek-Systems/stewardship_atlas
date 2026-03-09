@@ -129,7 +129,52 @@ def import_sheet(config, layer_name, delta_queue=DELTA_QUEUE):
 
 
 
+def gazetteer_grid(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Generate a grid of bbox regions covering the atlas area for use as gazetteer regions."""
+    import math, string
+    inlet_config = config['assets'][name]['config']
+    bbox = config['dataswale']['bbox']
+
+    num_cols = inlet_config['num_cols']
+    cell_size = abs(bbox['east'] - bbox['west']) / num_cols
+    num_rows = math.ceil(abs(bbox['north'] - bbox['south']) / cell_size)
+
+    row_index = list(string.ascii_uppercase)[:num_rows]
+    col_index = [str(x) for x in range(1, num_cols + 1)]
+
+    features = []
+    for row, rowname in enumerate(row_index):
+        for col, colname in enumerate(col_index):
+            s = bbox['north'] - (1 + row) * cell_size
+            n = bbox['north'] - row * cell_size
+            e = bbox['west'] + (1 + col) * cell_size
+            w = bbox['west'] + col * cell_size
+            cell_name = f"{colname}_{rowname}"
+            up_rowname = row_index[row - 1] if row > 0 else None
+            down_rowname = row_index[row + 1] if row + 1 < len(row_index) else None
+            right_colname = str(col + 2) if col + 1 < len(col_index) else None
+            left_colname = str(col) if col > 0 else None
+            features.append(geojson.Feature(
+                geometry=geojson.Polygon([[
+                    [w, s], [e, s], [e, n], [w, n], [w, s]
+                ]]),
+                properties={
+                    'name': cell_name,
+                    'north_neighbor': f"{colname}_{up_rowname}" if up_rowname else None,
+                    'south_neighbor': f"{colname}_{down_rowname}" if down_rowname else None,
+                    'east_neighbor': f"{right_colname}_{rowname}" if right_colname else None,
+                    'west_neighbor': f"{left_colname}_{rowname}" if left_colname else None,
+                }
+            ))
+
+    layer_name = config['assets'][name]['out_layer']
+    fc = geojson.FeatureCollection(features)
+    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=layer_name)
+    logger.info(f"Generated {len(features)} gazetteer grid cells ({num_cols}x{num_rows})")
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
-    "local_ogr": local_ogr
+    "local_ogr": local_ogr,
+    "gazetteer_grid": gazetteer_grid,
     }
