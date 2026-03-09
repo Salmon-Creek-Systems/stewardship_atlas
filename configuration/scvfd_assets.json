@@ -82,9 +82,16 @@
     "webmap" : {
 	"type": "outlet",
 	"name": "webmap",
-	"in_layers": ["basemap","ponds",  "contours", "roads", "creeks", "buildings", "watertanks", "poi"],
+	"in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "private_notes"],
 	"config_def": "webmap",
 	"access": ["public", "internal", "admin"]
+    },
+    "private_webmap": {
+        "type": "outlet",
+        "name": "private_webmap",
+        "in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "private_notes"],
+        "config_def": "webmap",
+        "access": ["admin", "technical"]
     },
     "spreadsheet_export" : {
 	"type": "outlet",
@@ -96,17 +103,32 @@
     "webedit" : {
 	"type": "outlet",
 	"name": "webedit",
-	"in_layers": ["basemap","roads", "creeks", "buildings", "poi", "ponds", "watertanks"],
+	"in_layers": ["basemap", "lidar_basemap", "roads", "creeks", "buildings", "hydrants", "poi", "ponds", "watertanks", "private_notes"],
 	"config_def": "webedit"
     },
     "runbook": {
         "type": "outlet",
         "name": "runbook",
-	"blend_percent": 50,
-        "in_layers": ["lidar_basemap", "roads", "ponds", "creeks", "buildings"],
+        "config_def": "qgis_runbook",
+        "base_url": "individual_pages",
+        "regions_layer": "regions",
+        "feature_scale": 0.5,
+        "blend_percent": 50,
+        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds"],
         "access": ["public", "internal", "admin"],
-        "config_def": "runbook",
-        "regions" : []},
+        "regions": []
+    },
+    "private_runbook": {
+        "type": "outlet",
+        "name": "private_runbook",
+        "config_def": "qgis_runbook",
+        "base_url": "individual_pages",
+        "regions_layer": "regions",
+        "feature_scale": 0.5,
+        "blend_percent": 50,
+        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds", "private_notes"],
+        "access": ["admin", "technical"]
+    },
     "html": {
         "type": "outlet",
         "name": "html",

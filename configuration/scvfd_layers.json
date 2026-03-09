@@ -76,5 +76,17 @@
     {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
      "add_labels": true, "interaction": "interface"},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
-    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]}
+    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
+    {"name": "hydrants", "geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255],
+     "add_labels": true, "interaction": "interface",
+     "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"},
+     "icon-size": 1.5},
+    {"name": "private_notes", "geometry_type": "point",
+     "color": [255, 0, 0], "fill_color": [255, 255, 255],
+     "add_labels": true, "label_background": true,
+     "editable_columns": [{"name": "name", "type": "string", "default": "Notes and Comments go here."}],
+     "symbol": {"png": "incident.png", "icon": "basic/pushpin"},
+     "icon-size": 2.0,
+     "access": ["admin"],
+     "interaction": "interface"}
 ]
