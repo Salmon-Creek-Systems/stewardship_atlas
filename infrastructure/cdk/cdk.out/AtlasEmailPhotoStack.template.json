@@ -1,5 +1,84 @@
 {
  "Resources": {
+  "AtlasWebappEC2Role0D03F116": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ec2.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "atlas-webapp-ec2-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasWebappEC2Role/Resource"
+   }
+  },
+  "AtlasWebappEC2RoleDefaultPolicyC7C6BED7": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AtlasDataBucket4CD05197",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AtlasWebappEC2RoleDefaultPolicyC7C6BED7",
+    "Roles": [
+     {
+      "Ref": "AtlasWebappEC2Role0D03F116"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasWebappEC2Role/DefaultPolicy/Resource"
+   }
+  },
+  "AtlasWebappInstanceProfile": {
+   "Type": "AWS::IAM::InstanceProfile",
+   "Properties": {
+    "InstanceProfileName": "atlas-webapp-instance-profile",
+    "Roles": [
+     {
+      "Ref": "AtlasWebappEC2Role0D03F116"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasWebappInstanceProfile"
+   }
+  },
   "AtlasDataBucket4CD05197": {
    "Type": "AWS::S3::Bucket",
    "Properties": {
@@ -450,7 +529,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12O0W7CMAxFv4V31xtkPzAq7blqPwCZ4DKvaYLqRAhF+fephImJp3PvsWR7h7uPLb5v6KqNPU2NkyPmIZKdgK56yGow75OdOEI7+keq6IITe3vqR69lT8oFHM3HE2FuR9/xMouqBA9fydu4hnb0f7mA0Iy5D45XfefzQE0F1BxIlaPi5wpQVsw9W5ZL7JPjob75Yv7Vl2kpVWhIi2W4Lx0incWfC3S3+B38m8GtQbP5UZFmST7KzNhX/gKctnl6PQEAAA=="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12OS27CMBCGz8LemRbSCwBSpe6i5ABoMBM6jTOuMrYQsnx3ZNyKltX3PzSPDWze1vC6wos29jQ1jo+QhoB2MnjRQ2KcIfXekdmPcmfnHdtrsQ/1IRpQLHWLH9lRNtpC2kU7USj1j6p4TP3z1exQKRuH8/GEkMoNWmZWZS/mPYoNRexH+dXl0gFVKShsC4ySQurJEn+HPjoa6gtPyR/71OZcA/VxsWTuS4eAZ5ZzNt01fHp5aWHdQrv6UuZmiRJ4Jugrbw3Xe9ZQAQAA"
    },
    "Metadata": {
     "aws:cdk:path": "AtlasEmailPhotoStack/CDKMetadata/Default"

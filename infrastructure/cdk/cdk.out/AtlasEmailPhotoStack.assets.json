@@ -16,16 +16,16 @@
         }
       }
     },
-    "98b2784c6cbb91bfe46d71bb507dca0a0a90b08b22ab2454011e4d547d2c9ac6": {
+    "fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46": {
       "displayName": "AtlasEmailPhotoStack Template",
       "source": {
         "path": "AtlasEmailPhotoStack.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "438886543302-us-east-1-393fb730": {
+        "438886543302-us-east-1-884f3521": {
           "bucketName": "cdk-hnb659fds-assets-438886543302-us-east-1",
-          "objectKey": "98b2784c6cbb91bfe46d71bb507dca0a0a90b08b22ab2454011e4d547d2c9ac6.json",
+          "objectKey": "fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46.json",
           "region": "us-east-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-east-1"
         }

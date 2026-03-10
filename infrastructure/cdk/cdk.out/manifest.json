@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-deploy-role-438886543302-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-cfn-exec-role-438886543302-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/98b2784c6cbb91bfe46d71bb507dca0a0a90b08b22ab2454011e4d547d2c9ac6.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -34,6 +34,24 @@
         "AtlasEmailPhotoStack.assets"
       ],
       "metadata": {
+        "/AtlasEmailPhotoStack/AtlasWebappEC2Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasWebappEC2Role0D03F116"
+          }
+        ],
+        "/AtlasEmailPhotoStack/AtlasWebappEC2Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasWebappEC2RoleDefaultPolicyC7C6BED7"
+          }
+        ],
+        "/AtlasEmailPhotoStack/AtlasWebappInstanceProfile": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasWebappInstanceProfile"
+          }
+        ],
         "/AtlasEmailPhotoStack/AtlasDataBucket/Resource": [
           {
             "type": "aws:cdk:logicalId",

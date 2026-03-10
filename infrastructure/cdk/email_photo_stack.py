@@ -30,12 +30,30 @@ class EmailPhotoStack(Stack):
                  **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
+        # --- IAM role for EC2 webapp server ---
+        # Attach to the SCVFD EC2 instance so the webapp can write images to S3
+        # without credentials on disk.
+        ec2_role = iam.Role(
+            self, "AtlasWebappEC2Role",
+            role_name="atlas-webapp-ec2-role",
+            assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+        )
+
+        ec2_instance_profile = iam.CfnInstanceProfile(
+            self, "AtlasWebappInstanceProfile",
+            instance_profile_name="atlas-webapp-instance-profile",
+            roles=[ec2_role.role_name],
+        )
+
         # --- S3 data bucket (stores processed images permanently) ---
         data_bucket = s3.Bucket(
             self, "AtlasDataBucket",
             bucket_name="scs-atlas-data",
             removal_policy=RemovalPolicy.RETAIN,
         )
+
+        # Grant EC2 webapp role write access to image storage
+        data_bucket.grant_put(ec2_role)
 
         # --- S3 ingress bucket ---
         ingress_bucket = s3.Bucket(
