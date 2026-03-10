@@ -1,0 +1,494 @@
+{
+ "Resources": {
+  "AtlasDataBucket4CD05197": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketName": "scs-atlas-data"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasDataBucket/Resource"
+   }
+  },
+  "AtlasIngressBucket3A2FE564": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketName": "atlas-ingress",
+    "LifecycleConfiguration": {
+     "Rules": [
+      {
+       "ExpirationInDays": 30,
+       "Status": "Enabled"
+      }
+     ]
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasIngressBucket/Resource"
+   }
+  },
+  "AtlasIngressBucketNotificationsD19E2D74": {
+   "Type": "Custom::S3BucketNotifications",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "AtlasIngressBucket3A2FE564"
+    },
+    "NotificationConfiguration": {
+     "LambdaFunctionConfigurations": [
+      {
+       "Events": [
+        "s3:ObjectCreated:*"
+       ],
+       "LambdaFunctionArn": {
+        "Fn::GetAtt": [
+         "EmailPhotoHandler36FE87FE",
+         "Arn"
+        ]
+       }
+      }
+     ]
+    },
+    "Managed": true,
+    "SkipDestinationValidation": false
+   },
+   "DependsOn": [
+    "AtlasIngressBucketAllowBucketNotificationsToAtlasEmailPhotoStackEmailPhotoHandler17AFDF876B6870E1",
+    "AtlasIngressBucketPolicyB74B598C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasIngressBucket/Notifications/Resource"
+   }
+  },
+  "AtlasIngressBucketAllowBucketNotificationsToAtlasEmailPhotoStackEmailPhotoHandler17AFDF876B6870E1": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EmailPhotoHandler36FE87FE",
+      "Arn"
+     ]
+    },
+    "Principal": "s3.amazonaws.com",
+    "SourceAccount": "438886543302",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "AtlasIngressBucket3A2FE564",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasIngressBucket/AllowBucketNotificationsToAtlasEmailPhotoStackEmailPhotoHandler17AFDF87"
+   }
+  },
+  "AtlasIngressBucketPolicyB74B598C": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "AtlasIngressBucket3A2FE564"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:PutObject",
+       "Condition": {
+        "StringEquals": {
+         "aws:Referer": "438886543302"
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ses.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AtlasIngressBucket3A2FE564",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "s3:PutObject",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ses.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AtlasIngressBucket3A2FE564",
+            "Arn"
+           ]
+          },
+          "/incoming/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasIngressBucket/Policy/Resource"
+   }
+  },
+  "EmailPhotoLambdaRole14C26A5C": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoLambdaRole/Resource"
+   }
+  },
+  "EmailPhotoLambdaRoleDefaultPolicy590C0344": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "AtlasIngressBucket3A2FE564",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "AtlasIngressBucket3A2FE564",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:DeleteObject*",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AtlasIngressBucket3A2FE564",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "EmailPhotoLambdaRoleDefaultPolicy590C0344",
+    "Roles": [
+     {
+      "Ref": "EmailPhotoLambdaRole14C26A5C"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoLambdaRole/DefaultPolicy/Resource"
+   }
+  },
+  "EmailPhotoHandler36FE87FE": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-438886543302-us-east-1",
+     "S3Key": "e84abba5dbc2693ea66c4a2a973487944ebf023137782366ba825f970ea4204f.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "WEBAPP_URL": "https://scvfd.fireatlas.org:9999"
+     }
+    },
+    "FunctionName": "atlas-email-photo-handler",
+    "Handler": "email_photo_handler.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "EmailPhotoLambdaRole14C26A5C",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "EmailPhotoLambdaRoleDefaultPolicy590C0344",
+    "EmailPhotoLambdaRole14C26A5C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoHandler/Resource",
+    "aws:asset:path": "asset.e84abba5dbc2693ea66c4a2a973487944ebf023137782366ba825f970ea4204f",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "EmailPhotoHandlerAllowS3Invoke9B930501": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EmailPhotoHandler36FE87FE",
+      "Arn"
+     ]
+    },
+    "Principal": "s3.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "AtlasIngressBucket3A2FE564",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoHandler/AllowS3Invoke"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:PutBucketNotification",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AtlasIngressBucket3A2FE564",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "Roles": [
+     {
+      "Ref": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Description": "AWS CloudFormation handler for \"Custom::S3BucketNotifications\" resources (@aws-cdk/aws-s3)",
+    "Code": {
+     "ZipFile": "import boto3  # type: ignore\nimport json\nimport logging\nimport urllib.request\n\ns3 = boto3.client(\"s3\")\n\nEVENTBRIDGE_CONFIGURATION = 'EventBridgeConfiguration'\nCONFIGURATION_TYPES = [\"TopicConfigurations\", \"QueueConfigurations\", \"LambdaFunctionConfigurations\"]\n\ndef handler(event: dict, context):\n  response_status = \"SUCCESS\"\n  error_message = \"\"\n  try:\n    props = event[\"ResourceProperties\"]\n    notification_configuration = props[\"NotificationConfiguration\"]\n    managed = props.get('Managed', 'true').lower() == 'true'\n    skipDestinationValidation = props.get('SkipDestinationValidation', 'false').lower() == 'true'\n    stack_id = event['StackId']\n    old = event.get(\"OldResourceProperties\", {}).get(\"NotificationConfiguration\", {})\n    if managed:\n      config = handle_managed(event[\"RequestType\"], notification_configuration)\n    else:\n      config = handle_unmanaged(props[\"BucketName\"], stack_id, event[\"RequestType\"], notification_configuration, old)\n    s3.put_bucket_notification_configuration(Bucket=props[\"BucketName\"], NotificationConfiguration=config, SkipDestinationValidation=skipDestinationValidation)\n  except Exception as e:\n    logging.exception(\"Failed to put bucket notification configuration\")\n    response_status = \"FAILED\"\n    error_message = f\"Error: {str(e)}. \"\n  finally:\n    submit_response(event, context, response_status, error_message)\n\ndef handle_managed(request_type, notification_configuration):\n  if request_type == 'Delete':\n    return {}\n  return notification_configuration\n\ndef handle_unmanaged(bucket, stack_id, request_type, notification_configuration, old):\n  def get_id(n):\n    n['Id'] = ''\n    sorted_notifications = sort_filter_rules(n)\n    strToHash=json.dumps(sorted_notifications, sort_keys=True).replace('\"Name\": \"prefix\"', '\"Name\": \"Prefix\"').replace('\"Name\": \"suffix\"', '\"Name\": \"Suffix\"')\n    return f\"{stack_id}-{hash(strToHash)}\"\n  def with_id(n):\n    n['Id'] = get_id(n)\n    return n\n\n  external_notifications = {}\n  existing_notifications = s3.get_bucket_notification_configuration(Bucket=bucket)\n  for t in CONFIGURATION_TYPES:\n    if request_type == 'Update':\n        old_incoming_ids = [get_id(n) for n in old.get(t, [])]\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not get_id(n) in old_incoming_ids]      \n    elif request_type == 'Delete':\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not n['Id'].startswith(f\"{stack_id}-\")]\n    elif request_type == 'Create':\n        external_notifications[t] = [n for n in existing_notifications.get(t, [])]\n  if EVENTBRIDGE_CONFIGURATION in existing_notifications:\n    external_notifications[EVENTBRIDGE_CONFIGURATION] = existing_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  if request_type == 'Delete':\n    return external_notifications\n\n  notifications = {}\n  for t in CONFIGURATION_TYPES:\n    external = external_notifications.get(t, [])\n    incoming = [with_id(n) for n in notification_configuration.get(t, [])]\n    notifications[t] = external + incoming\n\n  if EVENTBRIDGE_CONFIGURATION in notification_configuration:\n    notifications[EVENTBRIDGE_CONFIGURATION] = notification_configuration[EVENTBRIDGE_CONFIGURATION]\n  elif EVENTBRIDGE_CONFIGURATION in external_notifications:\n    notifications[EVENTBRIDGE_CONFIGURATION] = external_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  return notifications\n\ndef submit_response(event: dict, context, response_status: str, error_message: str):\n  response_body = json.dumps(\n    {\n      \"Status\": response_status,\n      \"Reason\": f\"{error_message}See the details in CloudWatch Log Stream: {context.log_stream_name}\",\n      \"PhysicalResourceId\": event.get(\"PhysicalResourceId\") or event[\"LogicalResourceId\"],\n      \"StackId\": event[\"StackId\"],\n      \"RequestId\": event[\"RequestId\"],\n      \"LogicalResourceId\": event[\"LogicalResourceId\"],\n      \"NoEcho\": False,\n    }\n  ).encode(\"utf-8\")\n  headers = {\"content-type\": \"\", \"content-length\": str(len(response_body))}\n  try:\n    req = urllib.request.Request(url=event[\"ResponseURL\"], headers=headers, data=response_body, method=\"PUT\")\n    with urllib.request.urlopen(req) as response:\n      print(response.read().decode(\"utf-8\"))\n    print(\"Status code: \" + response.reason)\n  except Exception as e:\n      print(\"send(..) failed executing request.urlopen(..): \" + str(e))\n\ndef sort_filter_rules(json_obj):\n  if not isinstance(json_obj, dict):\n      return json_obj\n  for key, value in json_obj.items():\n      if isinstance(value, dict):\n          json_obj[key] = sort_filter_rules(value)\n      elif isinstance(value, list):\n          json_obj[key] = [sort_filter_rules(item) for item in value]\n  if \"Filter\" in json_obj and \"Key\" in json_obj[\"Filter\"] and \"FilterRules\" in json_obj[\"Filter\"][\"Key\"]:\n      filter_rules = json_obj[\"Filter\"][\"Key\"][\"FilterRules\"]\n      sorted_filter_rules = sorted(filter_rules, key=lambda x: x[\"Name\"])\n      json_obj[\"Filter\"][\"Key\"][\"FilterRules\"] = sorted_filter_rules\n  return json_obj"
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.13",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Resource"
+   }
+  },
+  "AtlasReceiptRuleSet19F64974": {
+   "Type": "AWS::SES::ReceiptRuleSet",
+   "Properties": {
+    "RuleSetName": "atlas-email-inlet"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasReceiptRuleSet/Resource"
+   }
+  },
+  "AtlasReceiptRuleSetDeliverToS314AFDBC3": {
+   "Type": "AWS::SES::ReceiptRule",
+   "Properties": {
+    "Rule": {
+     "Actions": [
+      {
+       "S3Action": {
+        "BucketName": {
+         "Ref": "AtlasIngressBucket3A2FE564"
+        },
+        "ObjectKeyPrefix": "incoming/"
+       }
+      }
+     ],
+     "Enabled": true,
+     "Recipients": [
+      "scvfd@fireatlas.org"
+     ],
+     "ScanEnabled": true,
+     "TlsPolicy": "Require"
+    },
+    "RuleSetName": {
+     "Ref": "AtlasReceiptRuleSet19F64974"
+    }
+   },
+   "DependsOn": [
+    "AtlasIngressBucketPolicyB74B598C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/AtlasReceiptRuleSet/DeliverToS3/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12O0W7CMAxFv4V31xtkPzAq7blqPwCZ4DKvaYLqRAhF+fephImJp3PvsWR7h7uPLb5v6KqNPU2NkyPmIZKdgK56yGow75OdOEI7+keq6IITe3vqR69lT8oFHM3HE2FuR9/xMouqBA9fydu4hnb0f7mA0Iy5D45XfefzQE0F1BxIlaPi5wpQVsw9W5ZL7JPjob75Yv7Vl2kpVWhIi2W4Lx0incWfC3S3+B38m8GtQbP5UZFmST7KzNhX/gKctnl6PQEAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "AtlasEmailPhotoStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
