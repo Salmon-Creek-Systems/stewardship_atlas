@@ -2,6 +2,8 @@
 
 You can add a geotagged photo to the atlas by emailing it from your smartphone. The photo's GPS location is automatically extracted and a new point feature is created in the layer you specify.
 
+![Video Demo](../video/email_import.mov)
+
 ## Requirements
 
 - An iPhone or Android phone with location services enabled for the camera app
