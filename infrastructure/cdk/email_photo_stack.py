@@ -12,6 +12,7 @@ from aws_cdk import (
     Stack,
     Duration,
     RemovalPolicy,
+    BundlingOptions,
     aws_s3 as s3,
     aws_lambda as lambda_,
     aws_s3_notifications as s3n,
@@ -90,7 +91,7 @@ class EmailPhotoStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="email_photo_handler.handler",
             code=lambda_.Code.from_asset(
-                os.path.join(os.path.dirname(__file__), "..", "lambda")
+                os.path.join(os.path.dirname(__file__), "..", "lambda_build")
             ),
             role=lambda_role,
             timeout=Duration.seconds(30),

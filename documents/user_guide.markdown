@@ -361,6 +361,57 @@ Contact your atlas administrator for:
 - Downloaded data should be handled according to your organization's policies
 - Consider data licensing and attribution requirements when sharing
 
+### Diagnosing Email Photo Submissions
+
+If a photo email doesn't appear in the atlas within a few minutes, use the `trace_email.py` script to follow it through the pipeline and find where it stopped.
+
+```bash
+# Show the 3 most recent email submissions and their status
+python scripts/trace_email.py --profile atlas
+
+# Trace a specific email by its S3 key (found in the ingress bucket)
+python scripts/trace_email.py incoming/mvjamh5c7rtsvpb3qejlkaa0mhavb8uaj76luo81 --profile atlas
+```
+
+The script checks each stage in order:
+
+1. **SES receipt rule** — confirms the rule set is active and configured for the right recipient address
+2. **S3 ingress bucket** — shows any emails still sitting unprocessed; a successfully processed email is deleted from here automatically
+3. **Lambda invocation log** — shows what the Lambda did with the email and what the webapp returned
+4. **Feature in layer** — confirms the point was created and shows its coordinates
+
+Example output for a successful submission:
+
+```
+Email Photo Inlet — Pipeline Trace
+Atlas: scvfd  |  Region: us-east-1  |  Profile: atlas
+
+──────────────────────────────────────────────────────────
+  Stage 1 — SES receipt rule config
+──────────────────────────────────────────────────────────
+  ✓  Rule set 'atlas-email-inlet' is ACTIVE
+  ✓  Rule '...' (enabled): recipients=['scvfd@fireatlas.org'], actions=['S3Action']
+
+──────────────────────────────────────────────────────────
+  Stage 2 — S3 ingress bucket
+──────────────────────────────────────────────────────────
+  ✓  No unprocessed emails in ingress bucket
+
+──────────────────────────────────────────────────────────
+  Stage 3 — Lambda invocation log
+──────────────────────────────────────────────────────────
+  ✓  Invocation 32bc97bc… — SUCCESS (2026-03-10 21:41:44 UTC, 4.6s)
+     S3 key: incoming/mvjamh5c7rtsvpb3qejlkaa0mhavb8uaj76luo81
+     Webapp: HTTP 200  {"status":"ok","layer":"poi","lat":40.2055667,"lon":-123.9355917}
+
+──────────────────────────────────────────────────────────
+  Stage 4 — Feature in layer
+──────────────────────────────────────────────────────────
+  ✓  Feature created in layer 'poi' at (40.2055667, -123.9355917)
+```
+
+If an email never reached S3 at all (e.g. sent to the wrong address at the right domain), the script cannot currently diagnose that — it will only show that nothing arrived. More detailed SES receipt logging is planned (see [GitHub issue #17](https://github.com/Salmon-Creek-Systems/stewardship_atlas/issues/17)).
+
 ### Updates and Maintenance
 
 Your atlas administrator handles:
