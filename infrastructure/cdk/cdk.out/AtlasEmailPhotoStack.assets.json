@@ -1,0 +1,36 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "e84abba5dbc2693ea66c4a2a973487944ebf023137782366ba825f970ea4204f": {
+      "displayName": "EmailPhotoHandler/Code",
+      "source": {
+        "path": "asset.e84abba5dbc2693ea66c4a2a973487944ebf023137782366ba825f970ea4204f",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "438886543302-us-east-1-f92cb194": {
+          "bucketName": "cdk-hnb659fds-assets-438886543302-us-east-1",
+          "objectKey": "e84abba5dbc2693ea66c4a2a973487944ebf023137782366ba825f970ea4204f.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-east-1"
+        }
+      }
+    },
+    "fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46": {
+      "displayName": "AtlasEmailPhotoStack Template",
+      "source": {
+        "path": "AtlasEmailPhotoStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "438886543302-us-east-1-884f3521": {
+          "bucketName": "cdk-hnb659fds-assets-438886543302-us-east-1",
+          "objectKey": "fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

@@ -13,6 +13,7 @@ import requests
 import re
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
+import base64
 
 import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
@@ -31,9 +32,10 @@ SWALES_ROOT = "/root/swales_dev"
 import atlas
 import dataswale_geojson
 import outlets
-import versioning   
+import versioning
 import deltas_geojson
 import vector_inlets
+import email_inlet
 app = FastAPI()
 logger.logger.setLevel(0)
 
@@ -633,5 +635,87 @@ async def reset_staging(swalename: str):
     except Exception as e:
         logging.error(f"Error resetting staging: {str(e)}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class EmailPhotoPayload(BaseModel):
+    subject: str
+    sender: str
+    atlas_name: str
+    image_data: str       # base64-encoded image bytes
+    filename: str
+    received_at: str
+
+
+@app.post("/ingest/email_photo")
+async def ingest_email_photo(payload: EmailPhotoPayload):
+    try:
+        config_path = Path(SWALES_ROOT) / payload.atlas_name / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+
+        # Validate sender
+        admin_emails = ac.get("admin_emails", [])
+        sender_addr = payload.sender.strip().lower()
+        if not any(sender_addr == e.strip().lower() or sender_addr.endswith(f"<{e.strip().lower()}>")
+                   for e in admin_emails):
+            raise HTTPException(status_code=403, detail=f"Sender not authorised: {payload.sender}")
+
+        # Parse subject
+        layer_name, title = email_inlet.parse_subject(payload.subject)
+
+        # Validate layer exists
+        layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
+        if layer_name not in layer_names:
+            raise HTTPException(status_code=400, detail=f"Unknown layer: {layer_name}")
+
+        # Decode image and extract GPS
+        image_bytes = base64.b64decode(payload.image_data)
+        gps = email_inlet.extract_gps(image_bytes)
+        if gps is None:
+            raise HTTPException(status_code=400, detail="No GPS data found in image EXIF")
+
+        # Upload image to S3
+        import boto3
+        s3 = boto3.client("s3")
+        bucket = os.environ.get("ATLAS_DATA_BUCKET")
+        if not bucket:
+            raise HTTPException(status_code=500, detail="ATLAS_DATA_BUCKET env var not set")
+        timestamp_str = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        s3_key = f"{payload.atlas_name}/media/email_photos/{timestamp_str}_{payload.filename}"
+        s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes)
+        image_url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
+
+        # Build extra properties from EXIF
+        extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
+
+        # Build feature and write delta
+        feature = email_inlet.build_feature(
+            lat=gps["lat"],
+            lon=gps["lon"],
+            title=title,
+            sender=payload.sender,
+            timestamp=payload.received_at,
+            image_url=image_url,
+            extra_props=extra_props,
+        )
+        fc = {"type": "FeatureCollection", "features": [feature]}
+        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=layer_name)
+
+        # Refresh layer
+        dataswale_geojson.refresh_vector_layer(ac, layer_name)
+
+        return {
+            "status": "ok",
+            "layer": layer_name,
+            "lat": gps["lat"],
+            "lon": gps["lon"],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error in ingest_email_photo: {e}")
+        traceback_str = "".join(traceback.format_tb(e.__traceback__))
         logging.error(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))

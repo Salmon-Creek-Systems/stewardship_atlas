@@ -105,6 +105,25 @@ See: LINK TO HELP PAGE ON GOOGLE SHEETS WORKFLOW
 
 ---
 
+### Email Photo Submission
+
+Geotagged photos taken on a smartphone can be submitted directly to the atlas by email. GPS coordinates are extracted from the photo and a point feature is created in the specified layer automatically.
+
+**Use cases:**
+- Field crews adding observations without opening a browser
+- Quickly marking a location during site visits
+- Capturing photo evidence tied to a geographic location
+
+**How to use:**
+1. Take a photo with your phone (location services must be on)
+2. Email it to the atlas address (e.g. `scvfd@fireatlas.org`) from your registered admin email
+3. Set the subject to `<layer> | <title>` (e.g. `poi | Locked gate on Miller Road`)
+4. The feature appears in the atlas within a minute or two
+
+See: [Email Photo Submission](help/email_photo_submission.md)
+
+---
+
 ### External Applications (File Upload/Download)
 
 For complex edits, data can be downloaded, modified in external applications (QGIS, Excel, Python scripts), and re-uploaded.
