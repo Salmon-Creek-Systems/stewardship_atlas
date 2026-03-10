@@ -131,6 +131,35 @@ The **Edit Map** interface (Admin only) provides simple tools for common tasks:
 
 See detailed instructions: [Editing Guide](help/draw_vector.md)
 
+### Submitting Photos by Email
+
+The fastest way to add a point to the atlas from the field is to email a geotagged photo directly from your smartphone. No browser, no login — just take the photo and send it.
+
+**Requirements:**
+- Location services must be enabled in your phone's camera app
+- Your email address must be on the atlas admin list
+
+**How it works:**
+1. Take a photo outdoors so your phone has a GPS fix
+2. Email it to the atlas address (e.g. `scvfd@fireatlas.org`) with the photo as an attachment
+3. Format your subject line as `<layer> | <title>`:
+   - `poi | Locked gate on Miller Road`
+   - `hydrants | New hydrant at Ridgeline staging area`
+   - `private_notes | Erosion on north slope, check after rain`
+4. Send — the feature appears on the map within a minute or two
+
+The system extracts the GPS coordinates from the photo's EXIF data, creates a point feature in the layer you named, and stores the photo itself with a link from the feature. You can click the feature on the map to see the photo.
+
+**Tips:**
+- Take photos outdoors with a clear sky for the best GPS accuracy
+- The default iPhone and Android mail apps preserve GPS data in attachments; some third-party apps strip it
+- Layer names are case-insensitive; `POI` and `poi` both work
+- If you omit the `|` and title, the feature is created with the title "Photo submission"
+
+See: [Email Photo Submission](help/email_photo_submission.md)
+
+---
+
 ### Uploading Data
 
 If you have data from another source (GPS tracks, surveys, external datasets):
