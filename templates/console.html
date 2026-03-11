@@ -60,7 +60,7 @@
 
     <script>
       function initializePage(data) {
-            document.getElementById('logo').src = data.logo;
+            if (data.logo) document.getElementById('logo').src = data.logo;
             document.getElementById('version-string').textContent = data.version_string;
             document.getElementById('swale-name').textContent = data.swaleName;
             document.getElementById('console-type').textContent = data.consoleType;
