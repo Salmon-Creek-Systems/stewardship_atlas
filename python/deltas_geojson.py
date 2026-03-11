@@ -141,6 +141,45 @@ def add_deltas_from_features(
     return [ str(outpath) ]
 
 
+def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
+    """Remove layer features that intersect the drawn polygon in the delete delta.
+
+    Uses DuckDB spatial join (same pattern as annotate) — keeps all features
+    that do NOT intersect the delta polygon, discards the rest.
+
+    Moves the consumed delta to the work/ subdirectory when done.
+    """
+    duckdb.sql("INSTALL spatial; LOAD spatial;")
+    duckdb.sql(f"DROP TABLE IF EXISTS del_poly; CREATE TABLE del_poly AS SELECT * FROM ST_Read('{delta_filepath}');")
+    duckdb.sql(f"DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{layer_filepath}');")
+
+    res = duckdb.sql("""
+        SELECT ST_AsGeoJSON(feat_geom) AS geometry, feat.*
+        FROM feat
+        LEFT JOIN del_poly ON ST_Intersects(del_poly.geom, feat_geom)
+        WHERE del_poly.geom IS NULL
+    """)
+
+    surviving = [
+        geojson.Feature(
+            geometry=geojson.loads(row[0]),
+            properties={
+                col[len("feat_"):]: val
+                for col, val in zip(res.columns[1:], row[1:])
+                if col not in ("feat_geom",)
+            }
+        )
+        for row in res.fetchall()
+    ]
+
+    geojson.dump(geojson.FeatureCollection(surviving), open(layer_filepath, "w"))
+    logger.info(f"Delete delta removed features; {len(surviving)} remaining in {layer_filepath}")
+
+    moved_path = delta_filepath.parent / "work" / delta_filepath.name
+    delta_filepath.rename(moved_path)
+    logger.info(f"Moving consumed delete delta: {delta_filepath} -> {moved_path}")
+
+
 def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = False) -> FeatureCollection:
     """
    Apply all delta file sin order.
@@ -188,10 +227,15 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
             # delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", updated_properties: List[str] = [])
             output = eddies.delta_annotate_spatial_duckdb(
                 config=config,
-                layer_name = layer_name, 
+                layer_name = layer_name,
                 delta_name=filepath,
                 anno_in_path=filepath,
                 anno_type= "deltas")
+
+        # This is a Delta containing a drawn polygon — remove all layer features it intersects
+        elif action == "delete":
+            _apply_delete_delta(layer_filepath, filepath)
+
         else:
             raise InvalidDelta(f"Invalid action: {action}") 
         #delta_in_path = Path(filepath)

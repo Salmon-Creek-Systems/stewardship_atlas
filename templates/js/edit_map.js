@@ -290,6 +290,49 @@ document.getElementById('save-button').addEventListener('click', function() {
     }
 });
 
+// Delete button — show confirmation panel
+document.getElementById('delete-button').addEventListener('click', function() {
+    const features = td.getSnapshot();
+    if (features.length === 0) {
+        showErrorPopup('No area drawn. Please draw a polygon to select features for deletion.');
+        return;
+    }
+    document.getElementById('delete-confirm').style.display = 'block';
+});
+
+document.getElementById('delete-cancel-button').addEventListener('click', function() {
+    document.getElementById('delete-confirm').style.display = 'none';
+});
+
+document.getElementById('delete-confirm-button').addEventListener('click', function() {
+    const features = td.getSnapshot();
+    if (features.length === 0) {
+        showErrorPopup('No area drawn.');
+        return;
+    }
+    const geojson = {
+        "type": "FeatureCollection",
+        "layer": EDIT_CONFIG.layerName,
+        "action": "delete",
+        "features": features
+    };
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", EDIT_CONFIG.appUrl + '/delta_upload/' + EDIT_CONFIG.swalename);
+    xmlhttp.setRequestHeader("Content-Type", "application/json");
+    xmlhttp.onreadystatechange = function() {
+        if (xmlhttp.readyState === 4) {
+            if (xmlhttp.status === 200) {
+                document.getElementById('delete-confirm').style.display = 'none';
+                td.clear();
+                showSuccessNotification('Features deleted successfully.');
+            } else {
+                showErrorPopup('Delete failed. Please try again.');
+            }
+        }
+    };
+    xmlhttp.send(JSON.stringify({"data": geojson}));
+});
+
 // Add upload button functionality
 document.getElementById('upload-button').addEventListener('click', function() {
     // Create a file input element

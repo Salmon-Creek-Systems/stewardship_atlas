@@ -619,8 +619,17 @@ def generate_edit_controls_html(editable_attributes):
             <button id="upload-button" class="button">Upload GeoJSON</button>
             <button id="save-button" class="button">Save Features</button>
         </div>
+        <hr style="margin: 16px 0; border-color: #ccc;">
+        <div class="button-group">
+            <button id="delete-button" class="warning-button">Delete Features in Area</button>
+        </div>
+        <div id="delete-confirm" style="display:none; margin-top: 8px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Delete features in selected area?<br>This cannot be undone.</p>
+            <button id="delete-cancel-button" class="button">Cancel</button>
+            <button id="delete-confirm-button" class="warning-button">Delete</button>
+        </div>
     """
-    
+
     return select_html + string_html + buttons_html
 
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
