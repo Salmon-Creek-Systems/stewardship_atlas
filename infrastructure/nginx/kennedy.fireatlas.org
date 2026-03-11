@@ -26,12 +26,12 @@ server {
 
 	location /staging/outlets/html/admin/ {
 		auth_basic "VFD Admin Login";
-        	auth_basic_user_file /root/swales/roles/kennedy/admin.htpasswd;
+        	auth_basic_user_file /root/swales_dev/roles/kennedy/admin.htpasswd;
 	}
 
 	location /staging/outlets/html/internal/ {
 		auth_basic "VFD Admin Login";
-        	auth_basic_user_file /root/swales/roles/kennedy/internal.htpasswd;
+        	auth_basic_user_file /root/swales_dev/roles/kennedy/internal.htpasswd;
 	}
 
     listen 443 ssl; # managed by Certbot

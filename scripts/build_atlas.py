@@ -33,6 +33,7 @@ The GeoJSON file should have this structure:
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +46,53 @@ sys.path.insert(0, str(python_dir))
 
 import atlas
 import utils
+
+DEFAULT_ROLES = {"internal": "internal", "admin": "admin"}
+
+
+def setup_role_htpasswds(data_root: str, atlas_name: str):
+    """Create per-role htpasswd files used by nginx for auth.
+
+    Creates {data_root}/roles/{atlas_name}/{role}.htpasswd for each role,
+    reading passwords from {data_root}/roles/{atlas_name}_roles.json.
+
+    Falls back (in order) to:
+      infrastructure/htpasswd/roles/{atlas_name}_roles.json in the repo,
+      then DEFAULT_ROLES.
+    """
+    roles_dir = Path(data_root) / "roles" / atlas_name
+    roles_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find the roles JSON
+    data_root_roles_json = Path(data_root) / "roles" / f"{atlas_name}_roles.json"
+    infra_roles_json = script_dir.parent / "infrastructure" / "htpasswd" / "roles" / f"{atlas_name}_roles.json"
+
+    if data_root_roles_json.exists():
+        roles_json = data_root_roles_json
+    elif infra_roles_json.exists():
+        roles_json = infra_roles_json
+        print(f"Using roles from repo: {infra_roles_json}", file=sys.stderr)
+    else:
+        roles_json = None
+        print(f"Warning: no roles file found for {atlas_name}, using defaults", file=sys.stderr)
+
+    roles = DEFAULT_ROLES
+    if roles_json:
+        with open(roles_json) as f:
+            roles = json.load(f)
+
+    # Ensure roles JSON exists in data_root for atlas.py's add_htpasswds()
+    if not data_root_roles_json.exists():
+        data_root_roles_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(data_root_roles_json, 'w') as f:
+            json.dump(roles, f, indent=2)
+
+    # Create one htpasswd file per role (e.g. admin.htpasswd, internal.htpasswd)
+    for role, password in roles.items():
+        htpasswd_file = roles_dir / f"{role}.htpasswd"
+        flag = "bc" if not htpasswd_file.exists() else "b"
+        os.system(f"htpasswd -{flag} {htpasswd_file} {role} {password}")
+        print(f"Wrote {htpasswd_file}", file=sys.stderr)
 
 
 # Required properties that must be in the GeoJSON or passed to build_atlas()
@@ -180,6 +228,8 @@ def build_atlas(
             shared_dir=Path(shared_dir),
             feature_collection=feature_collection
         )
+        # Create per-role htpasswd files for nginx auth
+        setup_role_htpasswds(data_root, name)
         # Bootstrap core outlets
         atlas.materialize(config, 'notebook')
         atlas.materialize(config, 'html')
