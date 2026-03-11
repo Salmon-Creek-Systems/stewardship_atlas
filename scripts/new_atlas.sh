@@ -67,30 +67,34 @@ sed -i '/ssl_certificate\|ssl_certificate_key\|options-ssl-nginx\|ssl_dhparam/s/
 nginx -t && systemctl reload nginx
 certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos -m "gateless@gmail.com"
 
-# --- 5. Start webapp (background, logs to file) ---
+# --- 5. Start webapp in a named screen session ---
 echo "==> Starting webapp on port ${WEBAPP_PORT}..."
-LOGFILE="${ATLAS_DIR}/webapp.log"
 cd "${APP_DIR}/python"
-DATASWALE_PATH="${ATLAS_DIR}" ATLAS_DATA_BUCKET="${ATLAS_DATA_BUCKET}" \
-nohup uvicorn --port "${WEBAPP_PORT}" --host 0.0.0.0 webapp:app \
-    --reload --log-level trace \
-    --ssl-certfile "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" \
-    --ssl-keyfile  "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" \
-    > "${LOGFILE}" 2>&1 &
-echo "    Webapp PID $! — logs: ${LOGFILE}"
+screen -dmS "app_${ATLAS_NAME}" bash -c "
+    DATASWALE_PATH=${ATLAS_DIR} ATLAS_DATA_BUCKET=${ATLAS_DATA_BUCKET} \
+    uvicorn --port ${WEBAPP_PORT} --host 0.0.0.0 webapp:app \
+        --reload --log-level trace \
+        --ssl-certfile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem \
+        --ssl-keyfile  /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+"
+echo "    Started screen session 'app_${ATLAS_NAME}' (attach: screen -r app_${ATLAS_NAME})"
 
-# --- 6. Start Jupyter (background, logs to file) ---
+# --- 6. Start Jupyter in a named screen session ---
 echo "==> Starting Jupyter on port ${JUPYTER_PORT}..."
 NOTEBOOK_DIR="${ATLAS_DIR}/staging/outlets/notebook"
-JUPYTER_LOG="${ATLAS_DIR}/jupyter.log"
-nohup jupyter notebook --allow-root --port "${JUPYTER_PORT}" \
-    --notebook-dir "${NOTEBOOK_DIR}" \
-    > "${JUPYTER_LOG}" 2>&1 &
-echo "    Jupyter PID $! — logs: ${JUPYTER_LOG}"
+screen -dmS "jupyter_${ATLAS_NAME}" bash -c "
+    jupyter notebook --allow-root --port ${JUPYTER_PORT} \
+        --notebook-dir ${NOTEBOOK_DIR}
+"
+echo "    Started screen session 'jupyter_${ATLAS_NAME}' (attach: screen -r jupyter_${ATLAS_NAME})"
 
 echo ""
 echo "==> Done. Atlas ${ATLAS_NAME} is up."
 echo "    Webapp:  https://${DOMAIN}:${WEBAPP_PORT}"
 echo "    Jupyter: https://${DOMAIN}:${JUPYTER_PORT}"
+echo ""
+echo "    Attach to sessions:"
+echo "      screen -r app_${ATLAS_NAME}"
+echo "      screen -r jupyter_${ATLAS_NAME}"
 echo ""
 echo "    Next: materialize layers from the notebook."
