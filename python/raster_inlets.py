@@ -2,6 +2,7 @@ import logging, subprocess, requests
 import os, shutil, zipfile, io
 import versioning
 import utils
+import deltas_geojson
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
 
@@ -19,7 +20,7 @@ def local_raster(config=None, name=None, delta_queue=None):
     Do some CRS and rescaling if needed."""
     inlet_config = config['assets'][name]['config']
     inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
-    outpath = delta_queue.delta_path(config, name, 'create')
+    outpath = delta_queue.delta_path(config, name, 'create') if delta_queue else deltas_geojson.delta_path(config, name, 'create')
     logger.info(f"Delta raster in {outpath}")   
     return utils.canonicalize_raster(inpath, 
                                     outpath, 
@@ -29,12 +30,11 @@ def local_raster(config=None, name=None, delta_queue=None):
     
     
 
-def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
+def url_raster(config: Dict[str, Any], name: str, delta_queue=None):
     """Fetch data from URL and save to versioned outpath"""
     inlet_config = config['assets'][name]['config']
     bbox = config['dataswale']['bbox']
-    # inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
-    outpath = delta_queue.delta_path(config, name, 'create')
+    outpath = delta_queue.delta_path(config, name, 'create') if delta_queue else deltas_geojson.delta_path(config, name, 'create')
     workdir = outpath.parent / 'work'
     workfile = workdir / outpath.name 
     
