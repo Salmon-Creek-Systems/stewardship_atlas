@@ -83,8 +83,8 @@ echo "    Started screen session 'app_${ATLAS_NAME}' (attach: screen -r app_${AT
 echo "==> Starting Jupyter on port ${JUPYTER_PORT}..."
 NOTEBOOK_DIR="${ATLAS_DIR}/staging/outlets/notebook"
 screen -dmS "jupyter_${ATLAS_NAME}" bash -c "
-    jupyter notebook --allow-root --port ${JUPYTER_PORT} \
-        --notebook-dir ${NOTEBOOK_DIR}
+    jupyter notebook --config ${NOTEBOOK_DIR}/jupyter_notebook_config.py \
+        --allow-root --port ${JUPYTER_PORT}
 "
 echo "    Started screen session 'jupyter_${ATLAS_NAME}' (attach: screen -r jupyter_${ATLAS_NAME})"
 
