@@ -183,7 +183,7 @@ def build_atlas(
         # Bootstrap core outlets
         atlas.materialize(config, 'notebook')
         atlas.materialize(config, 'html')
-        atlas.materialize(config, 'webmap')
+        # atlas.materialize(config, 'webmap')
 
     return config, config_path
 
