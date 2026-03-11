@@ -391,7 +391,7 @@ ul {
 .help-page-content ul,
 .help-page-content ol {
   padding-left: 20px;
-  list-style: disc;
+  list-style: none;
   margin-bottom: 12px;
 }
 
