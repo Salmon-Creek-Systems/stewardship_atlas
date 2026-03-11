@@ -1,104 +1,75 @@
 <!DOCTYPE html>
 <html>
-{<head>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/local/css/console.css">
 </head>
 <body>
-    <center>
-    <table cellpadding=5 valign='top'>
-        <tr>
-            <td style="width:20%" align="right"><img id="logo" height=100 width=100 /></td>
-            <td><h1><span id="swale-name"></span> Fire Atlas <BR>
-		<span id="console-type"></span>
-    </h1></td>
-        </tr>
-        <tr valign='top'>
-            <td bgcolor="#cccccc">
-              <center><h2>MAPS</h2></center>
-                <div id="interfaces-section" style="display: none;">
-                    <h4>Interfaces</h4>
-                    <ul id="interfaces-list"></ul>
-                </div>
-                <div id="downloads-section" style="display: none;">
-                    <h4>Downloads</h4>
-                    <ul id="downloads-list"></ul>
- 
+    <header class="top-bar">
+        <img id="logo" />
+        <div class="top-bar-title">
+            <span class="atlas-name" id="swale-name"></span>
+            <span class="console-type" id="console-type"></span>
+        </div>
+    </header>
 
-                </div>
-            </td>
-            
-            
+    <div class="console-layout">
+        <nav class="sidebar">
+            <div class="sidebar-section" id="interfaces-section" style="display: none;">
+                <h2>Maps</h2>
+                <ul id="interfaces-list"></ul>
+            </div>
 
+            <div class="sidebar-section" id="downloads-section" style="display: none;">
+                <h2>Downloads</h2>
+                <ul id="downloads-list"></ul>
+            </div>
 
-            
-            <td ROWSPAN=2 id="layers-section" style="display: none;">
-                <center><h2><span id="panel-header">...</span></h2></center>
-                <ul id="layers-list"></ul>
-		<ul id="usecases-list"></ul>
-		
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <h2>HELP and LINKS</h2>
-                <div id="help-section" style="margin: 20px;">
+            <div class="sidebar-section">
+                <h2>Help</h2>
                 <ul id="help-list">
-                    <li>
-                        <a href="/local/documents/about.html">About</a>
-                    </li>
-                    <li>
-                        <a href="/local/documents/help/index.html">Help</a>
-                    </li>
-                    <li>
-                        <a href="/staging/outlets/html/internal">Internal</a>
-                    </li>		    
-                    <li>
-                        <a href="/staging/outlets/html/admin">Admin</a>
-                    </li>
-                    <li>
-                        <a href="https://www.google.com/maps/search/volunteer+fire+departments">VFD</a>
-                    </li>
-                    <li>
-                        <a href="/local/documents/contact.html">Contact</a>
-                    </li>
-
-                </ul>    
-
+                    <li><a href="/local/documents/about.html">About</a></li>
+                    <li><a href="/local/documents/help/index.html">Help</a></li>
+                    <li><a href="/staging/outlets/html/internal">Internal</a></li>
+                    <li><a href="/staging/outlets/html/admin">Admin</a></li>
+                    <li><a href="https://www.google.com/maps/search/volunteer+fire+departments">VFD</a></li>
+                    <li><a href="/local/documents/contact.html">Contact</a></li>
+                </ul>
             </div>
-                <h2>VERSIONS</h2>
-                (version: <span id="version-string"></span>)
-                <div id="versions-section" style="margin: 20px;">
-             
-                    <button id="publish-button" onclick="startPublish()">Publish Atlas</button>
-                    <button id="rollback-button" onclick="startRollback()">Rollback Version</button>
-                    <button id="reset-staging-button" onclick="startResetStaging()">Reset Staging</button>
-                    <div id="publish-status" style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #f0f0f0; min-height: 20px;"></div>
 
-                
-        
-                <ul id="versions-list"></ul>    
+            <div class="sidebar-section" id="versions-section">
+                <h2>Versions</h2>
+                <div class="version-string">version: <span id="version-string"></span></div>
+                <div class="version-controls">
+                    <button id="publish-button" class="btn" onclick="startPublish()">Publish Atlas</button>
+                    <button id="rollback-button" class="btn" onclick="startRollback()">Rollback</button>
+                    <button id="reset-staging-button" class="btn btn-destructive" onclick="startResetStaging()">Reset Staging</button>
+                </div>
+                <div id="publish-status"></div>
+                <ul id="versions-list"></ul>
             </div>
-                </td>
-         
-        </tr>
-    
-    </table>
-    </center>
+        </nav>
+
+        <main class="main-content" id="layers-section">
+            <h2 id="panel-header">...</h2>
+            <ul id="layers-list"></ul>
+            <ul id="usecases-list"></ul>
+        </main>
+    </div>
 
     <script>
-      // Initialize the page with data
-      
-        function initializePage(data) {
+      function initializePage(data) {
             document.getElementById('logo').src = data.logo;
             document.getElementById('version-string').textContent = data.version_string;
             document.getElementById('swale-name').textContent = data.swaleName;
             document.getElementById('console-type').textContent = data.consoleType;
-	    document.getElementById('panel-header').textContent = data.panelHeader;
+            document.getElementById('panel-header').textContent = data.panelHeader;
 
-	    swalename=data.swaleName;
-        baseurl=data.baseurl;
-        atlasappport=data.atlasappport;
-	    
+            swalename = data.swaleName;
+            baseurl = data.baseurl;
+            atlasappport = data.atlasappport;
+
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
                 const interfacesList = document.getElementById('interfaces-list');
@@ -135,17 +106,13 @@
                     const a = document.createElement('a');
                     a.href = `/${item}/outlets/html/admin`;
                     a.textContent = item;
-                    
-                    // Highlight the current version
                     if (item === data.version_string) {
                         a.classList.add('current-version');
-                        a.textContent = item + ' (CURRENT)';
+                        a.textContent = item + ' (current)';
                     }
-                    
                     li.appendChild(a);
                     versionsList.appendChild(li);
                 });
-                document.getElementById('versions-section').style.display = 'block';
             }
 
             // Setup use cases
@@ -153,142 +120,121 @@
                 const useCasesList = document.getElementById('usecases-list');
                 data.useCases.forEach(usr => {
                     const li = document.createElement('li');
-
                     li.textContent = usr.name;
-		    const casesList = document.createElement('ul');
-		    usr.cases.forEach(ucase => {
-			const icli = document.createElement('li');
-			const ica = document.createElement('a');
-			ica.href = ucase.uri;
-			ica.textContent = ucase.name;
-			icli.appendChild(ica);
-			casesList.appendChild(icli);
-			
-		    });
-		    li.appendChild(casesList);
+                    const casesList = document.createElement('ul');
+                    usr.cases.forEach(ucase => {
+                        const icli = document.createElement('li');
+                        const ica = document.createElement('a');
+                        ica.href = ucase.uri;
+                        ica.textContent = ucase.name;
+                        icli.appendChild(ica);
+                        casesList.appendChild(icli);
+                    });
+                    li.appendChild(casesList);
                     useCasesList.appendChild(li);
                 });
-                document.getElementById('layers-section').style.display = 'block';
             }
-
-
 
             // Setup layers
             if (data.layers && data.layers.length > 0) {
                 const layersList = document.getElementById('layers-list');
 
                 data.layers.forEach(item => {
-		    // Link to outlet directory
-		    const li = document.createElement('li');
+                    const li = document.createElement('li');
+
+                    // Layer name → outlet directory
                     const a1 = document.createElement('a');
                     a1.href = `../../../layers/${item.name}/`;
                     a1.textContent = item.name;
                     li.appendChild(a1);
 
-		    // Link to web edit for layer
+                    // Draw
                     const a2 = document.createElement('a');
                     a2.href = `../../webedit/${item.name}_create.html`;
                     a2.textContent = ' (draw) ';
-                    li.appendChild(document.createTextNode(' '));
+                    a2.className = 'action-mutate';
                     li.appendChild(a2);
 
-
-		    // Link to edit page for layer
+                    // Edit
                     const al = document.createElement('a');
                     al.href = `../../webedit/${item.name}_annotate.html`;
                     al.textContent = ' (edit) ';
-                    li.appendChild(document.createTextNode(' '));
+                    al.className = 'action-mutate';
                     li.appendChild(al);
 
-
-		    
-		    // Link to metadata file
+                    // Source
                     const a3 = document.createElement('a');
                     a3.href = `../${item.name}/attribution.html`;
                     a3.textContent = ' (source) ';
-                    li.appendChild(document.createTextNode(' '));
                     li.appendChild(a3);
 
-		    
-
-		    //if (item.name in data.spreadsheets) {
-		    // Link to gheet export
-		    const a4 = document.createElement('a');
-		    a4.href = '#';
-		    a4.textContent = ' (export sheet) ';
-		    a4.onclick = function(e) {
-		        e.preventDefault();
-		        exportToSheet(item.name, this);
-		    };
-		    li.appendChild(document.createTextNode(' '));
-		    li.appendChild(a4);       
-		    
-		    // Link to gheet import
-		    const a5 = document.createElement('a');
-		    a5.href = '#';
-		    a5.textContent = ' (import sheet) ';
-		    a5.onclick = function(e) {
-		        e.preventDefault();
-		        importFromSheet(item.name, this);
-		    };
-		    li.appendChild(document.createTextNode(' '));
-		    li.appendChild(a5);       
-		    //};
-            // Link to delta upload
-            const a6 = document.createElement('a');
-            a6.href = '#';
-            a6.textContent = ' (upload) ';
-            a6.onclick = function(e) {
-                e.preventDefault();
-                
-                // Create a file input element
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.accept = '.geojson,application/json';
-                
-                fileInput.onchange = function(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        try {
-                            const geojson = JSON.parse(e.target.result);
-                            
-                            // Add layer name to the GeoJSON
-                            geojson.layer = item.name;
-                            geojson.action = 'create'; // or whatever default action you want
-                            
-                            // Send to server using the same API as upload button
-                            var xmlhttp = new XMLHttpRequest();
-                            xmlhttp.open("POST", `${baseurl}:${atlasappport}/delta_upload/${swalename}`);
-                            xmlhttp.setRequestHeader("Content-Type", "application/json");
-                            var geojson_data = JSON.stringify({"data": geojson});
-                            xmlhttp.send(geojson_data);
-                            
-                            xmlhttp.onreadystatechange = function() {
-                                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-                                    alert('Upload successful!');
-                                } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
-                                    alert('Error uploading file: ' + (xmlhttp.responseText || 'Unknown error'));
-                                }
-                            }
-                        } catch (error) {
-                            alert('Error reading file: ' + error.message);
-                        }
+                    // Export sheet
+                    const a4 = document.createElement('a');
+                    a4.href = '#';
+                    a4.textContent = ' (export sheet) ';
+                    a4.className = 'action-mutate';
+                    a4.onclick = function(e) {
+                        e.preventDefault();
+                        exportToSheet(item.name, this);
                     };
-                    reader.readAsText(file);
-                };
-                
-                fileInput.click();
-            };
-            li.appendChild(document.createTextNode(' '));
-            li.appendChild(a6);
+                    li.appendChild(a4);
 
-		    // Link to refresh/materialize
+                    // Import sheet
+                    const a5 = document.createElement('a');
+                    a5.href = '#';
+                    a5.textContent = ' (import sheet) ';
+                    a5.className = 'action-mutate';
+                    a5.onclick = function(e) {
+                        e.preventDefault();
+                        importFromSheet(item.name, this);
+                    };
+                    li.appendChild(a5);
+
+                    // Upload
+                    const a6 = document.createElement('a');
+                    a6.href = '#';
+                    a6.textContent = ' (upload) ';
+                    a6.className = 'action-mutate';
+                    a6.onclick = function(e) {
+                        e.preventDefault();
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = '.geojson,application/json';
+                        fileInput.onchange = function(e) {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                try {
+                                    const geojson = JSON.parse(e.target.result);
+                                    geojson.layer = item.name;
+                                    geojson.action = 'create';
+                                    var xmlhttp = new XMLHttpRequest();
+                                    xmlhttp.open("POST", `${baseurl}:${atlasappport}/delta_upload/${swalename}`);
+                                    xmlhttp.setRequestHeader("Content-Type", "application/json");
+                                    xmlhttp.send(JSON.stringify({"data": geojson}));
+                                    xmlhttp.onreadystatechange = function() {
+                                        if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                                            alert('Upload successful!');
+                                        } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
+                                            alert('Error uploading file: ' + (xmlhttp.responseText || 'Unknown error'));
+                                        }
+                                    };
+                                } catch (error) {
+                                    alert('Error reading file: ' + error.message);
+                                }
+                            };
+                            reader.readAsText(file);
+                        };
+                        fileInput.click();
+                    };
+                    li.appendChild(a6);
+
+                    // Clear (destructive)
                     const refreshLink = document.createElement('a');
                     refreshLink.href = '#';
                     refreshLink.textContent = ' (clear) ';
+                    refreshLink.className = 'action-destructive';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
                         fetch(`${baseurl}:${atlasappport}/clear_layer/${swalename}/${item.name}`)
@@ -296,7 +242,7 @@
                             .then(data => {
                                 if (data.status === 'success') {
                                     alert('Refresh successful!');
-                                    window.location.reload();  // Reload the current page
+                                    window.location.reload();
                                 } else {
                                     alert('Refresh failed: ' + data.message);
                                 }
@@ -305,28 +251,22 @@
                                 alert('Error during refresh: ' + error);
                             });
                     };
-                    li.appendChild(document.createTextNode(' '));
                     li.appendChild(refreshLink);
 
                     layersList.appendChild(li);
                 });
-                document.getElementById('layers-section').style.display = 'block';
             }
         }
 
         function startPublish() {
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
-            
-            // Disable button during processing
             publishButton.disabled = true;
             statusDiv.innerHTML = `Processing... ${swalename}`;
-            
             fetch(`${baseurl}:${atlasappport}/publish?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
-                        // Start polling for completion
                         statusDiv.innerHTML = 'Publishing in progress...';
                         pollPublishStatus();
                     }
@@ -336,20 +276,17 @@
                     publishButton.disabled = false;
                 });
         }
-        
+
         function pollPublishStatus() {
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
-            
             fetch(`${baseurl}:${atlasappport}/publish-status?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
-                        // Still publishing, check again in 5 seconds
-			statusDiv.innerHTML = 'Publishing in progress...<HR>' + data.log.join("<BR>\n");
+                        statusDiv.innerHTML = 'Publishing in progress...<br>' + data.log.join('<br>');
                         setTimeout(pollPublishStatus, 5000);
                     } else {
-                        // Publishing complete
                         statusDiv.innerHTML = 'Publishing complete!';
                         publishButton.disabled = false;
                     }
@@ -363,14 +300,9 @@
         function startRollback() {
             const statusDiv = document.getElementById('publish-status');
             const rollbackButton = document.getElementById('rollback-button');
-            
-            if (!confirm('Are you sure you want to rollback to the previous version?')) {
-                return;
-            }
-            
+            if (!confirm('Are you sure you want to rollback to the previous version?')) return;
             rollbackButton.disabled = true;
             statusDiv.innerHTML = `Rolling back ${swalename}...`;
-            
             fetch(`${baseurl}:${atlasappport}/set-current-version/${swalename}`)
                 .then(response => response.json())
                 .then(data => {
@@ -390,14 +322,9 @@
         function startResetStaging() {
             const statusDiv = document.getElementById('publish-status');
             const resetButton = document.getElementById('reset-staging-button');
-            
-            if (!confirm('Are you sure you want to reset staging? This will:\n\n• Backup current staging to staging-backup-{timestamp}\n• Replace staging with the CURRENT published version\n\nAny uncommitted changes in staging will be moved to the backup.')) {
-                return;
-            }
-            
+            if (!confirm('Are you sure you want to reset staging? This will:\n\n• Backup current staging to staging-backup-{timestamp}\n• Replace staging with the CURRENT published version\n\nAny uncommitted changes in staging will be moved to the backup.')) return;
             resetButton.disabled = true;
             statusDiv.innerHTML = `Resetting staging for ${swalename}...`;
-            
             fetch(`${baseurl}:${atlasappport}/reset-staging/${swalename}`)
                 .then(response => response.json())
                 .then(data => {
@@ -415,81 +342,54 @@
         }
 
         function exportToSheet(layerName, linkElement) {
-            console.log(`Exporting layer: ${layerName}`);
-            
-            // Show loading state
             const originalText = linkElement.textContent;
             linkElement.textContent = ' (exporting...) ';
             linkElement.style.pointerEvents = 'none';
-            
             fetch(`${baseurl}:${atlasappport}/export_gsheet/${swalename}/${layerName}`)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Export response:', data);
-                    
                     if (data.status === 'success') {
-                        // Extract the Google Sheets URL from the message
                         const urlMatch = data.message.match(/https:\/\/docs\.google\.com\/spreadsheets\/d\/[^'"]+/);
                         if (urlMatch) {
-                            const sheetsUrl = urlMatch[0];
-                            console.log('Google Sheets URL:', sheetsUrl);
-                            
-                            // Show success message and open the sheet
                             alert(`Export successful! Opening Google Sheets...`);
-                            window.open(sheetsUrl, '_blank');
+                            window.open(urlMatch[0], '_blank');
                         } else {
-                            console.log('Could not extract URL from response:', data.message);
                             alert('Export successful! Check the console for details.');
                         }
                     } else {
-                        console.error('Export failed:', data);
                         alert('There was a problem with the export. Check the console for details.');
                     }
                 })
                 .catch(error => {
-                    console.error('Export error:', error);
                     alert('There was a problem with the export. Check the console for details.');
                 })
                 .finally(() => {
-                    // Restore original state
                     linkElement.textContent = originalText;
                     linkElement.style.pointerEvents = 'auto';
                 });
         }
-        
+
         function importFromSheet(layerName, linkElement) {
-            console.log(`Importing layer from sheet: ${layerName}`);
-            
-            // Show loading state
             const originalText = linkElement.textContent;
             linkElement.textContent = ' (importing...) ';
             linkElement.style.pointerEvents = 'none';
-            
-            fetch(`${baseurl}:${atlasappport}/import_sheet/${swalename}/${layerName}`, {
-                method: 'POST'
-            })
+            fetch(`${baseurl}:${atlasappport}/import_sheet/${swalename}/${layerName}`, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Import response:', data);
-                    
                     if (data.status === 'success') {
                         alert(`Import successful! Layer "${layerName}" has been refreshed.`);
-                        console.log('Delta paths:', data.delta_paths);
                     } else {
-                        console.error('Import failed:', data);
                         alert('There was a problem with the import. Check the console for details.');
                     }
                 })
                 .catch(error => {
-                    console.error('Import error:', error);
                     alert('There was a problem with the import. Check the console for details.');
                 })
                 .finally(() => {
-                    // Restore original state
                     linkElement.textContent = originalText;
                     linkElement.style.pointerEvents = 'auto';
                 });
         }
     </script>
 </body>
-</html> 
+</html>
