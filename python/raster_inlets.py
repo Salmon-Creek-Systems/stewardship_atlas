@@ -2,8 +2,11 @@ import logging, subprocess, requests
 import os, shutil, zipfile, io
 import versioning
 import utils
+import deltas_geojson as deltas
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
+
+DELTA_QUEUE = deltas
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -14,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 
 
-def local_raster(config=None, name=None, delta_queue=None):
+def local_raster(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch data from local file and save to versioned outpath.
     Do some CRS and rescaling if needed."""
     inlet_config = config['assets'][name]['config']
@@ -29,11 +32,10 @@ def local_raster(config=None, name=None, delta_queue=None):
     
     
 
-def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
+def url_raster(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
     """Fetch data from URL and save to versioned outpath"""
     inlet_config = config['assets'][name]['config']
     bbox = config['dataswale']['bbox']
-    # inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
     outpath = delta_queue.delta_path(config, name, 'create')
     workdir = outpath.parent / 'work'
     workfile = workdir / outpath.name 

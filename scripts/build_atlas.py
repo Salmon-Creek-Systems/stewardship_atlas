@@ -196,6 +196,9 @@ def build_atlas(
     # Determine config path
     config_path = Path(data_root) / name / 'staging' / 'atlas_config.json'
     
+    # Always create role htpasswd files regardless of config_only
+    setup_role_htpasswds(data_root, name)
+
     if config_only:
         # Only regenerate config, backup existing
         if config_path.exists():
@@ -204,7 +207,7 @@ def build_atlas(
             backup_path = config_path.parent / f"atlas_config-BACKUP-{timestamp}.json"
             config_path.rename(backup_path)
             print(f"Backed up existing config to: {backup_path}", file=sys.stderr)
-        
+
         # Generate config only (no directory creation)
         config = atlas.create_config(
             layers_path=layers_path,
@@ -212,10 +215,10 @@ def build_atlas(
             data_root=data_root,
             feature_collection=feature_collection
         )
-        
+
         # Ensure staging directory exists for writing config
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Write the config
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
