@@ -153,11 +153,15 @@ def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
     duckdb.sql(f"DROP TABLE IF EXISTS del_poly; CREATE TABLE del_poly AS SELECT * FROM ST_Read('{delta_filepath}');")
     duckdb.sql(f"DROP TABLE IF EXISTS feat; CREATE TABLE feat AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{layer_filepath}');")
 
+    # Anti-join: keep features with no intersection with the delete polygon.
+    # Use NOT EXISTS to avoid including del_poly geometry columns in the result,
+    # then explicitly convert feat_geom to GeoJSON and exclude the raw geometry column.
     res = duckdb.sql("""
-        SELECT ST_AsGeoJSON(feat_geom) AS geometry, feat.*
+        SELECT ST_AsGeoJSON(feat_geom) AS geometry, * EXCLUDE (feat_geom)
         FROM feat
-        LEFT JOIN del_poly ON ST_Intersects(del_poly.geom, feat_geom)
-        WHERE del_poly.geom IS NULL
+        WHERE NOT EXISTS (
+            SELECT 1 FROM del_poly WHERE ST_Intersects(del_poly.geom, feat_geom)
+        )
     """)
 
     surviving = [
@@ -166,7 +170,6 @@ def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
             properties={
                 col[len("feat_"):]: val
                 for col, val in zip(res.columns[1:], row[1:])
-                if col not in ("feat_geom",)
             }
         )
         for row in res.fetchall()
@@ -190,8 +193,8 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
     processed_dir = deltas_dir / "processed"
     work_dir = deltas_dir / "work"
     
-    # Get all .geojson files in the deltas directory
-    delta_files = list(deltas_dir.glob("*.geojson"))
+    # Get all .geojson files in the deltas directory, sorted by filename (timestamp order)
+    delta_files = sorted(deltas_dir.glob("*.geojson"))
 
     
     # start an empypty layer file
