@@ -615,5 +615,6 @@ def h3_cells(config, asset_name):
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
+    "contours": contours_gdal,  # legacy name, kept for config compatibility
     "h3_cells": h3_cells,
 }
