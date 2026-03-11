@@ -1,8 +1,8 @@
-# Submit a Photo by Email
+# Add a Location by Emailing a Geotagged Photo to the Atlas
 
 You can add a geotagged photo to the atlas by emailing it from your smartphone. The photo's GPS location is automatically extracted and a new point feature is created in the layer you specify.
 
-![Video Demo](../video/email_import.mov)
+[Video Demo](https://www.youtube.com/watch?v=dy-H-tFVqGc)
 
 ## Requirements
 
