@@ -75,5 +75,6 @@ def url_raster(config: Dict[str, Any], name: str, delta_queue: [Any, None]):
 
 asset_methods = {
     'url_raster': url_raster,
+    'fetch_url': url_raster,  # legacy name, kept for config compatibility
     'local_raster': local_raster
     }
