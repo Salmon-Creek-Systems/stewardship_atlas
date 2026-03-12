@@ -75,8 +75,68 @@ def url_raster(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
                                     inlet_config.get('resample_width', None))
     
 
+def terrain_dem_inlet(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
+    """Fetch COP30 DEM expanded to tile-aligned bbox.
+
+    For small atlases the atlas bbox is a tiny fraction of the tiles that
+    terrain_rgb_to_pmtiles generates. This inlet fetches COP30 for the full
+    extent of those tiles so the terrain-RGB has no nodata gaps within tile
+    boundaries, eliminating the pit/wall artefacts around small atlases.
+
+    Uses the same OpenTopography endpoint as opentopo_dem but expands the
+    bbox to align with mercantile tile boundaries at the appropriate zoom.
+    """
+    import math
+    import mercantile
+
+    inlet_config = config['assets'][name]['config']
+    atlas_bbox = config['dataswale']['bbox']
+
+    # Compute min_zoom matching what terrain_rgb_to_pmtiles will use
+    dem_width = abs(atlas_bbox['east'] - atlas_bbox['west'])
+    auto_min = math.ceil(math.log2(90.0 / dem_width))
+    min_zoom = max(inlet_config.get('min_zoom', 8), auto_min)
+
+    # Expand bbox to the union of tiles at min_zoom covering the atlas
+    covering = list(mercantile.tiles(
+        atlas_bbox['west'], atlas_bbox['south'],
+        atlas_bbox['east'], atlas_bbox['north'],
+        zooms=[min_zoom]
+    ))
+    tile_bounds = [mercantile.bounds(t) for t in covering]
+    expanded = {
+        'west': min(b.west for b in tile_bounds),
+        'south': min(b.south for b in tile_bounds),
+        'east': max(b.east for b in tile_bounds),
+        'north': max(b.north for b in tile_bounds),
+    }
+    logger.info(f"terrain_dem_inlet: z{min_zoom}, {len(covering)} tile(s), "
+                f"bbox {atlas_bbox} → {expanded}")
+
+    url = inlet_config['inpath_template'].format(
+        north=expanded['north'], south=expanded['south'],
+        east=expanded['east'], west=expanded['west'],
+        **config
+    )
+    logger.info(f"Fetching terrain DEM: {url}")
+    response = requests.get(url)
+    response.raise_for_status()
+
+    out_layer = config['assets'][name]['out_layer']
+    out_dir = versioning.atlas_path(config, 'layers') / out_layer
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f'{out_layer}.tiff'
+
+    with open(out_path, 'wb') as f:
+        f.write(response.content)
+
+    logger.info(f"terrain_dem_inlet: wrote {out_path} ({out_path.stat().st_size // 1024}KB)")
+    return out_path
+
+
 asset_methods = {
     'url_raster': url_raster,
     'fetch_url': url_raster,  # legacy name, kept for config compatibility
-    'local_raster': local_raster
-    }
+    'local_raster': local_raster,
+    'terrain_dem': terrain_dem_inlet,
+}

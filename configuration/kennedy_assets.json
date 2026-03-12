@@ -27,9 +27,14 @@
         "out_layer": "hillshade_tiles",
         "config_def": "hillshade_tiles"
     },
+    "terrain_dem": {
+        "type": "inlet",
+        "out_layer": "terrain_dem",
+        "config_def": "terrain_dem"
+    },
     "terrain_rgb_tiles": {
         "type": "eddy",
-        "in_layer": "elevation",
+        "in_layer": "terrain_dem",
         "out_layer": "terrain_rgb_tiles",
         "config_def": "terrain_rgb_tiles"
     },

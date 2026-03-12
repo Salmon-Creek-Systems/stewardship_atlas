@@ -470,6 +470,17 @@
             "citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
           }
     },
+    "terrain_dem": {
+        "asset_type": "inlet",
+        "fetch_type": "terrain_dem",
+        "interaction": "import",
+        "data_type": "tiff",
+        "inpath_template": "https://portal.opentopography.org/API/globaldem?demtype=COP30&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff&API_Key=b53534ba23d967feedbae2c7f85bfc4b",
+        "attribution": {
+            "url": "https://portal.opentopography.org/api/terms",
+            "description": "COP30 DEM expanded to tile-aligned bbox for terrain-RGB tiling"
+        }
+    },
     "opentopo_dem":  {
 	"asset_type": "inlet",
 	"fetch_type": "fetch_url",
