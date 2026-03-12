@@ -617,15 +617,26 @@ def _dem_to_terrain_rgb(in_path: Path, out_path: Path):
 
     Mapbox encoding: height = -10000 + (R*65536 + G*256 + B) * 0.1
     Valid elevation range: -10000m to +6553.4m (covers all Earth terrain).
+
+    NoData pixels are replaced with 0m (sea level) before encoding.
+    Without this, NoData encodes to (0,0,0) = -10,000m, producing
+    a pit around the atlas area and tall walls at DEM boundaries.
     """
     import rasterio
 
     with rasterio.open(str(in_path)) as src:
         elevation = src.read(1).astype(np.float64)
         profile = src.profile.copy()
+        nodata = src.nodata
 
-    encoded = (elevation + 10000) / 0.1
-    encoded = np.clip(encoded, 0, 16777215)  # 24-bit max
+    # Replace nodata and any non-finite values with 0m (sea level)
+    if nodata is not None:
+        elevation = np.where(elevation == nodata, 0.0, elevation)
+    elevation = np.nan_to_num(elevation, nan=0.0, posinf=8848.0, neginf=0.0)
+
+    # Encode to integer before bit-shifting to avoid float precision errors
+    encoded = np.round((elevation + 10000) / 0.1).astype(np.uint32)
+    encoded = np.clip(encoded, 0, 16777215)
 
     r = (encoded // 65536).astype(np.uint8)
     g = ((encoded % 65536) // 256).astype(np.uint8)
