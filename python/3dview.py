@@ -29,7 +29,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
             "run the terrain_rgb_tiles eddy first"
         )
-    terrain_rgb_path = f"/{atlas_name}/staging/layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
+    terrain_rgb_path = f"/staging/layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
 
     # Center from bbox
     bbox = config['dataswale']['bbox']
