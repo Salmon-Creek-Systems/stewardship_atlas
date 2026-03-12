@@ -629,10 +629,21 @@ def _dem_to_terrain_rgb(in_path: Path, out_path: Path):
         profile = src.profile.copy()
         nodata = src.nodata
 
-    # Replace nodata and any non-finite values with 0m (sea level)
+    # Replace nodata and non-finite values with the mean of valid pixels.
+    # Using 0m (sea level) creates a severe visual pit in mountainous regions;
+    # mean elevation blends much better with the actual terrain at boundaries.
     if nodata is not None:
-        elevation = np.where(elevation == nodata, 0.0, elevation)
-    elevation = np.nan_to_num(elevation, nan=0.0, posinf=8848.0, neginf=0.0)
+        nodata_mask = (elevation == nodata)
+        valid = elevation[~nodata_mask & np.isfinite(elevation)]
+    else:
+        nodata_mask = ~np.isfinite(elevation)
+        valid = elevation[np.isfinite(elevation)]
+
+    fill_value = float(np.mean(valid)) if len(valid) > 0 else 0.0
+    logger.info(f"terrain-RGB: fill value for nodata = {fill_value:.1f}m (mean of {len(valid)} valid pixels)")
+
+    elevation = np.where(nodata_mask, fill_value, elevation)
+    elevation = np.nan_to_num(elevation, nan=fill_value, posinf=8848.0, neginf=fill_value)
 
     # Encode to integer before bit-shifting to avoid float precision errors
     encoded = np.round((elevation + 10000) / 0.1).astype(np.uint32)
