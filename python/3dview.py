@@ -13,51 +13,29 @@ import versioning
 
 def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     """
-    Generate a 3D terrain HTML page using MapLibre GL JS.
-    
-    Args:
-        atlas_name: Name of the atlas
-        config: Atlas configuration dictionary
-    
-    Returns:
-        HTML content as string
+    Generate a 3D terrain HTML page using MapLibre GL JS + PMTiles.
+
+    Requires terrain_rgb_tiles eddy to have been run first to produce
+    layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles.
     """
-    
-    # Get paths for existing data
+
     atlas_name = config['name']
     atlas_path = versioning.atlas_path(config)
-    elevation_dir = atlas_path / "layers" / "elevation"
-    basemap_dir = atlas_path / "layers" / "basemap"
-    
-    # Find elevation files (TIFF or PNG)
-    elevation_files = list(elevation_dir.glob("*.tiff")) + list(elevation_dir.glob("*.tif")) + list(elevation_dir.glob("*.png"))
-    if not elevation_files:
-        raise FileNotFoundError(f"No elevation files found in {elevation_dir}")
-    
-    # Use the first elevation file found
-    elevation_file = elevation_files[0]
-    elevation_url = f"/{atlas_name}/staging/layers/elevation/{elevation_file.name}"
-    
-    # Find satellite basemap files
-    satellite_files = list(basemap_dir.glob("*satellite*")) + list(basemap_dir.glob("*sat*"))
-    if satellite_files:
-        basemap_file = satellite_files[0]
-        basemap_url = f"/atlas/{atlas_name}/layers/basemap/{basemap_file.name}"
-        use_local_basemap = True
-    else:
-        # Fallback to external satellite source
-        basemap_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        use_local_basemap = False
-    
-    # Get map bounds from config if available
-    bounds = config.get('bounds', None)
-    if bounds:
-        center_lng = (bounds[0] + bounds[2]) / 2
-        center_lat = (bounds[1] + bounds[3]) / 2
-    else:
-        # Default center if no bounds specified
-        center_lng, center_lat = -123.0, 40.0
-    
+
+    # Verify terrain-RGB PMTiles exists
+    terrain_rgb_file = atlas_path / "layers" / "terrain_rgb_tiles" / "terrain_rgb_tiles.pmtiles"
+    if not terrain_rgb_file.exists():
+        raise FileNotFoundError(
+            f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
+            "run the terrain_rgb_tiles eddy first"
+        )
+    terrain_rgb_path = f"/{atlas_name}/staging/layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
+
+    # Center from bbox
+    bbox = config['dataswale']['bbox']
+    center_lng = (bbox['west'] + bbox['east']) / 2
+    center_lat = (bbox['south'] + bbox['north']) / 2
+
     # Generate the HTML content
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -65,10 +43,9 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <title>3D Terrain - {atlas_name.title()}</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css' />
-    <link rel='stylesheet' href='/static/map.css' />
-    <link rel='stylesheet' href='/static/edit_controls.css' />
-    <script src='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js'></script>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script src='https://unpkg.com/pmtiles@3/dist/pmtiles.js'></script>
     <style>
         body {{ 
             margin: 0; 
@@ -144,11 +121,9 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         <div class="info-panel">
             <h3>3D Terrain View</h3>
             <p><strong>Atlas:</strong> {atlas_name.title()}</p>
-            <p><strong>Elevation:</strong> {elevation_file.name}</p>
-            <p><strong>Basemap:</strong> {'Local Satellite' if use_local_basemap else 'External Satellite'}</p>
-            <p><em>Use mouse to navigate: drag to pan, scroll to zoom, right-click to rotate</em></p>
+            <p><em>Drag to pan · Scroll to zoom · Right-click drag to rotate</em></p>
         </div>
-        
+
         <div class="terrain-controls">
             <label>
                 Terrain Exaggeration:
@@ -161,35 +136,39 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                 <span id="pitch-value">60°</span>
             </label>
         </div>
-        
-        <a href="/atlas/{atlas_name}/map.html" class="back-link">← Back to 2D Map</a>
+
+        <a href="../../html/admin" class="back-link">← Back</a>
     </div>
 
     <script>
+        // Register PMTiles protocol
+        const protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+
+        const terrainUrl = 'pmtiles://' + window.location.origin + '{terrain_rgb_path}';
+
         // Initialize the map
         const map = new maplibregl.Map({{
             container: 'map',
-            zoom: 12,
+            zoom: 14,
             center: [{center_lng}, {center_lat}],
             pitch: 60,
             bearing: 0,
             style: {{
                 version: 8,
                 sources: {{
-                    // Satellite basemap
                     satellite: {{
                         type: 'raster',
-                        tiles: ['{basemap_url}'],
+                        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}'],
                         tileSize: 256,
-                        attribution: '&copy; Satellite Imagery',
+                        attribution: '&copy; Esri',
                         maxzoom: 19
                     }},
-                    // Elevation data for terrain
-                    elevation: {{
+                    terrain: {{
                         type: 'raster-dem',
-                        tiles: ['{elevation_url}'],
-                        tileSize: 256,
-                        maxzoom: 15
+                        url: terrainUrl,
+                        encoding: 'mapbox',
+                        tileSize: 256
                     }}
                 }},
                 layers: [
@@ -203,7 +182,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                     }}
                 ],
                 terrain: {{
-                    source: 'elevation',
+                    source: 'terrain',
                     exaggeration: 1.5
                 }}
             }},
@@ -220,19 +199,19 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
         // Add terrain control
         map.addControl(new maplibregl.TerrainControl({{
-            source: 'elevation',
+            source: 'terrain',
             exaggeration: 1.5
         }}));
 
         // Handle terrain exaggeration slider
         const exaggerationSlider = document.getElementById('exaggeration');
         const exaggerationValue = document.getElementById('exaggeration-value');
-        
+
         exaggerationSlider.addEventListener('input', (e) => {{
             const value = parseFloat(e.target.value);
             exaggerationValue.textContent = value + 'x';
             map.setTerrain({{
-                source: 'elevation',
+                source: 'terrain',
                 exaggeration: value
             }});
         }});
@@ -256,10 +235,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
         // Add some helpful console logging
         map.on('load', () => {{
-            console.log('3D Terrain map loaded successfully');
-            console.log('Atlas:', '{atlas_name}');
-            console.log('Elevation source:', '{elevation_url}');
-            console.log('Basemap source:', '{basemap_url}');
+            console.log('3D Terrain map loaded — atlas: {atlas_name}');
+            console.log('Terrain PMTiles:', terrainUrl);
         }});
 
         // Handle errors gracefully
