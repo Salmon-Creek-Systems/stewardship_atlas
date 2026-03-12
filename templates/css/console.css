@@ -27,7 +27,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 23px;
   color: var(--text);
   background: var(--bg);
 }
@@ -73,14 +73,14 @@ ul {
 
 .top-bar-title .atlas-name {
   display: block;
-  font-size: 15px;
+  font-size: 23px;
   font-weight: 600;
   line-height: 1.2;
 }
 
 .top-bar-title .console-type {
   display: block;
-  font-size: 11px;
+  font-size: 17px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -116,7 +116,7 @@ ul {
 }
 
 .sidebar-section h2 {
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -125,7 +125,7 @@ ul {
 }
 
 .sidebar-section h3 {
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -135,7 +135,7 @@ ul {
 
 .sidebar-section li {
   margin-bottom: 5px;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 /* ── Main content ────────────────────────────────── */
@@ -145,7 +145,7 @@ ul {
 }
 
 .main-content > h2 {
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -166,18 +166,18 @@ ul {
 
 #layers-list li > a:first-child {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 21px;
   margin-right: 6px;
 }
 
 .action-mutate {
   color: var(--blue);
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .action-destructive {
   color: var(--red);
-  font-size: 13px;
+  font-size: 20px;
 }
 
 /* ── Use cases ───────────────────────────────────── */
@@ -189,7 +189,7 @@ ul {
 #usecases-list > li {
   margin-bottom: 10px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 #usecases-list > li > ul {
@@ -199,13 +199,13 @@ ul {
 
 #usecases-list > li > ul li {
   margin-bottom: 4px;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 /* ── Version controls ────────────────────────────── */
 
 .version-string {
-  font-size: 12px;
+  font-size: 18px;
   color: var(--text-muted);
   margin-bottom: 10px;
 }
@@ -220,7 +220,7 @@ ul {
 
 .btn {
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 20px;
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -249,7 +249,7 @@ ul {
 }
 
 #publish-status {
-  font-size: 12px;
+  font-size: 18px;
   color: var(--text-muted);
   text-align: right;
   padding: 4px 0;
@@ -258,7 +258,7 @@ ul {
 
 #versions-list li {
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .current-version {
@@ -309,7 +309,7 @@ ul {
 .close-button {
   background: none;
   border: none;
-  font-size: 22px;
+  font-size: 33px;
   cursor: pointer;
   color: var(--text-muted);
   padding: 0;
@@ -326,7 +326,7 @@ ul {
 
 .help-popup .help-body {
   padding: 18px 20px;
-  font-size: 14px;
+  font-size: 21px;
   line-height: 1.6;
 }
 
@@ -349,7 +349,7 @@ ul {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  font-size: 15px;
+  font-size: 23px;
   font-weight: 600;
 }
 
@@ -358,7 +358,7 @@ ul {
   margin: 0 auto;
   padding: 28px 24px;
   line-height: 1.7;
-  font-size: 15px;
+  font-size: 23px;
   text-align: left;
 }
 
@@ -437,7 +437,7 @@ ul {
   text-decoration: none;
   color: var(--text);
   display: inline-block;
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .button:hover {
@@ -476,7 +476,7 @@ ul {
   border-radius: 3px;
   margin-bottom: 5px;
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 21px;
 }
 
 .progress-bar {
@@ -504,7 +504,7 @@ ul {
   text-align: center;
   line-height: 18px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 18px;
 }
 
 .error-popup {
@@ -533,7 +533,7 @@ ul {
   border-radius: 4px;
   z-index: 1000;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
