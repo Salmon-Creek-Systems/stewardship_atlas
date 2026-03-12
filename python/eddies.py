@@ -612,6 +612,25 @@ def h3_cells(config, asset_name):
         raise Exception(f"H3 cells eddy failed: {str(e)}")
 
 
+def _auto_min_zoom(bounds: dict, configured_min: int) -> int:
+    """Compute a safe minimum zoom level based on the DEM's extent.
+
+    At zoom levels where the DEM is a tiny fraction of a tile, gdal2tiles
+    fills most of the tile with zeros → -10,000m terrain artefacts around
+    the atlas. We want tiles where the DEM covers at least ~25% of a tile.
+
+    Formula: at zoom z, a tile covers 360/2^z degrees longitude.
+    Require: dem_width / tile_width >= 0.25  →  z >= log2(90 / dem_width)
+    """
+    import math
+    dem_width = abs(bounds['east'] - bounds['west'])
+    safe_min = math.ceil(math.log2(90.0 / dem_width))
+    result = max(configured_min, safe_min)
+    if result > configured_min:
+        logger.info(f"_auto_min_zoom: raising min_zoom {configured_min}→{result} for {dem_width:.4f}° wide DEM")
+    return result
+
+
 def _dem_to_terrain_rgb(in_path: Path, out_path: Path):
     """Encode a DEM GeoTIFF to Mapbox terrain-RGB format.
 
@@ -723,7 +742,8 @@ def hillshade_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     out_layer = eddy['out_layer']
     min_zoom = eddy['config'].get('min_zoom', 8)
     max_zoom = eddy['config'].get('max_zoom', 18)
-    bounds = config['dataswale']['bbox']  # [min_lon, min_lat, max_lon, max_lat]
+    bounds = config['dataswale']['bbox']
+    min_zoom = _auto_min_zoom(bounds, min_zoom)
 
     in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
     out_dir = versioning.atlas_path(config, 'layers') / out_layer
@@ -771,6 +791,7 @@ def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     min_zoom = eddy['config'].get('min_zoom', 8)
     max_zoom = eddy['config'].get('max_zoom', 14)
     bounds = config['dataswale']['bbox']
+    min_zoom = _auto_min_zoom(bounds, min_zoom)
 
     in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
     out_dir = versioning.atlas_path(config, 'layers') / out_layer
