@@ -37,6 +37,26 @@
             "citation": "https://www.scvfd.fireatlas.org"
         }
     },
+    "hillshade_tiles": {
+        "asset_type": "eddy",
+        "fetch_type": "hillshade_tiles",
+        "data_type": "pmtiles",
+        "min_zoom": 8,
+        "max_zoom": 18,
+        "attribution": {
+            "description": "Hillshade raster tiles (PMTiles) for web map basemap"
+        }
+    },
+    "terrain_rgb_tiles": {
+        "asset_type": "eddy",
+        "fetch_type": "terrain_rgb_tiles",
+        "data_type": "pmtiles",
+        "min_zoom": 8,
+        "max_zoom": 14,
+        "attribution": {
+            "description": "Terrain-RGB tiles (PMTiles) for 3D terrain rendering"
+        }
+    },
     "h3_cells": {
         "type": "eddy",
         "in_layer": "roads",

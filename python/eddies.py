@@ -612,9 +612,177 @@ def h3_cells(config, asset_name):
         raise Exception(f"H3 cells eddy failed: {str(e)}")
 
 
+def _dem_to_terrain_rgb(in_path: Path, out_path: Path):
+    """Encode a DEM GeoTIFF to Mapbox terrain-RGB format.
+
+    Mapbox encoding: height = -10000 + (R*65536 + G*256 + B) * 0.1
+    Valid elevation range: -10000m to +6553.4m (covers all Earth terrain).
+    """
+    import rasterio
+
+    with rasterio.open(str(in_path)) as src:
+        elevation = src.read(1).astype(np.float64)
+        profile = src.profile.copy()
+
+    encoded = (elevation + 10000) / 0.1
+    encoded = np.clip(encoded, 0, 16777215)  # 24-bit max
+
+    r = (encoded // 65536).astype(np.uint8)
+    g = ((encoded % 65536) // 256).astype(np.uint8)
+    b = (encoded % 256).astype(np.uint8)
+
+    profile.update(count=3, dtype='uint8', driver='GTiff')
+    with rasterio.open(str(out_path), 'w', **profile) as dst:
+        dst.write(r, 1)
+        dst.write(g, 2)
+        dst.write(b, 3)
+
+
+def _tile_dir_to_pmtiles(tile_dir: Path, out_path: Path, min_zoom: int, max_zoom: int, bounds: list):
+    """Package an XYZ tile directory (from gdal2tiles --xyz) into a PMTiles archive.
+
+    bounds: [min_lon, min_lat, max_lon, max_lat]
+    """
+    from pmtiles.writer import Writer
+    from pmtiles.tile import TileType, Compression
+
+    center_lon = (bounds[0] + bounds[2]) / 2
+    center_lat = (bounds[1] + bounds[3]) / 2
+
+    header = {
+        "tile_type": TileType.PNG,
+        "tile_compression": Compression.NONE,
+        "min_zoom": min_zoom,
+        "max_zoom": max_zoom,
+        "min_lon_e7": int(bounds[0] * 1e7),
+        "min_lat_e7": int(bounds[1] * 1e7),
+        "max_lon_e7": int(bounds[2] * 1e7),
+        "max_lat_e7": int(bounds[3] * 1e7),
+        "center_zoom": (min_zoom + max_zoom) // 2,
+        "center_lon_e7": int(center_lon * 1e7),
+        "center_lat_e7": int(center_lat * 1e7),
+    }
+
+    with open(out_path, 'wb') as f:
+        writer = Writer(f)
+        for z in range(min_zoom, max_zoom + 1):
+            z_dir = tile_dir / str(z)
+            if not z_dir.exists():
+                continue
+            for x_dir in sorted(z_dir.iterdir()):
+                if not x_dir.is_dir():
+                    continue
+                x = int(x_dir.name)
+                for tile_file in sorted(x_dir.glob('*.png')):
+                    y = int(tile_file.stem)
+                    writer.write_tile(z, x, y, tile_file.read_bytes())
+        writer.finalize(header, metadata={})
+
+
+def hillshade_to_pmtiles(config: Dict[str, Any], eddy_name: str):
+    """Convert a hillshade (or any RGB raster) layer to a PMTiles archive.
+
+    Produces a raster-type PMTiles file suitable for use as a webmap basemap
+    via the MapLibre pmtiles:// protocol.
+
+    Per-atlas config keys:
+        in_layer:  source raster layer (e.g. "basemap" or "lidar_basemap")
+        out_layer: output layer name (e.g. "hillshade_tiles")
+    Shared config keys:
+        min_zoom (default 8), max_zoom (default 18)
+    """
+    import tempfile, shutil
+
+    eddy = config['assets'][eddy_name]
+    in_layer = eddy['in_layer']
+    out_layer = eddy['out_layer']
+    min_zoom = eddy['config'].get('min_zoom', 8)
+    max_zoom = eddy['config'].get('max_zoom', 18)
+    bounds = config['dataswale']['bbox']  # [min_lon, min_lat, max_lon, max_lat]
+
+    in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
+    out_dir = versioning.atlas_path(config, 'layers') / out_layer
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f'{out_layer}.pmtiles'
+
+    logger.info(f"hillshade_to_pmtiles: {in_path} -> {out_path} (z{min_zoom}-z{max_zoom})")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tile_dir = Path(tmp) / 'tiles'
+        result = subprocess.run(
+            ['gdal2tiles.py', '--xyz', '--resampling=bilinear',
+             f'--zoom={min_zoom}-{max_zoom}', '--processes=4',
+             str(in_path), str(tile_dir)],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"gdal2tiles failed:\n{result.stderr}")
+        logger.info(f"gdal2tiles complete: {result.stdout[-500:] if result.stdout else '(no output)'}")
+
+        _tile_dir_to_pmtiles(tile_dir, out_path, min_zoom, max_zoom, bounds)
+
+    logger.info(f"hillshade_to_pmtiles complete: {out_path}")
+    return out_path
+
+
+def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
+    """Convert a DEM elevation layer to terrain-RGB PMTiles for 3D terrain rendering.
+
+    Encodes raw elevation values (metres) into Mapbox terrain-RGB format, then
+    tiles and packages into PMTiles. The result is consumed by MapLibre as a
+    raster-dem source for both the 3D view and the webmap terrain toggle.
+
+    Per-atlas config keys:
+        in_layer:  elevation layer (e.g. "elevation")
+        out_layer: output layer name (e.g. "terrain_rgb_tiles")
+    Shared config keys:
+        min_zoom (default 8), max_zoom (default 14)
+    """
+    import tempfile, rasterio
+
+    eddy = config['assets'][eddy_name]
+    in_layer = eddy['in_layer']
+    out_layer = eddy['out_layer']
+    min_zoom = eddy['config'].get('min_zoom', 8)
+    max_zoom = eddy['config'].get('max_zoom', 14)
+    bounds = config['dataswale']['bbox']
+
+    in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
+    out_dir = versioning.atlas_path(config, 'layers') / out_layer
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f'{out_layer}.pmtiles'
+
+    logger.info(f"terrain_rgb_to_pmtiles: {in_path} -> {out_path} (z{min_zoom}-z{max_zoom})")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        terrain_rgb_path = tmp_path / 'terrain_rgb.tiff'
+
+        _dem_to_terrain_rgb(in_path, terrain_rgb_path)
+        logger.info(f"Terrain-RGB encoding complete: {terrain_rgb_path}")
+
+        tile_dir = tmp_path / 'tiles'
+        result = subprocess.run(
+            ['gdal2tiles.py', '--xyz', '--resampling=bilinear',
+             f'--zoom={min_zoom}-{max_zoom}', '--processes=4',
+             str(terrain_rgb_path), str(tile_dir)],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"gdal2tiles failed:\n{result.stderr}")
+        logger.info(f"gdal2tiles complete: {result.stdout[-500:] if result.stdout else '(no output)'}")
+
+        _tile_dir_to_pmtiles(tile_dir, out_path, min_zoom, max_zoom, bounds)
+
+    logger.info(f"terrain_rgb_to_pmtiles complete: {out_path}")
+    return out_path
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
     "contours": contours_gdal,  # legacy name, kept for config compatibility
     "h3_cells": h3_cells,
+    "hillshade_tiles": hillshade_to_pmtiles,
+    "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
 }
