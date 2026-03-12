@@ -644,7 +644,7 @@ def _tile_dir_to_pmtiles(tile_dir: Path, out_path: Path, min_zoom: int, max_zoom
     bounds: [min_lon, min_lat, max_lon, max_lat]
     """
     from pmtiles.writer import Writer
-    from pmtiles.tile import TileType, Compression
+    from pmtiles.tile import TileType, Compression, zxy_to_tileid
 
     center_lon = (bounds['west'] + bounds['east']) / 2
     center_lat = (bounds['south'] + bounds['north']) / 2
@@ -675,7 +675,7 @@ def _tile_dir_to_pmtiles(tile_dir: Path, out_path: Path, min_zoom: int, max_zoom
                 x = int(x_dir.name)
                 for tile_file in sorted(x_dir.glob('*.png')):
                     y = int(tile_file.stem)
-                    writer.write_tile(z, x, y, tile_file.read_bytes())
+                    writer.write_tile(zxy_to_tileid(z, x, y), tile_file.read_bytes())
         writer.finalize(header, metadata={})
 
 
