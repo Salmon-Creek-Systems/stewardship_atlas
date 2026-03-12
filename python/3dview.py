@@ -263,8 +263,8 @@ def create_3d_terrain_view(config: Dict[str, Any]) -> Path:
         Path to the generated HTML file
     """
     
-    output_path = versioning.atlas_path(config)  / "outlets" / "3dview" /  "index.html"
-    #output_path = atlas_path / "outlets" / "3dview" /  "index.html"
+    output_path = versioning.atlas_path(config) / "outlets" / "3dview" / "index.html"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     
     # Generate HTML content
