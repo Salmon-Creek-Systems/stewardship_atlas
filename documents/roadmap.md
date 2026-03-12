@@ -99,7 +99,33 @@ Scope:
 
 ## Feature Work (mix in alongside foundational projects)
 
-### 7. Geo-tagged photo ingest
+### 7. 3D Terrain View — polish and next steps
+
+**Current state** (branch `pmtiles-terrain`, wired for kennedy + SCVFD): Working 3D terrain view using MapLibre GL JS with terrain-RGB PMTiles. Accessible via "3D" button on webmap and in Maps section of all consoles. Key engineering learnings captured in MEMORY.md.
+
+**Next steps (in priority order):**
+
+**a. Switch terrain source to a global tile service**
+We generate our own terrain-RGB tiles from COP30 data. This works but has a hard edge where our atlas ends — the atlas sits in correct terrain but the surrounding world drops to sea level at the tile boundary. A global tile service (AWS Open Data Terrarium tiles, free + public domain) gives seamless terrain at any zoom with no edges:
+```
+https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png
+```
+Our own terrain-RGB PMTiles and the `terrain_dem` inlet work is still valuable for the hillshade-as-basemap use case (2D webmap), but for the 3D geometry source a global tile wins. Low-effort swap in `3dview.py`.
+
+**b. UI integration**
+The 3dview currently has its own bespoke styling. Needs:
+- Top bar consistent with the console (IBM Plex Sans, same grey, logo + atlas name)
+- Control panel styled like the webmap's floating panel (right side, same cards)
+- Home button back to admin console
+- Font matching rest of interface
+
+**c. Atlas layer data overlay**
+Add our vector layers (roads, hydrants, structures, etc.) on top of the 3D terrain. MapLibre supports adding GeoJSON sources and symbol/line/fill-extrusion layers on top of a terrain surface. Hydrants and structures as 3D symbols on terrain would be compelling for fire departments. Moderate effort — reuse the existing webmap layer config.
+
+**d. Satellite opacity**
+The ESRI satellite basemap drape is slightly too transparent. Easy CSS/paint property tweak in `3dview.py`.
+
+### 8. Geo-tagged photo ingest
 New inlet type: ingest geo-tagged photos as a data source (GPS EXIF → point features, with photo attachments). Self-contained addition to `vector_inlets.py`.
 
 Relatively low scope — good to slot between heavier projects.
