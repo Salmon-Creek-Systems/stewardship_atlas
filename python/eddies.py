@@ -632,15 +632,18 @@ def _dem_to_terrain_rgb(in_path: Path, out_path: Path):
     # Replace nodata and non-finite values with the mean of valid pixels.
     # Using 0m (sea level) creates a severe visual pit in mountainous regions;
     # mean elevation blends much better with the actual terrain at boundaries.
+    #
+    # COP30 quirk: coverage gaps are sometimes written as 0.0 with no declared
+    # nodata value. Treat exact zeros as nodata when nodata is None — safe
+    # because genuine 0m elevation won't appear in fire atlas (mountainous) regions.
     if nodata is not None:
-        nodata_mask = (elevation == nodata)
-        valid = elevation[~nodata_mask & np.isfinite(elevation)]
+        nodata_mask = (elevation == nodata) | ~np.isfinite(elevation)
     else:
-        nodata_mask = ~np.isfinite(elevation)
-        valid = elevation[np.isfinite(elevation)]
+        nodata_mask = (elevation == 0.0) | ~np.isfinite(elevation)
 
-    fill_value = float(np.mean(valid)) if len(valid) > 0 else 0.0
-    logger.info(f"terrain-RGB: fill value for nodata = {fill_value:.1f}m (mean of {len(valid)} valid pixels)")
+    valid = elevation[~nodata_mask]
+    fill_value = float(np.mean(valid)) if len(valid) > 0 else 100.0
+    logger.info(f"terrain-RGB: fill value = {fill_value:.1f}m (mean of {len(valid)} valid pixels, {nodata_mask.sum()} nodata)")
 
     elevation = np.where(nodata_mask, fill_value, elevation)
     elevation = np.nan_to_num(elevation, nan=fill_value, posinf=8848.0, neginf=fill_value)
