@@ -1,6 +1,9 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
+    {"name": "terrain_dem", "geometry_type": "raster"},
+    {"name": "hillshade_tiles", "geometry_type": "raster"},
+    {"name": "terrain_rgb_tiles", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [240, 255, 240], "constant_width": 4,
      "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
