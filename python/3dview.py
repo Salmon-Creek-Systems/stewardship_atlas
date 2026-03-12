@@ -29,7 +29,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
             "run the terrain_rgb_tiles eddy first"
         )
-    terrain_rgb_path = f"/staging/layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
+    terrain_rgb_rel_path = "../../layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
 
     # Center from bbox
     bbox = config['dataswale']['bbox']
@@ -145,7 +145,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         const protocol = new pmtiles.Protocol();
         maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
-        const terrainUrl = 'pmtiles://' + window.location.origin + '{terrain_rgb_path}';
+        const terrainUrl = 'pmtiles://' + new URL('{terrain_rgb_rel_path}', window.location.href).href;
 
         // Initialize the map
         const map = new maplibregl.Map({{
