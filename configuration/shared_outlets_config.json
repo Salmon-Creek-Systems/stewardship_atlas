@@ -39,6 +39,15 @@
             "citation": "https://portal.opentopography.org/api/terms"
         }
     },
+    "3dview": {
+        "asset_type": "outlet",
+        "name": "3dview",
+        "fetch_type": "3dview",
+        "interaction": "interface",
+        "attribution": {
+            "description": "3D terrain view using MapLibre GL JS and terrain-RGB PMTiles"
+        }
+    },
     "webmap": {
         "asset_type": "outlet",
         "name": "webmap",

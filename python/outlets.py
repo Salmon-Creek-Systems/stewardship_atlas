@@ -2593,20 +2593,11 @@ def build_region_map_grass_png(config, outlet_name, region):
     # return path to map
     return outpath
 
-def outlet_3dview(atlas_name, config):
-    """Generate a 3D terrain view using MapLibre GL JS."""
-    from pathlib import Path
-    import _3dview
-    
-    # Generate the 3D terrain HTML file
-    output_path = Path("outlets") / "3dview.html"
-    _3dview.create_3d_terrain_view(atlas_name, config, output_path)
-    
-    return {
-        'type': 'html',
-        'path': str(output_path),
-        'description': '3D terrain visualization using MapLibre GL JS'
-    }
+def outlet_3dview(config, name):
+    """Generate a 3D terrain view using MapLibre GL JS + PMTiles terrain-RGB."""
+    import importlib
+    dview = importlib.import_module('3dview')
+    return dview.create_3d_terrain_view(config)
 
 def outlet_notebook_jupyter(config, outlet_name):
     """Generate a Jupyter notebook for the outlet."""
@@ -2757,5 +2748,6 @@ asset_methods = {
     'webedit': outlet_webmap_edit,
     'sqlquery': outlet_sqlquery,
     'jupyter_notebook' : outlet_notebook_jupyter,
-    'config_editor': outlet_config_editor
+    'config_editor': outlet_config_editor,
+    '3dview': outlet_3dview,
 }

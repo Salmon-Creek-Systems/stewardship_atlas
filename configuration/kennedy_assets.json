@@ -33,6 +33,12 @@
         "out_layer": "terrain_rgb_tiles",
         "config_def": "terrain_rgb_tiles"
     },
+    "3dview": {
+        "type": "outlet",
+        "name": "3dview",
+        "config_def": "3dview",
+        "access": ["public", "internal", "admin"]
+    },
     "public_poi" : {
 	"type": "inlet",
 	"out_layer": "poi",
