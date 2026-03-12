@@ -10,7 +10,7 @@ import geojson
 # Add the python directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from vector_inlets import overture_duckdb, local_ogr
+from vector_inlets import overture_duckdb, local_ogr, gazetteer_grid
 
 class TestVectorInlets(unittest.TestCase):
     def setUp(self):
@@ -200,5 +200,134 @@ class TestVectorInlets(unittest.TestCase):
         self.assertIn('-spat_srs', args)
         self.assertEqual(args[args.index('-spat_srs') + 1], self.test_config['dataswale']['crs'])
 
+class TestGazetteerGrid(unittest.TestCase):
+    """Tests for gazetteer_grid() — projected-space grid generation."""
+
+    def _make_config(self, bbox, num_cols):
+        return {
+            "name": "test_atlas",
+            "dataswale": {"bbox": bbox},
+            "assets": {
+                "gazetteer_grid": {
+                    "config": {"num_cols": num_cols},
+                    "out_layer": "gazetteer_regions",
+                }
+            }
+        }
+
+    def _run(self, bbox, num_cols):
+        mock_dq = MagicMock()
+        captured = {}
+        def capture(config, name, fc, action, layer_name=None):
+            captured['fc'] = fc
+        mock_dq.add_deltas_from_features.side_effect = capture
+        config = self._make_config(bbox, num_cols)
+        gazetteer_grid(config=config, name="gazetteer_grid", delta_queue=mock_dq)
+        return captured['fc']
+
+    def test_num_columns(self):
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=4)
+        cols = {f['properties']['name'].split('_')[0] for f in fc['features']}
+        self.assertEqual(cols, {'1', '2', '3', '4'})
+
+    def test_cells_are_square_in_3857(self):
+        from pyproj import Transformer
+        to_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=3)
+        for feat in fc['features']:
+            coords = feat['geometry']['coordinates'][0]
+            # Project the four corners back to 3857
+            pts = [to_3857.transform(lon, lat) for lon, lat in coords[:4]]
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            width = max(xs) - min(xs)
+            height = max(ys) - min(ys)
+            self.assertAlmostEqual(width, height, places=0,
+                msg=f"Cell {feat['properties']['name']} not square: {width:.1f} x {height:.1f} m")
+
+    def test_no_gaps_between_adjacent_cells(self):
+        """East edge of cell (col, row) must equal west edge of cell (col+1, row)."""
+        from pyproj import Transformer
+        to_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=3)
+        by_name = {f['properties']['name']: f for f in fc['features']}
+        for feat in fc['features']:
+            east_nbr = feat['properties']['east_neighbor']
+            if east_nbr is None:
+                continue
+            coords_a = feat['geometry']['coordinates'][0]
+            coords_b = by_name[east_nbr]['geometry']['coordinates'][0]
+            # East edge of A: the two corners with max longitude in 3857
+            pts_a = [to_3857.transform(lon, lat) for lon, lat in coords_a[:4]]
+            pts_b = [to_3857.transform(lon, lat) for lon, lat in coords_b[:4]]
+            east_a = max(p[0] for p in pts_a)
+            west_b = min(p[0] for p in pts_b)
+            self.assertAlmostEqual(east_a, west_b, places=0,
+                msg=f"Gap between {feat['properties']['name']} and {east_nbr}: {abs(east_a - west_b):.2f} m")
+
+    def test_covers_full_bbox(self):
+        """Grid must cover the entire atlas bbox (may extend slightly beyond south)."""
+        from pyproj import Transformer
+        to_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=3)
+        west_m, south_m = to_3857.transform(bbox['west'], bbox['south'])
+        east_m, north_m = to_3857.transform(bbox['east'], bbox['north'])
+        all_pts = [
+            to_3857.transform(lon, lat)
+            for f in fc['features']
+            for lon, lat in f['geometry']['coordinates'][0]
+        ]
+        grid_west = min(p[0] for p in all_pts)
+        grid_east = max(p[0] for p in all_pts)
+        grid_north = max(p[1] for p in all_pts)
+        grid_south = min(p[1] for p in all_pts)
+        self.assertLessEqual(grid_west, west_m + 1)
+        self.assertGreaterEqual(grid_east, east_m - 1)
+        self.assertGreaterEqual(grid_north, north_m - 1)
+        self.assertLessEqual(grid_south, south_m + 1)
+
+    def test_neighbor_properties(self):
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=3)
+        by_name = {f['properties']['name']: f for f in fc['features']}
+        # 1_A: NW corner — no north or west neighbor
+        nw = by_name['1_A']['properties']
+        self.assertIsNone(nw['north_neighbor'])
+        self.assertIsNone(nw['west_neighbor'])
+        self.assertEqual(nw['east_neighbor'], '2_A')
+        self.assertEqual(nw['south_neighbor'], '1_B')
+        # 2_A: top row middle — no north neighbor
+        mid = by_name['2_A']['properties']
+        self.assertIsNone(mid['north_neighbor'])
+        self.assertEqual(mid['west_neighbor'], '1_A')
+        self.assertEqual(mid['east_neighbor'], '3_A')
+
+    def test_nw_convention(self):
+        """1_A must be the northernmost, westernmost cell."""
+        from pyproj import Transformer
+        to_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        bbox = {"west": -122.5, "east": -122.0, "south": 37.5, "north": 38.0}
+        fc = self._run(bbox, num_cols=3)
+        by_name = {f['properties']['name']: f for f in fc['features']}
+        nw_pts = [to_3857.transform(lon, lat)
+                  for lon, lat in by_name['1_A']['geometry']['coordinates'][0]]
+        grid_west = min(
+            to_3857.transform(lon, lat)[0]
+            for f in fc['features']
+            for lon, lat in f['geometry']['coordinates'][0]
+        )
+        grid_north = max(
+            to_3857.transform(lon, lat)[1]
+            for f in fc['features']
+            for lon, lat in f['geometry']['coordinates'][0]
+        )
+        self.assertAlmostEqual(min(p[0] for p in nw_pts), grid_west, places=0)
+        self.assertAlmostEqual(max(p[1] for p in nw_pts), grid_north, places=0)
+
+
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

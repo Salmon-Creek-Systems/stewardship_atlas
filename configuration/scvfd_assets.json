@@ -176,7 +176,7 @@
     "gazetteer": {
         "type": "outlet",
         "name": "gazetteer",
-        "config_def": "qgis_runbook",
+        "config_def": "qgis_gazetteer",
         "base_url": "individual_pages",
         "regions_layer": "gazetteer_regions",
         "feature_scale": 0.5,

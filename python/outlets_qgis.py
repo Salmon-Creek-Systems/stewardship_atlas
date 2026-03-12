@@ -62,7 +62,7 @@ from qgis.core import (
     QgsPointXY
 )
 from qgis.PyQt.QtGui import QColor, QFont
-from qgis.PyQt.QtCore import QSizeF
+from qgis.PyQt.QtCore import QSizeF, Qt
 
 # Import local modules
 try:
@@ -775,7 +775,49 @@ def create_region_layout(region, project, config, outlet_name):
         logger.warning("Features may extend beyond region boundary")
     
     layout.addLayoutItem(map_item)
-    
+
+    # Add neighbor cell labels at map edges (gazetteer only — gated on properties presence)
+    props = region.get('properties', {})
+    neighbor_map = {
+        'north_neighbor': ('north', 0),
+        'south_neighbor': ('south', 0),
+        'east_neighbor':  ('east',  270),
+        'west_neighbor':  ('west',  90),
+    }
+    label_w, label_h = 16, 6  # mm, unrotated bounding box
+    nbr_font = QFont("Arial", 12, QFont.Bold)
+    for prop_key, (side, rotation) in neighbor_map.items():
+        nbr_name = props.get(prop_key)
+        if not nbr_name:
+            continue
+        lbl = QgsLayoutItemLabel(layout)
+        lbl.setText(nbr_name)
+        lbl.setFont(nbr_font)
+        lbl.setHAlign(Qt.AlignHCenter)
+        lbl.setVAlign(Qt.AlignVCenter)
+        lbl.setBackgroundEnabled(True)
+        lbl.setBackgroundColor(QColor(255, 255, 255, 200))
+        lbl.setFrameEnabled(False)
+        lbl.attemptResize(QgsLayoutSize(label_w, label_h, QgsUnitTypes.LayoutMillimeters))
+        if side == 'north':
+            lx = map_x + (map_width - label_w) / 2
+            ly = map_y + 4
+        elif side == 'south':
+            lx = map_x + (map_width - label_w) / 2
+            ly = map_y + map_height - label_h - 4
+        elif side == 'west':
+            # Rotate 90° around label center — center stays at (map_x+8, map_y+map_height/2)
+            lx = map_x + 8 - label_w / 2
+            ly = map_y + map_height / 2 - label_h / 2
+        else:  # east
+            # Rotate 270° around label center — center stays at (map_x+map_width-8, map_y+map_height/2)
+            lx = map_x + map_width - 8 - label_w / 2
+            ly = map_y + map_height / 2 - label_h / 2
+        lbl.attemptMove(QgsLayoutPoint(lx, ly, QgsUnitTypes.LayoutMillimeters))
+        lbl.setItemRotation(rotation)
+        layout.addLayoutItem(lbl)
+        logger.debug(f"Added {side} neighbor label '{nbr_name}' to region {region['name']}")
+
     if enable_collar:
         # Calculate collar position (flush at bottom of page)
         collar_y = page_height - collar_height - margin
@@ -1253,42 +1295,107 @@ def outlet_runbook_qgis(config, outlet_name='runbook', skips=[], start_at=0, lim
     )
 
 
+def _gazetteer_grid_index_html(config, outlet_name, features):
+    """Build a grid-layout index.html for the gazetteer outlet.
+
+    Reads cell names from the gazetteer_regions layer features (format: '{col}_{row}',
+    e.g. '1_A', '3_B') and produces an HTML table where rows are letter rows and
+    columns are number columns, each cell linking to its PDF page.
+    """
+    atlas_name = config.get('name', 'Atlas')
+    webmap_url = f"../../staging/outlets/webmap/index.html"  # relative fallback
+
+    # Parse col/row from each feature name
+    cols = set()
+    rows = set()
+    for feat in features:
+        name = feat.get('properties', {}).get('name', '')
+        if '_' in name:
+            col, row = name.split('_', 1)
+            cols.add(col)
+            rows.add(row)
+
+    # Sort: columns numerically, rows alphabetically
+    sorted_cols = sorted(cols, key=lambda c: int(c))
+    sorted_rows = sorted(rows)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{atlas_name} Gazetteer Index</title>
+<style>
+  body {{ font-family: Arial, sans-serif; padding: 1em; }}
+  h1 {{ font-size: 1.2em; }}
+  .top-links {{ margin-bottom: 1em; }}
+  .top-links a {{ margin-right: 1.5em; }}
+  table {{ border-collapse: collapse; }}
+  th, td {{ border: 1px solid #999; padding: 0.4em 0.7em; text-align: center; }}
+  th {{ background: #ddd; font-weight: bold; }}
+  td a {{ text-decoration: none; color: #1a0dab; font-weight: bold; }}
+  td a:hover {{ text-decoration: underline; }}
+</style>
+</head>
+<body>
+<h1>{atlas_name} Gazetteer</h1>
+<div class="top-links">
+  <a href="gazetteer_all.pdf">Combined PDF</a>
+  <a href="{webmap_url}">Webmap</a>
+</div>
+<table>
+<tr><th></th>"""
+
+    for col in sorted_cols:
+        html += f"<th>{col}</th>"
+    html += "</tr>\n"
+
+    for row in sorted_rows:
+        html += f"<tr><th>{row}</th>"
+        for col in sorted_cols:
+            cell = f"{col}_{row}"
+            html += f'<td><a href="page_{cell}.pdf">{cell}</a></td>'
+        html += "</tr>\n"
+
+    html += "</table>\n</body>\n</html>\n"
+    return html
+
+
 def outlet_gazetteer_qgis(config, outlet_name='gazetteer', skips=[], first_n=0):
+    """Generate gazetteer PDFs using QGIS, with a grid-layout index page.
+
+    Reads the gazetteer_regions layer (populated by the gazetteer_grid inlet),
+    renders one PDF per cell, and writes an index.html laid out as a spatial grid
+    matching the cell arrangement on the map.
     """
-    Generate gazetteer using QGIS (generates grid regions automatically).
-    
-    For now, this still uses the GRASS approach for region generation
-    but renders with QGIS. Full QGIS implementation coming in Phase 2.
-    
-    Args:
-        config: Atlas configuration dict
-        outlet_name: Name of the gazetteer outlet (default: 'gazetteer')
-        skips: List of processing steps to skip
-        first_n: Only process first N regions (0 = all)
-        
-    Returns:
-        List of processed regions
-    """
-    # Import here to avoid circular dependency
-    from outlets import generate_gazetteerregions
-    
-    logger.info(f"Running QGIS gazetteer outlet")
-    
-    # Generate grid regions (still uses existing logic)
-    gaz_regions, gaz_html = generate_gazetteerregions(config, outlet_name)
-    
-    # Render with QGIS
+    import geojson as geojson_module
+
+    regions_layer_name = config['assets'][outlet_name].get('regions_layer', 'gazetteer_regions')
+    regions_path = versioning.atlas_path(config, "layers") / regions_layer_name / f"{regions_layer_name}.geojson"
+
+    if not regions_path.exists():
+        logger.error(f"Gazetteer regions layer not found: {regions_path}")
+        return []
+
+    with open(regions_path) as f:
+        fc = geojson_module.load(f)
+    features = fc.get('features', [])
+
+    index_html = _gazetteer_grid_index_html(config, outlet_name, features)
+    regions_html = [("index.html", index_html)]
+
+    logger.info(f"Running QGIS gazetteer outlet from: {regions_path}")
     return outlet_regions_qgis(
         config=config,
         outlet_name=outlet_name,
-        regions=gaz_regions,
-        regions_html=gaz_html,
+        regions_geojson_path=str(regions_path),
+        regions_html=regions_html,
         skips=skips,
         first_n=first_n
     )
 
 asset_methods = {
-    'qgis_runbook': outlet_runbook_qgis
+    'qgis_runbook': outlet_runbook_qgis,
+    'qgis_gazetteer': outlet_gazetteer_qgis,
     }
 
 if __name__ == "__main__":

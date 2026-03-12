@@ -172,5 +172,22 @@
             "license": "https://www.scvfd.fireatlas.org",
             "citation": "https://www.scvfd.fireatlas.org"
         }
+    },
+    "qgis_gazetteer": {
+        "name": "qgis_gazetteer",
+        "asset_type": "outlet",
+        "fetch_type": "qgis_gazetteer",
+        "interaction": "interface",
+        "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/",
+        "data_type": "geopdf",
+        "page_size": "A4",
+        "page_orientation": "Portrait",
+        "dpi": 300,
+        "attribution": {
+            "url": "https://www.scvfd.fireatlas.org",
+            "description": "QGIS-generated GeoPDF gazetteer grid maps.",
+            "license": "https://www.scvfd.fireatlas.org",
+            "citation": "https://www.scvfd.fireatlas.org"
+        }
     }
 }
