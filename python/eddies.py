@@ -646,18 +646,18 @@ def _tile_dir_to_pmtiles(tile_dir: Path, out_path: Path, min_zoom: int, max_zoom
     from pmtiles.writer import Writer
     from pmtiles.tile import TileType, Compression
 
-    center_lon = (bounds[0] + bounds[2]) / 2
-    center_lat = (bounds[1] + bounds[3]) / 2
+    center_lon = (bounds['west'] + bounds['east']) / 2
+    center_lat = (bounds['south'] + bounds['north']) / 2
 
     header = {
         "tile_type": TileType.PNG,
         "tile_compression": Compression.NONE,
         "min_zoom": min_zoom,
         "max_zoom": max_zoom,
-        "min_lon_e7": int(bounds[0] * 1e7),
-        "min_lat_e7": int(bounds[1] * 1e7),
-        "max_lon_e7": int(bounds[2] * 1e7),
-        "max_lat_e7": int(bounds[3] * 1e7),
+        "min_lon_e7": int(bounds['west'] * 1e7),
+        "min_lat_e7": int(bounds['south'] * 1e7),
+        "max_lon_e7": int(bounds['east'] * 1e7),
+        "max_lat_e7": int(bounds['north'] * 1e7),
         "center_zoom": (min_zoom + max_zoom) // 2,
         "center_lon_e7": int(center_lon * 1e7),
         "center_lat_e7": int(center_lat * 1e7),
