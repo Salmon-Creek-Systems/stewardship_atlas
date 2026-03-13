@@ -818,25 +818,42 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     layout.addLayoutItem(legend)
 
 
-def export_atlas(layout, output_dir, atlas_name):
+def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72):
     """
     Export atlas to both multi-page PDF and individual PDFs per region.
-    
+    Also exports a PNG thumbnail per page (map area only, collar cropped out).
+
     Args:
         layout: QgsPrintLayout with atlas enabled
         output_dir: Output directory path
         atlas_name: Base name for output files
-        
+        thumbnail_dpi: DPI for PNG thumbnails (default 72)
+
     Returns:
         dict with status and output paths
     """
     atlas = layout.atlas()
     exporter = QgsLayoutExporter(layout)
-    
+
+    # Compute the map-only crop fraction from the layout geometry.
+    # Find the atlas-driven map item and compare its width to the page width.
+    page = layout.pageCollection().page(0)
+    page_width_mm = page.pageSize().width()
+    page_height_mm = page.pageSize().height()
+    map_fraction_x = 1.0
+    map_fraction_y = 1.0
+    for item in layout.items():
+        if isinstance(item, QgsLayoutItemMap) and item.isAtlasDriven():
+            map_fraction_x = item.rect().width() / page_width_mm
+            map_fraction_y = item.rect().height() / page_height_mm
+            break
+    logger.info(f"Thumbnail crop: map is {map_fraction_x:.2%} of page width, {map_fraction_y:.2%} of page height")
+
     results = {
         'status': 'success',
         'multi_page_pdf': None,
         'individual_pdfs': [],
+        'individual_pngs': [],
         'total_pages': 0
     }
     
@@ -898,7 +915,7 @@ def export_atlas(layout, output_dir, atlas_name):
         individual_pdf_path = individual_dir / f"{safe_name}.pdf"
         
         result = exporter.exportToPdf(str(individual_pdf_path), pdf_settings)
-        
+
         if result == QgsLayoutExporter.Success:
             results['individual_pdfs'].append(str(individual_pdf_path))
             logger.info(f"  ✓ Page {page_num}: {region_name}")
@@ -906,7 +923,26 @@ def export_atlas(layout, output_dir, atlas_name):
             error_msg = get_export_error_message(result)
             logger.error(f"  ✗ Page {page_num} ({region_name}) failed: {error_msg}")
             results['status'] = 'partial'
-    
+
+        # PNG thumbnail — map area only (collar cropped out)
+        try:
+            from PIL import Image as PilImage
+            png_path = individual_dir / f"{safe_name}.png"
+            img_settings = QgsLayoutExporter.ImageExportSettings()
+            img_settings.dpi = thumbnail_dpi
+            img_result = exporter.exportToImage(str(png_path), img_settings)
+            if img_result == QgsLayoutExporter.Success:
+                img = PilImage.open(png_path)
+                crop_w = int(img.width * map_fraction_x)
+                crop_h = int(img.height * map_fraction_y)
+                img.crop((0, 0, crop_w, crop_h)).save(png_path)
+                results['individual_pngs'].append(str(png_path))
+                logger.info(f"  ✓ Thumbnail {page_num}: {png_path.name} ({crop_w}x{crop_h}px)")
+            else:
+                logger.warning(f"  ✗ Thumbnail failed for {region_name}: {get_export_error_message(img_result)}")
+        except Exception as e:
+            logger.warning(f"  ✗ Thumbnail error for {region_name}: {e}")
+
     atlas.endRender()
     results['total_pages'] = page_num
     

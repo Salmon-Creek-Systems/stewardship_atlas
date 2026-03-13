@@ -1348,8 +1348,13 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
         rows_html += f'<tr><th class="row-header">{row}</th>'
         for col in sorted_cols:
             cell = f"{col}_{row}"
-            filename = f"individual_pages/{col}_{row.lower()}.pdf"
-            rows_html += f'<td><a href="{filename}">{cell}</a></td>'
+            pdf_file = f"individual_pages/{col}_{row.lower()}.pdf"
+            png_file = f"individual_pages/{col}_{row.lower()}.png"
+            rows_html += (
+                f'<td><a href="{pdf_file}">'
+                f'<img src="{png_file}" alt="{cell}" title="{cell}">'
+                f'</a></td>'
+            )
         rows_html += '</tr>\n'
 
     col_headers = ''.join(f'<th>{col}</th>' for col in sorted_cols)
@@ -1462,9 +1467,8 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
   }}
   th, td {{
     border: 1px solid var(--border);
-    padding: 10px 16px;
+    padding: 0;
     text-align: center;
-    min-width: 64px;
   }}
   thead th {{
     background: var(--surface);
@@ -1472,23 +1476,30 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
     color: var(--text-muted);
     font-size: 13px;
     letter-spacing: 0.03em;
+    padding: 8px 12px;
   }}
   th.row-header {{
     background: var(--surface);
     font-weight: 600;
     color: var(--text-muted);
     font-size: 13px;
+    padding: 8px 12px;
+    min-width: 32px;
   }}
   td {{
     background: #fff;
+    line-height: 0;
   }}
   td:hover {{
-    background: #eff6ff;
+    opacity: 0.85;
   }}
   td a {{
-    font-weight: 500;
-    font-size: 15px;
     display: block;
+  }}
+  td img {{
+    display: block;
+    width: 100%;
+    height: auto;
   }}
 </style>
 </head>
