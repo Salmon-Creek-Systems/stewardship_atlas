@@ -19,6 +19,7 @@
     {"name": "roads", "geometry_type": "linestring",
         "color": [20, 20, 20], "add_labels": true,
         "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+        "qgis_width_scale": 2.0,
         "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
@@ -37,7 +38,7 @@
      "editable_columns": [{"name": "name", "type": "string", "default": ""}],
      "interaction": "interface"},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
-     "interaction": "interface", "vector_width":true},
+     "qgis_width_scale": 2.0, "interaction": "interface", "vector_width":true},
     {"name": "watertanks", "geometry_type": "point", "add_labels": true,
      "color": [50, 50, 250],"fill_color": [0, 0, 250], 
      "symbol": {"png": "watertank.png", "icon": "custom/octy"},
