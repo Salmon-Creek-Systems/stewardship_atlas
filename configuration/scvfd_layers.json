@@ -14,11 +14,12 @@
         "wms_url": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer",
         "wms_layer": "3DEPElevation:Hillshade Gray",
         "wms_format": "image/png",
-        "opacity": 1.0
+        "opacity": 0.5
     },
     {"name": "roads", "geometry_type": "linestring",
         "color": [20, 20, 20], "add_labels": true,
         "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+        "label_background": true,
         "qgis_width_scale": 2.0,
         "interaction": "interface", "vector_width":true,
         "editable_columns": [
@@ -38,7 +39,7 @@
      "editable_columns": [{"name": "name", "type": "string", "default": ""}],
      "interaction": "interface"},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
-     "qgis_width_scale": 2.0, "interaction": "interface", "vector_width":true},
+     "label_background": true, "qgis_width_scale": 2.0, "interaction": "interface", "vector_width":true},
     {"name": "watertanks", "geometry_type": "point", "add_labels": true,
      "color": [50, 50, 250],"fill_color": [0, 0, 250], 
      "symbol": {"png": "watertank.png", "icon": "custom/octy"},
