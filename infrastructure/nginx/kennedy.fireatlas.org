@@ -21,6 +21,7 @@ server {
 	return 302 /staging/outlets/html/public;
 }
 	location / {
+		autoindex on;
 		try_files $uri $uri/ =404;
 	}
 
