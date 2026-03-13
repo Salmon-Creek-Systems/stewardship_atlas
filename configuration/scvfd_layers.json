@@ -16,8 +16,10 @@
         "wms_format": "image/png",
         "opacity": 1.0
     },
-    {"name": "roads", "geometry_type": "linestring", 
-        "color": [20, 20, 20], "add_labels": true, "interaction": "interface", "vector_width":true,
+    {"name": "roads", "geometry_type": "linestring",
+        "color": [20, 20, 20], "add_labels": true,
+        "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+        "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
             {

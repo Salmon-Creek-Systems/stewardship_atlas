@@ -449,10 +449,17 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             pal_settings = QgsPalLayerSettings()
             pal_settings.enabled = True
 
+            # Custom expression override — takes precedence over all other label options.
+            # If set, used directly as a QGIS expression (isExpression=True).
+            # Returning NULL from the expression suppresses the label.
+            if 'label_expression' in layer_config:
+                pal_settings.isExpression = True
+                pal_settings.fieldName = layer_config['label_expression']
+                logger.info(f"Custom label expression for {layer.name()}: {layer_config['label_expression']}")
             # Deduplicate labels — show only one label per unique value.
             # Uses a QGIS aggregate expression: only the feature with the
             # minimum $id for each unique label value gets labelled.
-            if layer_config.get('label_deduplicate', False):
+            elif layer_config.get('label_deduplicate', False):
                 pal_settings.isExpression = True
                 pal_settings.fieldName = (
                     f'if($id = minimum($id, group_by:="{label_attr}"), "{label_attr}", NULL)'
