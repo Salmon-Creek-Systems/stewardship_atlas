@@ -620,25 +620,15 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
         
-        # Set layers for overview - show only basemap (not the coverage layer)
-        overview_layers = []
-        for layer in project.mapLayers().values():
-            layer_name = layer.name().lower()
-            # Only show basemap - exclude the coverage/regions layer
-            if 'basemap' in layer_name:
-                overview_layers.append(layer)
-        
-        if overview_layers:
-            overview_map.setKeepLayerSet(True)
-            overview_map.setLayers(overview_layers)
-            logger.info(f"Overview map showing {len(overview_layers)} layers: {[l.name() for l in overview_layers]}")
-            # Check if layers are valid
-            for layer in overview_layers:
-                logger.info(f"  - {layer.name()}: valid={layer.isValid()}, extent={layer.extent().toString()}")
-        else:
-            # Fallback: show all layers if we can't find basemap
-            overview_map.setKeepLayerSet(False)
-            logger.warning("Could not find basemap for overview, showing all layers")
+        # Set layers for overview — use the coverage (regions) layer only so the
+        # overview always shows the grid outline regardless of what basemap is loaded.
+        # We deliberately exclude raster basemaps (WMS/local) from the overview because
+        # they either cover the whole world (confusing extent) or are clipped to the
+        # current atlas feature by QGIS and make the overview look wrong.
+        overview_layers = [coverage_layer]
+        overview_map.setKeepLayerSet(True)
+        overview_map.setLayers(overview_layers)
+        logger.info(f"Overview map using coverage layer: {coverage_layer.name()}")
         
         # Ensure the map draws content
         overview_map.setDrawAnnotations(False)  # Don't draw annotations in overview
