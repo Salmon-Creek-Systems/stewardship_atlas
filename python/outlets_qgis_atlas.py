@@ -622,12 +622,21 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         # Set layers for overview — file-based rasters + coverage layer.
         # WMS layers are excluded because QGIS clips them to the current atlas
-        # feature, making the overview show only the current cell rather than
-        # the full atlas area.
+        # feature, making the overview show only the current cell.
+        # Rasters that have been set to 0 opacity (invisible on main map) are
+        # cloned at full opacity so they still show in the overview.
         overview_layers = []
         for layer in project.mapLayers().values():
             if isinstance(layer, QgsRasterLayer) and layer.providerType() != 'wms':
-                overview_layers.append(layer)
+                if layer.opacity() < 0.01:
+                    # Clone at full opacity for overview use
+                    clone = QgsRasterLayer(layer.source(), layer.name() + '_overview')
+                    clone.setOpacity(1.0)
+                    project.addMapLayer(clone, False)
+                    overview_layers.append(clone)
+                    logger.info(f"Cloned {layer.name()} at full opacity for overview")
+                else:
+                    overview_layers.append(layer)
         overview_layers.append(coverage_layer)
         overview_map.setKeepLayerSet(True)
         overview_map.setLayers(overview_layers)

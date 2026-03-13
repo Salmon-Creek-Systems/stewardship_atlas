@@ -1355,7 +1355,8 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
             png_file = f"individual_pages/{col}_{row.lower()}.png"
             rows_html += (
                 f'<td><a href="{pdf_file}">'
-                f'<img src="{png_file}" alt="{cell}" title="{cell}">'
+                f'<img src="{png_file}" alt="{cell}">'
+                f'<span class="cell-label">{cell}</span>'
                 f'</a></td>'
             )
         rows_html += '</tr>\n'
@@ -1468,8 +1469,11 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
     margin: 0 auto;
     font-size: 15px;
   }}
+  table {{
+    border-spacing: 1px;
+  }}
   th, td {{
-    border: 1px solid var(--border);
+    border: none;
     padding: 0;
     text-align: center;
   }}
@@ -1479,30 +1483,47 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
     color: var(--text-muted);
     font-size: 13px;
     letter-spacing: 0.03em;
-    padding: 8px 12px;
+    padding: 6px 8px;
   }}
   th.row-header {{
     background: var(--surface);
     font-weight: 600;
     color: var(--text-muted);
     font-size: 13px;
-    padding: 8px 12px;
-    min-width: 32px;
+    padding: 6px 8px;
+    min-width: 28px;
   }}
   td {{
     background: #fff;
     line-height: 0;
+    position: relative;
   }}
-  td:hover {{
-    opacity: 0.85;
+  td:hover .cell-label {{
+    opacity: 1;
   }}
   td a {{
     display: block;
+    position: relative;
   }}
   td img {{
     display: block;
     width: 100%;
     height: auto;
+  }}
+  .cell-label {{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 700;
+    color: #000;
+    background: rgba(255,255,255,0.75);
+    padding: 2px 5px;
+    border-radius: 2px;
+    pointer-events: none;
+    white-space: nowrap;
   }}
 </style>
 </head>
