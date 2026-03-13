@@ -447,8 +447,19 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
         fields = layer.fields()
         if fields.indexOf(label_attr) >= 0:
             pal_settings = QgsPalLayerSettings()
-            pal_settings.fieldName = label_attr
             pal_settings.enabled = True
+
+            # Deduplicate labels — show only one label per unique value.
+            # Uses a QGIS aggregate expression: only the feature with the
+            # minimum $id for each unique label value gets labelled.
+            if layer_config.get('label_deduplicate', False):
+                pal_settings.isExpression = True
+                pal_settings.fieldName = (
+                    f'if($id = minimum($id, group_by:="{label_attr}"), "{label_attr}", NULL)'
+                )
+                logger.info(f"Label deduplication enabled for {layer.name()} on field '{label_attr}'")
+            else:
+                pal_settings.fieldName = label_attr
             
             # Label-label collision avoidance (can be disabled per-layer with 'avoid_label_collisions': false)
             avoid_label_collisions = layer_config.get('avoid_label_collisions', True)

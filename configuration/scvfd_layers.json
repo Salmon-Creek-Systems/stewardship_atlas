@@ -85,7 +85,7 @@
      ]
     },
     {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
-     "add_labels": true, "interaction": "interface"},
+     "add_labels": true, "label_deduplicate": true, "interaction": "interface"},
     {"name": "gazetteer_regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
