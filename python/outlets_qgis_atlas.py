@@ -894,8 +894,38 @@ def get_export_error_message(error_code):
     return error_map.get(error_code, f"Unknown error ({error_code})")
 
 
+def outlet_gazetteer_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdfs=True):
+    """Like outlet_runbook_qgis_atlas but writes a grid-layout index page.
+
+    Runs the full QGIS Atlas render (one PDF per gazetteer cell), then overwrites
+    the linear index.html produced by make_regions_index with a spatial grid table.
+    """
+    import geojson as geojson_module
+
+    result = outlet_runbook_qgis_atlas(config, outlet_name,
+                                       only_generate=only_generate,
+                                       refresh_pdfs=refresh_pdfs)
+
+    outlet_config = config['assets'][outlet_name]
+    regions_layer_name = outlet_config['regions_layer']
+    regions_path = versioning.atlas_path(config, "layers") / regions_layer_name / f"{regions_layer_name}.geojson"
+
+    with open(regions_path) as f:
+        fc = geojson_module.load(f)
+    features = fc.get('features', [])
+
+    index_html = outlets_qgis._gazetteer_grid_index_html(config, outlet_name, features)
+    index_path = versioning.atlas_path(config, "outlets") / outlet_name / "index.html"
+    with open(index_path, 'w') as f:
+        f.write(index_html)
+    logger.info(f"Wrote gazetteer grid index to {index_path}")
+
+    return result
+
+
 # Asset method registration
 asset_methods = {
-    'outlet_runbook_qgis_atlas': outlet_runbook_qgis_atlas
+    'outlet_runbook_qgis_atlas': outlet_runbook_qgis_atlas,
+    'qgis_gazetteer': outlet_gazetteer_qgis_atlas,
 }
 
