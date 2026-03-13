@@ -620,15 +620,18 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
         
         logger.info(f"Overview map extent: {extent.toString()}, CRS: {render_crs.authid()}")
         
-        # Set layers for overview — use the coverage (regions) layer only so the
-        # overview always shows the grid outline regardless of what basemap is loaded.
-        # We deliberately exclude raster basemaps (WMS/local) from the overview because
-        # they either cover the whole world (confusing extent) or are clipped to the
-        # current atlas feature by QGIS and make the overview look wrong.
-        overview_layers = [coverage_layer]
+        # Set layers for overview — file-based rasters + coverage layer.
+        # WMS layers are excluded because QGIS clips them to the current atlas
+        # feature, making the overview show only the current cell rather than
+        # the full atlas area.
+        overview_layers = []
+        for layer in project.mapLayers().values():
+            if isinstance(layer, QgsRasterLayer) and layer.providerType() != 'wms':
+                overview_layers.append(layer)
+        overview_layers.append(coverage_layer)
         overview_map.setKeepLayerSet(True)
         overview_map.setLayers(overview_layers)
-        logger.info(f"Overview map using coverage layer: {coverage_layer.name()}")
+        logger.info(f"Overview map layers: {[l.name() for l in overview_layers]}")
         
         # Ensure the map draws content
         overview_map.setDrawAnnotations(False)  # Don't draw annotations in overview
