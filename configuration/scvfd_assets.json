@@ -181,7 +181,7 @@
         "regions_layer": "gazetteer_regions",
         "feature_scale": 0.5,
         "blend_percent": 40,
-        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
+        "in_layers": ["usgs_hillshade", "basemap", "contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
         "access": ["public", "internal", "admin"]
     },
     "notebook": {

@@ -8,6 +8,14 @@
      "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster"},
+    {
+        "name": "usgs_hillshade",
+        "geometry_type": "wms",
+        "wms_url": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer",
+        "wms_layer": "3DEPElevation:Hillshade Gray",
+        "wms_format": "image/png",
+        "opacity": 1.0
+    },
     {"name": "roads", "geometry_type": "linestring", 
         "color": [20, 20, 20], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [

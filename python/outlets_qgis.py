@@ -244,10 +244,22 @@ def load_full_layer(layer_config, config):
     geometry_type = layer_config.get('geometry_type', 'polygon')
     
     # Determine layer format and path
-    if geometry_type == 'raster':
+    if geometry_type == 'wms':
+        # Live WMS/XYZ tile service — no local file needed
+        wms_url = layer_config['wms_url']
+        wms_layer = layer_config.get('wms_layer', '')
+        wms_format = layer_config.get('wms_format', 'image/png')
+        uri = f"url={wms_url}&format={wms_format}&layers={wms_layer}&styles=&version=auto&crs=EPSG:3857"
+        layer = QgsRasterLayer(uri, layer_name, "wms")
+        if not layer.isValid():
+            logger.warning(f"Failed to load WMS layer: {layer_name} — {layer.error().message()}")
+            return None
+        logger.info(f"Loaded WMS layer: {layer_name} ({wms_url})")
+        return layer
+    elif geometry_type == 'raster':
         layer_format = 'tiff'
         layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
-        
+
         layer = QgsRasterLayer(str(layer_path), layer_name)
         if not layer.isValid():
             logger.warning(f"Failed to load raster layer: {layer_name} from {layer_path}")
