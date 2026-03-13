@@ -843,7 +843,7 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72):
     map_fraction_x = 1.0
     map_fraction_y = 1.0
     for item in layout.items():
-        if isinstance(item, QgsLayoutItemMap) and item.isAtlasDriven():
+        if isinstance(item, QgsLayoutItemMap) and item.atlasDriven():
             map_fraction_x = item.rect().width() / page_width_mm
             map_fraction_y = item.rect().height() / page_height_mm
             break
