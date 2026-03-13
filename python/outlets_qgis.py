@@ -1296,16 +1296,11 @@ def outlet_runbook_qgis(config, outlet_name='runbook', skips=[], start_at=0, lim
 
 
 def _gazetteer_grid_index_html(config, outlet_name, features):
-    """Build a grid-layout index.html for the gazetteer outlet.
-
-    Reads cell names from the gazetteer_regions layer features (format: '{col}_{row}',
-    e.g. '1_A', '3_B') and produces an HTML table where rows are letter rows and
-    columns are number columns, each cell linking to its PDF page.
-    """
+    """Build a grid-layout index.html for the gazetteer outlet, styled to match the console."""
     atlas_name = config.get('name', 'Atlas')
-    webmap_url = f"../../staging/outlets/webmap/index.html"  # relative fallback
+    logo_url = config.get('logo_url', config.get('logo', ''))
 
-    # Parse col/row from each feature name
+    # Parse col/row from each feature name (format: '{col}_{row}', e.g. '1_A')
     cols = set()
     rows = set()
     for feat in features:
@@ -1315,50 +1310,191 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
             cols.add(col)
             rows.add(row)
 
-    # Sort: columns numerically, rows alphabetically
     sorted_cols = sorted(cols, key=lambda c: int(c))
     sorted_rows = sorted(rows)
 
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>{atlas_name} Gazetteer Index</title>
-<style>
-  body {{ font-family: Arial, sans-serif; padding: 1em; }}
-  h1 {{ font-size: 1.2em; }}
-  .top-links {{ margin-bottom: 1em; }}
-  .top-links a {{ margin-right: 1.5em; }}
-  table {{ border-collapse: collapse; }}
-  th, td {{ border: 1px solid #999; padding: 0.4em 0.7em; text-align: center; }}
-  th {{ background: #ddd; font-weight: bold; }}
-  td a {{ text-decoration: none; color: #1a0dab; font-weight: bold; }}
-  td a:hover {{ text-decoration: underline; }}
-</style>
-</head>
-<body>
-<h1>{atlas_name} Gazetteer</h1>
-<div class="top-links">
-  <a href="gazetteer_all.pdf">Combined PDF</a>
-  <a href="{webmap_url}">Webmap</a>
-</div>
-<table>
-<tr><th></th>"""
+    logo_html = f'<img class="logo" src="{logo_url}" alt="">' if logo_url else ''
 
-    for col in sorted_cols:
-        html += f"<th>{col}</th>"
-    html += "</tr>\n"
-
+    rows_html = ''
     for row in sorted_rows:
-        html += f"<tr><th>{row}</th>"
+        rows_html += f'<tr><th class="row-header">{row}</th>'
         for col in sorted_cols:
             cell = f"{col}_{row}"
             filename = f"individual_pages/{col}_{row.lower()}.pdf"
-            html += f'<td><a href="{filename}">{cell}</a></td>'
-        html += "</tr>\n"
+            rows_html += f'<td><a href="{filename}">{cell}</a></td>'
+        rows_html += '</tr>\n'
 
-    html += "</table>\n</body>\n</html>\n"
-    return html
+    col_headers = ''.join(f'<th>{col}</th>' for col in sorted_cols)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{atlas_name} — Gazetteer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --font: 'IBM Plex Sans', Arial, sans-serif;
+    --bg: #ffffff;
+    --surface: #f7f7f7;
+    --border: #d8d8d8;
+    --text: #111111;
+    --text-muted: #888888;
+    --topbar-bg: #eeeeee;
+    --topbar-height: 52px;
+    --blue: #1d4ed8;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: var(--font);
+    font-size: 16px;
+    color: var(--text);
+    background: var(--bg);
+  }}
+  a {{ color: var(--blue); text-decoration: none; }}
+  a:hover {{ text-decoration: underline; }}
+
+  /* ── Top bar ── */
+  .top-bar {{
+    height: var(--topbar-height);
+    background: var(--topbar-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 12px;
+  }}
+  .logo {{
+    height: 34px;
+    width: 34px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }}
+  .top-bar-title .atlas-name {{
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.2;
+  }}
+  .top-bar-title .page-type {{
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    line-height: 1.2;
+  }}
+  .top-bar-home {{
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+  }}
+  .top-bar-home:hover {{ color: var(--blue); text-decoration: none; }}
+
+  /* ── Main content ── */
+  .content {{
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 24px;
+    text-align: center;
+  }}
+  .section-links {{
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+  }}
+  .section-links a {{
+    display: inline-block;
+    padding: 10px 22px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--blue);
+    background: var(--surface);
+    transition: background 0.15s, border-color 0.15s;
+  }}
+  .section-links a:hover {{
+    background: #eff6ff;
+    border-color: var(--blue);
+    text-decoration: none;
+  }}
+
+  /* ── Grid table ── */
+  .grid-wrap {{
+    overflow-x: auto;
+  }}
+  table {{
+    border-collapse: collapse;
+    margin: 0 auto;
+    font-size: 15px;
+  }}
+  th, td {{
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    text-align: center;
+    min-width: 64px;
+  }}
+  thead th {{
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 13px;
+    letter-spacing: 0.03em;
+  }}
+  th.row-header {{
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 13px;
+  }}
+  td {{
+    background: #fff;
+  }}
+  td:hover {{
+    background: #eff6ff;
+  }}
+  td a {{
+    font-weight: 500;
+    font-size: 15px;
+    display: block;
+  }}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  {logo_html}
+  <div class="top-bar-title">
+    <span class="atlas-name">{atlas_name}</span>
+    <span class="page-type">Gazetteer</span>
+  </div>
+  <a class="top-bar-home" href="../../html/">← Home</a>
+</header>
+
+<div class="content">
+  <div class="section-links">
+    <a href="../webmap/">Webmap</a>
+    <a href="{atlas_name.lower().replace(' ', '_')}_gazetteer.pdf">Combined PDF</a>
+  </div>
+  <div class="grid-wrap">
+    <table>
+      <thead>
+        <tr><th></th>{col_headers}</tr>
+      </thead>
+      <tbody>
+        {rows_html}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>
+"""
 
 
 def outlet_gazetteer_qgis(config, outlet_name='gazetteer', skips=[], first_n=0):
