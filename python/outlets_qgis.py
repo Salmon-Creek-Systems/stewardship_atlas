@@ -1353,7 +1353,8 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
         html += f"<tr><th>{row}</th>"
         for col in sorted_cols:
             cell = f"{col}_{row}"
-            html += f'<td><a href="page_{cell}.pdf">{cell}</a></td>'
+            filename = f"individual_pages/{col}_{row.lower()}.pdf"
+            html += f'<td><a href="{filename}">{cell}</a></td>'
         html += "</tr>\n"
 
     html += "</table>\n</body>\n</html>\n"

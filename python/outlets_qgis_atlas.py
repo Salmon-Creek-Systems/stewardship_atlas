@@ -54,6 +54,7 @@ from qgis.core import (
     QgsFeature
 )
 from qgis.PyQt.QtGui import QColor, QFont
+from qgis.PyQt.QtCore import Qt
 
 # Import local modules
 try:
@@ -432,13 +433,53 @@ def create_atlas_layout(project, coverage_layer, config, outlet_name):
     logger.info(f"Atlas layers to clip: {len(layers_to_clip)} layers")
     
     layout.addLayoutItem(map_item)
-    
+
+    # Gazetteer neighbor labels — atlas-expression-driven, update per page automatically.
+    # Only added if the coverage layer has neighbor fields (gazetteer, not runbook).
+    field_names = [f.name() for f in coverage_layer.fields()]
+    if 'north_neighbor' in field_names:
+        map_width = page_width - (2 * margin) - (collar_width if enable_collar else 0)
+        map_height = page_height - (2 * margin)
+        _add_gazetteer_neighbor_labels(layout, map_x, map_y, map_width, map_height)
+
     if enable_collar:
-        add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 
+        add_map_collar(layout, map_item, config, outlet_config, page_width, page_height,
                        margin, collar_width, render_crs, coverage_layer)
-    
+
     logger.info(f"Created atlas layout with {coverage_layer.featureCount()} pages")
     return layout
+
+
+def _add_gazetteer_neighbor_labels(layout, map_x, map_y, map_width, map_height):
+    """Add N/S/E/W neighbor cell labels at map edges for gazetteer pages.
+
+    Uses QGIS Atlas expression syntax so each page shows the correct neighbor names.
+    Labels render empty (invisible) when no neighbor exists (edge of grid).
+    """
+    label_w, label_h = 18, 7  # mm, unrotated
+    nbr_font = QFont("Arial", 12, QFont.Bold)
+
+    sides = [
+        # (field,          rotation, lx,                                     ly)
+        ('north_neighbor', 0,   map_x + (map_width - label_w) / 2,          map_y + 4),
+        ('south_neighbor', 0,   map_x + (map_width - label_w) / 2,          map_y + map_height - label_h - 4),
+        ('west_neighbor',  90,  map_x + 8 - label_w / 2,                    map_y + map_height / 2 - label_h / 2),
+        ('east_neighbor',  270, map_x + map_width - 8 - label_w / 2,        map_y + map_height / 2 - label_h / 2),
+    ]
+
+    for field, rotation, lx, ly in sides:
+        lbl = QgsLayoutItemLabel(layout)
+        # Atlas expression: show neighbor name, or empty string if NULL
+        lbl.setText(f"[%coalesce(\"{field}\", '')%]")
+        lbl.setFont(nbr_font)
+        lbl.setHAlign(Qt.AlignHCenter)
+        lbl.setVAlign(Qt.AlignVCenter)
+        lbl.setFrameEnabled(False)
+        lbl.setBackgroundEnabled(False)
+        lbl.attemptResize(QgsLayoutSize(label_w, label_h, QgsUnitTypes.LayoutMillimeters))
+        lbl.attemptMove(QgsLayoutPoint(lx, ly, QgsUnitTypes.LayoutMillimeters))
+        lbl.setItemRotation(rotation)
+        layout.addLayoutItem(lbl)
 
 
 def add_map_collar(layout, map_item, config, outlet_config, page_width, page_height, 

@@ -180,8 +180,8 @@
         "interaction": "interface",
         "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/",
         "data_type": "geopdf",
-        "page_size": "A4",
-        "page_orientation": "Portrait",
+        "page_size": "Letter",
+        "page_orientation": "Landscape",
         "dpi": 300,
         "attribution": {
             "url": "https://www.scvfd.fireatlas.org",
