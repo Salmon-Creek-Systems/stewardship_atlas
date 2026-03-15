@@ -12,34 +12,35 @@ from email_inlet import parse_subject, extract_gps, build_feature
 class TestParseSubject(unittest.TestCase):
 
     def test_layer_and_title(self):
-        layer, title = parse_subject("poi | Locked gate on Miller Road")
+        layer, title = parse_subject("poi: Locked gate on Miller Road")
         self.assertEqual(layer, "poi")
         self.assertEqual(title, "Locked gate on Miller Road")
 
-    def test_layer_only(self):
-        layer, title = parse_subject("notes")
-        self.assertEqual(layer, "notes")
-        self.assertEqual(title, "Photo submission")
+    def test_no_colon_defaults_to_poi(self):
+        # No colon — whole subject is title, layer defaults to poi
+        layer, title = parse_subject("Locked gate on Miller Road")
+        self.assertEqual(layer, "poi")
+        self.assertEqual(title, "Locked gate on Miller Road")
 
-    def test_empty_title_after_pipe(self):
-        layer, title = parse_subject("poi |")
+    def test_empty_title_after_colon(self):
+        layer, title = parse_subject("poi:")
         self.assertEqual(layer, "poi")
         self.assertEqual(title, "Photo submission")
 
     def test_layer_lowercased(self):
-        layer, title = parse_subject("POI | Something")
+        layer, title = parse_subject("POI: Something")
         self.assertEqual(layer, "poi")
 
     def test_extra_whitespace(self):
-        layer, title = parse_subject("  hydrants  |  New hydrant  ")
+        layer, title = parse_subject("  hydrants  :  New hydrant  ")
         self.assertEqual(layer, "hydrants")
         self.assertEqual(title, "New hydrant")
 
-    def test_pipe_in_title(self):
-        # Only split on first pipe
-        layer, title = parse_subject("poi | Title with | extra pipe")
+    def test_colon_in_title(self):
+        # Only split on first colon
+        layer, title = parse_subject("poi: Title with: extra colon")
         self.assertEqual(layer, "poi")
-        self.assertEqual(title, "Title with | extra pipe")
+        self.assertEqual(title, "Title with: extra colon")
 
 
 class TestExtractGps(unittest.TestCase):

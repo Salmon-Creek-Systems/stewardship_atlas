@@ -15,12 +15,17 @@ logger = logging.getLogger(__name__)
 def parse_subject(subject: str) -> tuple[str, str]:
     """Parse email subject into (layer_name, title).
 
-    Format: "<layer_name> | <title>"
-    Title defaults to "Photo submission" if absent.
+    Format: "<layer_name>: <title>"
+    If no colon is present, the entire subject is used as the title
+    and the layer defaults to "poi".
     """
-    parts = subject.split("|", 1)
-    layer_name = parts[0].strip().lower()
-    title = parts[1].strip() if len(parts) > 1 and parts[1].strip() else "Photo submission"
+    if ":" in subject:
+        layer_name, _, title = subject.partition(":")
+        layer_name = layer_name.strip().lower()
+        title = title.strip() or "Photo submission"
+    else:
+        layer_name = "poi"
+        title = subject.strip() or "Photo submission"
     return layer_name, title
 
 
