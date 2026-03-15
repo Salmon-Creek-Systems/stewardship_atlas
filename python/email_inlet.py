@@ -86,6 +86,7 @@ def build_feature(lat: float, lon: float, title: str, sender: str,
         "source": "email",
         "sender": sender,
         "image_url": image_url,
+        "URL": image_url,
     }
     if extra_props:
         properties.update(extra_props)
