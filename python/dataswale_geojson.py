@@ -17,6 +17,7 @@ logger.setLevel(logging.INFO)
 from pathlib import Path
 
 import versioning
+import utils
 
 def create(config) -> str:
     pass
@@ -111,7 +112,7 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     logger.info(f"Writing to {layer_path}")
     
     with versioning.atlas_file(layer_path, 'wt') as outfile:
-        geojson.dump(fc, outfile)
+        geojson.dump(fc, outfile, default=utils.json_serial)
     return layer_path
 
 

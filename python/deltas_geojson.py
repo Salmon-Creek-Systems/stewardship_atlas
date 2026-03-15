@@ -28,6 +28,7 @@ import duckdb
 
 import versioning
 import eddies
+import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -175,7 +176,7 @@ def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
         for row in res.fetchall()
     ]
 
-    geojson.dump(geojson.FeatureCollection(surviving), open(layer_filepath, "w"))
+    geojson.dump(geojson.FeatureCollection(surviving), open(layer_filepath, "w"), default=utils.json_serial)
     logger.info(f"Delete delta removed features; {len(surviving)} remaining in {layer_filepath}")
 
     moved_path = delta_filepath.parent / "work" / delta_filepath.name

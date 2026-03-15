@@ -1,6 +1,21 @@
 
 import logging, subprocess, json, copy
+from datetime import datetime, date
+from pathlib import Path
 import gspread, geojson
+
+
+def json_serial(obj):
+    """JSON default handler for types not natively serializable.
+    Covers datetime/date (from DuckDB) and Path objects.
+    Use as: json.dumps(data, default=json_serial)
+         or: geojson.dump(fc, f, default=json_serial)
+    """
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 # Configure logging
 logger = logging.getLogger(__name__)

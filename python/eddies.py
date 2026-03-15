@@ -187,11 +187,7 @@ def centroid_gdal(config:Dict[str, Any], eddy_name:str):
 
 
 
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default."""
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise TypeError(f"Type {type(obj)} not serializable")
+json_serial = utils.json_serial  # shared serializer — handles datetime, date, Path
 
 
 def delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", anno_in_path: Path = None, updated_properties: List[str] = []):
