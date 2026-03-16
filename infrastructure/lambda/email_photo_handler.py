@@ -73,6 +73,9 @@ def handler(event, context):
         logger.info("No image attachment found — skipping")
         return
 
+    logger.info(f"Subject: {subject}")
+    logger.info(f"From: {sender}")
+
     payload = {
         "subject": subject,
         "sender": sender,

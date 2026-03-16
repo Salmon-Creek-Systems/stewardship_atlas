@@ -718,6 +718,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             "layer": layer_name,
             "lat": gps["lat"],
             "lon": gps["lon"],
+            "image_url": image_url,
         }
 
     except HTTPException:

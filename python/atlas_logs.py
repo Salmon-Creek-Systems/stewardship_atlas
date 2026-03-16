@@ -33,7 +33,8 @@ def _parse_invocations(events):
         if msg.startswith("START RequestId:"):
             rid = msg.split()[2]
             current = {"request_id": rid, "start_ms": ts_ms, "end_ms": None,
-                       "s3_key": None, "webapp_response": None, "status": "in-progress"}
+                       "s3_key": None, "subject": None, "sender": None,
+                       "webapp_response": None, "status": "in-progress"}
             invocations.append(current)
 
         if current is None:
@@ -42,6 +43,14 @@ def _parse_invocations(events):
         m = re.search(r"Processing s3://[^/]+/(\S+)", msg)
         if m:
             current["s3_key"] = m.group(1)
+
+        m = re.search(r"Subject: (.+)", msg)
+        if m:
+            current["subject"] = m.group(1).strip()
+
+        m = re.search(r"From: (.+)", msg)
+        if m:
+            current["sender"] = m.group(1).strip()
 
         m = re.search(r"Webapp response: (\d+) (.+)", msg)
         if m:
@@ -102,6 +111,7 @@ def format_as_use_cases(invocations):
     if not invocations:
         return [{"name": "Email inlet: no log data available (check CloudWatch permissions)", "cases": []}]
 
+    import json as _json
     entries = []
     for inv in invocations:
         icon = "✓" if inv["status"] == "success" else "✗"
@@ -110,21 +120,33 @@ def format_as_use_cases(invocations):
             f"{(inv['end_ms'] - inv['start_ms']) / 1000:.1f}s"
             if inv["end_ms"] and inv["start_ms"] else "?"
         )
+
+        subject = inv.get("subject") or "?"
+        sender = inv.get("sender") or "?"
+        # Shorten "Display Name <email>" to just the email
+        if "<" in sender:
+            sender = sender.split("<")[1].rstrip(">")
+
+        image_url = None
         if inv["webapp_response"]:
             code, body = inv["webapp_response"]
-            import json as _json
             try:
-                detail = _json.loads(body).get("detail", body)
+                parsed = _json.loads(body)
+                detail = parsed.get("detail", body)
+                image_url = parsed.get("image_url")
             except Exception:
                 detail = body[:80]
             detail_str = f"HTTP {code} — {detail}"
         else:
             detail_str = "Lambda error (no webapp response)"
 
-        key_short = (inv["s3_key"] or "")[-20:] if inv["s3_key"] else "?"
+        cases = []
+        if image_url:
+            cases.append({"name": "View photo", "uri": image_url})
+
         entries.append({
-            "name": f"{icon} {start} ({duration}) …{key_short} — {detail_str}",
-            "cases": []
+            "name": f"{icon} {start} ({duration}) — {sender} — {subject} — {detail_str}",
+            "cases": cases
         })
 
     return entries
