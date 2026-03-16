@@ -649,24 +649,32 @@ class EmailPhotoPayload(BaseModel):
     received_at: str
 
 
-def _send_bounce(from_addr: str, to_addr: str, subject: str, body: str):
-    """Send a bounce/notification email via SES. Silently logs on failure."""
+def _send_bounce(from_addr: str, to_addrs, subject: str, body: str):
+    """Send a bounce/notification email via SES. Silently logs on failure.
+
+    to_addrs may be a single address string or a list of address strings.
+    Handles "Name <email>" format automatically.
+    """
+    def extract(addr):
+        addr = addr.strip()
+        return addr.split("<")[1].rstrip(">") if "<" in addr else addr
+
+    if isinstance(to_addrs, str):
+        to_addrs = [to_addrs]
+    recipients = [extract(a) for a in to_addrs if a]
+
     try:
         import boto3 as _boto3
         ses = _boto3.client("ses", region_name="us-east-1")
-        # Extract plain email from "Name <email>" format
-        to_plain = to_addr.strip()
-        if "<" in to_plain:
-            to_plain = to_plain.split("<")[1].rstrip(">")
         ses.send_email(
             Source=from_addr,
-            Destination={"ToAddresses": [to_plain]},
+            Destination={"ToAddresses": recipients},
             Message={
                 "Subject": {"Data": subject},
                 "Body": {"Text": {"Data": body}},
             },
         )
-        logging.info(f"Bounce sent to {to_plain}")
+        logging.info(f"Bounce sent to {recipients}")
     except Exception as e:
         logging.warning(f"Could not send bounce email: {e}")
 
@@ -706,7 +714,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             atlas_addr = f"{payload.atlas_name}@fireatlas.org"
             _send_bounce(
                 from_addr=atlas_addr,
-                to_addr=payload.sender,
+                to_addrs=[payload.sender] + admin_emails,
                 subject=f"Re: {payload.subject or '(no subject)'}",
                 body=(
                     f"Hi,\n\n"
