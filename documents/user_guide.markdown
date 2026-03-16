@@ -430,21 +430,38 @@ Only addresses listed in `admin_emails` in the atlas configuration are accepted.
 
 New submissions from that address will be accepted immediately after the config rebuild.
 
-### Reprocessing a Stuck Email
+### Inspecting and Reprocessing Stuck Emails
 
-If an email failed (e.g. sender was not yet authorised, or GPS was missing and you want to test again), the raw email stays in the S3 ingress bucket. Use `reprocess_email.py` to retrigger the Lambda:
+If an email failed, the raw email stays in the S3 ingress bucket. Use `reprocess_email.py` to list, inspect, and retrigger stuck emails:
 
 ```bash
 # See what's currently stuck in the ingress bucket
 python scripts/reprocess_email.py --list --profile atlas
 
+# Inspect a specific email — shows sender, subject, and whether GPS data is present
+python scripts/reprocess_email.py --inspect incoming/63hfbll9b84j2... --profile atlas
+
 # Retrigger a specific email by its S3 key
 python scripts/reprocess_email.py incoming/63hfbll9b84j2... --profile atlas
 ```
 
+The `--inspect` option downloads the raw email from S3 and shows:
+- **From / Subject / To** — confirms what was actually sent
+- **Camera make and model** — useful to verify it came from an iPhone vs another device
+- **GPS status** — whether GPS coordinates are present in the image EXIF, with coordinates if found
+
+Example output for a photo missing GPS data:
+```
+  From:    "Stinkin' Feathers" <planephun@gmail.com>
+  Subject: (empty)
+  Camera:  Apple iPhone 15 Pro
+  GPS:     ✗  No GPS data in EXIF — submission will fail.
+           Check iOS Settings → Privacy → Location Services → Camera.
+```
+
 Reprocessing copies the S3 object with a metadata change, which fires a new `ObjectCreated` event and causes the Lambda to run through the full pipeline again. Check the Technical Console after a few seconds to confirm the result.
 
-Note: if the original failure was due to missing GPS EXIF data, reprocessing the same email will fail again for the same reason — the photo itself needs to be resent with location services enabled.
+**Note:** if the original failure was due to missing GPS EXIF data, reprocessing the same email will fail again — the photo itself needs to be resent with location services enabled. GPS is stripped from the image when iOS Camera does not have location permission, which is set in **iOS Settings → Privacy & Security → Location Services → Camera** (should be "While Using").
 
 ### Updates and Maintenance
 
