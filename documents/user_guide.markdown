@@ -136,27 +136,46 @@ See detailed instructions: [Editing Guide](help/draw_vector.md)
 The fastest way to add a point to the atlas from the field is to email a geotagged photo directly from your smartphone. No browser, no login — just take the photo and send it.
 
 **Requirements:**
-- Location services must be enabled in your phone's camera app
+- Location services must be enabled in your phone's camera app (see below)
 - Your email address must be on the atlas admin list
 
 **How it works:**
 1. Take a photo outdoors so your phone has a GPS fix
 2. Email it to the atlas address (e.g. `scvfd@fireatlas.org`) with the photo as an attachment
-3. Format your subject line as `<layer> | <title>`:
-   - `poi | Locked gate on Miller Road`
-   - `hydrants | New hydrant at Ridgeline staging area`
-   - `private_notes | Erosion on north slope, check after rain`
+3. Write a subject line describing what you're documenting:
+   - `Locked gate on Miller Road` — goes to the default `poi` layer
+   - `hydrants: New hydrant at Ridgeline staging area` — goes to the `hydrants` layer
+   - `private_notes: Erosion on north slope, check after rain` — goes to `private_notes`
 4. Send — the feature appears on the map within a minute or two
 
-The system extracts the GPS coordinates from the photo's EXIF data, creates a point feature in the layer you named, and stores the photo itself with a link from the feature. You can click the feature on the map to see the photo.
+The system extracts the GPS coordinates from the photo's EXIF data, creates a point feature in the layer you named, and stores the photo itself with a link from the feature. You can click the feature on the map to see the photo (modifier-click on desktop, or the feature popup on mobile).
+
+**If something goes wrong:** You will receive an automatic reply from the atlas address explaining what happened. The atlas administrators are also notified. Common issues are described below.
 
 **Tips:**
 - Take photos outdoors with a clear sky for the best GPS accuracy
-- The default iPhone and Android mail apps preserve GPS data in attachments; some third-party apps strip it
-- Layer names are case-insensitive; `POI` and `poi` both work
-- If you omit the `|` and title, the feature is created with the title "Photo submission"
+- The default iPhone and Android mail apps preserve GPS data in attachments; some third-party apps (e.g. WhatsApp, Slack) strip it — attach directly from the Photos app or Camera Roll
+- Layer names in the subject are case-insensitive; `POI` and `poi` both work
+- If you omit the colon and layer name, the feature goes to `poi` automatically
 
-See: [Email Photo Submission](help/email_photo_submission.md)
+#### Making sure your phone has location services enabled
+
+The most common reason a photo submission fails is that the Camera app does not have permission to record your location. This can happen silently — the photo looks normal, but has no GPS coordinates embedded in it.
+
+**How to check on iPhone:**
+1. Open **Settings → Privacy & Security → Location Services**
+2. Scroll down to **Camera** and tap it
+3. It should say **While Using** — if it says Never or Ask Next Time, tap to change it
+
+**How to tell before you send:**
+- Open the photo in the **Photos app** and swipe up (or tap the info icon ⓘ). If a map thumbnail appears showing where the photo was taken, GPS is present.
+- If no map appears, the photo has no location data and the submission will fail.
+
+**Android:**
+- Go to **Settings → Apps → Camera → Permissions → Location** and ensure it is set to "Allow while using the app"
+- Similarly, open the photo in Google Photos and check if a location is shown in the details
+
+If location was off when you took the photo, you'll need to retake it with location enabled — there is no way to add GPS data to an existing photo after the fact.
 
 ---
 
