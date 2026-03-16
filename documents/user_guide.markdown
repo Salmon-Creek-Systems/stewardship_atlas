@@ -412,6 +412,40 @@ Atlas: scvfd  |  Region: us-east-1  |  Profile: atlas
 
 If an email never reached S3 at all (e.g. sent to the wrong address at the right domain), the script cannot currently diagnose that — it will only show that nothing arrived. More detailed SES receipt logging is planned (see [GitHub issue #17](https://github.com/Salmon-Creek-Systems/stewardship_atlas/issues/17)).
 
+### Live Email Log in the Technical Console
+
+The **Technical Console** (accessible to admin users) shows a live view of recent email submissions in its main panel. The panel fetches the latest log data each time the page loads — no regeneration needed. Each entry shows the sender, subject, processing status, duration, and a direct link to the stored photo if the submission succeeded.
+
+This is the quickest way to monitor incoming photos day-to-day without running a command-line script.
+
+### Adding a New Authorised Sender
+
+Only addresses listed in `admin_emails` in the atlas configuration are accepted. To add a new sender:
+
+1. Add the email address to `admin_emails` in `configuration/{atlas}.geojson`
+2. Commit and push, then pull on the server and rebuild the atlas config:
+   ```bash
+   python scripts/build_atlas.py config_only
+   ```
+
+New submissions from that address will be accepted immediately after the config rebuild.
+
+### Reprocessing a Stuck Email
+
+If an email failed (e.g. sender was not yet authorised, or GPS was missing and you want to test again), the raw email stays in the S3 ingress bucket. Use `reprocess_email.py` to retrigger the Lambda:
+
+```bash
+# See what's currently stuck in the ingress bucket
+python scripts/reprocess_email.py --list --profile atlas
+
+# Retrigger a specific email by its S3 key
+python scripts/reprocess_email.py incoming/63hfbll9b84j2... --profile atlas
+```
+
+Reprocessing copies the S3 object with a metadata change, which fires a new `ObjectCreated` event and causes the Lambda to run through the full pipeline again. Check the Technical Console after a few seconds to confirm the result.
+
+Note: if the original failure was due to missing GPS EXIF data, reprocessing the same email will fail again for the same reason — the photo itself needs to be resent with location services enabled.
+
 ### Updates and Maintenance
 
 Your atlas administrator handles:
