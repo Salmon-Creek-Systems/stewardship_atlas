@@ -2195,18 +2195,25 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     user_cases.append( {"name": "All Users", "cases": [ {'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in use_cases.keys()]})
     logger.info(f"Generated User Cases: {user_cases}")
          
-    # Generate technical view
+    # Generate technical view — main panel shows live email inlet log
+    try:
+        import atlas_logs
+        log_use_cases = atlas_logs.format_as_use_cases(atlas_logs.fetch_email_invocations())
+    except Exception as e:
+        logger.warning(f"Could not fetch log for technical console: {e}")
+        log_use_cases = [{"name": "Log not available", "cases": []}]
+
     technical_html = make_console_html(
         config,
         console_type='TECHNICAL',
-        panel_header = 'Layer operations and Access',        
-        displayed_interfaces=technical_interfaces, 
-        displayed_downloads=admin_downloads, 
-        displayed_inlets=admin_layers,
-        spreadsheets = config['spreadsheets'],
-        displayed_versions=[str(v)for v in config.get('dataswale', {}).get('versions', [])],
+        panel_header='Email Inlet Log',
+        displayed_interfaces=technical_interfaces,
+        displayed_downloads=admin_downloads,
+        displayed_inlets=[],
+        spreadsheets=config['spreadsheets'],
+        displayed_versions=[str(v) for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=[]
+        use_cases=log_use_cases
     )
 
     tech_path = outpath / "technical"

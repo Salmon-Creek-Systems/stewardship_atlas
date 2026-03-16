@@ -36,6 +36,7 @@ import versioning
 import deltas_geojson
 import vector_inlets
 import email_inlet
+import atlas_logs
 app = FastAPI()
 logger.logger.setLevel(0)
 
@@ -646,6 +647,13 @@ class EmailPhotoPayload(BaseModel):
     image_data: str       # base64-encoded image bytes
     filename: str
     received_at: str
+
+
+@app.get("/log/{swalename}")
+async def get_log(swalename: str, n: int = 3):
+    """Return recent pipeline log entries as use_cases for the technical console."""
+    invocations = atlas_logs.fetch_email_invocations(n=n)
+    return {"useCases": atlas_logs.format_as_use_cases(invocations)}
 
 
 @app.post("/ingest/email_photo")

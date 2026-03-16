@@ -56,6 +56,12 @@ class EmailPhotoStack(Stack):
         # Grant EC2 webapp role write access to image storage
         data_bucket.grant_put(ec2_role)
 
+        # Grant EC2 webapp role read access to CloudWatch Logs (for /log endpoint)
+        ec2_role.add_to_policy(iam.PolicyStatement(
+            actions=["logs:DescribeLogStreams", "logs:GetLogEvents"],
+            resources=[f"arn:aws:logs:*:*:log-group:/aws/lambda/atlas-email-photo-handler:*"],
+        ))
+
         # --- S3 ingress bucket ---
         ingress_bucket = s3.Bucket(
             self, "AtlasIngressBucket",
