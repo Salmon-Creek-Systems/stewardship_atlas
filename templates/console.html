@@ -116,13 +116,14 @@
             }
 
             // Setup use cases
-            if (data.useCases && data.useCases.length > 0) {
+            function renderUseCases(useCases) {
                 const useCasesList = document.getElementById('usecases-list');
-                data.useCases.forEach(usr => {
+                useCasesList.innerHTML = '';
+                useCases.forEach(usr => {
                     const li = document.createElement('li');
                     li.textContent = usr.name;
                     const casesList = document.createElement('ul');
-                    usr.cases.forEach(ucase => {
+                    (usr.cases || []).forEach(ucase => {
                         const icli = document.createElement('li');
                         const ica = document.createElement('a');
                         ica.href = ucase.uri;
@@ -133,6 +134,18 @@
                     li.appendChild(casesList);
                     useCasesList.appendChild(li);
                 });
+            }
+            if (data.useCases && data.useCases.length > 0) {
+                renderUseCases(data.useCases);
+            }
+
+            // For the technical console, fetch live log data on load
+            if (data.consoleType === 'TECHNICAL') {
+                document.getElementById('usecases-list').innerHTML = '<li>Loading log…</li>';
+                fetch(`${baseurl}:${atlasappport}/log/${swalename}`)
+                    .then(r => r.json())
+                    .then(d => { if (d.useCases) renderUseCases(d.useCases); })
+                    .catch(() => renderUseCases([{name: 'Log unavailable', cases: []}]));
             }
 
             // Setup layers
