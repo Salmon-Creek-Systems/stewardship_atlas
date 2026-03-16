@@ -649,6 +649,28 @@ class EmailPhotoPayload(BaseModel):
     received_at: str
 
 
+def _send_bounce(from_addr: str, to_addr: str, subject: str, body: str):
+    """Send a bounce/notification email via SES. Silently logs on failure."""
+    try:
+        import boto3 as _boto3
+        ses = _boto3.client("ses", region_name="us-east-1")
+        # Extract plain email from "Name <email>" format
+        to_plain = to_addr.strip()
+        if "<" in to_plain:
+            to_plain = to_plain.split("<")[1].rstrip(">")
+        ses.send_email(
+            Source=from_addr,
+            Destination={"ToAddresses": [to_plain]},
+            Message={
+                "Subject": {"Data": subject},
+                "Body": {"Text": {"Data": body}},
+            },
+        )
+        logging.info(f"Bounce sent to {to_plain}")
+    except Exception as e:
+        logging.warning(f"Could not send bounce email: {e}")
+
+
 @app.get("/log/{swalename}")
 async def get_log(swalename: str, n: int = 3):
     """Return recent pipeline log entries as use_cases for the technical console."""
@@ -681,6 +703,21 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         image_bytes = base64.b64decode(payload.image_data)
         gps = email_inlet.extract_gps(image_bytes)
         if gps is None:
+            atlas_addr = f"{payload.atlas_name}@fireatlas.org"
+            _send_bounce(
+                from_addr=atlas_addr,
+                to_addr=payload.sender,
+                subject=f"Re: {payload.subject or '(no subject)'}",
+                body=(
+                    f"Hi,\n\n"
+                    f"Your photo was received but could not be added to the atlas because "
+                    f"it doesn't contain GPS location data.\n\n"
+                    f"To fix this, please enable location access for the Camera app:\n"
+                    f"  iOS: Settings → Privacy & Security → Location Services → Camera → While Using\n\n"
+                    f"Once enabled, retake the photo and resend it to {atlas_addr}.\n\n"
+                    f"— {payload.atlas_name} Atlas"
+                ),
+            )
             raise HTTPException(status_code=400, detail="No GPS data found in image EXIF")
 
         # Upload image to S3

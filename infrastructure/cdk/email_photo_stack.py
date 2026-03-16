@@ -62,6 +62,12 @@ class EmailPhotoStack(Stack):
             resources=[f"arn:aws:logs:*:*:log-group:/aws/lambda/atlas-email-photo-handler:*"],
         ))
 
+        # Grant EC2 webapp role permission to send bounce emails via SES
+        ec2_role.add_to_policy(iam.PolicyStatement(
+            actions=["ses:SendEmail", "ses:SendRawEmail"],
+            resources=["*"],
+        ))
+
         # --- S3 ingress bucket ---
         ingress_bucket = s3.Bucket(
             self, "AtlasIngressBucket",
