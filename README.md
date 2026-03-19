@@ -18,6 +18,39 @@ Stewardship Atlas is an open platform for building and maintaining place-based g
 
 **Regional aggregation and planning** — A county agency, regional planning body, or multi-org network can pull together data from multiple contributing organizations into a unified, current picture that no single contributor maintains alone.
 
+## Requirements and Optional Dependencies
+
+**Requirements**
+
+- Python 3.10+
+- `geojson`, `shapely`, `requests`
+
+**Optional dependencies**
+
+Install only what your use case needs.
+
+| Capability | Dependency |
+|---|---|
+| Web API | `fastapi`, `uvicorn` |
+| Spatial queries and joins | `duckdb` |
+| GeoDataFrame operations | `geopandas` |
+| OpenStreetMap inlets | `overpass` |
+| Raster processing and tile generation | GDAL (`gdal_translate`, `gdalwarp`, `gdal2tiles`) |
+| Cloud raster sources (STAC / Planetary Computer) | `pystac-client`, `planetary-computer`, `mercantile` |
+| Print atlas and PDF generation | QGIS with PyQGIS |
+| Advanced spatial analysis | GRASS GIS |
+| Image processing (map sprites) | `Pillow` |
+| AWS cloud deployment | `boto3`, AWS account |
+
+**Experimental and edge cases**
+
+These integrations exist in the codebase or are planned but are not part of the standard workflow:
+
+- **Mapnik** — alternative map rendering pipeline (partial implementation)
+- **Leaflet** — alternative to the default MapLibre webmap outlet
+- **PostGIS** — relational spatial backend, as an alternative to file-based GeoJSON storage
+- **Apache Sedona** — distributed spatial processing for large-scale datasets
+
 ## Documentation
 
 - [User Guide](documents/user_guide.md)
