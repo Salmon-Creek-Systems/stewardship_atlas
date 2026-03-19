@@ -269,6 +269,30 @@ ul {
   border-radius: 3px;
 }
 
+/* ── Embedded asset iframes (public console) ─────── */
+
+#webmap-embed,
+#gazetteer-embed {
+  display: none;
+  margin-bottom: 20px;
+}
+
+.embed-iframe {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: block;
+}
+
+.webmap-iframe {
+  height: 65vh;
+  min-height: 400px;
+}
+
+.gazetteer-iframe {
+  height: 350px;
+}
+
 /* ── Help popup (scoped — shared with webmap) ────── */
 
 .help-popup {

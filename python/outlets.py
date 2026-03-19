@@ -1885,16 +1885,17 @@ def make_root_html(root_path_str):
 
 def make_console_html(config,
                       displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
-                      admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[]):
+                      admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[],
+                      webmap_available=False, gazetteer_available=False):
     """Generate HTML for the console interface."""
     logger.info(f"Making Console for {console_type}...")
-    
+
     # Read the template file
     template_dir = versioning.atlas_path(config, version='app') / 'templates'
     template_path = Path(template_dir / 'console.html')
     with open(template_path, 'r') as f:
         template = f.read()
-    
+
     # Prepare the data for the template
     data = {
         'version_string': config.get('version_string', 'staging'),
@@ -1909,7 +1910,9 @@ def make_console_html(config,
         'downloads': displayed_downloads,
         'useCases': use_cases,
         'spreadsheets': spreadsheets,
-        'layers': displayed_inlets
+        'layers': displayed_inlets,
+        'webmapAvailable': webmap_available,
+        'gazetteerAvailable': gazetteer_available,
     }
     
     # Insert the data initialization script
@@ -2256,16 +2259,22 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     logger.debug(f"Wrote internal view to: {internal_path}")
         
     # Generate public view
+    outlets_path = versioning.atlas_path(config, 'outlets')
+    webmap_available = (outlets_path / 'webmap' / 'index.html').exists()
+    gazetteer_available = (outlets_path / 'gazetteer' / 'index.html').exists()
+
     public_html = make_console_html(
         config,
         console_type='PUBLIC',
-        panel_header = 'Help and How-to',
-        displayed_interfaces=public_interfaces, 
-        displayed_downloads=public_downloads, 
-        displayed_inlets=[], 
+        panel_header='',
+        displayed_interfaces=public_interfaces,
+        displayed_downloads=public_downloads,
+        displayed_inlets=[],
         displayed_versions=[],
         use_cases=[],
-        admin_controls=[("Internal", "internal.html")]
+        admin_controls=[("Internal", "internal.html")],
+        webmap_available=webmap_available,
+        gazetteer_available=gazetteer_available,
     )
     
     public_path = outpath / "public"
