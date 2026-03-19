@@ -79,6 +79,7 @@
 
             // Embed webmap if materialized
             if (data.webmapAvailable) {
+                document.getElementById('layers-section').classList.add('has-webmap');
                 const webmapDiv = document.getElementById('webmap-embed');
                 const iframe = document.createElement('iframe');
                 iframe.src = '../../webmap/';
