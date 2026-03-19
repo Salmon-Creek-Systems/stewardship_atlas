@@ -271,8 +271,7 @@ ul {
 
 /* ── Embedded asset iframes (public console) ─────── */
 
-#webmap-embed,
-#gazetteer-embed {
+#webmap-embed {
   display: none;
 }
 
@@ -286,19 +285,10 @@ ul {
   height: calc(100vh - var(--topbar-height));
 }
 
-.gazetteer-iframe {
-  height: 350px;
-}
-
 /* When webmap is present, main content fills the viewport and has no padding */
 .main-content.has-webmap {
   padding: 0;
   overflow-y: auto;
-}
-
-/* Restore padding around the gazetteer section */
-.main-content.has-webmap #gazetteer-embed {
-  padding: 16px 22px 0;
 }
 
 /* ── Help popup (scoped — shared with webmap) ────── */

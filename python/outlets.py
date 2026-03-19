@@ -1886,7 +1886,7 @@ def make_root_html(root_path_str):
 def make_console_html(config,
                       displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
                       admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[],
-                      webmap_available=False, gazetteer_available=False):
+                      webmap_available=False):
     """Generate HTML for the console interface."""
     logger.info(f"Making Console for {console_type}...")
 
@@ -1912,7 +1912,6 @@ def make_console_html(config,
         'spreadsheets': spreadsheets,
         'layers': displayed_inlets,
         'webmapAvailable': webmap_available,
-        'gazetteerAvailable': gazetteer_available,
     }
     
     # Insert the data initialization script
@@ -2261,7 +2260,6 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     # Generate public view
     outlets_path = versioning.atlas_path(config, 'outlets')
     webmap_available = (outlets_path / 'webmap' / 'index.html').exists()
-    gazetteer_available = (outlets_path / 'gazetteer' / 'index.html').exists()
 
     public_html = make_console_html(
         config,
@@ -2274,7 +2272,6 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         use_cases=[],
         admin_controls=[("Internal", "internal.html")],
         webmap_available=webmap_available,
-        gazetteer_available=gazetteer_available,
     )
     
     public_path = outpath / "public"

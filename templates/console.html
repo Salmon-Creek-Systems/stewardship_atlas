@@ -54,7 +54,6 @@
         <main class="main-content" id="layers-section">
             <h2 id="panel-header">...</h2>
             <div id="webmap-embed"></div>
-            <div id="gazetteer-embed"></div>
             <ul id="layers-list"></ul>
             <ul id="usecases-list"></ul>
         </main>
@@ -89,16 +88,6 @@
                 webmapDiv.style.display = 'block';
             }
 
-            // Embed gazetteer index if materialized
-            if (data.gazetteerAvailable) {
-                const gazDiv = document.getElementById('gazetteer-embed');
-                const iframe = document.createElement('iframe');
-                iframe.src = '../../gazetteer/';
-                iframe.className = 'embed-iframe gazetteer-iframe';
-                iframe.title = 'Gazetteer Index';
-                gazDiv.appendChild(iframe);
-                gazDiv.style.display = 'block';
-            }
 
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
