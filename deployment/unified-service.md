@@ -38,7 +38,8 @@ nginx -t && nginx -s reload
 ```bash
 screen -S app_unified
 cd /root/swales_dev/app/python
-SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
+export SWALES_ROOT=/root/swales_dev
+export ATLAS_DATA_BUCKET=scs-atlas-data
 uvicorn --port 9000 --host 0.0.0.0 webapp:app \
   --ssl-certfile /etc/letsencrypt/live/fireatlas.org/fullchain.pem \
   --ssl-keyfile /etc/letsencrypt/live/fireatlas.org/privkey.pem
