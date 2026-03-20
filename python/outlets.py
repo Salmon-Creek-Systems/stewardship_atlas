@@ -398,10 +398,14 @@ void await map.loadImage('{im_uri}',
 
 """.format(**locals())
     
-    # Build app URL for API calls
-    base_url = config.get('base_url', 'http://localhost')
-    app_port = config.get('atlasappport', 9997)
-    app_url = f"{base_url}:{app_port}"
+    # Build app URL for API calls — use config['app_url'] if present (set at atlas creation),
+    # otherwise fall back to reconstructing from base_url + port for legacy configs.
+    if 'app_url' in config:
+        app_url = config['app_url']
+    else:
+        base_url = config.get('base_url', 'http://localhost')
+        app_port = config.get('atlasappport', 9997)
+        app_url = f"{base_url}:{app_port}"
     
     processed_template = template.format(
             title=title,
