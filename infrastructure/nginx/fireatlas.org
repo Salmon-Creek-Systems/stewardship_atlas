@@ -96,8 +96,8 @@ server {
     return 301 https://fireatlas.org/$atlas$request_uri;
 
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/wildcard.fireatlas.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/wildcard.fireatlas.org/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
