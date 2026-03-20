@@ -2334,6 +2334,7 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     # Replace placeholders
     template = template.replace('{atlas_name}', config['name'])
     template = template.replace('{tables_list}', tables_list)
+    template = template.replace('{app_url}', config.get('app_url', config.get('base_url', 'http://localhost')))
     
     # Write processed template
     with open(outpath / 'index.html', 'w') as f:

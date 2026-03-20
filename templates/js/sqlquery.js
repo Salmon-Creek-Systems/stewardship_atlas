@@ -24,9 +24,10 @@ async function executeQuery() {
     const resultsDiv = document.getElementById("results");
     const format = document.getElementById("format").value;
     const atlasName = document.querySelector('.container').dataset.atlasName;
-    
+    const appUrl = document.querySelector('.container').dataset.appUrl;
+
     try {
-        const response = await fetch(`${window.location.origin}/sql_query/${atlasName}`, {
+        const response = await fetch(`${appUrl}/sql_query/${atlasName}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
