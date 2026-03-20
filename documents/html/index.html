@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Atlas</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-image: url('/bearbutte1.jpeg');
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, Helvetica, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .card {
+            background: rgba(10, 20, 10, 0.82);
+            color: #e8e8e0;
+            border-radius: 6px;
+            padding: 2.5rem 3rem;
+            max-width: 680px;
+            width: 100%;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+        }
+
+        .card h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #d4e8c2;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.3rem;
+        }
+
+        .card .tagline {
+            font-size: 0.85rem;
+            color: #8aaa70;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 1.6rem;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid rgba(140, 170, 100, 0.3);
+            margin-bottom: 1.6rem;
+        }
+
+        .summary {
+            font-size: 0.95rem;
+            line-height: 1.65;
+            color: #ccccc0;
+            margin-bottom: 2rem;
+        }
+
+        .summary p + p {
+            margin-top: 0.9rem;
+        }
+
+        .section-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: #8aaa70;
+            margin-bottom: 0.7rem;
+        }
+
+        .atlas-list {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .atlas-list li {
+            margin-bottom: 0.4rem;
+        }
+
+        .atlas-list a {
+            display: flex;
+            align-items: baseline;
+            gap: 0.6rem;
+            color: #d4e8c2;
+            text-decoration: none;
+            font-size: 0.95rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 3px;
+            transition: background 0.15s;
+        }
+
+        .atlas-list a:hover {
+            background: rgba(140, 180, 100, 0.12);
+        }
+
+        .atlas-list .org {
+            font-weight: 600;
+        }
+
+        .atlas-list .loc {
+            font-size: 0.8rem;
+            color: #8aaa70;
+        }
+
+        .links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .links a {
+            color: #8aaa70;
+            text-decoration: none;
+            font-size: 0.82rem;
+            border: 1px solid rgba(140, 170, 100, 0.3);
+            padding: 0.3rem 0.7rem;
+            border-radius: 3px;
+            transition: border-color 0.15s, color 0.15s;
+        }
+
+        .links a:hover {
+            color: #d4e8c2;
+            border-color: rgba(140, 170, 100, 0.7);
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            color: #5a6a50;
+        }
+
+        .footer a {
+            color: #6a7a60;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            color: #8aaa70;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Fire Atlas</h1>
+        <div class="tagline">community &middot; fire resilience &middot; geospatial</div>
+        <hr>
+
+        <div class="summary">
+            <p>
+                Fire Atlas is a geospatial platform for volunteer fire departments and fire safe councils.
+                It combines public data sources, community-maintained records, and field-collected information
+                into a single, managed atlas — roads, structures, water sources, access points, and
+                land features — kept current by the people who know the ground.
+            </p>
+            <p>
+                Field crews access maps from a phone browser with no app required.
+                Administrators manage data layers, run print atlases for rigs and command, and
+                share verified data with partner agencies. During an active incident, an up-to-date
+                atlas is the situational awareness layer that day-to-day data maintenance makes possible.
+            </p>
+        </div>
+
+        <div class="section-label">Active atlases</div>
+        <ul class="atlas-list">
+            <li>
+                <a href="/scvfd/">
+                    <span class="org">Salmon Creek VFD</span>
+                    <span class="loc">Salmon Creek, CA</span>
+                </a>
+            </li>
+            <li>
+                <a href="/kennedy/">
+                    <span class="org">Kennedy</span>
+                    <span class="loc">Northern California</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wvfd.fireatlas.org/">
+                    <span class="org">Westport VFD</span>
+                    <span class="loc">Westport, CA</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="section-label">Resources</div>
+        <div class="links">
+            <a href="https://github.com/Salmon-Creek-Systems/stewardship_atlas">Source</a>
+            <a href="https://github.com/Salmon-Creek-Systems/stewardship_atlas/blob/main/documents/user_guide.md">User Guide</a>
+            <a href="/scvfd/staging/outlets/html/admin/help/">Help</a>
+            <a href="https://salmoncreeksystems.com">Salmon Creek Systems</a>
+        </div>
+
+        <div class="footer">
+            Built by <a href="https://salmoncreeksystems.com">Salmon Creek Systems</a>
+        </div>
+    </div>
+</body>
+</html>

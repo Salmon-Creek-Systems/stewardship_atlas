@@ -32,9 +32,10 @@ server {
     # fireatlas.org/{atlas}/staging/outlets/html/public → /root/swales_dev/{atlas}/staging/...
     root /root/swales_dev;
 
-    # Default redirect: apex → a landing page (update once a landing page exists)
+    # Landing page served from the shared app checkout
     location = / {
-        return 302 https://fireatlas.org/scvfd/staging/outlets/html/public;
+        alias /root/swales_dev/app/documents/html/;
+        index index.html;
     }
 
     # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/html/public
