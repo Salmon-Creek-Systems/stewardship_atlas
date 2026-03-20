@@ -18,21 +18,8 @@ import base64
 import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
 
-# Multi-atlas mode: set SWALES_ROOT to the root directory containing all atlas directories.
-# Single-atlas (legacy) mode: set DATASWALE_PATH to one atlas directory; SWALES_ROOT is inferred.
-DATASWALE_PATH = os.environ.get('DATASWALE_PATH')
-SWALES_ROOT = os.environ.get('SWALES_ROOT')
-
-if SWALES_ROOT:
-    # Multi-atlas mode: all atlases share this process, code loaded from working directory
-    print(f"Multi-atlas mode: serving all atlases from {SWALES_ROOT}")
-elif DATASWALE_PATH:
-    # Single-atlas legacy mode: add per-atlas code copy to path
-    print(f"Single-atlas mode: loading dataswale in {DATASWALE_PATH}")
-    sys.path.insert(0, f"{DATASWALE_PATH}/app/python")
-    SWALES_ROOT = str(Path(DATASWALE_PATH).parent)
-else:
-    raise RuntimeError("Either SWALES_ROOT or DATASWALE_PATH environment variable must be set")
+SWALES_ROOT = os.environ['SWALES_ROOT']
+print(f"Serving all atlases from {SWALES_ROOT}")
 
 # Boring Imports
 import sys, os, subprocess, time, json, string, random, math
