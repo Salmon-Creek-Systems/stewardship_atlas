@@ -187,7 +187,13 @@ def create_config(config: Dict[str, Any] = None,
         assets = assets or {}
     
     config['spreadsheets'] = {}
-    
+
+    # In unified mode there is one shared app/ checkout at {data_root}/app/.
+    # Create the symlink now so shared config JSONs can be found below.
+    p.mkdir(parents=True, exist_ok=True)
+    if not (p / 'app').exists() and (Path(data_root) / 'app').exists():
+        (p / 'app').symlink_to(Path(data_root) / 'app', target_is_directory=True)
+
     # Load asset and layer core/shared definitions
     shared_config_dir = p / 'app' / 'configuration'
     inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
@@ -301,10 +307,6 @@ def create(config: Dict[str, Any] = None,
     if not (p / 'CURRENT').is_symlink():
         (p / 'CURRENT').symlink_to(p / 'staging', target_is_directory=True)
 
-    # In unified mode there is one shared app/ checkout at {data_root}/app/.
-    # Point {atlas}/app/ there so create_config() can find shared config JSONs.
-    if not (p / 'app').exists() and (Path(data_root) / 'app').exists():
-        (p / 'app').symlink_to(Path(data_root) / 'app', target_is_directory=True)
 
     (p / 'staging').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
