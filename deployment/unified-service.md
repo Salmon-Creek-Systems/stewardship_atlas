@@ -41,8 +41,8 @@ cd /root/swales_dev/app/python
 export SWALES_ROOT=/root/swales_dev
 export ATLAS_DATA_BUCKET=scs-atlas-data
 uvicorn --port 9000 --host 0.0.0.0 webapp:app \
-  --ssl-certfile /etc/letsencrypt/live/fireatlas.org/fullchain.pem \
-  --ssl-keyfile /etc/letsencrypt/live/fireatlas.org/privkey.pem
+  --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
+  --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
 ```
 
 ## 6. Verify

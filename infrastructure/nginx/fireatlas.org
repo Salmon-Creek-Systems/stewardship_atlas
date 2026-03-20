@@ -7,8 +7,8 @@
 # Start the unified webapp:
 #   cd /root/swales_dev/app/python
 #   SWALES_ROOT=/root/swales_dev uvicorn --port 9000 --host 0.0.0.0 webapp:app \
-#     --ssl-certfile /etc/letsencrypt/live/fireatlas.org/fullchain.pem \
-#     --ssl-keyfile /etc/letsencrypt/live/fireatlas.org/privkey.pem
+#     --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
+#     --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
 #
 # app_url in atlas_config.json for new atlases: https://fireatlas.org:9000
 #
@@ -71,8 +71,8 @@ server {
     # Add additional atlas auth blocks here as new atlases are provisioned.
 
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/fireatlas.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
@@ -96,8 +96,8 @@ server {
     return 301 https://fireatlas.org/$atlas$request_uri;
 
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/fireatlas.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
