@@ -43,6 +43,12 @@ server {
         return 302 https://fireatlas.org/$1/staging/outlets/html/public;
     }
 
+    # Shared local data (CSS, JS, images) — mirrors the per-atlas local/ symlink
+    # that pointed at /root/data/ in the old per-atlas nginx setup.
+    location /local/ {
+        alias /root/data/;
+    }
+
     # Static files with directory listing
     location / {
         autoindex on;
