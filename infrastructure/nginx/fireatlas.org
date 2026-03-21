@@ -52,6 +52,16 @@ server {
     # Per-atlas auth — admin and internal paths.
     # Add a block per atlas. No changes needed for new atlases if they
     # follow the same htpasswd path convention.
+
+location ~ ^/samuelsloop/staging/outlets/html/admin/ {
+    auth_basic "Atlas Admin";
+    auth_basic_user_file /root/swales_dev/roles/samuelsloop/admin.htpasswd;
+}
+location ~ ^/samuelsloop/staging/outlets/html/internal/ {
+    auth_basic "Atlas Internal";
+    auth_basic_user_file /root/swales_dev/roles/samuelsloop/internal.htpasswd;
+}
+
     location ~ ^/scvfd/staging/outlets/html/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
