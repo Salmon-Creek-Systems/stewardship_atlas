@@ -1,0 +1,96 @@
+[
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
+    {"name": "elevation", "geometry_type": "raster"},
+    {"name": "hillshade_tiles", "geometry_type": "raster"},
+    {"name": "terrain_dem", "geometry_type": "raster"},
+    {"name": "terrain_rgb_tiles", "geometry_type": "raster"},
+    {"name": "contours", "geometry_type": "linestring", "color": [240, 255, 240], "constant_width": 4,
+     "vis" : {"minzoom": 14, "maxzoom": 22}},
+    {"name": "basemap", "geometry_type": "raster"},
+    {"name": "lidar_basemap", "geometry_type": "raster"},
+    {"name": "roads", "geometry_type": "linestring", 
+        "color": [20, 20, 20], "add_labels": true, "interaction": "interface", "vector_width":true,
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road" },
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [ 
+                    {"STREETTYPE": "RD", "vector_width": 15},
+                    {"STREETTYPE": "ST", "vector_width": 10},
+                    {"STREETTYPE": "Other", "vector_width": 5}
+                ],
+              "default": {"STREETTYPE": "ST", "vector_width": 10}
+            }]},
+    {"name": "lpss", "geometry_type": "point", "color": [0, 155, 50], "add_labels": true, "access": [ "admin"]},
+    {"name": "poi", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true, "access": [ "admin"],
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}],
+     "interaction": "interface"},
+    {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
+     "interaction": "interface", "vector_width":true},
+    {"name": "watertanks", "geometry_type": "point", "add_labels": true,
+     "color": [50, 50, 250],"fill_color": [0, 0, 250], 
+     "symbol": {"png": "watertank.png", "icon": "custom/octy"},
+     "icon-size": 1.0,
+     "interaction": "interface",
+     "editable_columns" :[
+	 {
+             "name": "size",
+             "type": "radio",
+             "values": [ 
+                 {"size": "< 2.5k gals.", "capacity": 2500 },
+		 {"size": "2.5k-5k gals", "capacity": 5000},
+		 {"size": "5-10k gals", "capacity": 10000},
+		 {"size": "> 10k gals", "capacity": 20000}
+             ],
+             "default": {"size": "2.5k-5k gals", "capacity": 5000}
+	 }]
+
+     },
+    {"name": "ponds", "geometry_type": "polygon", "color": [50, 50, 250],"fill_color": [0, 0, 250], "add_labels": true,
+     "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"}, "symbol": {"png": "waterdrop.png", "icon": "basic/pushpin"},
+     "icon-size": 2.0,
+     "interaction": "interface",
+     "editable_columns": [
+         {"name": "name", "type": "string", "default": "" },
+         {
+             "name": "accessible",
+             "type": "radio",
+             "values": [ 
+                 {"accessible": "yes"},
+		 {"accessible": "no"}
+             ],
+             "default":  {"accessible": "no"}
+         },
+	 {
+             "name": "size",
+             "type": "radio",
+             "values": [ 
+                 {"size": "> 500k gals.", "capacity": 500 },
+		 {"size": "100k-500k gals", "capacity": 100},
+		 {"size": "10k-100k gals", "capacity": 10},
+		 {"size": "< 10k gals", "capacity": 0}
+             ],
+             "default": {"size": "10k-100k gals", "capacity": 10}
+	 }
+     
+     ]
+    },
+    {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
+     "add_labels": true, "interaction": "interface"},
+    {"name": "gazetteer_regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
+    {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
+    {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},
+    {"name": "hydrants", "geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255],
+     "add_labels": true, "interaction": "interface",
+     "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"},
+     "icon-size": 1.5},
+    {"name": "private_notes", "geometry_type": "point",
+     "color": [255, 0, 0], "fill_color": [255, 255, 255],
+     "add_labels": true, "label_background": true,
+     "editable_columns": [{"name": "name", "type": "string", "default": "Notes and Comments go here."}],
+     "symbol": {"png": "incident.png", "icon": "basic/pushpin"},
+     "icon-size": 2.0,
+     "access": ["admin"],
+     "interaction": "interface"}
+]
