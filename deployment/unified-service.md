@@ -43,6 +43,9 @@ export ATLAS_DATA_BUCKET=scs-atlas-data
 uvicorn --port 9000 --host 0.0.0.0 webapp:app \
   --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
   --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
+
+# Note: cert path is fireatlas.org-0001 (the wildcard cert). The original
+# fireatlas.org cert is expired. Check /etc/letsencrypt/live/ if unsure.
 ```
 
 ## 6. Verify

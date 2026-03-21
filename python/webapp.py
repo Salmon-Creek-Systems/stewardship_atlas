@@ -364,15 +364,13 @@ async def list_files():
 @app.get("/refresh")
 async def refresh(swale: str, asset: str):
     try:
-        ac = json.load(open(f"/root/data/{swale}_atlas_config.json"))
-        dc = json.load(open(f"/root/data/{swale}/stage/dataswale_config.json"))
-        # res = atlas.asset_materialize(ac, dc, ac['assets'][asset + "_delta"])
-        res = atlas.asset_materialize(ac, dc, ac['assets'][asset])
+        config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        res = atlas.materialize(ac, asset)
         res_json = {
             "status": "success",
-            "message": f"Refreshed layer {asset}: {res}",
+            "message": f"Refreshed asset {asset}: {res}",
             "asset": asset,
-            "home": f"https://internal.fireatlas.org/{swale}/html/admin.html"
         }
         print(res_json)
         return res_json
