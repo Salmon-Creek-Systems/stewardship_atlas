@@ -134,37 +134,37 @@ map.on('load', async () => {
         'type': 'raster',
         'source': 'satellite',
         'paint': {
-            'raster-opacity': 0.7
+            'raster-opacity': 1.0
         }
     }, firstLayerId);
-    
+
     // Add USGS layer before the first existing layer
     map.addLayer({
         'id': 'usgs-layer',
         'type': 'raster',
         'source': 'usgs',
         'paint': {
-            'raster-opacity': 0.7
+            'raster-opacity': 1.0
         }
     }, firstLayerId);
-    
+
     // Add terrain layer before the first existing layer
     map.addLayer({
         'id': 'terrain-layer',
         'type': 'raster',
         'source': 'terrain',
         'paint': {
-            'raster-opacity': 0.7
+            'raster-opacity': 1.0
         }
     }, firstLayerId);
-    
+
     // Add shaded relief layer before the first existing layer
     map.addLayer({
         'id': 'shaded-relief-layer',
         'type': 'raster',
         'source': 'shaded-relief',
         'paint': {
-            'raster-opacity': 0.7
+            'raster-opacity': 1.0
         }
     }, firstLayerId);
     

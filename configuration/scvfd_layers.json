@@ -29,7 +29,7 @@
                 "values": [ 
                     {"STREETTYPE": "RD", "vector_width": 15},
                     {"STREETTYPE": "ST", "vector_width": 10},
-                    {"STREETTYPE": "Other", "vector_width": 5}
+                    {"STREETTYPE": "Other", "vector_width": 8}
                 ],
               "default": {"STREETTYPE": "ST", "vector_width": 10}
             }]},
