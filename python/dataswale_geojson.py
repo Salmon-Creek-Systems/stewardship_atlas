@@ -88,6 +88,38 @@ def add_webmap_urls(config, layer_name, fc, zoom=17):
     return fc
 
 
+def add_show_labels(config, layer_name, fc):
+    """
+    Set show_label property on each feature for layers with label_deduplicate enabled.
+
+    When label_deduplicate is true on the layer config, one feature per unique name
+    value gets show_label=True; all others get show_label=False. Features with a
+    missing or null name get show_label=False.
+
+    When label_deduplicate is not set, returns fc unchanged.
+    """
+    layer_config = next(
+        (l for l in config.get('dataswale', {}).get('layers', []) if l.get('name') == layer_name),
+        {}
+    )
+    if not layer_config.get('label_deduplicate', False):
+        return fc
+
+    seen_names = set()
+    for feature in fc.get('features', []):
+        if 'properties' not in feature:
+            feature['properties'] = {}
+        name_val = feature['properties'].get('name')
+        if name_val and name_val not in seen_names:
+            feature['properties']['show_label'] = True
+            seen_names.add(name_val)
+        else:
+            feature['properties']['show_label'] = False
+
+    logger.info(f"show_label assigned for {layer_name}: {len(seen_names)} unique labels")
+    return fc
+
+
 def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     """
     Rebuild the geojson for a layer in the dataswale from the current state of the Delta Queue.
@@ -107,6 +139,8 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
     fc['features'] = new_features
     # Add webmap URLs to each feature
     fc = add_webmap_urls(config, name, fc)
+    # Assign show_label for layers with label_deduplicate
+    fc = add_show_labels(config, name, fc)
     
     logger.debug(f"Writing to {layer_path} FC: {fc}")
     logger.info(f"Writing to {layer_path}")

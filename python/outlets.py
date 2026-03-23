@@ -181,6 +181,8 @@ def webmap_json(config, name, sprite_json=None):
                 #    label_layer['paint'] |=  paint
 
                 #label_layer['paint'] = layer.get('paint', {})
+                if layer.get('selective_label') or layer.get('label_deduplicate'):
+                    label_layer['filter'] = ['==', ['get', 'show_label'], True]
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
