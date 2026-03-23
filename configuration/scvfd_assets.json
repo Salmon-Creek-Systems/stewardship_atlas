@@ -105,7 +105,7 @@
     "webmap" : {
 	"type": "outlet",
 	"name": "webmap",
-	"in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "private_notes"],
+	"in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss"],
 	"config_def": "webmap",
 	"access": ["public", "internal", "admin"]
     },
