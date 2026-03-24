@@ -2051,7 +2051,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         styled_html = help_template.format(
             atlas_name=config['name'],
             title=title,
-            content=html_content
+            content=html_content,
+            base_url=config.get('base_url', '')
         )
         
         # Write HTML file

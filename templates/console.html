@@ -31,8 +31,8 @@
                 <ul id="help-list">
                     <li><a href="/local/documents/about.html">About</a></li>
                     <li><a href="/local/documents/help/index.html">Help</a></li>
-                    <li><a href="/staging/outlets/html/internal">Internal</a></li>
-                    <li><a href="/staging/outlets/html/admin">Admin</a></li>
+                    <li><a href="../internal">Internal</a></li>
+                    <li><a href="../admin">Admin</a></li>
                     <li><a href="https://www.google.com/maps/search/volunteer+fire+departments">VFD</a></li>
                     <li><a href="/local/documents/contact.html">Contact</a></li>
                 </ul>
@@ -123,7 +123,7 @@
                 data.versions.forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
-                    a.href = `/${item}/outlets/html/admin`;
+                    a.href = `${data.baseurl}/${item}/outlets/html/admin`;
                     a.textContent = item;
                     if (item === data.version_string) {
                         a.classList.add('current-version');
