@@ -1,0 +1,62 @@
+{
+ "Resources": {
+  "kennedyARecord29AFDC85": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "HostedZoneId": "Z053813635B6S6EHA5GKU",
+    "Name": "kennedy.fireatlas.org.",
+    "ResourceRecords": [
+     "54.241.152.98"
+    ],
+    "TTL": "1800",
+    "Type": "A"
+   },
+   "Metadata": {
+    "aws:cdk:path": "KennedyDns/kennedyARecord/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/yXGSwqAIBAA0LO01+ljHSC6QNgBwnQisxR0JCK6e4tW7zXQtDVUhboS18bxwy7wTKS0YxJTyFEjU1eaY8iEnYCnl6hDNGxY/b8J6X3ZeNMWfCmgFiCKPVnLY/ZkTwT5+wG4YnLMagAAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "KennedyDns/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

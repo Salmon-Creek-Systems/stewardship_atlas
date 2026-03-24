@@ -181,6 +181,8 @@ def webmap_json(config, name, sprite_json=None):
                 #    label_layer['paint'] |=  paint
 
                 #label_layer['paint'] = layer.get('paint', {})
+                if layer.get('selective_label') or layer.get('label_deduplicate'):
+                    label_layer['filter'] = ['==', ['get', 'show_label'], True]
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -398,10 +400,14 @@ void await map.loadImage('{im_uri}',
 
 """.format(**locals())
     
-    # Build app URL for API calls
-    base_url = config.get('base_url', 'http://localhost')
-    app_port = config.get('atlasappport', 9997)
-    app_url = f"{base_url}:{app_port}"
+    # Build app URL for API calls — use config['app_url'] if present (set at atlas creation),
+    # otherwise fall back to reconstructing from base_url + port for legacy configs.
+    if 'app_url' in config:
+        app_url = config['app_url']
+    else:
+        base_url = config.get('base_url', 'http://localhost')
+        app_port = config.get('atlasappport', 9997)
+        app_url = f"{base_url}:{app_port}"
     
     processed_template = template.format(
             title=title,
@@ -573,7 +579,7 @@ def outlet_webmap(config, name):
         logger.info(f"Generating basemap: {basemap_path}.")
         utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
 
-    template_path = versioning.atlas_path(config, version='app') / 'templates'    
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
     subprocess.run(['cp', '-r', template_path / 'js',  webmap_dir /  "js"])
 
@@ -635,7 +641,7 @@ def generate_edit_controls_html(editable_attributes):
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
     # Read template files
-    template_path = versioning.atlas_path(config, version='app') / 'templates'    
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     with open(template_path / 'edit_map.html', 'r') as f:
         template = f.read()
         
@@ -685,7 +691,7 @@ def outlet_webmap_edit(config: dict, name: str):
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)
     
-    template_path = versioning.atlas_path(config, version='app') / 'templates'    
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
 
     subprocess.run(['cp', '-r', template_path / 'css', webedit_dir ])
     subprocess.run(['cp', '-r', template_path / 'js', webedit_dir ])
@@ -2045,7 +2051,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         styled_html = help_template.format(
             atlas_name=config['name'],
             title=title,
-            content=html_content
+            content=html_content,
+            base_url=config.get('base_url', '')
         )
         
         # Write HTML file
@@ -2076,7 +2083,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         index_html = help_template.format(
             atlas_name=config['name'],
             title="Help Index",
-            content=index_content
+            content=index_content,
+            base_url=config.get('base_url', '')
         )
         
         # Write index.html
@@ -2114,7 +2122,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     contact_html = help_template.format(
         atlas_name=config['name'],
         title="Contact",
-        content=contact_content
+        content=contact_content,
+        base_url=config.get('base_url', '')
     )
     
     # Write contact.html to documents directory (parent of help directory)
@@ -2157,7 +2166,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     about_html = help_template.format(
         atlas_name=config['name'],
         title="About",
-        content=about_content
+        content=about_content,
+        base_url=config.get('base_url', '')
     )
     
     # Write about.html to documents directory
@@ -2330,13 +2340,14 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     # Replace placeholders
     template = template.replace('{atlas_name}', config['name'])
     template = template.replace('{tables_list}', tables_list)
+    template = template.replace('{app_url}', config.get('app_url', config.get('base_url', 'http://localhost')))
     
     # Write processed template
     with open(outpath / 'index.html', 'w') as f:
         f.write(template)
     
     # Copy CSS and JS files
-    template_path = versioning.atlas_path(config, version='app') / 'templates' 
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', template_path / 'css' / 'sqlquery.css', str(css_dir)])
     subprocess.run(['cp',  template_path / 'js' / 'sqlquery.js', str(js_dir)])
     
@@ -2354,7 +2365,7 @@ def outlet_config_editor(config: dict, outlet_name: str):
     outpath.mkdir(parents=True, exist_ok=True)
     
     # Read the template file
-    template_path = versioning.atlas_path(config, version='app') / 'templates'    
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     with open(template_path / 'config_editor.html', 'r') as f:
         template = f.read()
     

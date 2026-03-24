@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "0b054d3bb2e4841e021b033a0d962e71a7764b08c04454b9f0128fe57e688fe0": {
+      "displayName": "KennedySecurityGroup Template",
+      "source": {
+        "path": "KennedySecurityGroup.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "438886543302-us-west-1-72653747": {
+          "bucketName": "cdk-hnb659fds-assets-438886543302-us-west-1",
+          "objectKey": "0b054d3bb2e4841e021b033a0d962e71a7764b08c04454b9f0128fe57e688fe0.json",
+          "region": "us-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-west-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

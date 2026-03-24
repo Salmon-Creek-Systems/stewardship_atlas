@@ -1,0 +1,147 @@
+# Unified Atlas Webapp — fireatlas.org
+#
+# Serves all atlas static files at fireatlas.org/{atlas}/
+# API calls go directly to the unified uvicorn process (configured via app_url
+# in atlas_config.json — no nginx proxy needed for API traffic).
+#
+# Start the unified webapp:
+#   cd /root/swales_dev/app/python
+#   SWALES_ROOT=/root/swales_dev uvicorn --port 9000 --host 0.0.0.0 webapp:app \
+#     --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
+#     --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
+#
+# app_url in atlas_config.json for new atlases: https://fireatlas.org:9000
+#
+# Prerequisites:
+#   - SSL cert for fireatlas.org apex domain (certbot --nginx -d fireatlas.org)
+#   - Wildcard cert *.fireatlas.org for subdomain redirect block
+#     (certbot certonly --manual --preferred-challenges dns -d "*.fireatlas.org")
+#     (DNS TXT record goes in Route 53, personal AWS account)
+#   - Or: use per-subdomain redirect blocks (see bottom of file)
+#
+# Per-atlas htpasswd files: /root/swales_dev/roles/{atlas}/admin.htpasswd etc.
+# To add a new atlas: no nginx changes needed — just add data under SWALES_ROOT/{atlas}/
+
+
+# ── Static file server — fireatlas.org ──────────────────────────────────────
+
+server {
+    server_name fireatlas.org;
+
+    # Static files root — serves all atlas data.
+    # fireatlas.org/{atlas}/staging/outlets/html/public → /root/swales_dev/{atlas}/staging/...
+    root /root/swales_dev;
+
+    # Landing page served from the shared app checkout
+    location = / {
+        root /root/swales_dev/app/documents/html;
+        try_files /index.html =404;
+    }
+
+    # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/html/public
+    location ~ ^/([a-zA-Z0-9_-]+)/?$ {
+        return 302 https://fireatlas.org/$1/staging/outlets/html/public;
+    }
+
+    # Shared local data (CSS, JS, images) — mirrors the per-atlas local/ symlink
+    # that pointed at /root/data/ in the old per-atlas nginx setup.
+    location /local/ {
+        alias /root/data/;
+    }
+
+    # Static files with directory listing
+    location / {
+        autoindex on;
+        try_files $uri $uri/ =404;
+    }
+
+    # Per-atlas auth — admin and internal paths.
+    # Add a block per atlas. No changes needed for new atlases if they
+    # follow the same htpasswd path convention.
+
+location ~ ^/samuelsloop/staging/outlets/html/admin/ {
+    auth_basic "Atlas Admin";
+    auth_basic_user_file /root/swales_dev/roles/samuelsloop/admin.htpasswd;
+}
+location ~ ^/samuelsloop/staging/outlets/html/internal/ {
+    auth_basic "Atlas Internal";
+    auth_basic_user_file /root/swales_dev/roles/samuelsloop/internal.htpasswd;
+}
+
+    location ~ ^/scvfd/staging/outlets/html/admin/ {
+        auth_basic "Atlas Admin";
+        auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
+    }
+    location ~ ^/scvfd/staging/outlets/html/internal/ {
+        auth_basic "Atlas Internal";
+        auth_basic_user_file /root/swales_dev/roles/scvfd/internal.htpasswd;
+    }
+    location ~ ^/kennedy/staging/outlets/html/admin/ {
+        auth_basic "Atlas Admin";
+        auth_basic_user_file /root/swales_dev/roles/kennedy/admin.htpasswd;
+    }
+    location ~ ^/kennedy/staging/outlets/html/internal/ {
+        auth_basic "Atlas Internal";
+        auth_basic_user_file /root/swales_dev/roles/kennedy/internal.htpasswd;
+    }
+    # Add additional atlas auth blocks here as new atlases are provisioned.
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+# HTTP → HTTPS redirect for apex domain
+server {
+    server_name fireatlas.org;
+    listen 80;
+    return 301 https://$host$request_uri;
+}
+
+
+# ── Subdomain redirects ──────────────────────────────────────────────────────
+# Preserves existing customer bookmarks: {atlas}.fireatlas.org → fireatlas.org/{atlas}/
+#
+# Requires a wildcard SSL cert for *.fireatlas.org.
+# If not available, use the per-subdomain blocks at the bottom of this file.
+
+server {
+    server_name ~^(?<atlas>[a-zA-Z0-9_-]+)\.fireatlas\.org$;
+    return 301 https://fireatlas.org/$atlas$request_uri;
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    server_name ~^(?<atlas>[a-zA-Z0-9_-]+)\.fireatlas\.org$;
+    listen 80;
+    return 301 https://fireatlas.org/$atlas$request_uri;
+}
+
+# ── Alternative: per-subdomain redirect blocks (if no wildcard cert) ─────────
+# Uncomment and add one block per existing atlas subdomain.
+#
+# server {
+#     server_name scvfd.fireatlas.org;
+#     return 301 https://fireatlas.org/scvfd$request_uri;
+#     listen 443 ssl;
+#     ssl_certificate /etc/letsencrypt/live/scvfd.fireatlas.org/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/scvfd.fireatlas.org/privkey.pem;
+#     include /etc/letsencrypt/options-ssl-nginx.conf;
+#     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+# }
+# server {
+#     server_name kennedy.fireatlas.org;
+#     return 301 https://fireatlas.org/kennedy$request_uri;
+#     listen 443 ssl;
+#     ssl_certificate /etc/letsencrypt/live/kennedy.fireatlas.org/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/kennedy.fireatlas.org/privkey.pem;
+#     include /etc/letsencrypt/options-ssl-nginx.conf;
+#     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+# }

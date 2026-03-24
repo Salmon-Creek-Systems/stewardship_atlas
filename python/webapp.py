@@ -17,15 +17,12 @@ import base64
 
 import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
-DATASWALE_PATH = os.environ['DATASWALE_PATH']
-print(f"Loading dataswale in {DATASWALE_PATH}")
-sys.path.insert(0, f"{DATASWALE_PATH}/app/python")
+
+SWALES_ROOT = os.environ['SWALES_ROOT']
+print(f"Serving all atlases from {SWALES_ROOT}")
 
 # Boring Imports
 import sys, os, subprocess, time, json, string, random, math
-
-
-SWALES_ROOT = "/root/swales_dev"
 
 
 # our Imports|
@@ -367,15 +364,13 @@ async def list_files():
 @app.get("/refresh")
 async def refresh(swale: str, asset: str):
     try:
-        ac = json.load(open(f"/root/data/{swale}_atlas_config.json"))
-        dc = json.load(open(f"/root/data/{swale}/stage/dataswale_config.json"))
-        # res = atlas.asset_materialize(ac, dc, ac['assets'][asset + "_delta"])
-        res = atlas.asset_materialize(ac, dc, ac['assets'][asset])
+        config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        res = atlas.materialize(ac, asset)
         res_json = {
             "status": "success",
-            "message": f"Refreshed layer {asset}: {res}",
+            "message": f"Refreshed asset {asset}: {res}",
             "asset": asset,
-            "home": f"https://internal.fireatlas.org/{swale}/html/admin.html"
         }
         print(res_json)
         return res_json
@@ -492,7 +487,7 @@ async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
     try:
         print(f"SQL Query [{swalename}]: {payload.query}")
         # Load config
-        ac = json.load(open(f"/root/swales/{swalename}/staging/atlas_config.json"))
+        ac = json.load(open(Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"))
         #config_path = versioning.atlas_path(ac, "atlas_config.json")
         #ac = json.load(open(config_path))
 

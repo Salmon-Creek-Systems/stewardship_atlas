@@ -227,7 +227,7 @@ This should be a deliberate pass once the codebase is better tested (don't reorg
 - Deployment automation (CI/CD for server updates)
 - Docker / containerized QGIS for reproducible PDF generation
 - Advanced ML/analytics on atlas data (natural territory for applied math work once LiDAR is in)
-- **Process management**: replace screen sessions for Jupyter and webapp with proper process management (systemd units, supervisor, or similar). Each atlas currently requires manually starting processes in screen which is fragile and hard to monitor. Should include: auto-start on boot, restart on failure, per-atlas process isolation, log management. Also: everything currently runs as root, which is bad practice and should be fixed alongside process management.
+- **Process management**: replace screen sessions for Jupyter and webapp with proper process management (systemd units, supervisor, or similar). Each atlas currently requires manually starting processes in screen which is fragile and hard to monitor. Should include: auto-start on boot, restart on failure, per-atlas process isolation, log management. Also: everything currently runs as root, which is bad practice and should be fixed alongside process management. **Jupyter near-term**: single server at `swales_dev/` root (one port, all atlases visible, data isolation enforced by notebook code). **Jupyter long-term**: JupyterHub for proper per-user workspace isolation if non-admin customers need direct notebook access.
 
 ### Rethinking the Outlet Concept
 

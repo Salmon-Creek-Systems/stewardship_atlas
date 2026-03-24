@@ -354,7 +354,7 @@ document.getElementById('upload-button').addEventListener('click', function() {
                 geojson.action = EDIT_CONFIG.action;
                 // Send to server using the same API as store button
                 var xmlhttp = new XMLHttpRequest();
-                xmlhttp.open("POST", 'https://' + EDIT_CONFIG.swalename + '.fireatlas.org:9997/delta_upload/' + EDIT_CONFIG.swalename);
+                xmlhttp.open("POST", EDIT_CONFIG.appUrl + '/delta_upload/' + EDIT_CONFIG.swalename);
                 xmlhttp.setRequestHeader("Content-Type", "application/json");
                 var geojson_data = JSON.stringify({"data": geojson});
                 xmlhttp.send(geojson_data);

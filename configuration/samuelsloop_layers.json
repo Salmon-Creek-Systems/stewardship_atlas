@@ -1,26 +1,15 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "elevation", "geometry_type": "raster"},
-    {"name": "terrain_dem", "geometry_type": "raster"},
     {"name": "hillshade_tiles", "geometry_type": "raster"},
+    {"name": "terrain_dem", "geometry_type": "raster"},
     {"name": "terrain_rgb_tiles", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [240, 255, 240], "constant_width": 4,
      "vis" : {"minzoom": 14, "maxzoom": 22}},
     {"name": "basemap", "geometry_type": "raster"},
-    {"name": "lidar_basemap", "geometry_type": "raster", "opacity": 0.0},
-    {
-        "name": "usgs_hillshade",
-        "geometry_type": "wms",
-        "wms_url": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer",
-        "wms_layer": "3DEPElevation:Hillshade Gray",
-        "wms_format": "image/png",
-        "opacity": 0.5
-    },
-    {"name": "roads", "geometry_type": "linestring",
-        "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
-        "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
-        "qgis_width_scale": 4.0,
-        "interaction": "interface", "vector_width":true,
+    {"name": "lidar_basemap", "geometry_type": "raster"},
+    {"name": "roads", "geometry_type": "linestring", 
+        "color": [20, 20, 20], "add_labels": true, "interaction": "interface", "vector_width":true,
         "editable_columns": [
             {"name": "name", "type": "string", "default": "Road" },
             {
@@ -29,7 +18,7 @@
                 "values": [ 
                     {"STREETTYPE": "RD", "vector_width": 15},
                     {"STREETTYPE": "ST", "vector_width": 10},
-                    {"STREETTYPE": "Other", "vector_width": 8}
+                    {"STREETTYPE": "Other", "vector_width": 5}
                 ],
               "default": {"STREETTYPE": "ST", "vector_width": 10}
             }]},
@@ -38,7 +27,7 @@
      "editable_columns": [{"name": "name", "type": "string", "default": ""}],
      "interaction": "interface"},
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
-     "qgis_width_scale": 4.0, "interaction": "interface", "vector_width":true},
+     "interaction": "interface", "vector_width":true},
     {"name": "watertanks", "geometry_type": "point", "add_labels": true,
      "color": [50, 50, 250],"fill_color": [0, 0, 250], 
      "symbol": {"png": "watertank.png", "icon": "custom/octy"},
@@ -88,7 +77,7 @@
      ]
     },
     {"name": "buildings", "geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250,0,0],
-     "add_labels": true, "label_deduplicate": true, "interaction": "interface"},
+     "add_labels": true, "interaction": "interface"},
     {"name": "gazetteer_regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
     {"name": "addresses", "geometry_type": "polygon", "color": [255, 0, 0]},
     {"name": "parcels", "geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0,0,0,0]},

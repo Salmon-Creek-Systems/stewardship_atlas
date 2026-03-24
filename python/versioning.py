@@ -13,8 +13,13 @@ logger.setLevel(logging.INFO)
 
 def atlas_path(config=None, local_path='', version='staging'):
     """
-    Return the path to the atlas file, with versioning if provided
+    Return the path to the atlas file, with versioning if provided.
+    Special case: version='app' returns the root of the currently-running
+    code (i.e. the repo containing this file), so templates and scripts
+    always come from the live codebase regardless of per-atlas app/ checkouts.
     """
+    if version == 'app':
+        return Path(__file__).parent.parent / local_path
     atlas_name = config['name']
     data_root = config['data_root']
     atlas_path = Path(data_root) / atlas_name / version / local_path

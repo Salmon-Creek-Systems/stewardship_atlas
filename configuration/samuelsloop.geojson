@@ -1,0 +1,46 @@
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "type": "Feature",
+    "geometry": {
+        "coordinates": [
+          [
+            [
+              -123.96911357688893,
+              40.24481413658842
+            ],
+            [
+              -123.96911357688893,
+              40.19989455462354
+            ],
+            [
+              -123.9155668372122,
+              40.19989455462354
+            ],
+            [
+              -123.9155668372122,
+              40.24481413658842
+            ],
+            [
+              -123.96911357688893,
+              40.24481413658842
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+    "properties": {
+      "name": "samuelsloop",
+      "data_root": "/root/swales_dev",
+      "shared_dir": "/root/data",
+      "assets_path": "/root/swales_dev/app/configuration/samuelsloop_assets.json",
+      "layers_path": "/root/swales_dev/app/configuration/samuelsloop_layers.json",
+      "admin_emails": ["admin@example.com"],
+      "base_url": "https://fireatlas.org/samuelsloop",
+      "app_url": "https://fireatlas.org:9000",
+      "port": 9000,
+      "versioned_outlets": ["html", "webmap"],
+      "logo_url": "https://scs-atlas-data.s3.amazonaws.com/samuelsloop/logo.png"
+    }
+  }]
+}

@@ -158,9 +158,9 @@ def create_config(config: Dict[str, Any] = None,
         feature = feature_collection['features'][0]
         name = feature['properties']['name']
         admin_emails = feature['properties']['admin_emails']
-        config['base_url'] = feature['properties'].get('base_url', f"https://internal.fireatlas.org/{name}")
-        config['app_url'] = feature['properties'].get('app_url', f"https://{name}.fireatlas.org:9999")
-        config['atlasappport'] = feature['properties'].get('atlasappport', 9998)
+        config['base_url'] = feature['properties'].get('base_url', f"https://fireatlas.org/{name}")
+        config['app_url'] = feature['properties'].get('app_url', "https://fireatlas.org")
+        config['atlasappport'] = feature['properties'].get('atlasappport', 443)
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
         config['logo'] = feature['properties'].get('logo', "/local/scs-smallgrass1.png")
         config['dataswale']['versioned_outlets'] = feature['properties'].get('versioned_outlets', [])
@@ -187,7 +187,13 @@ def create_config(config: Dict[str, Any] = None,
         assets = assets or {}
     
     config['spreadsheets'] = {}
-    
+
+    # In unified mode there is one shared app/ checkout at {data_root}/app/.
+    # Create the symlink now so shared config JSONs can be found below.
+    p.mkdir(parents=True, exist_ok=True)
+    if not (p / 'app').exists() and (Path(data_root) / 'app').exists():
+        (p / 'app').symlink_to(Path(data_root) / 'app', target_is_directory=True)
+
     # Load asset and layer core/shared definitions
     shared_config_dir = p / 'app' / 'configuration'
     inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
@@ -300,6 +306,7 @@ def create(config: Dict[str, Any] = None,
 
     if not (p / 'CURRENT').is_symlink():
         (p / 'CURRENT').symlink_to(p / 'staging', target_is_directory=True)
+
 
     (p / 'staging').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
