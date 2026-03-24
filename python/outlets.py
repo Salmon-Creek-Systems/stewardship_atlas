@@ -579,7 +579,7 @@ def outlet_webmap(config, name):
         logger.info(f"Generating basemap: {basemap_path}.")
         utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
 
-    template_path = Path(__file__).parent.parent / 'templates'
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
     subprocess.run(['cp', '-r', template_path / 'js',  webmap_dir /  "js"])
 
@@ -641,7 +641,7 @@ def generate_edit_controls_html(editable_attributes):
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
     # Read template files
-    template_path = Path(__file__).parent.parent / 'templates'
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     with open(template_path / 'edit_map.html', 'r') as f:
         template = f.read()
         
@@ -691,7 +691,7 @@ def outlet_webmap_edit(config: dict, name: str):
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)
     
-    template_path = Path(__file__).parent.parent / 'templates'
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
 
     subprocess.run(['cp', '-r', template_path / 'css', webedit_dir ])
     subprocess.run(['cp', '-r', template_path / 'js', webedit_dir ])
@@ -1897,7 +1897,7 @@ def make_console_html(config,
     logger.info(f"Making Console for {console_type}...")
 
     # Read the template file
-    template_dir = Path(__file__).parent.parent / 'templates'
+    template_dir = versioning.atlas_path(config, version='app') / 'templates'
     template_path = Path(template_dir / 'console.html')
     with open(template_path, 'r') as f:
         template = f.read()
@@ -1941,7 +1941,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     css_dir =  versioning.atlas_path(config, "local") / 'css'
     logger.debug(f"Creating CSS dir: {css_dir}")
     css_dir.mkdir(exist_ok=True)
-    template_dir = Path(__file__).parent.parent / 'templates'
+    template_dir = versioning.atlas_path(config, version='app') / 'templates'
     template_path = Path(template_dir / 'css' /  'console.css')
     subprocess.run(['cp', template_path, str(css_dir)])
     
@@ -2027,7 +2027,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
 
     # Read the help template
 
-    template_dir = Path(__file__).parent.parent / 'templates'
+    template_dir = versioning.atlas_path(config, version='app') / 'templates'
     help_template_path = Path(template_dir / 'help.html')
     
     #help_template_path = Path("../templates/help.html")
@@ -2330,7 +2330,7 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     
     # Read and process template
 
-    template_path = Path(__file__).parent.parent / 'templates' / 'sqlquery.html'
+    template_path = versioning.atlas_path(config, version='app') / 'templates' / 'sqlquery.html'
     with open(template_path, 'r') as f:
         template = f.read()
     
@@ -2344,7 +2344,7 @@ def outlet_sqlquery(config: dict, outlet_name: str):
         f.write(template)
     
     # Copy CSS and JS files
-    template_path = Path(__file__).parent.parent / 'templates'
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', template_path / 'css' / 'sqlquery.css', str(css_dir)])
     subprocess.run(['cp',  template_path / 'js' / 'sqlquery.js', str(js_dir)])
     
@@ -2362,7 +2362,7 @@ def outlet_config_editor(config: dict, outlet_name: str):
     outpath.mkdir(parents=True, exist_ok=True)
     
     # Read the template file
-    template_path = Path(__file__).parent.parent / 'templates'
+    template_path = versioning.atlas_path(config, version='app') / 'templates'
     with open(template_path / 'config_editor.html', 'r') as f:
         template = f.read()
     
