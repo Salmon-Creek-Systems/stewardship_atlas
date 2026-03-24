@@ -2083,7 +2083,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         index_html = help_template.format(
             atlas_name=config['name'],
             title="Help Index",
-            content=index_content
+            content=index_content,
+            base_url=config.get('base_url', '')
         )
         
         # Write index.html
@@ -2121,7 +2122,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     contact_html = help_template.format(
         atlas_name=config['name'],
         title="Contact",
-        content=contact_content
+        content=contact_content,
+        base_url=config.get('base_url', '')
     )
     
     # Write contact.html to documents directory (parent of help directory)
@@ -2164,7 +2166,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     about_html = help_template.format(
         atlas_name=config['name'],
         title="About",
-        content=about_content
+        content=about_content,
+        base_url=config.get('base_url', '')
     )
     
     # Write about.html to documents directory
