@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "6a09b8d098dd2d513a90bad1bd6cf546cb732cf90ad85030032b5a62ca870dc2": {
+      "displayName": "KennedyDns Template",
+      "source": {
+        "path": "KennedyDns.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "280439772481-us-east-1-e2dc4270": {
+          "bucketName": "cdk-hnb659fds-assets-280439772481-us-east-1",
+          "objectKey": "6a09b8d098dd2d513a90bad1bd6cf546cb732cf90ad85030032b5a62ca870dc2.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-file-publishing-role-280439772481-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

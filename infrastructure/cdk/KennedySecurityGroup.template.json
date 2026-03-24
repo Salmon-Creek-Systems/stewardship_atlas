@@ -1,0 +1,75 @@
+{
+ "Resources": {
+  "AtlasEC2SGfrom000008887D96F38E8": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "CidrIp": "0.0.0.0/0",
+    "Description": "kennedy port 8887",
+    "FromPort": 8887,
+    "GroupId": "sg-00acc74a2e9943cf8",
+    "IpProtocol": "tcp",
+    "ToPort": 8887
+   },
+   "Metadata": {
+    "aws:cdk:path": "KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:8887"
+   }
+  },
+  "AtlasEC2SGfrom000009997B012C898": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "CidrIp": "0.0.0.0/0",
+    "Description": "kennedy port 9997",
+    "FromPort": 9997,
+    "GroupId": "sg-00acc74a2e9943cf8",
+    "IpProtocol": "tcp",
+    "ToPort": 9997
+   },
+   "Metadata": {
+    "aws:cdk:path": "KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:9997"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/zPSMzIx1DNQTCwv1k1OydbNyUzSqw4uSUzO1glKLc4vLUpO1UksL45PTTbSc07LC05NLi3KLKl0L8ovLfDMSy9KLS6u1QmoLMnIz9M31jM01jNWzCrOzNQtKs0rycxN1QuC0ABkGk5sZwAAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "KennedySecurityGroup/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
