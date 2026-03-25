@@ -70,6 +70,7 @@
             swalename = data.swaleName;
             baseurl = data.baseurl;
             atlasappport = data.atlasappport;
+            apiurl = data.apiurl;
 
             // Hide panel header if empty
             if (!data.panelHeader) {
@@ -161,7 +162,7 @@
             // For the technical console, fetch live log data on load
             if (data.consoleType === 'TECHNICAL') {
                 document.getElementById('usecases-list').innerHTML = '<li>Loading log…</li>';
-                fetch(`${baseurl}:${atlasappport}/log/${swalename}`)
+                fetch(`${apiurl}/log/${swalename}`)
                     .then(r => r.json())
                     .then(d => { if (d.useCases) renderUseCases(d.useCases); })
                     .catch(() => renderUseCases([{name: 'Log unavailable', cases: []}]));
@@ -242,7 +243,7 @@
                                     geojson.layer = item.name;
                                     geojson.action = 'create';
                                     var xmlhttp = new XMLHttpRequest();
-                                    xmlhttp.open("POST", `${baseurl}:${atlasappport}/delta_upload/${swalename}`);
+                                    xmlhttp.open("POST", `${apiurl}/delta_upload/${swalename}`);
                                     xmlhttp.setRequestHeader("Content-Type", "application/json");
                                     xmlhttp.send(JSON.stringify({"data": geojson}));
                                     xmlhttp.onreadystatechange = function() {
@@ -269,7 +270,7 @@
                     refreshLink.className = 'action-destructive';
                     refreshLink.onclick = function(e) {
                         e.preventDefault();
-                        fetch(`${baseurl}:${atlasappport}/clear_layer/${swalename}/${item.name}`)
+                        fetch(`${apiurl}/clear_layer/${swalename}/${item.name}`)
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
@@ -295,7 +296,7 @@
             const publishButton = document.getElementById('publish-button');
             publishButton.disabled = true;
             statusDiv.innerHTML = `Processing... ${swalename}`;
-            fetch(`${baseurl}:${atlasappport}/publish?swale=${swalename}`)
+            fetch(`${apiurl}/publish?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -312,7 +313,7 @@
         function pollPublishStatus() {
             const statusDiv = document.getElementById('publish-status');
             const publishButton = document.getElementById('publish-button');
-            fetch(`${baseurl}:${atlasappport}/publish-status?swale=${swalename}`)
+            fetch(`${apiurl}/publish-status?swale=${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.publishing) {
@@ -335,7 +336,7 @@
             if (!confirm('Are you sure you want to rollback to the previous version?')) return;
             rollbackButton.disabled = true;
             statusDiv.innerHTML = `Rolling back ${swalename}...`;
-            fetch(`${baseurl}:${atlasappport}/set-current-version/${swalename}`)
+            fetch(`${apiurl}/set-current-version/${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -357,7 +358,7 @@
             if (!confirm('Are you sure you want to reset staging? This will:\n\n• Backup current staging to staging-backup-{timestamp}\n• Replace staging with the CURRENT published version\n\nAny uncommitted changes in staging will be moved to the backup.')) return;
             resetButton.disabled = true;
             statusDiv.innerHTML = `Resetting staging for ${swalename}...`;
-            fetch(`${baseurl}:${atlasappport}/reset-staging/${swalename}`)
+            fetch(`${apiurl}/reset-staging/${swalename}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -377,7 +378,7 @@
             const originalText = linkElement.textContent;
             linkElement.textContent = ' (exporting...) ';
             linkElement.style.pointerEvents = 'none';
-            fetch(`${baseurl}:${atlasappport}/export_gsheet/${swalename}/${layerName}`)
+            fetch(`${apiurl}/export_gsheet/${swalename}/${layerName}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -405,7 +406,7 @@
             const originalText = linkElement.textContent;
             linkElement.textContent = ' (importing...) ';
             linkElement.style.pointerEvents = 'none';
-            fetch(`${baseurl}:${atlasappport}/import_sheet/${swalename}/${layerName}`, { method: 'POST' })
+            fetch(`${apiurl}/import_sheet/${swalename}/${layerName}`, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {

@@ -8,7 +8,7 @@ app = cdk.App()
 # --- Email photo inlet (SES → S3 → Lambda → webapp) ---
 EmailPhotoStack(
     app, "AtlasEmailPhotoStack",
-    webapp_url="https://scvfd.fireatlas.org:9999",
+    webapp_url="https://fireatlas.org:9000",
     receipt_addresses=[
         "scvfd@fireatlas.org",
     ],
