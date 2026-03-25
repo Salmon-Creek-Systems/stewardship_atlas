@@ -192,6 +192,20 @@ atlas.materialize(config, "gdal_contours")
 atlas.materialize(config, "webmap")
 ```
 
+**Known asset method keys** (from `outlets.asset_methods` in `python/outlets.py`):
+
+| Key | What it generates |
+|-----|-------------------|
+| `html` | All console HTML variants: technical, admin, internal, public — all four are generated together by `outlet_html`. To regenerate after template changes, run `atlas.materialize(config, "html")`. **Do not try `technical_console`, `admin_console`, etc. — they don't exist.** |
+| `webmap` | MapLibre webmap |
+| `webmap_private` | Private variant of webmap |
+| `webedit` | Web editing interface |
+| `runbook` | PDF runbook (non-QGIS) |
+| `sqlquery` | SQL query outlet |
+| `jupyter_notebook` | Jupyter notebook outlet |
+| `config_editor` | Config editor UI |
+| `3dview` | 3D terrain view |
+
 ## Current Atlases
 
 - `wvfd` / `wvfd_dev` — Westport Volunteer Fire Department. Recent paying contract; significant code, config, and data changes were made here that need to be propagated back to SCVFD.
