@@ -482,6 +482,63 @@ Reprocessing copies the S3 object with a metadata change, which fires a new `Obj
 
 **Note:** if the original failure was due to missing GPS EXIF data, reprocessing the same email will fail again — the photo itself needs to be resent with location services enabled. GPS is stripped from the image when iOS Camera does not have location permission, which is set in **iOS Settings → Privacy & Security → Location Services → Camera** (should be "While Using").
 
+### Testing the Platform
+
+The platform has three levels of tests. All commands are run from the repo root unless noted.
+
+#### Unit Tests (no server required)
+
+Fast tests covering core Python modules (`utils`, `versioning`, `deltas`, etc.). Run locally without a server or QGIS.
+
+```bash
+cd python
+python -m pytest tests/ -v
+```
+
+Exclude the e2e tests when running unit tests only:
+
+```bash
+cd python
+python -m pytest tests/ --ignore=tests/test_kennedy_e2e.py -v
+```
+
+#### End-to-End Tests (read-only, against live server)
+
+Playwright-based browser tests that exercise the deployed platform: webmap rendering, console pages, layer GeoJSON endpoints, and the log API. These make no writes.
+
+```bash
+cd python
+ATLAS_NAME=kennedy \
+ATLAS_BASE_URL=https://fireatlas.org \
+ATLAS_API_URL=https://fireatlas.org:9000 \
+ATLAS_USER=admin ATLAS_PASSWORD=admin \
+pytest tests/test_kennedy_e2e.py -v
+```
+
+Change `ATLAS_NAME` to run against a different atlas (e.g. `scvfd`). Credentials must match that atlas's admin htpasswd.
+
+First-time setup (once per machine):
+
+```bash
+pip3 install -r python/requirements-dev.txt --break-system-packages
+playwright install chromium
+```
+
+#### Manual Smoke Tests
+
+Quick checks you can run from the server to verify a specific atlas is healthy after a config change or redeploy:
+
+```bash
+# Check the log API
+curl https://fireatlas.org:9000/log/kennedy
+
+# Verify a layer GeoJSON is present and non-empty
+curl -s https://fireatlas.org/kennedy/staging/layers/roads/roads.geojson | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['features']), 'features')"
+
+# Reprocess a stuck email by S3 key
+python3 scripts/reprocess_email.py <s3-key>
+```
+
 ### Updates and Maintenance
 
 Your atlas administrator handles:
