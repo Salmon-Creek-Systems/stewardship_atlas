@@ -51,6 +51,21 @@ class EmailPhotoStack(Stack):
             self, "AtlasDataBucket",
             bucket_name="scs-atlas-data",
             removal_policy=RemovalPolicy.RETAIN,
+            block_public_access=s3.BlockPublicAccess(
+                block_public_acls=True,
+                ignore_public_acls=True,
+                block_public_policy=False,
+                restrict_public_buckets=False,
+            ),
+        )
+
+        # Public read for email photos only — rest of bucket stays private
+        data_bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                principals=[iam.AnyPrincipal()],
+                actions=["s3:GetObject"],
+                resources=[data_bucket.arn_for_objects("*/media/email_photos/*")],
+            )
         )
 
         # Grant EC2 webapp role write access to image storage
