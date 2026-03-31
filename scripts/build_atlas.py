@@ -123,7 +123,8 @@ def build_atlas(
     versioned_outlets: List[str],
     logo_url: str,
     geometry: Dict[str, Any],
-    config_only: bool = False
+    config_only: bool = False,
+    extra_props: Dict[str, Any] = None
 ) -> Tuple[Dict[str, Any], Path]:
     """
     Build a new atlas or regenerate config for an existing one.
@@ -182,6 +183,7 @@ def build_atlas(
             "type": "Feature",
             "geometry": geometry,
             "properties": {
+                **(extra_props or {}),
                 "name": name,
                 "admin_emails": admin_emails or [],
                 "base_url": base_url,
@@ -289,6 +291,9 @@ def main():
         sys.exit(1)
     
     # Extract all parameters from properties
+    known_props = set(REQUIRED_PROPERTIES) | {'app_url', 'config_only'}
+    extra_props = {k: v for k, v in properties.items() if k not in known_props}
+
     try:
         config, config_path = build_atlas(
             name=properties['name'],
@@ -303,7 +308,8 @@ def main():
             versioned_outlets=properties['versioned_outlets'],
             logo_url=properties['logo_url'],
             geometry=geometry,
-            config_only=config_only
+            config_only=config_only,
+            extra_props=extra_props
         )
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
