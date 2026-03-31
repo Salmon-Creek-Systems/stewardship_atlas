@@ -732,7 +732,10 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             raise HTTPException(status_code=500, detail="ATLAS_DATA_BUCKET env var not set")
         timestamp_str = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         s3_key = f"{payload.atlas_name}/media/email_photos/{timestamp_str}_{payload.filename}"
-        s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes)
+        import mimetypes
+        content_type = mimetypes.guess_type(payload.filename)[0] or "application/octet-stream"
+        s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes,
+                      ContentType=content_type, ContentDisposition="inline")
         image_url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
 
         # Build extra properties from EXIF
