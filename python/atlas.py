@@ -156,14 +156,27 @@ def create_config(config: Dict[str, Any] = None,
     # Extract properties from feature_collection if provided
     if feature_collection:
         feature = feature_collection['features'][0]
-        name = feature['properties']['name']
-        admin_emails = feature['properties']['admin_emails']
-        config['base_url'] = feature['properties'].get('base_url', f"https://fireatlas.org/{name}")
-        config['app_url'] = feature['properties'].get('app_url', "https://fireatlas.org")
-        config['atlasappport'] = feature['properties'].get('atlasappport', 443)
+        props = feature['properties']
+
+        # Pass all GeoJSON properties into config; special cases below override as needed
+        config.update(props)
+
+        # bbox comes from geometry, not properties
         bbox = utils.geojson_to_bbox(feature['geometry']['coordinates'][0])
-        config['logo'] = feature['properties'].get('logo', "/local/scs-smallgrass1.png")
-        config['dataswale']['versioned_outlets'] = feature['properties'].get('versioned_outlets', [])
+
+        # versioned_outlets belongs under dataswale, not at top level
+        config['dataswale']['versioned_outlets'] = props.get('versioned_outlets', [])
+        config.pop('versioned_outlets', None)
+
+        # Defaults for optional fields that may be absent from the GeoJSON
+        config.setdefault('base_url', f"https://fireatlas.org/{props['name']}")
+        config.setdefault('app_url', "https://fireatlas.org")
+        config.setdefault('atlasappport', 443)
+        config.setdefault('logo', "/local/scs-smallgrass1.png")
+        config.setdefault('admin_emails', [])
+
+        name = props['name']
+        admin_emails = config['admin_emails']
     
     p = Path(data_root) / name
     
