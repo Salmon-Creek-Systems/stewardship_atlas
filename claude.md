@@ -257,6 +257,20 @@ python -m pytest tests/test_foo.py # single file
 ```
 Tests are unittest-based. Most can run locally without QGIS or server data paths.
 
+### Run end-to-end tests (against live server, read-only)
+```bash
+cd python
+ATLAS_BASE_URL=https://fireatlas.org \
+ATLAS_API_URL=https://fireatlas.org:9000 \
+ATLAS_USER=... ATLAS_PASSWORD=... \
+pytest tests/test_kennedy_e2e.py -v
+```
+E2e tests use Playwright + requests. Install deps once:
+```bash
+pip3 install -r requirements-dev.txt --break-system-packages
+playwright install chromium
+```
+
 ### Atlas CLI
 ```bash
 python scripts/build_atlas.py --help

@@ -87,11 +87,17 @@ def setup_role_htpasswds(data_root: str, atlas_name: str):
         with open(data_root_roles_json, 'w') as f:
             json.dump(roles, f, indent=2)
 
-    # Create one htpasswd file per role (e.g. admin.htpasswd, internal.htpasswd)
+    # Create one htpasswd file per role (e.g. admin.htpasswd, internal.htpasswd).
+    # Admin user is also added to every non-admin file so a single admin login
+    # grants access to all access-controlled consoles.
+    admin_password = roles.get("admin")
+
     for role, password in roles.items():
         htpasswd_file = roles_dir / f"{role}.htpasswd"
         flag = "bc" if not htpasswd_file.exists() else "b"
         os.system(f"htpasswd -{flag} {htpasswd_file} {role} {password}")
+        if role != "admin" and admin_password:
+            os.system(f"htpasswd -b {htpasswd_file} admin {admin_password}")
         print(f"Wrote {htpasswd_file}", file=sys.stderr)
 
 

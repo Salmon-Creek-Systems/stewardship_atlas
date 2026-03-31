@@ -1,0 +1,5 @@
+# Dev/test dependencies — install globally: pip3 install -r requirements-dev.txt --break-system-packages
+# Then: playwright install chromium
+pytest
+pytest-playwright
+requests
