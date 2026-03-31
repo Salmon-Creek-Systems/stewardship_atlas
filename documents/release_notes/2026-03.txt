@@ -1,0 +1,58 @@
+Subject: Stewardship Atlas — March 2026 updates
+
+Hi [DEPARTMENT NAME] team,
+
+Here's a quick look at what's new in your atlas over the past month.
+
+------------------------------------------------------------------------
+Email Photo Submission
+------------------------------------------------------------------------
+You can now add a point to the map by emailing a geotagged photo directly
+to the atlas. Take a photo on your phone, attach it to an email with a
+brief subject line describing what you found, and it appears on the map
+within a minute or two — no login required.
+
+Learn more: https://fireatlas.org/local/documents/help/email_photo_submission.html
+
+------------------------------------------------------------------------
+3D Terrain View
+------------------------------------------------------------------------
+A new 3D view is available from the interactive webmap. Click the "3D"
+button in the map navigation bar to open an interactive terrain model of
+your coverage area — tilt, rotate, and zoom to explore the landscape in
+three dimensions.
+
+Learn more: https://fireatlas.org/local/documents/help/3d_terrain_view.html
+
+------------------------------------------------------------------------
+Editing Tools Expanded
+------------------------------------------------------------------------
+The "annotate" link in the Admin Console is now labeled "edit" — and it
+does more than it used to. In addition to updating feature properties, the
+edit interface now lets you delete features: draw a polygon around what you
+want to remove, click Delete, and confirm. No more exporting a spreadsheet
+just to remove a single point.
+
+Learn more: https://fireatlas.org/local/documents/help/editing_layer_data.html
+
+------------------------------------------------------------------------
+Console Refresh
+------------------------------------------------------------------------
+The Admin Console has a new look — updated fonts, a cleaner layout, and
+color-coded action buttons (blue for edits, red for destructive actions).
+Map labels on dense layers are now deduplicated so repeated text doesn't
+crowd the view. Nothing about how the console works has changed, just
+easier to read and navigate.
+
+------------------------------------------------------------------------
+Gazetteer Improvements
+------------------------------------------------------------------------
+The gazetteer PDF map book has been updated with projected grid cells,
+neighbor page numbers printed on each edge so you can follow features
+across pages, and a new grid index overview page as a table of contents.
+
+Learn more: https://fireatlas.org/local/documents/help/gazetteer.html
+
+------------------------------------------------------------------------
+
+As always, reply to this email with any questions or if anything looks off.

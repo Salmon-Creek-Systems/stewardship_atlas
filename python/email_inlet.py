@@ -12,19 +12,19 @@ from PIL.ExifTags import TAGS, GPSTAGS
 logger = logging.getLogger(__name__)
 
 
-def parse_subject(subject: str) -> tuple[str, str]:
+def parse_subject(subject: str, default_layer: str = "poi") -> tuple[str, str]:
     """Parse email subject into (layer_name, title).
 
     Format: "<layer_name>: <title>"
     If no colon is present, the entire subject is used as the title
-    and the layer defaults to "poi".
+    and the layer defaults to default_layer.
     """
     if ":" in subject:
         layer_name, _, title = subject.partition(":")
         layer_name = layer_name.strip().lower()
         title = title.strip() or "Photo submission"
     else:
-        layer_name = "poi"
+        layer_name = default_layer
         title = subject.strip() or "Photo submission"
     return layer_name, title
 

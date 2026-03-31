@@ -34,11 +34,23 @@ For bulk edits or when you need to modify many features at once:
 
 **Best for:** Bulk text changes, fixing typos across many features, deleting multiple features
 
-## Deleting Features
+## Method 3: Deleting Features with the Edit Map
 
-- **Single feature:** Use the spreadsheet method - export, delete the row, re-import
-- **Multiple features:** Use the spreadsheet method for efficiency
-- **Geometry-based deletion:** Edit the GeoJSON directly in QGIS, then upload via Edit Map
+You can delete features directly on the map by drawing a polygon around them:
+
+1. From the Admin Console, click the **"edit"** link for the layer
+2. **Draw a polygon** on the map around the feature(s) you want to remove
+3. A **Delete** button will appear in the edit panel — click it
+4. Confirm the deletion when prompted
+
+All features whose geometry intersects the polygon will be removed. This works well
+for removing a single misplaced point or a cluster of features in a specific area.
+
+**Note:** Deletions cannot be undone through the edit interface. If you need to recover
+deleted features, roll back to a previous published version.
+
+**Bulk deletion:** If you need to remove many features across the layer, the spreadsheet
+method (export, delete rows, re-import) is more efficient.
 
 ## Tips
 

@@ -22,6 +22,11 @@ class TestParseSubject(unittest.TestCase):
         self.assertEqual(layer, "poi")
         self.assertEqual(title, "Locked gate on Miller Road")
 
+    def test_no_colon_uses_default_layer(self):
+        layer, title = parse_subject("Locked gate on Miller Road", default_layer="private_notes")
+        self.assertEqual(layer, "private_notes")
+        self.assertEqual(title, "Locked gate on Miller Road")
+
     def test_empty_title_after_colon(self):
         layer, title = parse_subject("poi:")
         self.assertEqual(layer, "poi")

@@ -695,7 +695,8 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             raise HTTPException(status_code=403, detail=f"Sender not authorised: {payload.sender}")
 
         # Parse subject
-        layer_name, title = email_inlet.parse_subject(payload.subject)
+        default_layer = ac.get("email_photo_default_layer", "poi")
+        layer_name, title = email_inlet.parse_subject(payload.subject, default_layer)
 
         # Validate layer exists
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
