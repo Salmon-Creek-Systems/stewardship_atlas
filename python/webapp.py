@@ -737,6 +737,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes,
                       ContentType=content_type, ContentDisposition="inline")
         image_url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
+        logging.info(f"S3 upload: {s3_key} content_type={content_type} content_disposition=inline")
 
         # Build extra properties from EXIF
         extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
@@ -763,6 +764,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             "lat": gps["lat"],
             "lon": gps["lon"],
             "image_url": image_url,
+            "content_type": content_type,
         }
 
     except HTTPException:

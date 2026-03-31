@@ -134,9 +134,12 @@ def format_as_use_cases(invocations):
                 parsed = _json.loads(body)
                 detail = parsed.get("detail", body)
                 image_url = parsed.get("image_url")
+                content_type = parsed.get("content_type")
             except Exception:
                 detail = body[:80]
-            detail_str = f"HTTP {code} — {detail}"
+                content_type = None
+            ct_str = f" [{content_type}]" if content_type else ""
+            detail_str = f"HTTP {code}{ct_str} — {detail}"
         else:
             detail_str = "Lambda error (no webapp response)"
 
