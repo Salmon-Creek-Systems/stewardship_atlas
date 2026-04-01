@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, logger
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import json
 from datetime import datetime
@@ -19,6 +21,7 @@ import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
 
 SWALES_ROOT = os.environ['SWALES_ROOT']
+ATLAS_SHARED_DIR = os.environ.get('ATLAS_SHARED_DIR', '/root/data')
 print(f"Serving all atlases from {SWALES_ROOT}")
 
 # Boring Imports
@@ -50,6 +53,11 @@ app.add_middleware(
 STORAGE_DIR = "/root/data/uploads/"
 # os.makedirs(f"{STORAGE_DIR}/roads_deltas", exist_ok=True)
 
+# Serve templates directory for the create-atlas UI
+_templates_dir = versioning.atlas_path(local_path='templates', version='app')
+app.mount("/templates", StaticFiles(directory=str(_templates_dir)), name="templates")
+
+
 class JSONPayload(BaseModel):
     data: Dict[str, Any]
 
@@ -61,6 +69,17 @@ class PinToPOIPayload(BaseModel):
 class SQLQueryPayload(BaseModel):
     query: str
     return_format: str = 'csv'  # Default to CSV format
+
+class BBox(BaseModel):
+    west: float
+    east: float
+    north: float
+    south: float
+
+class CreateAtlasRequest(BaseModel):
+    name: str   # display name (e.g. "Salmon Creek VFD")
+    slug: str   # atlas ID / directory name (e.g. "scvfd")
+    bbox: BBox
 
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
@@ -380,6 +399,9 @@ async def refresh(swale: str, asset: str):
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
 
+# Global dict to track atlas creation status, keyed by slug
+create_statuses: Dict[str, Any] = {}
+
 # Global variable to track publish status
 publish_status = {
     "publishing": False,
@@ -480,6 +502,98 @@ async def publish_status_check(swale: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/create")
+async def create_page():
+    create_html = versioning.atlas_path(local_path='templates/create_atlas.html', version='app')
+    return FileResponse(str(create_html))
+
+
+@app.post("/create_atlas")
+async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: BackgroundTasks):
+    slug = payload.slug.strip()
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', slug):
+        raise HTTPException(status_code=400, detail="slug must start with a letter and contain only letters, numbers, and underscores")
+    if (Path(SWALES_ROOT) / slug).exists():
+        raise HTTPException(status_code=409, detail=f"Atlas '{slug}' already exists")
+
+    create_statuses[slug] = {
+        "creating": True,
+        "started_at": datetime.now().isoformat(),
+        "finished_at": None,
+        "log": [["Starting atlas creation", datetime.now().isoformat()]]
+    }
+
+    bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
+            "north": payload.bbox.north, "south": payload.bbox.south}
+
+    feature_collection = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [bbox["west"], bbox["south"]],
+                    [bbox["east"], bbox["south"]],
+                    [bbox["east"], bbox["north"]],
+                    [bbox["west"], bbox["north"]],
+                    [bbox["west"], bbox["south"]]
+                ]]
+            },
+            "properties": {
+                "name": slug,
+                "description": payload.name,
+                "app_url": "https://fireatlas.org:9000",
+                "versioned_outlets": ["html", "webmap"]
+            }
+        }]
+    }
+
+    layers_path = str(versioning.atlas_path(local_path='configuration/starter_layers.json', version='app'))
+    assets_path = str(versioning.atlas_path(local_path='configuration/starter_assets.json', version='app'))
+
+    async def finish_creating():
+        try:
+            create_statuses[slug]["log"].append(["Creating atlas structure", datetime.now().isoformat()])
+            atlas.create(
+                layers_path=layers_path,
+                assets_path=assets_path,
+                data_root=SWALES_ROOT,
+                shared_dir=Path(ATLAS_SHARED_DIR),
+                feature_collection=feature_collection
+            )
+            create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
+
+            ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
+            for outlet_name in ["html", "webmap", "webedit"]:
+                create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
+                atlas.materialize(ac, outlet_name)
+                create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
+
+            create_statuses[slug]["log"].append(["Done", datetime.now().isoformat()])
+            create_statuses[slug]["creating"] = False
+            create_statuses[slug]["finished_at"] = datetime.now().isoformat()
+        except Exception as e:
+            logging.error(f"Error creating atlas {slug}: {e}")
+            logging.error(traceback.format_exc())
+            create_statuses[slug]["log"].append([f"ERROR: {e}", datetime.now().isoformat()])
+            create_statuses[slug]["creating"] = False
+            create_statuses[slug]["finished_at"] = datetime.now().isoformat()
+
+    background_tasks.add_task(finish_creating)
+    return {"status": "success", "creating": True, "atlas_slug": slug,
+            "started_at": create_statuses[slug]["started_at"]}
+
+
+@app.get("/create-status")
+async def create_status_check(atlas_slug: str):
+    if atlas_slug not in create_statuses:
+        raise HTTPException(status_code=404, detail=f"No creation in progress for '{atlas_slug}'")
+    s = create_statuses[atlas_slug]
+    return {"status": "success", "creating": s["creating"],
+            "started_at": s["started_at"], "finished_at": s["finished_at"], "log": s["log"]}
+
 
 @app.post("/sql_query/{swalename}")
 async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
