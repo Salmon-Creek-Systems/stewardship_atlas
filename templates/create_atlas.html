@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Create New Atlas</title>
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/terra-draw@1.0.0-beta.0/dist/terra-draw.umd.js"></script>
+    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <link href='/templates/css/map.css' rel='stylesheet' />
+    <link href='/templates/css/shared_controls.css' rel='stylesheet' />
+</head>
+<body>
+    <div id="controls">
+        <div class="control-panel title-panel">
+            <h4>Create New Atlas</h4>
+            <a href="/" class="button link-button">Home</a>
+        </div>
+
+        <div class="control-panel">
+            <label>Atlas Name:</label>
+            <input type="text" id="atlas-name" class="input-field" placeholder="e.g. Salmon Creek VFD">
+            <label style="margin-top:8px;">Atlas ID:</label>
+            <input type="text" id="atlas-slug" class="input-field" placeholder="e.g. scvfd">
+            <div id="slug-error" style="color:#c00; font-size:12px; margin-top:4px; display:none;"></div>
+        </div>
+
+        <div class="control-panel view-panel">
+            <label>Basemap:</label>
+            <select id="basemap-select" class="input-field">
+                <option value="terrain" selected>OpenMapTiles Terrain</option>
+                <option value="satellite">Satellite (ESRI)</option>
+                <option value="usgs">USGS Topo</option>
+                <option value="shaded-relief">USGS Shaded Relief</option>
+            </select>
+        </div>
+
+        <div class="control-panel">
+            <p style="margin:0 0 6px 0; font-size:13px;">Draw a rectangle to define the atlas area, then submit.</p>
+            <button id="draw-btn" class="button" style="width:100%; margin-bottom:6px;">Draw Area</button>
+            <button id="clear-btn" class="button" style="width:100%; margin-bottom:6px;" disabled>Clear</button>
+            <button id="submit-btn" class="button" style="width:100%; background:#2a6;" disabled>Create Atlas</button>
+        </div>
+
+        <div id="progress-panel" class="control-panel" style="display:none;">
+            <label>Progress:</label>
+            <div id="progress-log" style="font-size:12px; max-height:200px; overflow-y:auto; background:#111; color:#9f9; padding:6px; border-radius:4px; font-family:monospace;"></div>
+        </div>
+
+        <div id="loading-progress" class="progress-bar" style="display:none;">
+            <div class="progress-fill"></div>
+            <div class="progress-text">Creating atlas...</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+    const TERRAIN_SOURCE = {
+        type: 'raster',
+        tiles: ['https://tile.opentopomap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)'
+    };
+    const SATELLITE_SOURCE = {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles &copy; Esri'
+    };
+    const USGS_SOURCE = {
+        type: 'raster',
+        tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles courtesy of the U.S. Geological Survey'
+    };
+    const SHADED_RELIEF_SOURCE = {
+        type: 'raster',
+        tiles: ['https://basemap.nationalmap.gov/arcgis/services/USGSShadedReliefOnly/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&FORMAT=image/png&TRANSPARENT=true&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}'],
+        tileSize: 256,
+        attribution: 'USGS Shaded Relief'
+    };
+
+    const BASEMAP_SOURCES = { terrain: TERRAIN_SOURCE, satellite: SATELLITE_SOURCE, usgs: USGS_SOURCE, 'shaded-relief': SHADED_RELIEF_SOURCE };
+
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+            version: 8,
+            sources: { basemap: TERRAIN_SOURCE },
+            layers: [{ id: 'basemap-layer', type: 'raster', source: 'basemap' }]
+        },
+        center: [-120, 38],
+        zoom: 5
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+    document.getElementById('basemap-select').addEventListener('change', function() {
+        map.getSource('basemap').setTiles(BASEMAP_SOURCES[this.value].tiles);
+    });
+
+    // TerraDraw polygon mode — user draws any shape, we extract the bbox
+    let td = null;
+    let drawnBbox = null;
+
+    function nameToSlug(name) {
+        return name.toLowerCase()
+            .replace(/[^a-z0-9\s_]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .replace(/^[0-9_]+/, '');
+    }
+
+    document.getElementById('atlas-name').addEventListener('input', function() {
+        const slugField = document.getElementById('atlas-slug');
+        slugField.value = nameToSlug(this.value);
+        validateSlug();
+    });
+
+    document.getElementById('atlas-slug').addEventListener('input', validateSlug);
+
+    function validateSlug() {
+        const slug = document.getElementById('atlas-slug').value;
+        const err = document.getElementById('slug-error');
+        if (!slug) { err.style.display = 'none'; return false; }
+        if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(slug)) {
+            err.textContent = 'Must start with a letter; only letters, numbers, underscore allowed.';
+            err.style.display = 'block';
+            return false;
+        }
+        err.style.display = 'none';
+        return true;
+    }
+
+    function updateSubmitBtn() {
+        const slug = document.getElementById('atlas-slug').value;
+        const valid = drawnBbox && slug && /^[a-zA-Z][a-zA-Z0-9_]*$/.test(slug);
+        document.getElementById('submit-btn').disabled = !valid;
+    }
+
+    map.on('load', function() {
+        td = new TerraDraw.TerraDraw({
+            adapter: new TerraDraw.TerraDrawMapLibreGLAdapter({ map }),
+            modes: [
+                new TerraDraw.TerraDrawPolygonMode(),
+                new TerraDraw.TerraDrawSelectMode({ flags: { polygon: { feature: { draggable: true } } } })
+            ]
+        });
+        td.start();
+
+        td.on('finish', function() {
+            const features = td.getSnapshot();
+            if (!features.length) return;
+            const coords = features[0].geometry.coordinates[0];
+            const lons = coords.map(c => c[0]);
+            const lats = coords.map(c => c[1]);
+            drawnBbox = {
+                west: Math.min(...lons),
+                east: Math.max(...lons),
+                south: Math.min(...lats),
+                north: Math.max(...lats)
+            };
+            document.getElementById('clear-btn').disabled = false;
+            document.getElementById('draw-btn').disabled = true;
+            updateSubmitBtn();
+        });
+    });
+
+    document.getElementById('draw-btn').addEventListener('click', function() {
+        td.setMode('polygon');
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', function() {
+        td.clear();
+        drawnBbox = null;
+        this.disabled = true;
+        document.getElementById('draw-btn').disabled = false;
+        document.getElementById('submit-btn').disabled = true;
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', async function() {
+        if (!validateSlug() || !drawnBbox) return;
+        const name = document.getElementById('atlas-name').value.trim() || document.getElementById('atlas-slug').value;
+        const slug = document.getElementById('atlas-slug').value.trim();
+
+        this.disabled = true;
+        document.getElementById('draw-btn').disabled = true;
+        document.getElementById('clear-btn').disabled = true;
+        document.getElementById('progress-panel').style.display = 'block';
+        document.getElementById('loading-progress').style.display = 'block';
+
+        let resp;
+        try {
+            resp = await fetch('/create_atlas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, slug, bbox: drawnBbox })
+            });
+        } catch(e) {
+            appendLog('ERROR: ' + e.message);
+            return;
+        }
+
+        if (!resp.ok) {
+            const detail = (await resp.json()).detail || resp.statusText;
+            appendLog('ERROR: ' + detail);
+            document.getElementById('loading-progress').style.display = 'none';
+            return;
+        }
+
+        pollStatus(slug);
+    });
+
+    function appendLog(msg) {
+        const log = document.getElementById('progress-log');
+        log.textContent += msg + '\n';
+        log.scrollTop = log.scrollHeight;
+    }
+
+    async function pollStatus(slug) {
+        while (true) {
+            await new Promise(r => setTimeout(r, 1500));
+            let data;
+            try {
+                const r = await fetch('/create-status?atlas_slug=' + encodeURIComponent(slug));
+                data = await r.json();
+            } catch(e) {
+                appendLog('Poll error: ' + e.message);
+                continue;
+            }
+            const log = document.getElementById('progress-log');
+            log.textContent = data.log.map(e => e[0]).join('\n');
+            log.scrollTop = log.scrollHeight;
+
+            if (!data.creating) {
+                document.getElementById('loading-progress').style.display = 'none';
+                if (data.log.some(e => e[0].startsWith('ERROR'))) {
+                    appendLog('\nCreation failed. Check server logs.');
+                } else {
+                    appendLog('\nRedirecting to your new atlas...');
+                    setTimeout(() => { window.location.href = '/' + slug + '/staging/outlets/html/public'; }, 1500);
+                }
+                break;
+            }
+        }
+    }
+    </script>
+</body>
+</html>

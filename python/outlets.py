@@ -1881,8 +1881,9 @@ def make_root_html(root_path_str):
 
     atlas_html += "<HR width='40%'><UL>"
     atlas_html += "\n".join( [f"<LI><A HREF='{a}/index.html'>{b}</A></LI>" for a,b in zip(atlas_path_list, atlas_name_list) ] )
-    
-    atlas_html += "</UL></CENTER></BODY></HTML>"
+    atlas_html += "</UL>"
+    atlas_html += "<HR width='40%'><p><A HREF='/create' style='font-size:1.1em;'>+ Create New Atlas</A></p>"
+    atlas_html += "</CENTER></BODY></HTML>"
     outpath = f"{root_path}/index.html"
     logger.info(atlas_html)
     with open(outpath, "w") as f:

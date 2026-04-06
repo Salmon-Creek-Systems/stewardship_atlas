@@ -1,5 +1,40 @@
 # Stewardship Atlas User Guide
 
+## Contents
+
+- [Overview](#overview)
+- [Examples and Use Cases](#examples-and-use-cases)
+- [Access and Data Control](#access-and-data-control)
+- [Viewing Data](#viewing-data)
+  - [Interactive Web Map](#interactive-web-map)
+  - [Printable Maps and Documents](#printable-maps-and-documents)
+  - [Jupyter Notebooks](#jupyter-notebooks)
+  - [Files and Exports to Other Platforms](#files-and-exports-to-other-platforms)
+- [Curating and Editing Data](#curating-and-editing-data)
+  - [Web-Based Editing](#web-based-editing)
+  - [Submitting Photos by Email](#submitting-photos-by-email)
+  - [Uploading Data](#uploading-data)
+  - [Direct Python Access](#direct-python-access-advanced)
+  - [Data Versioning](#data-versioning)
+- [Sharing Data](#sharing-data)
+- [Advanced Topics](#advanced-topics)
+  - [Creating a New Atlas](#creating-a-new-atlas)
+  - [Batch-Ingesting Photos from S3](#batch-ingesting-photos-from-s3)
+- [Technical Details](#technical-details)
+  - [System Requirements](#system-requirements)
+  - [Data Formats](#data-formats)
+  - [Getting Help](#getting-help)
+  - [Performance Tips](#performance-tips)
+  - [Privacy and Data Handling](#privacy-and-data-handling)
+  - [Diagnosing Email Photo Submissions](#diagnosing-email-photo-submissions)
+  - [Live Email Log in the Technical Console](#live-email-log-in-the-technical-console)
+  - [Adding a New Authorised Sender](#adding-a-new-authorised-sender)
+  - [Inspecting and Reprocessing Stuck Emails](#inspecting-and-reprocessing-stuck-emails)
+  - [Testing the Platform](#testing-the-platform)
+  - [Updates and Maintenance](#updates-and-maintenance)
+
+---
+
 ## Overview
 
 A Stewardship Atlas is a data set; a configuration for storing, processing, and sharing that data set; and a set of implementions for doing so.
@@ -297,6 +332,59 @@ For websites or presentations, you can embed atlas maps:
 - Use the web map URL in an iframe
 - Link to specific Gazetteer pages
 - Embed exported images from print outputs
+
+## Advanced Topics
+
+### Creating a New Atlas
+
+A new atlas can be created entirely through the web interface — no server access or configuration files required.
+
+1. Go to [fireatlas.org/create](https://fireatlas.org/create)
+2. **Draw the atlas area**: use the draw tool to sketch a polygon covering the geographic region of interest. The bounding box of your drawing becomes the atlas extent.
+3. **Name it**: enter a display name (e.g. *Salmon Creek VFD*). An atlas ID is generated automatically from the name (e.g. `scvfd`) — you can edit it before submitting.
+4. Click **Create Atlas**. A progress log shows what's happening. Creation typically takes under a minute.
+5. When complete you are redirected to the new atlas's public console.
+
+**What you get out of the box:**
+- Interactive web map with OpenMapTiles Terrain basemap
+- Web editing interface for roads, creeks, and landmarks layers
+- Admin and public consoles
+
+**First steps after creation:**
+
+The atlas starts with empty layers. To populate it with publicly available data, open the Admin Console and trigger the data inlets:
+
+- **Roads** — fetches road network from Overture Maps for your area
+- **Creeks** — fetches waterways from the USGS National Hydrography Dataset
+- **Landmarks** — fetches points of interest from OpenStreetMap
+
+Each fetch runs as a background job; refresh the console to see progress. Data quality varies by region — Overture and NHD have excellent coverage across the United States; OSM coverage is strong in populated areas.
+
+**Default credentials:**
+
+New atlases use shared default credentials: `admin` / `admin` and `internal` / `internal`. These are intentionally simple placeholders. Contact your platform administrator to set up credentials specific to your atlas before sharing access with your community.
+
+---
+
+### Batch-Ingesting Photos from S3
+
+If you have a collection of geotagged photos already stored in S3 that need to be added to an atlas layer, use `scripts/ingest_s3_photos.py`. It applies the same GPS extraction and delta-writing pipeline as the email inlet.
+
+```bash
+# Preview — no writes
+SWALES_ROOT=/root/swales_dev \
+python3 scripts/ingest_s3_photos.py scvfd s3://my-bucket/field-photos/2026-04/ --dry-run
+
+# Ingest into a specific layer
+SWALES_ROOT=/root/swales_dev \
+python3 scripts/ingest_s3_photos.py scvfd s3://my-bucket/field-photos/2026-04/ --layer poi
+```
+
+Photos without GPS EXIF data are skipped and reported on stdout. All valid photos from the run are written as a single delta batch. The `--layer` flag defaults to the atlas's configured `email_photo_default_layer`.
+
+Photos must be publicly readable at their S3 URL for the atlas web map to display them inline.
+
+---
 
 ## Technical Details
 

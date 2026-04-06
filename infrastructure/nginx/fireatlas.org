@@ -86,6 +86,32 @@ location ~ ^/samuelsloop/staging/outlets/html/internal/ {
     }
     # Add additional atlas auth blocks here as new atlases are provisioned.
 
+    # Generic fallback auth blocks — cover any atlas not listed above.
+    # New atlases created via /create are protected automatically by these.
+    # To give an atlas its own credentials, add a specific block above these.
+    # shared.htpasswd contains default admin:admin and internal:internal credentials.
+    # Create it on the server: htpasswd -bc /root/swales_dev/roles/shared.htpasswd admin admin
+    #                          htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
+    location ~ /outlets/html/admin/ {
+        auth_basic "Atlas Admin";
+        auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
+    }
+    location ~ /outlets/html/internal/ {
+        auth_basic "Atlas Internal";
+        auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
+    }
+
+    # Atlas creation UI — proxy to webapp port 9000.
+    # Covers GET /create (page), POST /create_atlas (API), GET /create-status (poll),
+    # and GET /templates/* (static assets for the create page).
+    location ~ ^/(create|create_atlas|create-status|templates/) {
+        proxy_pass https://127.0.0.1:9000;
+        proxy_ssl_verify off;
+        proxy_ssl_session_reuse on;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
