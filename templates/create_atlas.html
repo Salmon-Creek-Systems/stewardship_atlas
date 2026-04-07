@@ -44,7 +44,7 @@
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
                     <input type="number" id="bbox-west" step="any" placeholder="W" style="width:72px; text-align:center;" class="input-field">
-                    <span style="font-size:11px; color:#888;">lat/lon</span>
+                    <input type="text" id="bbox-csv" placeholder="W,S,E,N" style="width:80px; text-align:center; font-size:11px;" class="input-field" title="Paste a bounding box as W,S,E,N">
                     <input type="number" id="bbox-east" step="any" placeholder="E" style="width:72px; text-align:center;" class="input-field">
                 </div>
                 <div style="text-align:center;">
@@ -169,6 +169,20 @@
 
     ['bbox-north', 'bbox-south', 'bbox-east', 'bbox-west'].forEach(function(id) {
         document.getElementById(id).addEventListener('input', updateSubmitBtn);
+    });
+
+    document.getElementById('bbox-csv').addEventListener('input', function() {
+        const parts = this.value.split(',').map(s => s.trim());
+        if (parts.length === 4) {
+            const [w, s, e, n] = parts.map(Number);
+            if ([w, s, e, n].every(v => !isNaN(v))) {
+                document.getElementById('bbox-west').value  = w;
+                document.getElementById('bbox-south').value = s;
+                document.getElementById('bbox-east').value  = e;
+                document.getElementById('bbox-north').value = n;
+                updateSubmitBtn();
+            }
+        }
     });
 
     map.on('load', function() {
