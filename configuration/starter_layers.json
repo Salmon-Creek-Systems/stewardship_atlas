@@ -1,5 +1,6 @@
 [
-    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3, "interaction": "interface", "access": ["admin"]},
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3, "interaction": "interface", "access": ["admin"],
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "roads", "geometry_type": "linestring",
         "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
         "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
@@ -19,7 +20,8 @@
         ]
     },
     {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
-     "interaction": "interface", "vector_width": true},
+     "interaction": "interface", "vector_width": true,
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "landmarks", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
      "interaction": "interface",
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]}
