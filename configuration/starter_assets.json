@@ -31,5 +31,11 @@
         "type": "outlet",
         "name": "html",
         "config_def": "static_html"
+    },
+    "notebook": {
+        "type": "outlet",
+        "name": "notebook",
+        "config_def": "jupyter_notebook",
+        "access": ["technical"]
     }
 }
