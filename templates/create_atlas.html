@@ -35,9 +35,22 @@
         </div>
 
         <div class="control-panel">
-            <p style="margin:0 0 6px 0; font-size:13px;">Draw a rectangle to define the atlas area, then submit.</p>
+            <p style="margin:0 0 6px 0; font-size:13px;">Draw a rectangle to define the atlas area, or enter coordinates below, then submit.</p>
             <button id="draw-btn" class="button" style="width:100%; margin-bottom:6px;">Draw Area</button>
             <button id="clear-btn" class="button" style="width:100%; margin-bottom:6px;" disabled>Clear</button>
+            <div style="margin-bottom:6px;">
+                <div style="text-align:center; margin-bottom:2px;">
+                    <input type="number" id="bbox-north" step="any" placeholder="N" style="width:72px; text-align:center;" class="input-field">
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                    <input type="number" id="bbox-west" step="any" placeholder="W" style="width:72px; text-align:center;" class="input-field">
+                    <span style="font-size:11px; color:#888;">lat/lon</span>
+                    <input type="number" id="bbox-east" step="any" placeholder="E" style="width:72px; text-align:center;" class="input-field">
+                </div>
+                <div style="text-align:center;">
+                    <input type="number" id="bbox-south" step="any" placeholder="S" style="width:72px; text-align:center;" class="input-field">
+                </div>
+            </div>
             <button id="submit-btn" class="button" style="width:100%; background:#2a6;" disabled>Create Atlas</button>
         </div>
 
@@ -132,11 +145,27 @@
         return true;
     }
 
+    function getTypedBbox() {
+        const n = parseFloat(document.getElementById('bbox-north').value);
+        const s = parseFloat(document.getElementById('bbox-south').value);
+        const e = parseFloat(document.getElementById('bbox-east').value);
+        const w = parseFloat(document.getElementById('bbox-west').value);
+        if (!isNaN(n) && !isNaN(s) && !isNaN(e) && !isNaN(w)) {
+            return { north: n, south: s, east: e, west: w };
+        }
+        return null;
+    }
+
     function updateSubmitBtn() {
         const slug = document.getElementById('atlas-slug').value;
-        const valid = drawnBbox && slug && /^[a-zA-Z][a-zA-Z0-9_]*$/.test(slug);
+        const hasBbox = drawnBbox || getTypedBbox();
+        const valid = hasBbox && slug && /^[a-zA-Z][a-zA-Z0-9_]*$/.test(slug);
         document.getElementById('submit-btn').disabled = !valid;
     }
+
+    ['bbox-north', 'bbox-south', 'bbox-east', 'bbox-west'].forEach(function(id) {
+        document.getElementById(id).addEventListener('input', updateSubmitBtn);
+    });
 
     map.on('load', function() {
         td = new terraDraw.TerraDraw({
@@ -175,11 +204,12 @@
         drawnBbox = null;
         this.disabled = true;
         document.getElementById('draw-btn').disabled = false;
-        document.getElementById('submit-btn').disabled = true;
+        updateSubmitBtn();
     });
 
     document.getElementById('submit-btn').addEventListener('click', async function() {
-        if (!validateSlug() || !drawnBbox) return;
+        const bbox = getTypedBbox() || drawnBbox;
+        if (!validateSlug() || !bbox) return;
         const name = document.getElementById('atlas-name').value.trim() || document.getElementById('atlas-slug').value;
         const slug = document.getElementById('atlas-slug').value.trim();
 
@@ -194,7 +224,7 @@
             resp = await fetch('/create_atlas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, slug, bbox: drawnBbox })
+                body: JSON.stringify({ name, slug, bbox: bbox })
             });
         } catch(e) {
             appendLog('ERROR: ' + e.message);
