@@ -568,8 +568,12 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
             for inlet_name in ["public_roads", "public_creeks", "public_landmarks"]:
                 create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
-                atlas.materialize(ac, inlet_name)
-                create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
+                try:
+                    atlas.materialize(ac, inlet_name)
+                    create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
+                except Exception as inlet_err:
+                    logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
+                    create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
             for outlet_name in ["html", "webmap", "webedit"]:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                 atlas.materialize(ac, outlet_name)

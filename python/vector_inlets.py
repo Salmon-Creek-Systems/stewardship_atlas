@@ -53,7 +53,7 @@ def fetch_osm(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
     """Fetch OpenStreetMap data and store in versioned directory"""
     
     # Initialize Overpass API
-    api = overpass.API()
+    api = overpass.API(timeout=60)
     
     # Get query from template
     query = config['assets'][name]['config']['template'].format(**config['dataswale']['bbox'])
