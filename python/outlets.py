@@ -409,13 +409,17 @@ void await map.loadImage('{im_uri}',
         app_port = config.get('atlasappport', 9997)
         app_url = f"{base_url}:{app_port}"
     
+    has_raster = any(l.get('geometry_type') == 'raster' for l in config['dataswale']['layers'])
+    lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if has_raster else ''
+
     processed_template = template.format(
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
             webmap_help=help_html,
-            app_url=app_url)
+            app_url=app_url,
+            lidar_basemap_option=lidar_basemap_option)
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)
