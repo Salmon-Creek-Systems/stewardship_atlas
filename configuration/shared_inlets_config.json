@@ -609,5 +609,31 @@
         "asset_type": "inlet",
         "fetch_type": "gazetteer_grid",
         "num_cols": 6
+    },
+    "landfire_evc": {
+        "name": "landfire_evc",
+        "asset_type": "inlet",
+        "fetch_type": "fetch_url",
+        "interaction": "import",
+        "data_type": "tiff",
+        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF240/US_240EVC/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&size=2048,2048&format=tiff&pixelType=U8&noDataInterpretation=esriNoDataMatchAny&f=image",
+        "attribution": {
+            "url": "https://www.landfire.gov/",
+            "description": "LANDFIRE 2020 Existing Vegetation Cover (EVC) — percent canopy cover by lifeform",
+            "license": "Public Domain"
+        }
+    },
+    "landfire_evt": {
+        "name": "landfire_evt",
+        "asset_type": "inlet",
+        "fetch_type": "fetch_url",
+        "interaction": "import",
+        "data_type": "tiff",
+        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF240/US_240EVT/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&size=2048,2048&format=tiff&pixelType=U16&noDataInterpretation=esriNoDataMatchAny&f=image",
+        "attribution": {
+            "url": "https://www.landfire.gov/",
+            "description": "LANDFIRE 2020 Existing Vegetation Type (EVT) — vegetation community classification",
+            "license": "Public Domain"
+        }
     }
 }

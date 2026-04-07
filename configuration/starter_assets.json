@@ -14,6 +14,16 @@
         "out_layer": "landmarks",
         "config_def": "osm_poi"
     },
+    "landfire_evc": {
+        "type": "inlet",
+        "out_layer": "landfire_evc",
+        "config_def": "landfire_evc"
+    },
+    "landfire_evt": {
+        "type": "inlet",
+        "out_layer": "landfire_evt",
+        "config_def": "landfire_evt"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",

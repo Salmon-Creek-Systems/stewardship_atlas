@@ -24,5 +24,7 @@
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "landmarks", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
      "interaction": "interface",
-     "editable_columns": [{"name": "name", "type": "string", "default": ""}]}
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
+    {"name": "landfire_evc", "geometry_type": "raster"},
+    {"name": "landfire_evt", "geometry_type": "raster"}
 ]

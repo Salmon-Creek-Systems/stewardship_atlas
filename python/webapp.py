@@ -566,7 +566,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
-            for inlet_name in ["public_roads", "public_creeks", "public_landmarks"]:
+            for inlet_name in ["public_roads", "public_creeks", "public_landmarks", "landfire_evc", "landfire_evt"]:
                 create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
                 try:
                     await asyncio.to_thread(atlas.materialize, ac, inlet_name)
