@@ -128,9 +128,13 @@
         const slugField = document.getElementById('atlas-slug');
         slugField.value = nameToSlug(this.value);
         validateSlug();
+        updateSubmitBtn();
     });
 
-    document.getElementById('atlas-slug').addEventListener('input', validateSlug);
+    document.getElementById('atlas-slug').addEventListener('input', function() {
+        validateSlug();
+        updateSubmitBtn();
+    });
 
     function validateSlug() {
         const slug = document.getElementById('atlas-slug').value;
