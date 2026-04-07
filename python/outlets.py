@@ -567,17 +567,18 @@ def outlet_webmap(config, name):
     
     basemap_name = config['assets'][name]['in_layers'][0]
     basemap_dir = versioning.atlas_path(config, "layers") / basemap_name
-    
-    # make a JPG of basemap tiff..
-    # TODO this should be a tiling URL instead of a local file..
-    # TODO maybe resampling happens here?
-    # TODO here is where we should be using Dagster and actual asset mgmt
-    basemap_path = basemap_dir / f"{basemap_name}.jpg"
-    if basemap_path.exists():
-        logger.info(f"Using extant basemap: {basemap_path}.")
-    else:
-        logger.info(f"Generating basemap: {basemap_path}.")
-        utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
+
+    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+    basemap_layer = layers_dict.get(basemap_name, {})
+    if basemap_layer.get('geometry_type') == 'raster':
+        # make a JPG of basemap tiff..
+        # TODO this should be a tiling URL instead of a local file..
+        basemap_path = basemap_dir / f"{basemap_name}.jpg"
+        if basemap_path.exists():
+            logger.info(f"Using extant basemap: {basemap_path}.")
+        else:
+            logger.info(f"Generating basemap: {basemap_path}.")
+            utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
 
     template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
