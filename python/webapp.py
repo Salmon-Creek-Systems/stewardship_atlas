@@ -556,7 +556,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
     async def finish_creating():
         try:
             create_statuses[slug]["log"].append(["Creating atlas structure", datetime.now().isoformat()])
-            atlas.create(
+            await asyncio.to_thread(atlas.create,
                 layers_path=layers_path,
                 assets_path=assets_path,
                 data_root=SWALES_ROOT,
@@ -569,7 +569,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             for inlet_name in ["public_roads", "public_creeks", "public_landmarks"]:
                 create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
                 try:
-                    atlas.materialize(ac, inlet_name)
+                    await asyncio.to_thread(atlas.materialize, ac, inlet_name)
                     create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
                 except Exception as inlet_err:
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
@@ -577,7 +577,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             for outlet_name in ["notebook", "html", "webmap", "webedit"]:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                 try:
-                    atlas.materialize(ac, outlet_name)
+                    await asyncio.to_thread(atlas.materialize, ac, outlet_name)
                     create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
                 except Exception as outlet_err:
                     logging.error(f"Outlet {outlet_name} failed for {slug}: {outlet_err}")
