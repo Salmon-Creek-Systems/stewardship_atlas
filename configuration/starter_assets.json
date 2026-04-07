@@ -17,14 +17,14 @@
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["roads", "creeks", "landmarks"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
     "webedit": {
         "type": "outlet",
         "name": "webedit",
-        "in_layers": ["roads", "creeks", "landmarks"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks"],
         "config_def": "webedit"
     },
     "html": {
