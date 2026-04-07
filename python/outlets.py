@@ -674,6 +674,9 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         for att in ea.get('editable_columns', [])
     ]
     
+    has_raster = any(l.get('geometry_type') == 'raster' for l in config['dataswale']['layers'])
+    lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if has_raster else ''
+
     # Format template
     return template.format(
         swale_name=config['name'],
@@ -685,7 +688,8 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         map_config=json.dumps(map_config['map_config'], indent=2),
         mode_string=mode_string,
         controls_config=json.dumps(controls_config),
-        legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2))
+        legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2),
+        lidar_basemap_option=lidar_basemap_option)
 
 def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
