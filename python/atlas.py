@@ -349,7 +349,9 @@ def create(config: Dict[str, Any] = None,
     if (p / 'staging' / 'layers' / 'regions').exists():
         if feature_collection:
             logger.info(f"Storing initial feature collection in {p / 'staging' / 'layers' / 'regions'}...")
-            geojson.dump(feature_collection, open(p / 'staging' / 'layers' / 'regions' / 'default_atlas_regions.geojson', "w"))
+            regions_dir = p / 'staging' / 'layers' / 'regions'
+            geojson.dump(feature_collection, open(regions_dir / 'default_atlas_regions.geojson', "w"))
+            geojson.dump(feature_collection, open(regions_dir / 'regions.geojson', "w"))
     
     # Write config file
     config_path = p / 'staging' / 'atlas_config.json'

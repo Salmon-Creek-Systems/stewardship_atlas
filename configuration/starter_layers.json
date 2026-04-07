@@ -1,5 +1,5 @@
 [
-    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]},
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3, "interaction": "interface", "access": ["admin"]},
     {"name": "roads", "geometry_type": "linestring",
         "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
         "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
