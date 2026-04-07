@@ -566,10 +566,14 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
+            raster_inlets = {"landfire_evc", "landfire_evt"}
             for inlet_name in ["public_roads", "public_creeks", "public_landmarks", "landfire_evc", "landfire_evt"]:
                 create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
                 try:
                     await asyncio.to_thread(atlas.materialize, ac, inlet_name)
+                    if inlet_name in raster_inlets:
+                        layer_name = ac['assets'][inlet_name]['out_layer']
+                        await asyncio.to_thread(dataswale_geojson.refresh_raster_layer, ac, layer_name)
                     create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
                 except Exception as inlet_err:
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
