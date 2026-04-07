@@ -199,4 +199,5 @@ asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
     "gazetteer_grid": gazetteer_grid,
+    "fetch_osm": fetch_osm,
     }
