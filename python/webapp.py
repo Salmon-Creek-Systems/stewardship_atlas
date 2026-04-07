@@ -576,8 +576,13 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                     create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
             for outlet_name in ["notebook", "html", "webmap", "webedit"]:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
-                atlas.materialize(ac, outlet_name)
-                create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
+                try:
+                    atlas.materialize(ac, outlet_name)
+                    create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
+                except Exception as outlet_err:
+                    logging.error(f"Outlet {outlet_name} failed for {slug}: {outlet_err}")
+                    logging.error(traceback.format_exc())
+                    create_statuses[slug]["log"].append([f"Warning: {outlet_name} failed ({outlet_err}) — skipped", datetime.now().isoformat()])
 
             create_statuses[slug]["log"].append(["Done", datetime.now().isoformat()])
             create_statuses[slug]["creating"] = False

@@ -272,6 +272,10 @@
             try {
                 const r = await fetch('/create-status?atlas_slug=' + encodeURIComponent(slug));
                 data = await r.json();
+                if (!r.ok || !data.log) {
+                    appendLog('Poll error: unexpected response (' + r.status + ')');
+                    continue;
+                }
             } catch(e) {
                 appendLog('Poll error: ' + e.message);
                 continue;
