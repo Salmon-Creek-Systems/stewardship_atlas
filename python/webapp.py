@@ -766,6 +766,15 @@ class EmailPhotoPayload(BaseModel):
     received_at: str
 
 
+class WebPhotoPayload(BaseModel):
+    atlas_name: str
+    layer_name: str
+    image_data: str       # base64-encoded image bytes
+    filename: str
+    fallback_lat: float | None = None
+    fallback_lon: float | None = None
+
+
 def _send_bounce(from_addr: str, to_addrs, subject: str, body: str):
     """Send a bounce/notification email via SES. Silently logs on failure.
 
@@ -893,6 +902,77 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         raise
     except Exception as e:
         logging.error(f"Error in ingest_email_photo: {e}")
+        traceback_str = "".join(traceback.format_tb(e.__traceback__))
+        logging.error(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/ingest/web_photo")
+async def ingest_web_photo(payload: WebPhotoPayload):
+    try:
+        config_path = Path(SWALES_ROOT) / payload.atlas_name / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+
+        # Validate layer exists
+        layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
+        if payload.layer_name not in layer_names:
+            raise HTTPException(status_code=400, detail=f"Unknown layer: {payload.layer_name}")
+
+        # Decode image and extract GPS
+        image_bytes = base64.b64decode(payload.image_data)
+        gps = email_inlet.extract_gps(image_bytes)
+
+        if gps is None:
+            if payload.fallback_lat is None or payload.fallback_lon is None:
+                raise HTTPException(status_code=400, detail="No GPS data found in image and no fallback location provided")
+            lat = payload.fallback_lat
+            lon = payload.fallback_lon
+            extra_props = {}
+        else:
+            lat = gps["lat"]
+            lon = gps["lon"]
+            extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
+
+        # Upload image to S3
+        import boto3
+        s3 = boto3.client("s3")
+        bucket = os.environ.get("ATLAS_DATA_BUCKET")
+        if not bucket:
+            raise HTTPException(status_code=500, detail="ATLAS_DATA_BUCKET env var not set")
+        timestamp_str = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        s3_key = f"{payload.atlas_name}/media/email_photos/web_{timestamp_str}_{payload.filename}"
+        import mimetypes
+        content_type = mimetypes.guess_type(payload.filename)[0] or "application/octet-stream"
+        s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes,
+                      ContentType=content_type, ContentDisposition="inline")
+        image_url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
+
+        title = Path(payload.filename).stem
+        feature = email_inlet.build_feature(
+            lat=lat,
+            lon=lon,
+            title=title,
+            sender="web_upload",
+            timestamp=datetime.utcnow().isoformat(),
+            image_url=image_url,
+            extra_props=extra_props,
+        )
+        fc = {"type": "FeatureCollection", "features": [feature]}
+        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=payload.layer_name)
+        dataswale_geojson.refresh_vector_layer(ac, payload.layer_name)
+
+        return {
+            "status": "ok",
+            "layer": payload.layer_name,
+            "lat": lat,
+            "lon": lon,
+            "image_url": image_url,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error in ingest_web_photo: {e}")
         traceback_str = "".join(traceback.format_tb(e.__traceback__))
         logging.error(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))

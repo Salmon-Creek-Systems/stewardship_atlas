@@ -595,7 +595,7 @@ def outlet_webmap(config, name):
   
     return output_path
 
-def generate_edit_controls_html(editable_attributes):
+def generate_edit_controls_html(editable_attributes, geometry_type='point'):
     """Generate HTML for edit controls based on attribute configuration"""
     select_html = ""
     string_html = ""
@@ -623,12 +623,15 @@ def generate_edit_controls_html(editable_attributes):
                 # {str_value} {value[ edit_att['name'] ] }
             select_html += "</select></div>"
             
+    photo_button = '<button id="upload-photo-button" class="button">Upload Photo</button>\n            ' \
+        if geometry_type == 'point' else ''
+
     # Add drawing action buttons at the bottom of the editing controls
-    buttons_html = """
+    buttons_html = f"""
         <div class="button-group">
             <button id="reset-button" class="warning-button">Reset Drawing</button>
             <button id="upload-button" class="button">Upload GeoJSON</button>
-            <button id="save-button" class="button">Save Features</button>
+            {photo_button}<button id="save-button" class="button">Save Features</button>
         </div>
         <hr style="margin: 16px 0; border-color: #ccc;">
         <div class="button-group">
@@ -651,7 +654,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         template = f.read()
         
     # Generate controls HTML
-    controls_html = generate_edit_controls_html(ea.get('editable_columns', []))
+    controls_html = generate_edit_controls_html(ea.get('editable_columns', []), ea.get('geometry_type', 'point'))
     
     # Prepare mode string
     mode_string = {

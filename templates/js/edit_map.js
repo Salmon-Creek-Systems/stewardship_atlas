@@ -333,6 +333,63 @@ document.getElementById('delete-confirm-button').addEventListener('click', funct
     xmlhttp.send(JSON.stringify({"data": geojson}));
 });
 
+// Add photo upload button functionality (point layers only)
+const uploadPhotoBtn = document.getElementById('upload-photo-button');
+if (uploadPhotoBtn) {
+    uploadPhotoBtn.addEventListener('click', function() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+
+        fileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                // Strip the data URL prefix to get raw base64
+                const base64 = ev.target.result.split(',')[1];
+
+                // Get fallback coords from any drawn point in TerraDraw
+                let fallback_lat = null, fallback_lon = null;
+                const features = td.getSnapshot();
+                if (features.length > 0 && features[0].geometry.type === 'Point') {
+                    fallback_lon = features[0].geometry.coordinates[0];
+                    fallback_lat = features[0].geometry.coordinates[1];
+                }
+
+                const payload = {
+                    atlas_name: EDIT_CONFIG.swalename,
+                    layer_name: EDIT_CONFIG.layerName,
+                    image_data: base64,
+                    filename: file.name,
+                    fallback_lat: fallback_lat,
+                    fallback_lon: fallback_lon
+                };
+
+                fetch(EDIT_CONFIG.appUrl + '/ingest/web_photo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                }).then(function(r) {
+                    return r.json().then(function(data) { return {ok: r.ok, data: data}; });
+                }).then(function(result) {
+                    if (result.ok && result.data.status === 'ok') {
+                        showSuccessNotification('Photo added at ' + result.data.lat.toFixed(5) + ', ' + result.data.lon.toFixed(5));
+                    } else {
+                        showErrorPopup('Photo upload failed: ' + (result.data.detail || 'unknown error'));
+                    }
+                }).catch(function(err) {
+                    showErrorPopup('Photo upload error: ' + err.message);
+                });
+            };
+            reader.readAsDataURL(file);
+        };
+
+        fileInput.click();
+    });
+}
+
 // Add upload button functionality
 document.getElementById('upload-button').addEventListener('click', function() {
     // Create a file input element
