@@ -139,11 +139,11 @@
     }
 
     map.on('load', function() {
-        td = new TerraDraw.TerraDraw({
-            adapter: new TerraDraw.TerraDrawMapLibreGLAdapter({ map }),
+        td = new terraDraw.TerraDraw({
+            adapter: new terraDraw.TerraDrawMapLibreGLAdapter({ map }),
             modes: [
-                new TerraDraw.TerraDrawPolygonMode(),
-                new TerraDraw.TerraDrawSelectMode({ flags: { polygon: { feature: { draggable: true } } } })
+                new terraDraw.TerraDrawPolygonMode(),
+                new terraDraw.TerraDrawSelectMode({ flags: { polygon: { feature: { draggable: true } } } })
             ]
         });
         td.start();
