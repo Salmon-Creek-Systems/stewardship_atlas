@@ -87,5 +87,17 @@
             "license": "Apache 2.0",
             "citation": "Uber H3"
         }
+    },
+    "fuel_mass_landfire": {
+        "type": "eddy",
+        "fetch_type": "fuel_mass_landfire",
+        "in_layer": "burns_index",
+        "out_layer": "burns_index",
+        "landfire_layer": "Landfire_LF2024/LF2024_EVC_CONUS",
+        "attribution": {
+            "url": "https://www.landfire.gov/",
+            "description": "Fuel mass per H3 cell (tons/acre) derived from LANDFIRE EVC",
+            "license": "Public Domain"
+        }
     }
 }
