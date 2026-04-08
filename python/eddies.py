@@ -378,6 +378,54 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
         raise Exception(f"Failed to generate H3 indices for LineString: {str(e)}")
 
 
+def h3_for_point(geometry, starting_res=8, swap_coordinates=True, max_num_cells=None):
+    """
+    Generate an H3 index for a GeoJSON Point geometry.
+
+    Args:
+        geometry: GeoJSON Point geometry object with type "Point" and coordinates [lng, lat]
+        starting_res: H3 resolution to use (default: 8)
+        swap_coordinates: Whether coordinates are [lng, lat] order (default: True);
+                          if True, swaps to lat, lng before calling H3
+
+    Returns:
+        Dictionary containing the single H3 cell, resolution used, and representative index
+
+    Raises:
+        Exception: If geometry is invalid or processing fails
+    """
+    try:
+        if not isinstance(geometry, dict):
+            raise Exception("Geometry must be a dictionary")
+
+        if geometry.get('type') != 'Point':
+            raise Exception(f"Geometry type must be 'Point', got '{geometry.get('type')}'")
+
+        if 'coordinates' not in geometry:
+            raise Exception("Geometry must contain 'coordinates' field")
+
+        coordinates = geometry['coordinates']
+        if not coordinates or len(coordinates) < 2:
+            raise Exception("Point coordinates must have at least [lng, lat]")
+
+        if swap_coordinates:
+            # GeoJSON is [lng, lat]; H3 wants (lat, lng)
+            lng, lat = coordinates[0], coordinates[1]
+        else:
+            lat, lng = coordinates[0], coordinates[1]
+
+        cell = h3.latlng_to_cell(lat, lng, starting_res)
+        return {
+            'cells': [cell],
+            'resolution': starting_res,
+            'cell_count': 1,
+            'representative_index': cell
+        }
+
+    except Exception as e:
+        raise Exception(f"Failed to generate H3 index for Point: {str(e)}")
+
+
 def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cells=10):
     """
     Generate H3 indices for a GeoJSON polygon geometry.
@@ -513,8 +561,10 @@ def h3_cells(config, asset_name):
             h3_function = h3_for_polygon
         elif geometry_type == 'linestring':
             h3_function = h3_for_linestring
+        elif geometry_type == 'point':
+            h3_function = h3_for_point
         else:
-            raise Exception(f"Unsupported geometry type '{geometry_type}' for layer '{in_layer}'. Only 'polygon' and 'linestring' are supported.")
+            raise Exception(f"Unsupported geometry type '{geometry_type}' for layer '{in_layer}'. Only 'polygon', 'linestring', and 'point' are supported.")
         
         # Process each feature and collect H3 cells with properties
         features = layer_data['features']
