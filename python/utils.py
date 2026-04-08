@@ -77,15 +77,47 @@ def geojson_multipolygon_to_bbox(geojson):
     }
 
 def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
-    """Convert TIFF to JPG using versioned paths"""
-    # Construct JPG path
-    jpg_path = tiff_path + ".jpg"
-    
-    
+    """Convert TIFF to JPG using versioned paths.
+
+    For single-band rasters (e.g. LANDFIRE), applies a percentile stretch
+    (2nd–98th) after masking nodata so actual data variation is visible.
+    For multi-band (RGB) rasters, falls back to gdal_translate -scale.
+    """
+    jpg_path = str(tiff_path) + ".jpg"
+    tiff_path = str(tiff_path)
     logger.debug(f"Converting TIFF to JPG: {jpg_path}")
-    subprocess.check_output(['gdal_translate', '-scale', tiff_path, jpg_path])
-    # subprocess.check_output(['gdal_translate','-scale',tiff_path, jpg_path])
-    
+
+    try:
+        from osgeo import gdal
+        import numpy as np
+        ds = gdal.Open(tiff_path)
+        n_bands = ds.RasterCount
+        if n_bands >= 3:
+            # RGB raster — simple auto-scale is fine
+            subprocess.check_output(['gdal_translate', '-scale', tiff_path, jpg_path])
+        else:
+            # Single-band data raster — percentile stretch to avoid nodata poisoning scale
+            band = ds.GetRasterBand(1)
+            nodata = band.GetNoDataValue()
+            data = band.ReadAsArray().astype(float)
+            if nodata is not None:
+                data = np.where(data == nodata, np.nan, data)
+            valid = data[~np.isnan(data)]
+            if len(valid) == 0:
+                logger.warning(f"tiff2jpg: no valid data pixels in {tiff_path}")
+                return jpg_path
+            lo, hi = np.percentile(valid, 2), np.percentile(valid, 98)
+            if hi <= lo:
+                hi = lo + 1
+            logger.debug(f"tiff2jpg: scaling {tiff_path} from [{lo:.1f}, {hi:.1f}] → [0, 255]")
+            scaled = np.clip((data - lo) / (hi - lo) * 255, 0, 255)
+            scaled = np.where(np.isnan(scaled), 0, scaled).astype(np.uint8)
+            from PIL import Image
+            Image.fromarray(scaled, mode='L').save(jpg_path)
+    except Exception as e:
+        logger.warning(f"tiff2jpg Python approach failed ({e}), falling back to gdal_translate")
+        subprocess.check_output(['gdal_translate', '-scale', tiff_path, jpg_path])
+
     return jpg_path
 
 def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
