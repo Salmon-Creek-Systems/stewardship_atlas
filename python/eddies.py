@@ -820,6 +820,153 @@ def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     return out_path
 
 
+def _h3_grid_distance_safe(cell_a, cell_b):
+    """H3 grid distance handling resolution mismatches by upsampling lower-res cell."""
+    res_a = h3.get_resolution(cell_a)
+    res_b = h3.get_resolution(cell_b)
+    if res_a == res_b:
+        return h3.grid_distance(cell_a, cell_b)
+    elif res_a < res_b:
+        cell_a = h3.cell_to_center_child(cell_a, res_b)
+    else:
+        cell_b = h3.cell_to_center_child(cell_b, res_a)
+    return h3.grid_distance(cell_a, cell_b)
+
+
+def _get_cell_path_distances(burns_features, target_features, distance_name):
+    """
+    For each burn cell, find minimum H3 grid distance to any cell in target_features.
+    Attaches result as burn['properties'][distance_name].
+    """
+    target_cells = [f['properties']['h3_index'] for f in target_features
+                    if f.get('properties', {}).get('h3_index')]
+    if not target_cells:
+        for burn in burns_features:
+            burn['properties'][distance_name] = 0
+        return burns_features
+    for burn in burns_features:
+        burn_cell = burn['properties'].get('h3_index')
+        if not burn_cell:
+            burn['properties'][distance_name] = 0
+            continue
+        min_dist = min(_h3_grid_distance_safe(burn_cell, t) for t in target_cells)
+        burn['properties'][distance_name] = min_dist
+    return burns_features
+
+
+def _cell_yield(burn_props, treatment_key, tc, biomass_price, biochar_price):
+    """Compute per-treatment metrics for a single burn cell."""
+    fuel_mass = burn_props.get('fuel_mass', 1.0) or 1.0
+    water_distance = burn_props.get('creeks_distance', 0)
+    drag_distance = burn_props.get('roads_distance', 0)
+    processing_rate = (tc['production_rate']
+                       + water_distance * tc['water_distance_cost']
+                       + drag_distance * tc['drag_distance_cost'])
+    processed = fuel_mass * tc['biomass_rate']
+    biochar = tc['biochar_rate'] * processed
+    cost_rate = tc['cost_rate'] / 8.0  # daily -> hourly
+    budget_cost = processing_rate * cost_rate
+    risk_reduced = fuel_mass * tc['risk_reduction_rate']
+    air_pollution = tc['air_pollution'] * processed
+    biomass_sale = biomass_price * processed
+    biochar_sale = biochar_price * biochar
+    return {
+        'budget_cost': budget_cost,
+        'biomass_extracted': processed,
+        'biochar_extracted': biochar,
+        'air_pollution': air_pollution,
+        'risk_reduced': risk_reduced,
+        'biomass_sale': biomass_sale,
+        'biochar_sale': biochar_sale,
+    }
+
+
+def biochar_simulation(config, asset_name):
+    """
+    Biochar logistics simulation eddy.
+    Reads burns_index, roads_index, creeks_index, processing_sites_index.
+    For each burn cell, computes H3 grid distances to infrastructure and evaluates
+    all treatment options. Writes results to the processing_sites layer directory.
+    """
+    ac = config['assets'][asset_name]
+    biomass_price = ac.get('biomass_price', 0.001)
+    biochar_price = ac.get('biochar_price', 0.01)
+
+    # Load treatments file — path relative to atlas app root
+    app_root = versioning.atlas_path(config, version='app')
+    treatments_path = Path(app_root) / ac['treatments_file']
+    with open(treatments_path) as f:
+        treatments_raw = json.load(f)
+    treatments = {k: v for k, v in treatments_raw.items() if not k.startswith('_')}
+
+    # Load layers
+    def load_layer(name):
+        path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
+        with open(path) as f:
+            fc = json.load(f)
+        return fc.get('features', [])
+
+    burns = load_layer('burns_index')
+    roads = load_layer('roads_index')
+    creeks = load_layer('creeks_index')
+    sites = load_layer('processing_sites_index')
+
+    if not burns:
+        logger.warning(f"biochar_simulation: burns_index is empty, nothing to simulate")
+        return
+
+    # Compute distances from each burn cell to nearest infrastructure
+    logger.info(f"biochar_simulation: computing distances for {len(burns)} burn cells")
+    burns = _get_cell_path_distances(burns, roads, 'roads_distance')
+    burns = _get_cell_path_distances(burns, creeks, 'creeks_distance')
+    burns = _get_cell_path_distances(burns, sites, 'sites_distance')
+
+    # Evaluate all treatments per burn cell; accumulate per-treatment totals
+    metric_keys = ['budget_cost', 'biomass_extracted', 'biochar_extracted',
+                   'air_pollution', 'risk_reduced', 'biomass_sale', 'biochar_sale']
+    totals = {t: {k: 0.0 for k in metric_keys} for t in treatments}
+
+    for burn in burns:
+        burn['properties']['treatments'] = {}
+        for t_key, tc in treatments.items():
+            result = _cell_yield(burn['properties'], t_key, tc, biomass_price, biochar_price)
+            burn['properties']['treatments'][t_key] = result
+            for k in metric_keys:
+                totals[t_key][k] += result[k]
+
+    # Write burns_simulation.geojson — all burn cells with per-cell metrics
+    sites_layer_path = versioning.atlas_path(config, 'layers') / 'processing_sites' / 'processing_sites.geojson'
+    layer_dir = Path(sites_layer_path).parent
+    layer_dir.mkdir(parents=True, exist_ok=True)
+
+    sim_path = layer_dir / 'burns_simulation.geojson'
+    with open(sim_path, 'w') as f:
+        json.dump({'type': 'FeatureCollection', 'features': burns}, f)
+    logger.info(f"biochar_simulation: wrote {sim_path}")
+
+    # Write biochar_summary.csv — one row per treatment
+    import csv
+    csv_path = layer_dir / 'biochar_summary.csv'
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['treatment'] + metric_keys)
+        writer.writeheader()
+        for t_key, vals in totals.items():
+            writer.writerow({'treatment': t_key, **vals})
+    logger.info(f"biochar_simulation: wrote {csv_path}")
+
+    # Update processing_sites GeoJSON — annotate each site point with totals
+    try:
+        with open(sites_layer_path) as f:
+            sites_fc = json.load(f)
+        for feature in sites_fc.get('features', []):
+            feature['properties']['simulation_totals'] = totals
+        with open(sites_layer_path, 'w') as f:
+            json.dump(sites_fc, f)
+        logger.info(f"biochar_simulation: annotated processing_sites with simulation totals")
+    except (FileNotFoundError, json.JSONDecodeError):
+        logger.warning("biochar_simulation: processing_sites layer not found or empty, skipping annotation")
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -827,4 +974,5 @@ asset_methods = {
     "h3_cells": h3_cells,
     "hillshade_tiles": hillshade_to_pmtiles,
     "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
+    "biochar_simulation": biochar_simulation,
 }
