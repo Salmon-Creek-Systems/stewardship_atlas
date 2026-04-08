@@ -33,23 +33,18 @@ def webmap_json(config, name, sprite_json=None):
     Layers which invole dynamic content - marker images for example - will be added seperately 
     since the layer must be set up inside the callback for the image load.
     """
-    # Calculate center and zoom from bbox
     bbox = config['dataswale']['bbox']
-    center_lat = (bbox['north'] + bbox['south']) / 2
-    center_lon = (bbox['east'] + bbox['west']) / 2 
-    lat_diff = bbox['north'] - bbox['south']
-    zoom = 12  # Default zoom, could be calculated based on bbox size
 
     # Set up the map config general properties
     atlas_url = f"{config['base_url']}/staging"
     sprite_url = atlas_url + "/outlets/" + name + "/sprite"
     map_config = {
         "container": "map",
+        "bounds": [[bbox['west'], bbox['south']], [bbox['east'], bbox['north']]],
+        "fitBoundsOptions": {"padding": 40},
         "style": {
             "glyphs" : "https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf",
             "version": 8,
-            "center": [center_lon, center_lat],
-            "zoom": zoom
             }
     }
     
@@ -409,8 +404,10 @@ void await map.loadImage('{im_uri}',
         app_port = config.get('atlasappport', 9997)
         app_url = f"{base_url}:{app_port}"
     
-    has_raster = any(l.get('geometry_type') == 'raster' for l in config['dataswale']['layers'])
-    lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if has_raster else ''
+    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+    webmap_in_layers = config.get('assets', {}).get('webmap', {}).get('in_layers', [])
+    basemap_is_raster = bool(webmap_in_layers) and layers_dict.get(webmap_in_layers[0], {}).get('geometry_type') == 'raster'
+    lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if basemap_is_raster else ''
 
     processed_template = template.format(
             title=title,
@@ -674,8 +671,10 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         for att in ea.get('editable_columns', [])
     ]
     
-    has_raster = any(l.get('geometry_type') == 'raster' for l in config['dataswale']['layers'])
-    lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if has_raster else ''
+    layers_dict_edit = {l['name']: l for l in config['dataswale']['layers']}
+    webedit_in_layers = config.get('assets', {}).get('webedit', {}).get('in_layers', [])
+    basemap_is_raster_edit = bool(webedit_in_layers) and layers_dict_edit.get(webedit_in_layers[0], {}).get('geometry_type') == 'raster'
+    lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if basemap_is_raster_edit else ''
 
     # Format template
     return template.format(

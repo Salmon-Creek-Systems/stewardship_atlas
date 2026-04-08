@@ -578,7 +578,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 except Exception as inlet_err:
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
                     create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
-            for outlet_name in ["notebook", "html", "webmap", "webedit"]:
+            for outlet_name in ["notebook", "webmap", "webedit", "html"]:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                 try:
                     await asyncio.to_thread(atlas.materialize, ac, outlet_name)
