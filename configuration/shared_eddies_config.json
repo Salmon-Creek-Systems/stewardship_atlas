@@ -99,5 +99,14 @@
             "description": "Fuel mass per H3 cell (tons/acre) derived from LANDFIRE EVC",
             "license": "Public Domain"
         }
+    },
+    "biochar_simulation": {
+        "type": "eddy",
+        "fetch_type": "biochar_simulation",
+        "in_layers": ["burns_index", "roads_index", "creeks_index", "processing_sites_index"],
+        "out_layer": "processing_sites",
+        "treatments_file": "configuration/treatments/default_treatments.json",
+        "biomass_price": 0.001,
+        "biochar_price": 0.01
     }
 }
