@@ -10,7 +10,7 @@ import numpy as np
 # Add the python directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from eddies import contours_gdal, hillshade_gdal, asset_methods
+from eddies import contours_gdal, hillshade_gdal, h3_for_point, asset_methods
 
 class TestEddies(unittest.TestCase):
     def setUp(self):
@@ -143,6 +143,58 @@ class TestEddies(unittest.TestCase):
         self.assertIn('derived_hillshade', asset_methods)
         self.assertEqual(asset_methods['generate_contours'], contours_gdal)
         self.assertEqual(asset_methods['derived_hillshade'], hillshade_gdal)
+
+
+class TestH3ForPoint(unittest.TestCase):
+    """Tests for h3_for_point — Point geometry H3 indexing."""
+
+    def _make_point(self, lng, lat):
+        return {'type': 'Point', 'coordinates': [lng, lat]}
+
+    def test_returns_single_cell(self):
+        """h3_for_point should return exactly one H3 cell."""
+        geometry = self._make_point(-122.4, 37.8)
+        result = h3_for_point(geometry)
+        self.assertEqual(result['cell_count'], 1)
+        self.assertEqual(len(result['cells']), 1)
+
+    def test_representative_index_matches_cell(self):
+        """representative_index should be the same as the single cell."""
+        geometry = self._make_point(-122.4, 37.8)
+        result = h3_for_point(geometry)
+        self.assertEqual(result['representative_index'], result['cells'][0])
+
+    def test_resolution_matches_starting_res(self):
+        """Returned resolution should match the requested starting resolution."""
+        geometry = self._make_point(-118.2, 34.0)
+        result = h3_for_point(geometry, starting_res=9)
+        self.assertEqual(result['resolution'], 9)
+
+    def test_cell_is_valid_h3_string(self):
+        """The returned cell should be a non-empty string (valid H3 index)."""
+        geometry = self._make_point(-122.4, 37.8)
+        result = h3_for_point(geometry)
+        cell = result['cells'][0]
+        self.assertIsInstance(cell, str)
+        self.assertTrue(len(cell) > 0)
+
+    def test_wrong_geometry_type_raises(self):
+        """Passing a non-Point geometry should raise an exception."""
+        geometry = {'type': 'LineString', 'coordinates': [[-122.4, 37.8], [-122.5, 37.9]]}
+        with self.assertRaises(Exception):
+            h3_for_point(geometry)
+
+    def test_missing_coordinates_raises(self):
+        """Geometry without coordinates should raise an exception."""
+        with self.assertRaises(Exception):
+            h3_for_point({'type': 'Point'})
+
+    def test_accepts_max_num_cells_kwarg(self):
+        """h3_for_point should silently accept max_num_cells (used by h3_cells dispatcher)."""
+        geometry = self._make_point(-122.4, 37.8)
+        result = h3_for_point(geometry, starting_res=8, max_num_cells=10)
+        self.assertEqual(result['cell_count'], 1)
+
 
 if __name__ == '__main__':
     unittest.main() 

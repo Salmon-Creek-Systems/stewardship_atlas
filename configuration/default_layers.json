@@ -226,5 +226,23 @@
         "fill_opacity": 0.3,
         "add_labels": false,
         "access": ["internal", "public", "admin"]
+    },
+    "processing_sites": {
+        "geometry_type": "point",
+        "color": [128, 0, 128],
+        "add_labels": true,
+        "interaction": "interface",
+        "access": ["admin"],
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Processing Site"}
+        ]
+    },
+    "processing_sites_index": {
+        "geometry_type": "polygon",
+        "color": [128, 0, 128],
+        "fill_color": [128, 0, 128],
+        "fill_opacity": 0.3,
+        "add_labels": false,
+        "access": ["internal", "public", "admin"]
     }
 }
