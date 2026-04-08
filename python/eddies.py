@@ -514,7 +514,7 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
 
 def h3_cells(config, asset_name):
     """
-    Eddy function to generate hexagonal H3 cell features from input layer geometries.
+    Eddy function to generate hexagonal H3 cell features from input layer geometries. 
     
     Args:
         config: Configuration dictionary containing assets
@@ -1088,18 +1088,17 @@ def biochar_simulation(config, asset_name):
                 totals[t_key][k] += result[k]
 
     # Write burns_simulation.geojson — all burn cells with per-cell metrics
-    sites_layer_path = versioning.atlas_path(config, 'layers') / 'processing_sites' / 'processing_sites.geojson'
-    layer_dir = Path(sites_layer_path).parent
-    layer_dir.mkdir(parents=True, exist_ok=True)
+    sim_layer_dir = versioning.atlas_path(config, 'layers') / 'burns_simulation'
+    sim_layer_dir.mkdir(parents=True, exist_ok=True)
 
-    sim_path = layer_dir / 'burns_simulation.geojson'
+    sim_path = sim_layer_dir / 'burns_simulation.geojson'
     with open(sim_path, 'w') as f:
         json.dump({'type': 'FeatureCollection', 'features': burns}, f)
     logger.info(f"biochar_simulation: wrote {sim_path}")
 
-    # Write biochar_summary.csv — one row per treatment
+    # Write biochar_summary.csv — one row per treatment (alongside the simulation layer)
     import csv
-    csv_path = layer_dir / 'biochar_summary.csv'
+    csv_path = sim_layer_dir / 'biochar_summary.csv'
     with open(csv_path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['treatment'] + metric_keys)
         writer.writeheader()
@@ -1108,6 +1107,7 @@ def biochar_simulation(config, asset_name):
     logger.info(f"biochar_simulation: wrote {csv_path}")
 
     # Update processing_sites GeoJSON — annotate each site point with totals
+    sites_layer_path = versioning.atlas_path(config, 'layers') / 'processing_sites' / 'processing_sites.geojson'
     try:
         with open(sites_layer_path) as f:
             sites_fc = json.load(f)
