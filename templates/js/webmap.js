@@ -171,12 +171,20 @@ map.on('load', async () => {
     // Initialize basemap switching
     initializeBasemapSwitching(map);
 
-    // Set initial visibility - hide all basemaps except the default one
-    map.setLayoutProperty('satellite-layer', 'visibility', 'none');
-    map.setLayoutProperty('usgs-layer', 'visibility', 'none');
-    map.setLayoutProperty('terrain-layer', 'visibility', 'none');
-    map.setLayoutProperty('shaded-relief-layer', 'visibility', 'none');
-    // The default basemap should already be visible from the style
+    // Hide all basemaps then show the one matching the dropdown's selected value
+    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer', 'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
+    allBasemapLayerIds.forEach(id => {
+        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+    });
+    const basemapValueToLayer = {
+        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
+        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
+        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
+    };
+    const initialBasemap = document.getElementById('basemap-select').value;
+    if (basemapValueToLayer[initialBasemap]) {
+        map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
+    }
     // layers we need to load dynamically follow:
     // {dynamic_layers}
 

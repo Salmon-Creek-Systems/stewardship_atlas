@@ -565,6 +565,10 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             )
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
+            atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
+            with open(atlas_geojson_path, 'w') as f:
+                json.dump(feature_collection, f, indent=2)
+
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
             raster_inlets = {"landfire_evc", "landfire_evt"}
             for inlet_name in ["public_roads", "public_creeks", "public_landmarks", "landfire_evc", "landfire_evt"]:
