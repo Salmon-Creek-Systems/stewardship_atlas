@@ -10,6 +10,15 @@ import numpy as np
 # Add the python directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Stub out heavy server-side dependencies before importing eddies
+for _mod in ('duckdb', 'geojson', 'osgeo', 'osgeo.gdal', 'osgeo.ogr',
+             'versioning', 'utils', 'outlets', 'dataswale_geojson',
+             'matplotlib', 'matplotlib.colors', 'matplotlib.pyplot',
+             'rasterio', 'geopandas', 'mercantile', 'pmtiles',
+             'pmtiles.writer', 'shapely', 'shapely.geometry'):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
+
 from eddies import contours_gdal, hillshade_gdal, h3_for_point, asset_methods
 
 class TestEddies(unittest.TestCase):
