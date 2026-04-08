@@ -820,6 +820,109 @@ def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     return out_path
 
 
+def fuel_mass_from_landfire(config: Dict[str, Any], asset_name: str):
+    """
+    Annotates burns_index H3 cells with fuel_mass (tons/acre) derived from LANDFIRE EVC.
+    Downloads a single EVC raster patch covering the atlas bbox, samples at each cell centroid.
+    """
+    import rasterio
+    import requests
+    import tempfile
+
+    ac = config['assets'][asset_name]
+    bbox = config['dataswale']['bbox']
+    landfire_layer = ac.get('landfire_layer', 'Landfire_LF2024/LF2024_EVC_CONUS')
+
+    # Load burns_index layer
+    burns_index_path = versioning.atlas_path(config, 'layers') / 'burns_index' / 'burns_index.geojson'
+    with open(burns_index_path) as f:
+        fc = geojson.load(f)
+
+    features = fc.get('features', [])
+    if not features:
+        logger.warning(f"fuel_mass_from_landfire: burns_index has no features, nothing to annotate")
+        return burns_index_path
+
+    # Build LANDFIRE EVC export URL
+    url = (
+        f"https://lfps.usgs.gov/arcgis/rest/services/{landfire_layer}/ImageServer/exportImage"
+        f"?bbox={bbox['west']},{bbox['south']},{bbox['east']},{bbox['north']}"
+        f"&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff"
+        f"&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image"
+    )
+    logger.info(f"fuel_mass_from_landfire: fetching EVC raster from {url}")
+
+    # Load EVC → fuel_mass lookup table
+    config_dir = Path(__file__).parent.parent / 'configuration'
+    lookup_path = config_dir / 'landfire_evc_fuel_loads.json'
+    with open(lookup_path) as f:
+        evc_lookup = json.load(f)
+    default_fuel = float(evc_lookup.get('_default', 2.0))
+    nodata_value = 32767  # S16 nodata for LANDFIRE
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_tiff = Path(tmp) / 'evc.tiff'
+
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        with open(tmp_tiff, 'wb') as f:
+            f.write(response.content)
+        logger.info(f"fuel_mass_from_landfire: downloaded EVC raster ({tmp_tiff.stat().st_size // 1024}KB)")
+
+        annotated = 0
+        nodata_count = 0
+        out_of_bounds_count = 0
+
+        with rasterio.open(str(tmp_tiff)) as dataset:
+            raster_data = dataset.read(1)
+            transform = dataset.transform
+            raster_height, raster_width = raster_data.shape
+
+            for feature in features:
+                h3_index = feature.get('properties', {}).get('h3_index')
+                if not h3_index:
+                    logger.warning(f"fuel_mass_from_landfire: feature missing h3_index, skipping")
+                    continue
+
+                lat, lng = h3.cell_to_latlng(h3_index)
+
+                try:
+                    row, col = dataset.index(lng, lat)
+                except Exception:
+                    # centroid outside raster bounds
+                    feature['properties']['fuel_mass'] = 0.0
+                    out_of_bounds_count += 1
+                    continue
+
+                if row < 0 or row >= raster_height or col < 0 or col >= raster_width:
+                    feature['properties']['fuel_mass'] = 0.0
+                    out_of_bounds_count += 1
+                    continue
+
+                pixel_value = int(raster_data[row, col])
+
+                if pixel_value == nodata_value:
+                    feature['properties']['fuel_mass'] = 0.0
+                    nodata_count += 1
+                    continue
+
+                fuel_load = float(evc_lookup.get(str(pixel_value), default_fuel))
+                feature['properties']['fuel_mass'] = fuel_load
+                annotated += 1
+
+    logger.info(
+        f"fuel_mass_from_landfire: annotated {annotated} cells, "
+        f"{nodata_count} nodata, {out_of_bounds_count} out-of-bounds"
+    )
+
+    # Write updated burns_index back in place
+    burns_index_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(burns_index_path, 'w') as f:
+        geojson.dump(fc, f)
+
+    return burns_index_path
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -827,4 +930,5 @@ asset_methods = {
     "h3_cells": h3_cells,
     "hillshade_tiles": hillshade_to_pmtiles,
     "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
+    "fuel_mass_landfire": fuel_mass_from_landfire,
 }
