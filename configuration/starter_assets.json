@@ -27,7 +27,7 @@
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },

@@ -569,20 +569,20 @@ def outlet_webmap(config, name):
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)
     
-    basemap_name = config['assets'][name]['in_layers'][0]
-    basemap_dir = versioning.atlas_path(config, "layers") / basemap_name
-
     layers_dict = {l['name']: l for l in config['dataswale']['layers']}
-    basemap_layer = layers_dict.get(basemap_name, {})
-    if basemap_layer.get('geometry_type') == 'raster':
-        # make a JPG of basemap tiff..
-        # TODO this should be a tiling URL instead of a local file..
-        basemap_path = basemap_dir / f"{basemap_name}.jpg"
-        if basemap_path.exists():
-            logger.info(f"Using extant basemap: {basemap_path}.")
-        else:
-            logger.info(f"Generating basemap: {basemap_path}.")
-            utils.tiff2jpg(f"{basemap_dir}/{basemap_name}.tiff", basemap_path)
+    for layer_name in config['assets'][name]['in_layers']:
+        layer_def = layers_dict.get(layer_name, {})
+        if layer_def.get('geometry_type') == 'raster':
+            layer_dir = versioning.atlas_path(config, "layers") / layer_name
+            tiff_path = layer_dir / f"{layer_name}.tiff"
+            jpg_path = layer_dir / f"{layer_name}.tiff.jpg"
+            if jpg_path.exists():
+                logger.info(f"Using extant raster JPG: {jpg_path}")
+            elif tiff_path.exists():
+                logger.info(f"Generating raster JPG: {jpg_path}")
+                utils.tiff2jpg(str(tiff_path))
+            else:
+                logger.warning(f"No tiff found for raster layer {layer_name}, skipping JPG")
 
     template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
