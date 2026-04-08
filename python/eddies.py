@@ -1087,18 +1087,19 @@ def biochar_simulation(config, asset_name):
             for k in metric_keys:
                 totals[t_key][k] += result[k]
 
-    # Write burns_simulation.geojson — all burn cells with per-cell metrics
-    sim_layer_dir = versioning.atlas_path(config, 'layers') / 'burns_simulation'
-    sim_layer_dir.mkdir(parents=True, exist_ok=True)
+    # Write outputs into the processing_sites layer directory
+    sites_layer_dir = versioning.atlas_path(config, 'layers') / 'processing_sites'
+    sites_layer_dir.mkdir(parents=True, exist_ok=True)
 
-    sim_path = sim_layer_dir / 'burns_simulation.geojson'
+    # burns_simulation.geojson — burn hex cells annotated with per-cell metrics (sidecar file)
+    sim_path = sites_layer_dir / 'burns_simulation.geojson'
     with open(sim_path, 'w') as f:
         json.dump({'type': 'FeatureCollection', 'features': burns}, f)
     logger.info(f"biochar_simulation: wrote {sim_path}")
 
-    # Write biochar_summary.csv — one row per treatment (alongside the simulation layer)
+    # biochar_summary.csv — per-treatment totals
     import csv
-    csv_path = sim_layer_dir / 'biochar_summary.csv'
+    csv_path = sites_layer_dir / 'biochar_summary.csv'
     with open(csv_path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['treatment'] + metric_keys)
         writer.writeheader()
@@ -1107,7 +1108,7 @@ def biochar_simulation(config, asset_name):
     logger.info(f"biochar_simulation: wrote {csv_path}")
 
     # Update processing_sites GeoJSON — annotate each site point with totals
-    sites_layer_path = versioning.atlas_path(config, 'layers') / 'processing_sites' / 'processing_sites.geojson'
+    sites_layer_path = sites_layer_dir / 'processing_sites.geojson'
     try:
         with open(sites_layer_path) as f:
             sites_fc = json.load(f)

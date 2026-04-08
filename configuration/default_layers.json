@@ -245,14 +245,4 @@
         "add_labels": false,
         "access": ["internal", "public", "admin"]
     },
-    "burns_simulation": {
-        "geometry_type": "polygon",
-        "color": [0, 100, 80],
-        "fill_color": [0, 150, 100],
-        "fill_opacity": 0.6,
-        "add_labels": false,
-        "access": ["internal", "admin"],
-        "label": "Biochar Simulation",
-        "vis": {"layout": {"visibility": "none"}}
-    }
 }
