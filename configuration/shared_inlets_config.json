@@ -616,7 +616,7 @@
         "fetch_type": "fetch_url",
         "interaction": "import",
         "data_type": "tiff",
-        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVC_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
+        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVC_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
         "attribution": {
             "url": "https://www.landfire.gov/",
             "description": "LANDFIRE 2024 Existing Vegetation Cover (EVC) — percent canopy cover by lifeform",
@@ -629,7 +629,7 @@
         "fetch_type": "fetch_url",
         "interaction": "import",
         "data_type": "tiff",
-        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVT_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
+        "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVT_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
         "attribution": {
             "url": "https://www.landfire.gov/",
             "description": "LANDFIRE 2024 Existing Vegetation Type (EVT) — vegetation community classification",
