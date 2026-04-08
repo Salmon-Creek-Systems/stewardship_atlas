@@ -24,17 +24,52 @@
         "out_layer": "landfire_evt",
         "config_def": "landfire_evt"
     },
+    "roads_h3": {
+        "type": "eddy",
+        "config_def": "h3_cells",
+        "in_layer": "roads",
+        "out_layer": "roads_index",
+        "starting_resolution": 8
+    },
+    "creeks_h3": {
+        "type": "eddy",
+        "config_def": "h3_cells",
+        "in_layer": "creeks",
+        "out_layer": "creeks_index",
+        "starting_resolution": 11,
+        "max_cells": 100
+    },
+    "burns_h3": {
+        "type": "eddy",
+        "config_def": "h3_cells",
+        "in_layer": "burns",
+        "out_layer": "burns_index",
+        "starting_resolution": 11,
+        "max_cells": 100
+    },
+    "processing_sites_h3": {
+        "type": "eddy",
+        "config_def": "processing_sites_h3"
+    },
+    "fuel_mass_landfire": {
+        "type": "eddy",
+        "config_def": "fuel_mass_landfire"
+    },
+    "biochar_simulation": {
+        "type": "eddy",
+        "config_def": "biochar_simulation"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "burns", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
     "webedit": {
         "type": "outlet",
         "name": "webedit",
-        "in_layers": ["regions", "roads", "creeks", "landmarks"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "burns", "processing_sites"],
         "config_def": "webedit"
     },
     "html": {
