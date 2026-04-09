@@ -566,8 +566,19 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
             atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
+            atlas_geojson = json.loads(json.dumps(feature_collection))
+            atlas_geojson['features'][0]['properties'].update({
+                "data_root": SWALES_ROOT,
+                "shared_dir": ATLAS_SHARED_DIR,
+                "layers_path": layers_path,
+                "assets_path": assets_path,
+                "base_url": f"https://fireatlas.org/{slug}",
+                "port": 9000,
+                "admin_emails": [],
+                "logo_url": "",
+            })
             with open(atlas_geojson_path, 'w') as f:
-                json.dump(feature_collection, f, indent=2)
+                json.dump(atlas_geojson, f, indent=2)
 
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
             raster_inlets = {"landfire_evc", "landfire_evt"}
