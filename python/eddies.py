@@ -643,9 +643,10 @@ def h3_cells(config, asset_name):
         # utils.save_layer(out_layer, hex_layer_data)
     
         out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         fc = geojson.FeatureCollection(0)
         fc['features'] = h3_cells_with_properties
-                                       
+
         with open(out_path, 'w') as f:
             geojson.dump(fc, f)
 
