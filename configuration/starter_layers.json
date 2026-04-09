@@ -1,6 +1,5 @@
 [
     {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3,
-     "line_paint": {"line-dasharray": [3, 3], "line-width": 2},
      "interaction": "interface", "access": ["admin"],
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "roads", "geometry_type": "linestring",
