@@ -59,6 +59,7 @@
     },
     "h3_cells": {
         "type": "eddy",
+        "fetch_type": "h3_cells",
         "in_layer": "roads",
         "out_layer": "roads_hexagons",
         "starting_resolution": 8,
