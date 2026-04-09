@@ -62,7 +62,7 @@
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },

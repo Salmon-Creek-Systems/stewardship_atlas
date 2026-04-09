@@ -527,6 +527,20 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
     bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
             "north": payload.bbox.north, "south": payload.bbox.south}
 
+    # Compute H3 resolution that gives ~10 cells across the short axis of the bbox.
+    # H3 approximate average edge lengths (km) by resolution.
+    _H3_EDGE_KM = {5: 86.745, 6: 32.906, 7: 12.447, 8: 4.642, 9: 1.755, 10: 0.664, 11: 0.252, 12: 0.095}
+    _lat_center = (bbox["north"] + bbox["south"]) / 2
+    _width_km = (bbox["east"] - bbox["west"]) * math.cos(math.radians(_lat_center)) * 111
+    _height_km = (bbox["north"] - bbox["south"]) * 111
+    _short_axis_km = min(_width_km, _height_km)
+    _target_cell_width_km = max(_short_axis_km / 10.0, 0.001)
+    _default_h3_resolution = 8
+    for _r in range(5, 13):
+        if _H3_EDGE_KM[_r] * 1.732 >= _target_cell_width_km:
+            _default_h3_resolution = _r
+    _default_h3_resolution = max(5, min(12, _default_h3_resolution))
+
     feature_collection = {
         "type": "FeatureCollection",
         "features": [{
@@ -545,7 +559,8 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 "name": slug,
                 "description": payload.name,
                 "app_url": "https://fireatlas.org:9000",
-                "versioned_outlets": ["html", "webmap"]
+                "versioned_outlets": ["html", "webmap"],
+                "default_h3_resolution": _default_h3_resolution
             }
         }]
     }

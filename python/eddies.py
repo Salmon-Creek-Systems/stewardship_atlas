@@ -529,13 +529,13 @@ def h3_cells(config, asset_name):
         Exception: If configuration is invalid or processing fails
     """
     try:
-        # Get the asset configuration
-        asset_config = config['assets'][asset_name]
-        
+        # Get the asset configuration — use resolved 'config' subdict which has merged shared + overrides
+        asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+
         # Extract configuration parameters
         in_layer = asset_config['in_layer']
         out_layer = asset_config['out_layer']
-        starting_resolution = asset_config.get('starting_resolution', 11)
+        starting_resolution = asset_config.get('starting_resolution', config.get('default_h3_resolution', 11))
         algorithm = asset_config.get('algorithm', 'max_num_cells')
         max_cells = asset_config.get('max_cells', 10)
         swap_coordinates = asset_config.get('swap_coordinates', True)
