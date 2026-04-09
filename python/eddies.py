@@ -880,7 +880,7 @@ def fuel_mass_from_landfire(config: Dict[str, Any], asset_name: str):
     import requests
     import tempfile
 
-    ac = config['assets'][asset_name]
+    ac = config['assets'][asset_name].get('config', config['assets'][asset_name])
     bbox = config['dataswale']['bbox']
     landfire_layer = ac.get('landfire_layer', 'Landfire_LF2024/LF2024_EVC_CONUS')
 
@@ -1042,7 +1042,7 @@ def biochar_simulation(config, asset_name):
     For each burn cell, computes H3 grid distances to infrastructure and evaluates
     all treatment options. Writes results to the processing_sites layer directory.
     """
-    ac = config['assets'][asset_name]
+    ac = config['assets'][asset_name].get('config', config['assets'][asset_name])
     biomass_price = ac.get('biomass_price', 0.001)
     biochar_price = ac.get('biochar_price', 0.01)
 

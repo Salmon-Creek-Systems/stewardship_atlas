@@ -29,7 +29,7 @@
         "config_def": "h3_cells",
         "in_layer": "roads",
         "out_layer": "roads_index",
-        "starting_resolution": 8
+        "starting_resolution": 11
     },
     "creeks_h3": {
         "type": "eddy",
@@ -49,7 +49,8 @@
     },
     "processing_sites_h3": {
         "type": "eddy",
-        "config_def": "processing_sites_h3"
+        "config_def": "processing_sites_h3",
+        "starting_resolution": 11
     },
     "fuel_mass_landfire": {
         "type": "eddy",
