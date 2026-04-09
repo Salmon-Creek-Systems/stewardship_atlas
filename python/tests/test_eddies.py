@@ -150,9 +150,13 @@ class TestEddies(unittest.TestCase):
 
     def test_asset_methods(self):
         """Test that asset methods are correctly registered"""
-        self.assertIn('generate_contours', asset_methods)
+        self.assertIn('gdal_contours', asset_methods)
+        self.assertIn('contours', asset_methods)  # alias
         self.assertIn('derived_hillshade', asset_methods)
-        self.assertEqual(asset_methods['generate_contours'], contours_gdal)
+        self.assertIn('h3_cells', asset_methods)
+        self.assertIn('fuel_mass_landfire', asset_methods)
+        self.assertIn('biochar_simulation', asset_methods)
+        self.assertEqual(asset_methods['gdal_contours'], contours_gdal)
         self.assertEqual(asset_methods['derived_hillshade'], hillshade_gdal)
 
 

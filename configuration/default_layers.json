@@ -244,5 +244,5 @@
         "fill_opacity": 0.3,
         "add_labels": false,
         "access": ["internal", "public", "admin"]
-    },
+    }
 }
