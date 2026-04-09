@@ -1,5 +1,7 @@
 [
-    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3, "interaction": "interface", "access": ["admin"],
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3,
+     "line_paint": {"line-dasharray": [3, 3], "line-width": 2},
+     "interaction": "interface", "access": ["admin"],
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "roads", "geometry_type": "linestring",
         "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
@@ -29,7 +31,7 @@
     {"name": "landfire_evt", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},
     {"name": "burns", "geometry_type": "polygon", "color": [155, 5, 5], "fill_color": [255, 50, 50],
      "add_labels": true, "interaction": "interface", "access": ["admin"],
-     "paint": {"fill-opacity": 0.75},
+     "fill_opacity": 0.4,
      "editable_columns": [{"name": "name", "type": "string", "default": "Treatment Area"}]},
     {"name": "processing_sites", "geometry_type": "point", "color": [128, 0, 128],
      "add_labels": true, "interaction": "interface", "access": ["admin"],

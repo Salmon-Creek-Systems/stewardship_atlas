@@ -131,7 +131,23 @@ def webmap_json(config, name, sprite_json=None):
             
                 
         map_layers.append(map_layer)
-        
+
+        # For polygon layers with line_paint: add a separate line layer for dashed/styled borders
+        if layer['geometry_type'] == 'polygon' and (line_paint := layer.get('line_paint')):
+            line_layer = {
+                'id': f"{layer_name}-border-layer",
+                'type': 'line',
+                'source': layer_name,
+                'paint': {
+                    'line-color': utils.rgb_to_css(layer.get('color', [150, 150, 150])),
+                    'line-width': 2,
+                    **line_paint
+                }
+            }
+            if vis := layer.get('vis'):
+                line_layer |= vis
+            map_layers.append(line_layer)
+
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
             label_layer = {
