@@ -2791,6 +2791,7 @@ asset_methods = {
     'webmap': outlet_webmap,
     'webmap_private': outlet_webmap,
     'webedit': outlet_webmap_edit,
+    'sql_duckdb': outlet_sql_duckdb,
     'sqlquery': outlet_sqlquery,
     'jupyter_notebook' : outlet_notebook_jupyter,
     'config_editor': outlet_config_editor,

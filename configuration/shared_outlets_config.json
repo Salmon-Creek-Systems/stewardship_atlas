@@ -142,6 +142,11 @@
             "citation": "https://www.scvfd.fireatlas.org"
         }
     },
+    "sqldb": {
+        "asset_type": "outlet",
+        "name": "sqldb",
+        "fetch_type": "sql_duckdb"
+    },
     "sqlquery": {
         "asset_type": "outlet",
         "name": "sqlquery",

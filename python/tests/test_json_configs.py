@@ -26,7 +26,11 @@ class TestJsonConfigs(unittest.TestCase):
             self.assertIn('fetch_type', entry, f"{name} missing fetch_type")
 
     def test_shared_outlets_config(self):
-        self._load(CONFIG_DIR / 'shared_outlets_config.json')
+        data = self._load(CONFIG_DIR / 'shared_outlets_config.json')
+        for name, entry in data.items():
+            # fetch_type may be at top level or nested under 'config' (legacy inconsistency)
+            has_ft = 'fetch_type' in entry or 'fetch_type' in entry.get('config', {})
+            self.assertTrue(has_ft, f"outlets config '{name}' missing fetch_type")
 
     def test_shared_inlets_config(self):
         self._load(CONFIG_DIR / 'shared_inlets_config.json')
