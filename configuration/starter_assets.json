@@ -83,5 +83,16 @@
         "name": "notebook",
         "config_def": "jupyter_notebook",
         "access": ["technical"]
+    },
+    "sqldb": {
+        "type": "outlet",
+        "name": "sqldb",
+        "layers": ["roads", "creeks", "burns", "processing_sites"]
+    },
+    "sqlquery": {
+        "type": "outlet",
+        "name": "sqlquery",
+        "config_def": "sqlquery",
+        "access": ["admin"]
     }
 }

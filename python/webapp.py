@@ -70,6 +70,9 @@ class SQLQueryPayload(BaseModel):
     query: str
     return_format: str = 'csv'  # Default to CSV format
 
+class NLSQLPayload(BaseModel):
+    natural_language: str
+
 class BBox(BaseModel):
     west: float
     east: float
@@ -669,6 +672,63 @@ async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sql_generate/{swalename}")
+async def generate_sql_from_nl(swalename: str, payload: NLSQLPayload):
+    """Generate SQL from natural language using Claude."""
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise HTTPException(status_code=503, detail="NL SQL generation not configured")
+    try:
+        ac = json.load(open(Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"))
+
+        # Find the db used by the sqlquery outlet (mirrors outlets.outlet_sqlquery logic)
+        sqlquery_cfg = ac.get('assets', {}).get('sqlquery', {})
+        db_outlet_name = sqlquery_cfg.get('config', sqlquery_cfg).get('db_outlet', 'sqldb')
+        db_path = versioning.atlas_path(ac, "outlets") / db_outlet_name / "atlas.db"
+
+        # Build schema description for the prompt
+        schema_lines = []
+        if db_path.exists():
+            import duckdb as _duckdb
+            with _duckdb.connect(str(db_path), read_only=True) as conn:
+                tables = [r[0] for r in conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
+                ).fetchall()]
+                for table in sorted(tables):
+                    cols = [r[0] for r in conn.execute(
+                        f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+                    ).fetchall()]
+                    schema_lines.append(f"  {table}({', '.join(cols)})")
+        schema_text = '\n'.join(schema_lines) if schema_lines else '  (schema unavailable)'
+
+        prompt = f"""You are a SQL assistant for a geospatial fire atlas database (DuckDB with spatial extension).
+
+Available tables:
+{schema_text}
+
+Write a DuckDB SQL query for the following request. Return ONLY the SQL query, no explanation or markdown.
+
+Request: {payload.natural_language}"""
+
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        sql = message.content[0].text.strip()
+
+        return {"sql": sql, "original_nl": payload.natural_language}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR generating SQL: {e}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/save_config/{swalename}")
 async def save_config(swalename: str, payload: JSONPayload):
