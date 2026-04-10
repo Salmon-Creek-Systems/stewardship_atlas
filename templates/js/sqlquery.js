@@ -19,11 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 SELECT * FROM roads
 LIMIT 10;`);
 
-    // Show NL section only if enabled
-    const container = document.querySelector('.container');
-    if (container.dataset.nlEnabled === 'true') {
-        document.getElementById('nl-section').style.display = '';
-    }
+    document.getElementById('nl-section').style.display = '';
 });
 
 async function generateSQL() {

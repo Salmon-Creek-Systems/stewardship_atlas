@@ -2362,8 +2362,6 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     else:
         tables_list = '<li><em>Run the sqldb outlet first to populate schema.</em></li>'
 
-    nl_sql_enabled = 'true' if os.environ.get('ANTHROPIC_API_KEY') else 'false'
-
     template_path = versioning.atlas_path(config, version='app') / 'templates' / 'sqlquery.html'
     with open(template_path, 'r') as f:
         template = f.read()
@@ -2371,7 +2369,6 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     template = template.replace('{atlas_name}', config['name'])
     template = template.replace('{tables_list}', tables_list)
     template = template.replace('{app_url}', config.get('app_url', config.get('base_url', 'http://localhost')))
-    template = template.replace('{nl_sql_enabled}', nl_sql_enabled)
 
     with open(outpath / 'index.html', 'w') as f:
         f.write(template)
