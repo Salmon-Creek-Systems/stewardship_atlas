@@ -1657,7 +1657,8 @@ def outlet_sql_duckdb(config: dict, outlet_name: str):
     
     """
     outlet_config = config['assets'][outlet_name]
-    data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
+    data_path = versioning.atlas_path(config, "outlets") / outlet_name / "atlas.db"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(data_path)) as conn:
         conn.execute("INSTALL spatial; LOAD spatial; ")
         for layer in config['dataswale']['layers']:
