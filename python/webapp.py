@@ -16,6 +16,7 @@ import re
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 import base64
+import boto3
 
 import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
@@ -582,6 +583,23 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 feature_collection=feature_collection
             )
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
+
+            # Register email ingest address in SES receipt rule
+            try:
+                email_addr = f"{slug}@fireatlas.org"
+                ses = boto3.client('ses', region_name='us-east-1')
+                rule_set = ses.describe_receipt_rule_set(RuleSetName='atlas-email-inlet')
+                for rule in rule_set['Rules']:
+                    if any('S3Action' in a for a in rule['Actions']):
+                        recipients = rule.get('Recipients', [])
+                        if email_addr not in recipients:
+                            rule['Recipients'] = recipients + [email_addr]
+                            ses.update_receipt_rule(RuleSetName='atlas-email-inlet', Rule=rule)
+                        break
+                create_statuses[slug]["log"].append([f"Email ingest configured for {email_addr}", datetime.now().isoformat()])
+            except Exception as ses_err:
+                logging.warning(f"Could not configure SES for {slug}: {ses_err}")
+                create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
 
             atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
             atlas_geojson = json.loads(json.dumps(feature_collection))
