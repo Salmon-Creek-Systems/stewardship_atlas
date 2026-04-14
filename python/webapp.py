@@ -935,16 +935,8 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         config_path = Path(SWALES_ROOT) / payload.atlas_name / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
 
-        # Validate sender
-        # If admin_emails is explicitly [] (open ingest mode), accept anyone.
-        # If the key is missing entirely, default to [] which also accepts anyone.
-        # Only restrict when admin_emails is a non-empty list.
-        admin_emails = ac.get("admin_emails", [])
-        if admin_emails:
-            sender_addr = payload.sender.strip().lower()
-            if not any(sender_addr == e.strip().lower() or sender_addr.endswith(f"<{e.strip().lower()}>")
-                       for e in admin_emails):
-                raise HTTPException(status_code=403, detail=f"Sender not authorised: {payload.sender}")
+        # No sender restriction — anyone can submit photos via email.
+        # See issue #61 for splitting photo-submission auth from admin_emails.
 
         # Parse subject
         default_layer = ac.get("email_photo_default_layer", "processing_sites")
