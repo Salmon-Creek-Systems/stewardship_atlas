@@ -1,8 +1,6 @@
 # Unified Webapp Migration: SCVFD and WVFD
 
-**Status**: Pending — verify kennedy is fully working first, then execute.
-
-Kennedy is already on the unified deployment and serves as the reference. SCVFD and WVFD are still on the legacy per-atlas model.
+**Status**: Complete (confirmed 2026-04-14 via HTTP — both atlases serving from fireatlas.org:9000 with path-based URLs).
 
 ---
 
