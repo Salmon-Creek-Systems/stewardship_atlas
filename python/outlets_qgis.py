@@ -1566,9 +1566,14 @@ def outlet_gazetteer_qgis(config, outlet_name='gazetteer', skips=[], first_n=0):
     Reads the gazetteer_regions layer (populated by the gazetteer_grid inlet),
     renders one PDF per cell, and writes an index.html laid out as a spatial grid
     matching the cell arrangement on the map.
+
+    Asset config options:
+        skips: list of steps to skip. Pass ["region_maps"] to skip PDF generation
+               entirely and only produce the index.html (much faster).
     """
     import geojson as geojson_module
 
+    skips = config['assets'][outlet_name].get('skips', skips)
     regions_layer_name = config['assets'][outlet_name].get('regions_layer', 'gazetteer_regions')
     regions_path = versioning.atlas_path(config, "layers") / regions_layer_name / f"{regions_layer_name}.geojson"
 
