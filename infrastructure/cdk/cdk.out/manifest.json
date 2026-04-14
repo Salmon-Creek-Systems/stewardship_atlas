@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-deploy-role-438886543302-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-cfn-exec-role-438886543302-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/fc491f1f9f3084ee9954924f8a5614ae7186e6997c0c4ca2e9570105027e3f46.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/3d9ddd0c3db63a881beae92bbc99bba39777818a29ef6b4d5c93195a52e0af38.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -56,6 +56,12 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "AtlasDataBucket4CD05197"
+          }
+        ],
+        "/AtlasEmailPhotoStack/AtlasDataBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasDataBucketPolicyAAAF6F3C"
           }
         ],
         "/AtlasEmailPhotoStack/AtlasIngressBucket/Resource": [
@@ -156,6 +162,132 @@
         ]
       },
       "displayName": "AtlasEmailPhotoStack"
+    },
+    "KennedyDns.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "KennedyDns.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "KennedyDns": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://280439772481/us-east-1",
+      "properties": {
+        "templateFile": "KennedyDns.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-deploy-role-280439772481-us-east-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-cfn-exec-role-280439772481-us-east-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-280439772481-us-east-1/6a09b8d098dd2d513a90bad1bd6cf546cb732cf90ad85030032b5a62ca870dc2.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "KennedyDns.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-lookup-role-280439772481-us-east-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "KennedyDns.assets"
+      ],
+      "metadata": {
+        "/KennedyDns/kennedyARecord/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "kennedyARecord29AFDC85"
+          }
+        ],
+        "/KennedyDns/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/KennedyDns/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/KennedyDns/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "KennedyDns"
+    },
+    "KennedySecurityGroup.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "KennedySecurityGroup.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "KennedySecurityGroup": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://438886543302/us-west-1",
+      "properties": {
+        "templateFile": "KennedySecurityGroup.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-deploy-role-438886543302-us-west-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-cfn-exec-role-438886543302-us-west-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-west-1/0b054d3bb2e4841e021b033a0d962e71a7764b08c04454b9f0128fe57e688fe0.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "KennedySecurityGroup.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-lookup-role-438886543302-us-west-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "KennedySecurityGroup.assets"
+      ],
+      "metadata": {
+        "/KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:8887": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasEC2SGfrom000008887D96F38E8"
+          }
+        ],
+        "/KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:9997": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AtlasEC2SGfrom000009997B012C898"
+          }
+        ],
+        "/KennedySecurityGroup/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/KennedySecurityGroup/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/KennedySecurityGroup/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "KennedySecurityGroup"
     },
     "Tree": {
       "type": "cdk:tree",
