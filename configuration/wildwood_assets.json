@@ -58,7 +58,7 @@
         "config_def": "static_html"},
     "sqldb": {
 	"type": "outlet",
-	"name": "sqldb",
+	"config_def": "sqldb",
 	"layers": ["basemap", "roads", "creeks"]
     },
     "sqlquery": {

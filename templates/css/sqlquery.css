@@ -60,4 +60,52 @@ select, button {
 
 .error {
     color: red;
-} 
+}
+
+.nl-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f0f4ff;
+    border-radius: 5px;
+    border-left: 3px solid #4a7fd4;
+}
+
+.nl-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nl-input-row input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+#generate-btn {
+    background: #4a7fd4;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#generate-btn:hover {
+    background: #3a6fc4;
+}
+
+#generate-btn:disabled {
+    background: #9ab3e0;
+    cursor: default;
+}
+
+.nl-source {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #555;
+    font-style: italic;
+}

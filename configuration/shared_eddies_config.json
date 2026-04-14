@@ -59,6 +59,7 @@
     },
     "h3_cells": {
         "type": "eddy",
+        "fetch_type": "h3_cells",
         "in_layer": "roads",
         "out_layer": "roads_hexagons",
         "starting_resolution": 8,
@@ -71,5 +72,42 @@
             "license": "Apache 2.0",
             "citation": "Uber H3"
         }
+    },
+    "processing_sites_h3": {
+        "type": "eddy",
+        "fetch_type": "h3_cells",
+        "in_layer": "processing_sites",
+        "out_layer": "processing_sites_index",
+        "starting_resolution": 8,
+        "algorithm": "max_num_cells",
+        "max_cells": 10,
+        "swap_coordinates": true,
+        "attribution": {
+            "url": "https://h3geo.org/",
+            "description": "H3 hexagonal hierarchical geospatial indexing system",
+            "license": "Apache 2.0",
+            "citation": "Uber H3"
+        }
+    },
+    "fuel_mass_landfire": {
+        "type": "eddy",
+        "fetch_type": "fuel_mass_landfire",
+        "in_layer": "burns_index",
+        "out_layer": "burns_index",
+        "landfire_layer": "Landfire_LF2024/LF2024_EVC_CONUS",
+        "attribution": {
+            "url": "https://www.landfire.gov/",
+            "description": "Fuel mass per H3 cell (tons/acre) derived from LANDFIRE EVC",
+            "license": "Public Domain"
+        }
+    },
+    "biochar_simulation": {
+        "type": "eddy",
+        "fetch_type": "biochar_simulation",
+        "in_layers": ["burns_index", "roads_index", "creeks_index", "processing_sites_index"],
+        "out_layer": "processing_sites",
+        "treatments_file": "configuration/treatments/default_treatments.json",
+        "biomass_price": 0.001,
+        "biochar_price": 0.01
     }
 }

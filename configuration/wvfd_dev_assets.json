@@ -243,7 +243,7 @@
   },
   "sqldb": {
     "type": "outlet",
-    "name": "sqldb",
+    "config_def": "sqldb",
     "layers": ["basemap", "roads_secondary", "creeks"]
   },
   "sqlquery": {

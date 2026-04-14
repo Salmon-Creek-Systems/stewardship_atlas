@@ -78,8 +78,10 @@ class EmailPhotoStack(Stack):
         ))
 
         # Grant EC2 webapp role permission to send bounce emails via SES
+        # and to update the receipt rule when new atlases are created
         ec2_role.add_to_policy(iam.PolicyStatement(
-            actions=["ses:SendEmail", "ses:SendRawEmail"],
+            actions=["ses:SendEmail", "ses:SendRawEmail",
+                     "ses:DescribeReceiptRuleSet", "ses:UpdateReceiptRule"],
             resources=["*"],
         ))
 

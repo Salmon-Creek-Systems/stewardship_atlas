@@ -100,6 +100,7 @@ def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> st
     layer_name = config['assets'][asset_name]['out_layer']
     p =  versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.{delta_type}"
     p.parent.mkdir(parents=True, exist_ok=True)
+    (p.parent / 'work').mkdir(exist_ok=True)
     return p
 
 def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action: str) -> str:
@@ -109,6 +110,7 @@ def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     p =  versioning.atlas_path(config,"deltas") / layer_name / f"assetless__{timestamp}__{delta_action}.geojson"
     p.parent.mkdir(parents=True, exist_ok=True)
+    (p.parent / 'work').mkdir(exist_ok=True)
     return p
 
 def add_deltas_from_features(
@@ -194,6 +196,8 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
     processed_dir = deltas_dir / "processed"
     work_dir = deltas_dir / "work"
     
+    work_dir.mkdir(parents=True, exist_ok=True)
+
     # Get all .geojson files in the deltas directory, sorted by filename (timestamp order)
     delta_files = sorted(deltas_dir.glob("*.geojson"))
 

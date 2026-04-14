@@ -378,6 +378,54 @@ def h3_for_linestring(geometry, starting_res=8, swap_coordinates=True, max_num_c
         raise Exception(f"Failed to generate H3 indices for LineString: {str(e)}")
 
 
+def h3_for_point(geometry, starting_res=8, swap_coordinates=True, max_num_cells=None):
+    """
+    Generate an H3 index for a GeoJSON Point geometry.
+
+    Args:
+        geometry: GeoJSON Point geometry object with type "Point" and coordinates [lng, lat]
+        starting_res: H3 resolution to use (default: 8)
+        swap_coordinates: Whether coordinates are [lng, lat] order (default: True);
+                          if True, swaps to lat, lng before calling H3
+
+    Returns:
+        Dictionary containing the single H3 cell, resolution used, and representative index
+
+    Raises:
+        Exception: If geometry is invalid or processing fails
+    """
+    try:
+        if not isinstance(geometry, dict):
+            raise Exception("Geometry must be a dictionary")
+
+        if geometry.get('type') != 'Point':
+            raise Exception(f"Geometry type must be 'Point', got '{geometry.get('type')}'")
+
+        if 'coordinates' not in geometry:
+            raise Exception("Geometry must contain 'coordinates' field")
+
+        coordinates = geometry['coordinates']
+        if not coordinates or len(coordinates) < 2:
+            raise Exception("Point coordinates must have at least [lng, lat]")
+
+        if swap_coordinates:
+            # GeoJSON is [lng, lat]; H3 wants (lat, lng)
+            lng, lat = coordinates[0], coordinates[1]
+        else:
+            lat, lng = coordinates[0], coordinates[1]
+
+        cell = h3.latlng_to_cell(lat, lng, starting_res)
+        return {
+            'cells': [cell],
+            'resolution': starting_res,
+            'cell_count': 1,
+            'representative_index': cell
+        }
+
+    except Exception as e:
+        raise Exception(f"Failed to generate H3 index for Point: {str(e)}")
+
+
 def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cells=10):
     """
     Generate H3 indices for a GeoJSON polygon geometry.
@@ -466,7 +514,7 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
 
 def h3_cells(config, asset_name):
     """
-    Eddy function to generate hexagonal H3 cell features from input layer geometries.
+    Eddy function to generate hexagonal H3 cell features from input layer geometries. 
     
     Args:
         config: Configuration dictionary containing assets
@@ -481,13 +529,13 @@ def h3_cells(config, asset_name):
         Exception: If configuration is invalid or processing fails
     """
     try:
-        # Get the asset configuration
-        asset_config = config['assets'][asset_name]
-        
+        # Get the asset configuration — use resolved 'config' subdict which has merged shared + overrides
+        asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+
         # Extract configuration parameters
         in_layer = asset_config['in_layer']
         out_layer = asset_config['out_layer']
-        starting_resolution = asset_config.get('starting_resolution', 11)
+        starting_resolution = asset_config.get('starting_resolution', config.get('default_h3_resolution', 11))
         algorithm = asset_config.get('algorithm', 'max_num_cells')
         max_cells = asset_config.get('max_cells', 10)
         swap_coordinates = asset_config.get('swap_coordinates', True)
@@ -513,8 +561,10 @@ def h3_cells(config, asset_name):
             h3_function = h3_for_polygon
         elif geometry_type == 'linestring':
             h3_function = h3_for_linestring
+        elif geometry_type == 'point':
+            h3_function = h3_for_point
         else:
-            raise Exception(f"Unsupported geometry type '{geometry_type}' for layer '{in_layer}'. Only 'polygon' and 'linestring' are supported.")
+            raise Exception(f"Unsupported geometry type '{geometry_type}' for layer '{in_layer}'. Only 'polygon', 'linestring', and 'point' are supported.")
         
         # Process each feature and collect H3 cells with properties
         features = layer_data['features']
@@ -593,9 +643,10 @@ def h3_cells(config, asset_name):
         # utils.save_layer(out_layer, hex_layer_data)
     
         out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         fc = geojson.FeatureCollection(0)
         fc['features'] = h3_cells_with_properties
-                                       
+
         with open(out_path, 'w') as f:
             geojson.dump(fc, f)
 
@@ -820,6 +871,257 @@ def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     return out_path
 
 
+def fuel_mass_from_landfire(config: Dict[str, Any], asset_name: str):
+    """
+    Annotates burns_index H3 cells with fuel_mass (tons/acre) derived from LANDFIRE EVC.
+    Downloads a single EVC raster patch covering the atlas bbox, samples at each cell centroid.
+    """
+    import rasterio
+    import requests
+    import tempfile
+
+    ac = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    bbox = config['dataswale']['bbox']
+    landfire_layer = ac.get('landfire_layer', 'Landfire_LF2024/LF2024_EVC_CONUS')
+
+    # Load burns_index layer
+    burns_index_path = versioning.atlas_path(config, 'layers') / 'burns_index' / 'burns_index.geojson'
+    with open(burns_index_path) as f:
+        fc = geojson.load(f)
+
+    features = fc.get('features', [])
+    if not features:
+        logger.warning(f"fuel_mass_from_landfire: burns_index has no features, nothing to annotate")
+        return burns_index_path
+
+    # Build LANDFIRE EVC export URL
+    url = (
+        f"https://lfps.usgs.gov/arcgis/rest/services/{landfire_layer}/ImageServer/exportImage"
+        f"?bbox={bbox['west']},{bbox['south']},{bbox['east']},{bbox['north']}"
+        f"&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff"
+        f"&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image"
+    )
+    logger.info(f"fuel_mass_from_landfire: fetching EVC raster from {url}")
+
+    # Load EVC → fuel_mass lookup table
+    config_dir = Path(__file__).parent.parent / 'configuration'
+    lookup_path = config_dir / 'landfire_evc_fuel_loads.json'
+    with open(lookup_path) as f:
+        evc_lookup = json.load(f)
+    default_fuel = float(evc_lookup.get('_default', 2.0))
+    nodata_value = 32767  # S16 nodata for LANDFIRE
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_tiff = Path(tmp) / 'evc.tiff'
+
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        with open(tmp_tiff, 'wb') as f:
+            f.write(response.content)
+        logger.info(f"fuel_mass_from_landfire: downloaded EVC raster ({tmp_tiff.stat().st_size // 1024}KB)")
+
+        annotated = 0
+        nodata_count = 0
+        out_of_bounds_count = 0
+
+        with rasterio.open(str(tmp_tiff)) as dataset:
+            raster_data = dataset.read(1)
+            transform = dataset.transform
+            raster_height, raster_width = raster_data.shape
+
+            for feature in features:
+                h3_index = feature.get('properties', {}).get('h3_index')
+                if not h3_index:
+                    logger.warning(f"fuel_mass_from_landfire: feature missing h3_index, skipping")
+                    continue
+
+                lat, lng = h3.cell_to_latlng(h3_index)
+
+                try:
+                    row, col = dataset.index(lng, lat)
+                except Exception:
+                    # centroid outside raster bounds
+                    feature['properties']['fuel_mass'] = 0.0
+                    out_of_bounds_count += 1
+                    continue
+
+                if row < 0 or row >= raster_height or col < 0 or col >= raster_width:
+                    feature['properties']['fuel_mass'] = 0.0
+                    out_of_bounds_count += 1
+                    continue
+
+                pixel_value = int(raster_data[row, col])
+
+                if pixel_value == nodata_value:
+                    feature['properties']['fuel_mass'] = 0.0
+                    nodata_count += 1
+                    continue
+
+                fuel_load = float(evc_lookup.get(str(pixel_value), default_fuel))
+                feature['properties']['fuel_mass'] = fuel_load
+                annotated += 1
+
+    logger.info(
+        f"fuel_mass_from_landfire: annotated {annotated} cells, "
+        f"{nodata_count} nodata, {out_of_bounds_count} out-of-bounds"
+    )
+
+    # Write updated burns_index back in place
+    burns_index_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(burns_index_path, 'w') as f:
+        geojson.dump(fc, f)
+
+    return burns_index_path
+
+
+def _h3_grid_distance_safe(cell_a, cell_b):
+    """H3 grid distance handling resolution mismatches by upsampling lower-res cell."""
+    res_a = h3.get_resolution(cell_a)
+    res_b = h3.get_resolution(cell_b)
+    if res_a == res_b:
+        return h3.grid_distance(cell_a, cell_b)
+    elif res_a < res_b:
+        cell_a = h3.cell_to_center_child(cell_a, res_b)
+    else:
+        cell_b = h3.cell_to_center_child(cell_b, res_a)
+    return h3.grid_distance(cell_a, cell_b)
+
+
+def _get_cell_path_distances(burns_features, target_features, distance_name):
+    """
+    For each burn cell, find minimum H3 grid distance to any cell in target_features.
+    Attaches result as burn['properties'][distance_name].
+    """
+    target_cells = [f['properties']['h3_index'] for f in target_features
+                    if f.get('properties', {}).get('h3_index')]
+    if not target_cells:
+        for burn in burns_features:
+            burn['properties'][distance_name] = 0
+        return burns_features
+    for burn in burns_features:
+        burn_cell = burn['properties'].get('h3_index')
+        if not burn_cell:
+            burn['properties'][distance_name] = 0
+            continue
+        min_dist = min(_h3_grid_distance_safe(burn_cell, t) for t in target_cells)
+        burn['properties'][distance_name] = min_dist
+    return burns_features
+
+
+def _cell_yield(burn_props, treatment_key, tc, biomass_price, biochar_price):
+    """Compute per-treatment metrics for a single burn cell."""
+    fuel_mass = burn_props.get('fuel_mass', 1.0) or 1.0
+    water_distance = burn_props.get('creeks_distance', 0)
+    drag_distance = burn_props.get('roads_distance', 0)
+    processing_rate = (tc['production_rate']
+                       + water_distance * tc['water_distance_cost']
+                       + drag_distance * tc['drag_distance_cost'])
+    processed = fuel_mass * tc['biomass_rate']
+    biochar = tc['biochar_rate'] * processed
+    cost_rate = tc['cost_rate'] / 8.0  # daily -> hourly
+    budget_cost = processing_rate * cost_rate
+    risk_reduced = fuel_mass * tc['risk_reduction_rate']
+    air_pollution = tc['air_pollution'] * processed
+    biomass_sale = biomass_price * processed
+    biochar_sale = biochar_price * biochar
+    return {
+        'budget_cost': budget_cost,
+        'biomass_extracted': processed,
+        'biochar_extracted': biochar,
+        'air_pollution': air_pollution,
+        'risk_reduced': risk_reduced,
+        'biomass_sale': biomass_sale,
+        'biochar_sale': biochar_sale,
+    }
+
+
+def biochar_simulation(config, asset_name):
+    """
+    Biochar logistics simulation eddy.
+    Reads burns_index, roads_index, creeks_index, processing_sites_index.
+    For each burn cell, computes H3 grid distances to infrastructure and evaluates
+    all treatment options. Writes results to the processing_sites layer directory.
+    """
+    ac = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    biomass_price = ac.get('biomass_price', 0.001)
+    biochar_price = ac.get('biochar_price', 0.01)
+
+    # Load treatments file — path relative to atlas app root
+    app_root = versioning.atlas_path(config, version='app')
+    treatments_path = Path(app_root) / ac['treatments_file']
+    with open(treatments_path) as f:
+        treatments_raw = json.load(f)
+    treatments = {k: v for k, v in treatments_raw.items() if not k.startswith('_')}
+
+    # Load layers
+    def load_layer(name):
+        path = versioning.atlas_path(config, 'layers') / name / f'{name}.geojson'
+        with open(path) as f:
+            fc = json.load(f)
+        return fc.get('features', [])
+
+    burns = load_layer('burns_index')
+    roads = load_layer('roads_index')
+    creeks = load_layer('creeks_index')
+    sites = load_layer('processing_sites_index')
+
+    if not burns:
+        logger.warning(f"biochar_simulation: burns_index is empty, nothing to simulate")
+        return
+
+    # Compute distances from each burn cell to nearest infrastructure
+    logger.info(f"biochar_simulation: computing distances for {len(burns)} burn cells")
+    burns = _get_cell_path_distances(burns, roads, 'roads_distance')
+    burns = _get_cell_path_distances(burns, creeks, 'creeks_distance')
+    burns = _get_cell_path_distances(burns, sites, 'sites_distance')
+
+    # Evaluate all treatments per burn cell; accumulate per-treatment totals
+    metric_keys = ['budget_cost', 'biomass_extracted', 'biochar_extracted',
+                   'air_pollution', 'risk_reduced', 'biomass_sale', 'biochar_sale']
+    totals = {t: {k: 0.0 for k in metric_keys} for t in treatments}
+
+    for burn in burns:
+        burn['properties']['treatments'] = {}
+        for t_key, tc in treatments.items():
+            result = _cell_yield(burn['properties'], t_key, tc, biomass_price, biochar_price)
+            burn['properties']['treatments'][t_key] = result
+            for k in metric_keys:
+                totals[t_key][k] += result[k]
+
+    # Write outputs into the processing_sites layer directory
+    sites_layer_dir = versioning.atlas_path(config, 'layers') / 'processing_sites'
+    sites_layer_dir.mkdir(parents=True, exist_ok=True)
+
+    # burns_simulation.geojson — burn hex cells annotated with per-cell metrics (sidecar file)
+    sim_path = sites_layer_dir / 'burns_simulation.geojson'
+    with open(sim_path, 'w') as f:
+        json.dump({'type': 'FeatureCollection', 'features': burns}, f)
+    logger.info(f"biochar_simulation: wrote {sim_path}")
+
+    # biochar_summary.csv — per-treatment totals
+    import csv
+    csv_path = sites_layer_dir / 'biochar_summary.csv'
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['treatment'] + metric_keys)
+        writer.writeheader()
+        for t_key, vals in totals.items():
+            writer.writerow({'treatment': t_key, **vals})
+    logger.info(f"biochar_simulation: wrote {csv_path}")
+
+    # Update processing_sites GeoJSON — annotate each site point with totals
+    sites_layer_path = sites_layer_dir / 'processing_sites.geojson'
+    try:
+        with open(sites_layer_path) as f:
+            sites_fc = json.load(f)
+        for feature in sites_fc.get('features', []):
+            feature['properties']['simulation_totals'] = totals
+        with open(sites_layer_path, 'w') as f:
+            json.dump(sites_fc, f)
+        logger.info(f"biochar_simulation: annotated processing_sites with simulation totals")
+    except (FileNotFoundError, json.JSONDecodeError):
+        logger.warning("biochar_simulation: processing_sites layer not found or empty, skipping annotation")
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -827,4 +1129,6 @@ asset_methods = {
     "h3_cells": h3_cells,
     "hillshade_tiles": hillshade_to_pmtiles,
     "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
+    "fuel_mass_landfire": fuel_mass_from_landfire,
+    "biochar_simulation": biochar_simulation,
 }

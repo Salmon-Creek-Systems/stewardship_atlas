@@ -1,0 +1,47 @@
+{
+  "_notes": "Default biochar treatment parameters. production_rate is staff-hours per acre. cost_rate is daily USD. Distances are H3 grid steps.",
+  "conservation_burn": {
+    "label": "Conservation Burn",
+    "production_rate": 2.4,
+    "biomass_rate": 0.90,
+    "biochar_rate": 0.03,
+    "risk_reduction_rate": 0.90,
+    "cost_rate": 3000,
+    "water_distance_cost": 0.05,
+    "drag_distance_cost": 0.005,
+    "air_pollution": 8
+  },
+  "ring_of_fire_kiln": {
+    "label": "Ring of Fire Kiln",
+    "production_rate": 16,
+    "biomass_rate": 0.80,
+    "biochar_rate": 0.10,
+    "risk_reduction_rate": 0.80,
+    "cost_rate": 600,
+    "water_distance_cost": 0.02,
+    "drag_distance_cost": 0.05,
+    "air_pollution": 4
+  },
+  "trailer_kiln": {
+    "label": "Trailer Kiln",
+    "production_rate": 8,
+    "biomass_rate": 0.90,
+    "biochar_rate": 0.30,
+    "risk_reduction_rate": 0.90,
+    "cost_rate": 1000,
+    "water_distance_cost": 0.01,
+    "drag_distance_cost": 0.03,
+    "air_pollution": 2
+  },
+  "chop_and_leave": {
+    "label": "Chop and Leave",
+    "production_rate": 20,
+    "biomass_rate": 0.01,
+    "biochar_rate": 0.0,
+    "risk_reduction_rate": 0.50,
+    "cost_rate": 300,
+    "water_distance_cost": 0.005,
+    "drag_distance_cost": 0.0001,
+    "air_pollution": 1
+  }
+}

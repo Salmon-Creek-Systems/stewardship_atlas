@@ -131,7 +131,7 @@ def webmap_json(config, name, sprite_json=None):
             
                 
         map_layers.append(map_layer)
-        
+
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
             label_layer = {
@@ -1657,7 +1657,8 @@ def outlet_sql_duckdb(config: dict, outlet_name: str):
     
     """
     outlet_config = config['assets'][outlet_name]
-    data_path = versioning.atlas_path(config, "outlets") / outlet_name /  "atlas.db"
+    data_path = versioning.atlas_path(config, "outlets") / outlet_name / "atlas.db"
+    data_path.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(data_path)) as conn:
         conn.execute("INSTALL spatial; LOAD spatial; ")
         for layer in config['dataswale']['layers']:
@@ -2328,42 +2329,54 @@ def outlet_sqlquery(config: dict, outlet_name: str):
     outlet_config = config['assets'][outlet_name]
     outpath = versioning.atlas_path(config, "outlets") / outlet_name
     outpath.mkdir(parents=True, exist_ok=True)
-    
-    # Create CSS and JS directories
+
     css_dir = outpath / 'css'
     js_dir = outpath / 'js'
     css_dir.mkdir(exist_ok=True)
     js_dir.mkdir(exist_ok=True)
-    
-    # Get available tables from sqldb outlet
-    sqldb_config = config['assets'].get('sqldb', {})
-    available_tables = sqldb_config.get('layers', [])
+
+    # Find the db built by the db outlet (default: "sqldb")
+    db_outlet_name = outlet_config.get('config', outlet_config).get('db_outlet', 'sqldb')
+    db_path = versioning.atlas_path(config, "outlets") / db_outlet_name / "atlas.db"
+
+    # Introspect schema from the db; fall back gracefully if db not yet built
+    schema = {}  # {table: [col, ...]}
     tables_list = ''
-    for table in available_tables:
-        columns = sql_query(config, outlet_name, f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}'")
-        columns_list = ', '.join([f'<li>{column}</li>' for column in columns])
-        tables_list += f'<li>{table}: {columns_list}</li>\n'
-    
-    # Read and process template
+    if db_path.exists():
+        try:
+            import duckdb as _duckdb
+            with _duckdb.connect(str(db_path), read_only=True) as conn:
+                tables = [r[0] for r in conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
+                ).fetchall()]
+                for table in sorted(tables):
+                    cols = [r[0] for r in conn.execute(
+                        f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+                    ).fetchall()]
+                    schema[table] = cols
+                    cols_html = ''.join(f'<li>{c}</li>' for c in cols)
+                    tables_list += f'<li><strong>{table}</strong><ul>{cols_html}</ul></li>\n'
+        except Exception as e:
+            logger.warning(f"Could not read schema from {db_path}: {e}")
+            tables_list = '<li><em>Run the sqldb outlet first to populate schema.</em></li>'
+    else:
+        tables_list = '<li><em>Run the sqldb outlet first to populate schema.</em></li>'
 
     template_path = versioning.atlas_path(config, version='app') / 'templates' / 'sqlquery.html'
     with open(template_path, 'r') as f:
         template = f.read()
-    
-    # Replace placeholders
+
     template = template.replace('{atlas_name}', config['name'])
     template = template.replace('{tables_list}', tables_list)
     template = template.replace('{app_url}', config.get('app_url', config.get('base_url', 'http://localhost')))
-    
-    # Write processed template
+
     with open(outpath / 'index.html', 'w') as f:
         f.write(template)
-    
-    # Copy CSS and JS files
-    template_path = versioning.atlas_path(config, version='app') / 'templates'
-    subprocess.run(['cp', template_path / 'css' / 'sqlquery.css', str(css_dir)])
-    subprocess.run(['cp',  template_path / 'js' / 'sqlquery.js', str(js_dir)])
-    
+
+    template_dir = versioning.atlas_path(config, version='app') / 'templates'
+    subprocess.run(['cp', str(template_dir / 'css' / 'sqlquery.css'), str(css_dir)])
+    subprocess.run(['cp', str(template_dir / 'js' / 'sqlquery.js'), str(js_dir)])
+
     return outpath / 'index.html'
 
 def outlet_config_editor(config: dict, outlet_name: str):
@@ -2776,6 +2789,7 @@ asset_methods = {
     'webmap': outlet_webmap,
     'webmap_private': outlet_webmap,
     'webedit': outlet_webmap_edit,
+    'sql_duckdb': outlet_sql_duckdb,
     'sqlquery': outlet_sqlquery,
     'jupyter_notebook' : outlet_notebook_jupyter,
     'config_editor': outlet_config_editor,

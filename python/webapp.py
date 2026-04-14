@@ -16,6 +16,7 @@ import re
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 import base64
+import boto3
 
 import sys
 #webapp_conf = json.load(open("webapp_conf.json"))
@@ -69,6 +70,9 @@ class PinToPOIPayload(BaseModel):
 class SQLQueryPayload(BaseModel):
     query: str
     return_format: str = 'csv'  # Default to CSV format
+
+class NLSQLPayload(BaseModel):
+    natural_language: str
 
 class BBox(BaseModel):
     west: float
@@ -527,6 +531,20 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
     bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
             "north": payload.bbox.north, "south": payload.bbox.south}
 
+    # Compute H3 resolution that gives ~10 cells across the short axis of the bbox.
+    # H3 approximate average edge lengths (km) by resolution.
+    _H3_EDGE_KM = {5: 86.745, 6: 32.906, 7: 12.447, 8: 4.642, 9: 1.755, 10: 0.664, 11: 0.252, 12: 0.095}
+    _lat_center = (bbox["north"] + bbox["south"]) / 2
+    _width_km = (bbox["east"] - bbox["west"]) * math.cos(math.radians(_lat_center)) * 111
+    _height_km = (bbox["north"] - bbox["south"]) * 111
+    _short_axis_km = min(_width_km, _height_km)
+    _target_cell_width_km = max(_short_axis_km / 10.0, 0.001)
+    _default_h3_resolution = 8
+    for _r in range(5, 13):
+        if _H3_EDGE_KM[_r] * 1.732 >= _target_cell_width_km:
+            _default_h3_resolution = _r
+    _default_h3_resolution = max(5, min(12, _default_h3_resolution))
+
     feature_collection = {
         "type": "FeatureCollection",
         "features": [{
@@ -545,7 +563,8 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 "name": slug,
                 "description": payload.name,
                 "app_url": "https://fireatlas.org:9000",
-                "versioned_outlets": ["html", "webmap"]
+                "versioned_outlets": ["html", "webmap"],
+                "default_h3_resolution": _default_h3_resolution
             }
         }]
     }
@@ -565,9 +584,37 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             )
             create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
+            # Register email ingest address in SES receipt rule
+            try:
+                email_addr = f"{slug}@fireatlas.org"
+                ses = boto3.client('ses', region_name='us-east-1')
+                rule_set = ses.describe_receipt_rule_set(RuleSetName='atlas-email-inlet')
+                for rule in rule_set['Rules']:
+                    if any('S3Action' in a for a in rule['Actions']):
+                        recipients = rule.get('Recipients', [])
+                        if email_addr not in recipients:
+                            rule['Recipients'] = recipients + [email_addr]
+                            ses.update_receipt_rule(RuleSetName='atlas-email-inlet', Rule=rule)
+                        break
+                create_statuses[slug]["log"].append([f"Email ingest configured for {email_addr}", datetime.now().isoformat()])
+            except Exception as ses_err:
+                logging.warning(f"Could not configure SES for {slug}: {ses_err}")
+                create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
+
             atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
+            atlas_geojson = json.loads(json.dumps(feature_collection))
+            atlas_geojson['features'][0]['properties'].update({
+                "data_root": SWALES_ROOT,
+                "shared_dir": ATLAS_SHARED_DIR,
+                "layers_path": layers_path,
+                "assets_path": assets_path,
+                "base_url": f"https://fireatlas.org/{slug}",
+                "port": 9000,
+                "admin_emails": [],
+                "logo_url": "",
+            })
             with open(atlas_geojson_path, 'w') as f:
-                json.dump(feature_collection, f, indent=2)
+                json.dump(atlas_geojson, f, indent=2)
 
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
             raster_inlets = {"landfire_evc", "landfire_evt"}
@@ -643,6 +690,63 @@ async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sql_generate/{swalename}")
+async def generate_sql_from_nl(swalename: str, payload: NLSQLPayload):
+    """Generate SQL from natural language using Claude."""
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise HTTPException(status_code=503, detail="NL SQL generation not configured")
+    try:
+        ac = json.load(open(Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"))
+
+        # Find the db used by the sqlquery outlet (mirrors outlets.outlet_sqlquery logic)
+        sqlquery_cfg = ac.get('assets', {}).get('sqlquery', {})
+        db_outlet_name = sqlquery_cfg.get('config', sqlquery_cfg).get('db_outlet', 'sqldb')
+        db_path = versioning.atlas_path(ac, "outlets") / db_outlet_name / "atlas.db"
+
+        # Build schema description for the prompt
+        schema_lines = []
+        if db_path.exists():
+            import duckdb as _duckdb
+            with _duckdb.connect(str(db_path), read_only=True) as conn:
+                tables = [r[0] for r in conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
+                ).fetchall()]
+                for table in sorted(tables):
+                    cols = [r[0] for r in conn.execute(
+                        f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+                    ).fetchall()]
+                    schema_lines.append(f"  {table}({', '.join(cols)})")
+        schema_text = '\n'.join(schema_lines) if schema_lines else '  (schema unavailable)'
+
+        prompt = f"""You are a SQL assistant for a geospatial fire atlas database (DuckDB with spatial extension).
+
+Available tables:
+{schema_text}
+
+Write a DuckDB SQL query for the following request. Return ONLY the SQL query, no explanation or markdown.
+
+Request: {payload.natural_language}"""
+
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        sql = message.content[0].text.strip()
+
+        return {"sql": sql, "original_nl": payload.natural_language}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR generating SQL: {e}")
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/save_config/{swalename}")
 async def save_config(swalename: str, payload: JSONPayload):
@@ -832,14 +936,18 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         ac = json.load(open(config_path))
 
         # Validate sender
+        # If admin_emails is explicitly [] (open ingest mode), accept anyone.
+        # If the key is missing entirely, default to [] which also accepts anyone.
+        # Only restrict when admin_emails is a non-empty list.
         admin_emails = ac.get("admin_emails", [])
-        sender_addr = payload.sender.strip().lower()
-        if not any(sender_addr == e.strip().lower() or sender_addr.endswith(f"<{e.strip().lower()}>")
-                   for e in admin_emails):
-            raise HTTPException(status_code=403, detail=f"Sender not authorised: {payload.sender}")
+        if admin_emails:
+            sender_addr = payload.sender.strip().lower()
+            if not any(sender_addr == e.strip().lower() or sender_addr.endswith(f"<{e.strip().lower()}>")
+                       for e in admin_emails):
+                raise HTTPException(status_code=403, detail=f"Sender not authorised: {payload.sender}")
 
         # Parse subject
-        default_layer = ac.get("email_photo_default_layer", "poi")
+        default_layer = ac.get("email_photo_default_layer", "processing_sites")
         layer_name, title = email_inlet.parse_subject(payload.subject, default_layer)
 
         # Validate layer exists
