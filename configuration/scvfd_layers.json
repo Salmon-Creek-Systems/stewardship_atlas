@@ -5,7 +5,7 @@
     {"name": "hillshade_tiles", "geometry_type": "raster"},
     {"name": "terrain_rgb_tiles", "geometry_type": "raster"},
     {"name": "contours", "geometry_type": "linestring", "color": [240, 255, 240], "constant_width": 4,
-     "vis" : {"minzoom": 14, "maxzoom": 22}},
+     "vis" : {"minzoom": 14, "maxzoom": 22}, "paint": {"line-opacity": 0.5}},
     {"name": "basemap", "geometry_type": "raster"},
     {"name": "lidar_basemap", "geometry_type": "raster", "opacity": 0.0},
     {

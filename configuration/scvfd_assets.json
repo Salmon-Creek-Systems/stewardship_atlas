@@ -105,14 +105,14 @@
     "webmap" : {
 	"type": "outlet",
 	"name": "webmap",
-	"in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss"],
+	"in_layers": ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss"],
 	"config_def": "webmap",
 	"access": ["public", "internal", "admin"]
     },
     "private_webmap": {
         "type": "outlet",
         "name": "private_webmap",
-        "in_layers": ["basemap", "lidar_basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "private_notes"],
+        "in_layers": ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "private_notes"],
         "config_def": "webmap",
         "access": ["admin", "technical"]
     },
@@ -138,7 +138,7 @@
         "feature_scale": 0.5,
         "blend_percent": 50,
         "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds"],
-        "access": ["public", "internal", "admin"],
+        "access": ["technical"],
         "regions": []
     },
     "private_runbook": {
@@ -150,7 +150,7 @@
         "feature_scale": 0.5,
         "blend_percent": 50,
         "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds", "private_notes"],
-        "access": ["admin", "technical"]
+        "access": ["technical"]
     },
     "html": {
         "type": "outlet",
@@ -165,7 +165,7 @@
 	"type": "outlet",
 	"name": "sqlquery",
 	"config_def": "sqlquery",
-	"access": ["admin"]
+	"access": ["technical"]
     },
     "gazetteer_grid": {
         "type": "inlet",
