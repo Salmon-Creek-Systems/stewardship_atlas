@@ -292,7 +292,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
         output_dir = versioning.atlas_path(config) / 'outlets' / outlet_name
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        results = export_atlas(layout, output_dir, config.get('name', 'atlas'))
+        multipage_pdf = outlet_config.get('multipage_pdf', True)
+        results = export_atlas(layout, output_dir, config.get('name', 'atlas'), multipage_pdf=multipage_pdf)
         # generate index
 
         logger.info(f"Atlas PDF generation complete: {results}")
@@ -827,7 +828,7 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     layout.addLayoutItem(legend)
 
 
-def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72):
+def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf=True):
     """
     Export atlas to both multi-page PDF and individual PDFs per region.
     Also exports a PNG thumbnail per page (map area only, collar cropped out).
@@ -837,6 +838,7 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72):
         output_dir: Output directory path
         atlas_name: Base name for output files
         thumbnail_dpi: DPI for PNG thumbnails (default 72)
+        multipage_pdf: Whether to generate the combined multi-page PDF (default True)
 
     Returns:
         dict with status and output paths
@@ -873,27 +875,30 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72):
     pdf_settings.forceVectorOutput = True
     pdf_settings.exportMetadata = True
     
-    # Export multi-page PDF
-    multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
-    logger.info(f"Exporting multi-page PDF to: {multi_pdf_path}")
-    
-    result = exporter.exportToPdf(atlas, str(multi_pdf_path), pdf_settings)
-    
-    # Atlas export returns tuple (error_code, error_string), unlike single-page export
-    if isinstance(result, tuple):
-        error_code, error_detail = result
+    # Export multi-page PDF (optional — slow, can be disabled via asset config)
+    if multipage_pdf:
+        multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
+        logger.info(f"Exporting multi-page PDF to: {multi_pdf_path}")
+
+        result = exporter.exportToPdf(atlas, str(multi_pdf_path), pdf_settings)
+
+        # Atlas export returns tuple (error_code, error_string), unlike single-page export
+        if isinstance(result, tuple):
+            error_code, error_detail = result
+        else:
+            error_code, error_detail = result, ""
+
+        if error_code == QgsLayoutExporter.Success:
+            results['multi_page_pdf'] = str(multi_pdf_path)
+            logger.info(f"✓ Multi-page PDF exported successfully")
+        else:
+            error_msg = get_export_error_message(error_code)
+            if error_detail:
+                error_msg = f"{error_msg}: {error_detail}"
+            logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
+            results['status'] = 'partial'
     else:
-        error_code, error_detail = result, ""
-    
-    if error_code == QgsLayoutExporter.Success:
-        results['multi_page_pdf'] = str(multi_pdf_path)
-        logger.info(f"✓ Multi-page PDF exported successfully")
-    else:
-        error_msg = get_export_error_message(error_code)
-        if error_detail:
-            error_msg = f"{error_msg}: {error_detail}"
-        logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
-        results['status'] = 'partial'
+        logger.info("Skipping multi-page PDF (multipage_pdf=False in asset config)")
     
     # Export individual PDFs per region
     individual_dir = output_dir / "individual_pages"
