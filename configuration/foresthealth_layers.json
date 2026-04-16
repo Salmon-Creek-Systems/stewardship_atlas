@@ -1,0 +1,46 @@
+[
+    {"name": "regions", "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3,
+     "interaction": "interface", "access": ["admin"],
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
+    {"name": "roads", "geometry_type": "linestring",
+        "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
+        "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+        "interaction": "interface", "vector_width": true,
+        "editable_columns": [
+            {"name": "name", "type": "string", "default": "Road"},
+            {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                    {"STREETTYPE": "RD", "vector_width": 15},
+                    {"STREETTYPE": "ST", "vector_width": 10},
+                    {"STREETTYPE": "Other", "vector_width": 8}
+                ],
+                "default": {"STREETTYPE": "RD", "vector_width": 15}
+            }
+        ]
+    },
+    {"name": "creeks", "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
+     "interaction": "interface", "vector_width": true,
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
+    {"name": "landmarks", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
+     "interaction": "interface",
+     "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
+    {"name": "landfire_evc", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},
+    {"name": "landfire_evt", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},
+    {"name": "terrain_dem", "geometry_type": "raster"},
+    {"name": "basemap", "geometry_type": "raster"},
+    {"name": "terrain_rgb_tiles", "geometry_type": "raster"},
+    {"name": "hillshade_tiles", "geometry_type": "raster"},
+    {"name": "roads_index", "geometry_type": "polygon", "color": [100, 55, 50], "fill_color": [100, 55, 50], "fill_opacity": 0.3, "vis": {"layout": {"visibility": "none"}}},
+    {"name": "creeks_index", "geometry_type": "polygon", "color": [50, 55, 255], "fill_color": [50, 55, 255], "fill_opacity": 0.3, "vis": {"layout": {"visibility": "none"}}},
+    {"name": "burns_index", "geometry_type": "polygon", "color": [200, 55, 55], "fill_color": [200, 55, 55], "fill_opacity": 0.3, "vis": {"layout": {"visibility": "none"}}},
+    {"name": "processing_sites_index", "geometry_type": "polygon", "color": [128, 0, 128], "fill_color": [128, 0, 128], "fill_opacity": 0.3, "vis": {"layout": {"visibility": "none"}}},
+    {"name": "burns", "geometry_type": "polygon", "color": [155, 5, 5], "fill_color": [255, 50, 50],
+     "add_labels": true, "interaction": "interface", "access": ["admin"],
+     "fill_opacity": 0.4,
+     "editable_columns": [{"name": "name", "type": "string", "default": "Treatment Area"}]},
+    {"name": "processing_sites", "geometry_type": "point", "color": [128, 0, 128],
+     "add_labels": true, "interaction": "interface", "access": ["admin"],
+     "editable_columns": [{"name": "name", "type": "string", "default": "Processing Site"}]}
+]
