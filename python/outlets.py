@@ -478,6 +478,9 @@ def generate_sprite_from_layers(config, webmap_dir):
         try:
             # Load image from /local/ path (symlink to shared datastore)
             full_path = local_path / png_path
+            templates_path = versioning.atlas_path(config, version='app') / 'templates' / 'icons' / png_path
+            if not os.path.exists(full_path) and os.path.exists(templates_path):
+                full_path = templates_path
             if os.path.exists(full_path):
                 img = Image.open(full_path)
                 # Create both 1x and 2x versions
