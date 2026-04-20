@@ -58,10 +58,17 @@
         "config_def": "3dview",
         "access": ["public", "internal", "admin"]
     },
+    "canopy_density": {
+        "type": "inlet",
+        "out_layer": "canopy_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/canopy_density_2m.tif"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "canopy_density", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
