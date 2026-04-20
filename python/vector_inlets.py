@@ -221,8 +221,12 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
         if coords and len(coords) >= 2:
             lon, lat = coords[0], coords[1]
             if bbox['west'] <= lon <= bbox['east'] and bbox['south'] <= lat <= bbox['north']:
-                if feature.get('properties', {}).get('image_url'):
-                    feature['properties']['URL'] = feature['properties']['image_url']
+                props = feature.get('properties', {})
+                if props.get('image_url'):
+                    props['URL'] = props['image_url']
+                user = props.get('user_name', '')
+                date = props.get('observed_on_string', '')
+                props['name'] = ' · '.join(filter(None, [user, date]))
                 features.append(feature)
 
     filtered = geojson.FeatureCollection(features)
