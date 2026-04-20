@@ -111,9 +111,13 @@ def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
                 hi = lo + 1
             logger.debug(f"tiff2jpg: scaling {tiff_path} from [{lo:.1f}, {hi:.1f}] → [0, 255]")
             scaled = np.clip((data - lo) / (hi - lo) * 255, 0, 255)
+            alpha = np.where(np.isnan(scaled), 0, 255).astype(np.uint8)
             scaled = np.where(np.isnan(scaled), 0, scaled).astype(np.uint8)
             from PIL import Image
-            Image.fromarray(scaled, mode='L').save(jpg_path)
+            png_path = str(tiff_path) + ".png"
+            rgba = np.stack([scaled, scaled, scaled, alpha], axis=-1)
+            Image.fromarray(rgba, mode='RGBA').save(png_path)
+            return png_path
     except Exception as e:
         logger.warning(f"tiff2jpg Python approach failed ({e}), falling back to gdal_translate")
         subprocess.check_output(['gdal_translate', '-scale', tiff_path, jpg_path])

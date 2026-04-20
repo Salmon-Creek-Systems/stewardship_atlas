@@ -635,5 +635,17 @@
             "description": "LANDFIRE 2024 Existing Vegetation Type (EVT) — vegetation community classification",
             "license": "Public Domain"
         }
+    },
+    "s3_geotiff": {
+        "asset_type": "inlet",
+        "fetch_type": "s3_raster",
+        "interaction": "import",
+        "data_type": "tiff"
+    },
+    "s3_geojson_inlet": {
+        "asset_type": "inlet",
+        "fetch_type": "s3_geojson",
+        "interaction": "import",
+        "data_type": "geojson"
     }
 }

@@ -63,9 +63,13 @@ def webmap_json(config, name, sprite_json=None):
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
         if layer['geometry_type'] == 'raster':
-            map_sources[layer_name] =  {
-                'type': 'image', 
-                'url': f"../../layers/{layer_name}/{layer_name}.tiff.jpg",
+            layer_dir = versioning.atlas_path(config, "layers") / layer_name
+            raster_filename = (f"{layer_name}.tiff.png"
+                               if (layer_dir / f"{layer_name}.tiff.png").exists()
+                               else f"{layer_name}.tiff.jpg")
+            map_sources[layer_name] = {
+                'type': 'image',
+                'url': f"../../layers/{layer_name}/{raster_filename}",
                 'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
@@ -474,6 +478,9 @@ def generate_sprite_from_layers(config, webmap_dir):
         try:
             # Load image from /local/ path (symlink to shared datastore)
             full_path = local_path / png_path
+            templates_path = versioning.atlas_path(config, version='app') / 'templates' / 'icons' / png_path
+            if not os.path.exists(full_path) and os.path.exists(templates_path):
+                full_path = templates_path
             if os.path.exists(full_path):
                 img = Image.open(full_path)
                 # Create both 1x and 2x versions
@@ -563,23 +570,26 @@ def outlet_webmap(config, name):
     webmap_dir.mkdir(parents=True, exist_ok=True)
     sprite_json = generate_sprite_from_layers(config, webmap_dir)
     
-    # Generate base map configuration with sprite
-    map_config = webmap_json(config, name, sprite_json)
-    
+    # Convert raster layers to display images before building webmap JSON
+    # so webmap_json can check which format exists when building URLs
     layers_dict = {l['name']: l for l in config['dataswale']['layers']}
     for layer_name in config['assets'][name]['in_layers']:
         layer_def = layers_dict.get(layer_name, {})
         if layer_def.get('geometry_type') == 'raster':
             layer_dir = versioning.atlas_path(config, "layers") / layer_name
             tiff_path = layer_dir / f"{layer_name}.tiff"
+            png_path = layer_dir / f"{layer_name}.tiff.png"
             jpg_path = layer_dir / f"{layer_name}.tiff.jpg"
-            if jpg_path.exists():
-                logger.info(f"Using extant raster JPG: {jpg_path}")
+            if png_path.exists() or jpg_path.exists():
+                logger.info(f"Using extant raster image: {png_path if png_path.exists() else jpg_path}")
             elif tiff_path.exists():
-                logger.info(f"Generating raster JPG: {jpg_path}")
+                logger.info(f"Generating raster image: {tiff_path}")
                 utils.tiff2jpg(str(tiff_path))
             else:
-                logger.warning(f"No tiff found for raster layer {layer_name}, skipping JPG")
+                logger.warning(f"No tiff found for raster layer {layer_name}, skipping")
+
+    # Generate base map configuration with sprite
+    map_config = webmap_json(config, name, sprite_json)
 
     template_path = versioning.atlas_path(config, version='app') / 'templates'
     subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])

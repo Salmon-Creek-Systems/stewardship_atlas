@@ -119,6 +119,9 @@
             }
 
             // Setup versions
+            if (!data.versions || data.versions.length === 0) {
+                document.getElementById('versions-section').style.display = 'none';
+            }
             if (data.versions && data.versions.length > 0) {
                 const versionsList = document.getElementById('versions-list');
                 data.versions.forEach(item => {

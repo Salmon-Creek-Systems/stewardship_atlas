@@ -58,17 +58,38 @@
         "config_def": "3dview",
         "access": ["public", "internal", "admin"]
     },
+    "canopy_density": {
+        "type": "inlet",
+        "out_layer": "canopy_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/canopy_density_2m.tif"
+    },
+    "ladder_fuel_density": {
+        "type": "inlet",
+        "out_layer": "ladder_fuel_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/ladder_fuel_density_2m.tif"
+    },
+    "inaturalist": {
+        "type": "inlet",
+        "out_layer": "inaturalist",
+        "config_def": "s3_geojson_inlet",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/INaturalist_export.geojson"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "inaturalist", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "processing_sites_index", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
     "webedit": {
         "type": "outlet",
         "name": "webedit",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "processing_sites"],
         "config_def": "webedit"
     },
     "html": {

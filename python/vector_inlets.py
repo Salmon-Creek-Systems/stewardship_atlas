@@ -195,9 +195,53 @@ def gazetteer_grid(config=None, name=None, delta_queue=DELTA_QUEUE):
     logger.info(f"Generated {len(features)} gazetteer grid cells ({num_cols}x{num_rows})")
 
 
+def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Fetch a GeoJSON file from a private S3 bucket, filter to atlas bbox, write to delta queue.
+    Copies image_url → URL on each feature to enable webmap click-to-open behavior."""
+    import boto3, json, tempfile
+
+    inlet_config = config['assets'][name]['config']
+    bucket = inlet_config['s3_bucket']
+    key = inlet_config['s3_key']
+    bbox = config['dataswale']['bbox']
+
+    with tempfile.NamedTemporaryFile(suffix='.geojson') as tmp:
+        logger.info(f"Fetching s3://{bucket}/{key}")
+        try:
+            boto3.client('s3').download_file(bucket, key, tmp.name)
+        except Exception as e:
+            logger.error(f"Failed to fetch s3://{bucket}/{key}: {e}")
+            raise
+        with open(tmp.name) as f:
+            fc = json.load(f)
+
+    features = []
+    for feature in fc.get('features', []):
+        coords = feature.get('geometry', {}).get('coordinates', [])
+        if coords and len(coords) >= 2:
+            lon, lat = coords[0], coords[1]
+            if bbox['west'] <= lon <= bbox['east'] and bbox['south'] <= lat <= bbox['north']:
+                props = feature.get('properties', {})
+                if props.get('image_url'):
+                    props['URL'] = props['image_url']
+                common = props.get('common_name', '')
+                scientific = props.get('scientific_name', '')
+                user = props.get('user_name', '')
+                date = props.get('observed_on_string', '')
+                species = f"{common} ({scientific})" if common and scientific else common or scientific
+                observer = ' @ '.join(filter(None, [user, date]))
+                props['name'] = props.get('common_name', '')
+                features.append(feature)
+
+    filtered = geojson.FeatureCollection(features)
+    logger.info(f"s3_geojson: {len(features)} features within bbox (of {len(fc.get('features', []))} total)")
+    delta_queue.add_deltas_from_features(config, name, filtered, 'create')
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
     "gazetteer_grid": gazetteer_grid,
     "fetch_osm": fetch_osm,
+    "s3_geojson": s3_geojson,
     }

@@ -134,9 +134,35 @@ def terrain_dem_inlet(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE
     return out_path
 
 
+def s3_raster(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
+    """Fetch GeoTIFF from a private S3 bucket and save to versioned outpath."""
+    import boto3
+
+    inlet_config = config['assets'][name]['config']
+    bucket = inlet_config['s3_bucket']
+    key = inlet_config['s3_key']
+    outpath = delta_queue.delta_path(config, name, 'create')
+    workdir = outpath.parent / 'work'
+    workfile = workdir / outpath.name
+
+    logger.info(f"Fetching s3://{bucket}/{key}")
+    try:
+        boto3.client('s3').download_file(bucket, key, str(workfile))
+    except Exception as e:
+        logger.error(f"Failed to fetch s3://{bucket}/{key}: {e}")
+        raise
+
+    return utils.canonicalize_raster(workfile,
+                                     outpath,
+                                     config['dataswale']['crs'],
+                                     config['dataswale']['bbox'],
+                                     inlet_config.get('resample_width', None))
+
+
 asset_methods = {
     'url_raster': url_raster,
     'fetch_url': url_raster,  # legacy name, kept for config compatibility
     'local_raster': local_raster,
     'terrain_dem': terrain_dem_inlet,
+    's3_raster': s3_raster,
 }
