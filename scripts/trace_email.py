@@ -127,12 +127,12 @@ def check_s3_for_key(s3, key):
 
 
 def list_recent_s3_objects(s3, n):
-    """List the n most recent objects in the ingress prefix."""
+    """List the n most recent objects in the ingress prefix (n=0 returns all)."""
     try:
         resp = s3.list_objects_v2(Bucket=INGRESS_BUCKET, Prefix=INGRESS_PREFIX)
         objects = resp.get("Contents", [])
         objects.sort(key=lambda o: o["LastModified"], reverse=True)
-        return objects[:n]
+        return objects if n == 0 else objects[:n]
     except ClientError as e:
         err(f"Could not list ingress bucket: {e}")
         return []
@@ -141,15 +141,18 @@ def list_recent_s3_objects(s3, n):
 # ── stage 3: Lambda CloudWatch logs ───────────────────────────────────────────
 
 def get_recent_streams(logs, n):
-    """Return the n most recently active log streams."""
+    """Return the n most recently active log streams (n=0 returns all via pagination)."""
     try:
-        resp = logs.describe_log_streams(
-            logGroupName=LOG_GROUP,
-            orderBy="LastEventTime",
-            descending=True,
-            limit=n * 2,  # fetch extra in case some are empty
-        )
-        return resp.get("logStreams", [])[:n]
+        streams = []
+        kwargs = dict(logGroupName=LOG_GROUP, orderBy="LastEventTime", descending=True, limit=50)
+        while True:
+            resp = logs.describe_log_streams(**kwargs)
+            streams.extend(resp.get("logStreams", []))
+            token = resp.get("nextToken")
+            if not token or (n > 0 and len(streams) >= n):
+                break
+            kwargs["nextToken"] = token
+        return streams if n == 0 else streams[:n]
     except ClientError as e:
         err(f"Could not list log streams: {e}")
         return []
@@ -294,7 +297,7 @@ def main():
     parser.add_argument("--profile", default="atlas", help="AWS profile (default: atlas)")
     parser.add_argument("--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION})")
     parser.add_argument("--atlas", default=DEFAULT_ATLAS, help=f"Atlas name (default: {DEFAULT_ATLAS})")
-    parser.add_argument("--n", type=int, default=DEFAULT_N, help=f"Number of recent invocations to show (default: {DEFAULT_N})")
+    parser.add_argument("--n", type=int, default=DEFAULT_N, help=f"Number of recent invocations to show (default: {DEFAULT_N}; 0 = all)")
     parser.add_argument("--data-root", default=os.environ.get("DATASWALE_PATH"), help="Path to atlas data root (for feature verification)")
     args = parser.parse_args()
 
@@ -324,7 +327,7 @@ def main():
 
     # ── Stage 3: Lambda logs ──
     section("Stage 3 — Lambda invocation log")
-    streams = get_recent_streams(logs, args.n * 3)
+    streams = get_recent_streams(logs, 0 if args.n == 0 else args.n * 3)
     if not streams:
         err("No Lambda log streams found — has the function ever run?")
         sys.exit(1)
@@ -348,7 +351,7 @@ def main():
 
         # Sort by start time descending, take N
         all_invocations.sort(key=lambda i: i["start_ms"] or 0, reverse=True)
-        recent = all_invocations[:args.n]
+        recent = all_invocations if args.n == 0 else all_invocations[:args.n]
 
         if not recent:
             warn("No invocations found in recent log streams")
