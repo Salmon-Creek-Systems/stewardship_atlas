@@ -75,14 +75,14 @@
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "processing_sites_index", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
     "webedit": {
         "type": "outlet",
         "name": "webedit",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "processing_sites"],
         "config_def": "webedit"
     },
     "html": {
