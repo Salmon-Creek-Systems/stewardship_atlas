@@ -224,9 +224,13 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
                 props = feature.get('properties', {})
                 if props.get('image_url'):
                     props['URL'] = props['image_url']
+                common = props.get('common_name', '')
+                scientific = props.get('scientific_name', '')
                 user = props.get('user_name', '')
                 date = props.get('observed_on_string', '')
-                props['name'] = ' · '.join(filter(None, [user, date]))
+                species = f"{common} ({scientific})" if common and scientific else common or scientific
+                observer = ' @ '.join(filter(None, [user, date]))
+                props['name'] = ' '.join(filter(None, [species, f"[{observer}]" if observer else '']))
                 features.append(feature)
 
     filtered = geojson.FeatureCollection(features)
