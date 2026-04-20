@@ -27,6 +27,7 @@
      "interaction": "interface",
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
     {"name": "canopy_density", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.7}},
+    {"name": "ladder_fuel_density", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.7}},
     {"name": "landfire_evc", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},
     {"name": "landfire_evt", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},
     {"name": "terrain_dem", "geometry_type": "raster"},

@@ -65,10 +65,17 @@
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/canopy_density_2m.tif"
     },
+    "ladder_fuel_density": {
+        "type": "inlet",
+        "out_layer": "ladder_fuel_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/ladder_fuel_density_2m.tif"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",
-        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "canopy_density", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
+        "in_layers": ["regions", "roads", "creeks", "landmarks", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "burns_index", "processing_sites_index", "burns", "processing_sites"],
         "config_def": "webmap",
         "access": ["public", "internal", "admin"]
     },
