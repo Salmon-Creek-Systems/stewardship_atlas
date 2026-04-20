@@ -26,6 +26,7 @@
     {"name": "landmarks", "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
      "interaction": "interface",
      "editable_columns": [{"name": "name", "type": "string", "default": ""}]},
+    {"name": "inaturalist", "geometry_type": "point", "color": [0, 180, 100], "add_labels": true, "interaction": "interface"},
     {"name": "canopy_density", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.7}},
     {"name": "ladder_fuel_density", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.7}},
     {"name": "landfire_evc", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.5}},

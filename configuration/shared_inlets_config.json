@@ -641,5 +641,11 @@
         "fetch_type": "s3_raster",
         "interaction": "import",
         "data_type": "tiff"
+    },
+    "s3_geojson_inlet": {
+        "asset_type": "inlet",
+        "fetch_type": "s3_geojson",
+        "interaction": "import",
+        "data_type": "geojson"
     }
 }
