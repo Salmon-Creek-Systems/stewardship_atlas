@@ -173,6 +173,10 @@ def webmap_json(config, name, sprite_json=None):
             #XSXSXblabel_layer |=  layer.get('vis', {})
             if vis := layer.get('vis'):
                 label_layer |= vis
+            if 'label_minzoom' in layer:
+                label_layer['minzoom'] = layer['label_minzoom']
+            if 'label_maxzoom' in layer:
+                label_layer['maxzoom'] = layer['label_maxzoom']
             if "symbol" not in layer:
                 #if paint := layer.get('paint'):
                 #    if not 'paint' in label_layer:
