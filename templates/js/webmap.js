@@ -10,6 +10,40 @@ map.addControl(new maplibregl.ScaleControl({
 // Add legend control
 map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
 
+// Zoom indicator — updates next to the scale bar
+function updateZoomDisplay() {
+    const el = document.getElementById('zoom-indicator');
+    if (el) el.textContent = 'z' + map.getZoom().toFixed(1);
+}
+map.on('zoom', updateZoomDisplay);
+
+// Legend filter toggle — replaces "only rendered" checkbox with "showing all / some" text
+function injectLegendToggle() {
+    const legendCtrl = document.querySelector('.maplibregl-ctrl-bottom-left .maplibregl-ctrl');
+    if (!legendCtrl) return;
+    const cb = legendCtrl.querySelector('input[type="checkbox"]');
+    if (!cb || cb.dataset.toggleInjected) return;
+    cb.dataset.toggleInjected = 'true';
+
+    const toggle = document.createElement('div');
+    toggle.id = 'layer-filter-toggle';
+    toggle.innerHTML = 'showing <strong class="tf-all">all</strong> / <strong class="tf-some">some</strong> layers';
+    cb.parentNode.insertBefore(toggle, cb);
+
+    function syncToggle() {
+        toggle.querySelector('.tf-all').classList.toggle('active', !cb.checked);
+        toggle.querySelector('.tf-some').classList.toggle('active', cb.checked);
+    }
+    syncToggle();
+
+    toggle.addEventListener('click', () => {
+        cb.click();
+        syncToggle();
+    });
+}
+const legendObserver = new MutationObserver(() => injectLegendToggle());
+legendObserver.observe(document.body, { childList: true, subtree: true });
+
 // Function to get URL parameters
 function getUrlParameter(name) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -88,6 +122,16 @@ map.setLayoutProperty = function(layerId, property, value) {
 
 // Add satellite source and layer
 map.on('load', async () => {
+    // Inject zoom indicator next to scale bar
+    const scaleEl = document.querySelector('.maplibregl-ctrl-scale');
+    if (scaleEl) {
+        const zoomEl = document.createElement('span');
+        zoomEl.id = 'zoom-indicator';
+        scaleEl.parentNode.insertBefore(zoomEl, scaleEl);
+        updateZoomDisplay();
+    }
+    injectLegendToggle();
+
     // Get the first layer ID from the style to ensure basemaps are at the bottom
     const style = map.getStyle();
     const firstLayerId = style.layers[0].id;

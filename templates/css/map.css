@@ -2,9 +2,37 @@ body {
     margin: 0; 
     padding: 0; 
 }
-#map { 
-    position: absolute; 
-    top: 0; 
-    bottom: 0; 
-    width: 100%; 
-} 
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+#zoom-indicator {
+    display: inline-block;
+    font-size: 11px;
+    color: #333;
+    background: rgba(255,255,255,0.8);
+    padding: 0 4px;
+    margin-right: 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+    line-height: 20px;
+}
+
+/* Replace "only rendered" checkbox with styled text toggle */
+.maplibregl-ctrl-bottom-left input[type="checkbox"],
+.maplibregl-ctrl-bottom-left label[for] {
+    display: none !important;
+}
+
+#layer-filter-toggle {
+    font-size: 12px;
+    padding: 4px 6px 2px;
+    cursor: pointer;
+    user-select: none;
+    color: #555;
+}
+#layer-filter-toggle strong { font-weight: normal; color: #bbb; }
+#layer-filter-toggle strong.active { font-weight: bold; color: #222; }
