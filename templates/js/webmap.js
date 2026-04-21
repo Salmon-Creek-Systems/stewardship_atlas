@@ -27,36 +27,14 @@ const zoomControl = {
 };
 map.addControl(zoomControl, 'bottom-left');
 
-// Legend filter toggle — replaces "only rendered" checkbox with "showing all / some" text
-function injectLegendToggle() {
-    const legendCtrl = document.querySelector('.maplibregl-ctrl-bottom-left .maplibregl-ctrl');
-    if (!legendCtrl) return;
-    const cb = legendCtrl.querySelector('input[type="checkbox"]');
-    if (!cb || cb.dataset.toggleInjected) return;
-    cb.dataset.toggleInjected = 'true';
-
-    // Hide only this specific checkbox and its immediate label wrapper — not layer checkboxes
-    cb.style.display = 'none';
-    const cbLabel = cb.closest('label');
-    if (cbLabel) cbLabel.style.display = 'none';
-
-    const toggle = document.createElement('div');
-    toggle.id = 'layer-filter-toggle';
-    toggle.innerHTML = 'showing <strong class="tf-all">all</strong> / <strong class="tf-some">some</strong> layers';
-    (cbLabel || cb).parentNode.insertBefore(toggle, cbLabel || cb);
-
-    function syncToggle() {
-        toggle.querySelector('.tf-all').classList.toggle('active', !cb.checked);
-        toggle.querySelector('.tf-some').classList.toggle('active', cb.checked);
+// Relabel the legend "Only rendered" checkbox to something clearer
+function relabelLegend() {
+    const label = document.querySelector('.maplibregl-legend-onlyRendered-label');
+    if (label && label.textContent === 'Only rendered') {
+        label.textContent = 'Visible layers only';
     }
-    syncToggle();
-
-    toggle.addEventListener('click', () => {
-        cb.click();
-        syncToggle();
-    });
 }
-const legendObserver = new MutationObserver(() => injectLegendToggle());
+const legendObserver = new MutationObserver(relabelLegend);
 legendObserver.observe(document.body, { childList: true, subtree: true });
 
 // Function to get URL parameters
@@ -137,7 +115,7 @@ map.setLayoutProperty = function(layerId, property, value) {
 
 // Add satellite source and layer
 map.on('load', async () => {
-    injectLegendToggle();
+    relabelLegend();
     zoomControl._update();
 
     // Get the first layer ID from the style to ensure basemaps are at the bottom
