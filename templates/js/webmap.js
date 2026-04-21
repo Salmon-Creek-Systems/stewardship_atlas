@@ -27,15 +27,6 @@ const zoomControl = {
 };
 map.addControl(zoomControl, 'bottom-left');
 
-// Relabel the legend "Only rendered" checkbox to something clearer
-function relabelLegend() {
-    const label = document.querySelector('.maplibregl-legend-onlyRendered-label');
-    if (label && label.textContent === 'Only rendered') {
-        label.textContent = 'Visible layers only';
-    }
-}
-const legendObserver = new MutationObserver(relabelLegend);
-legendObserver.observe(document.body, { childList: true, subtree: true });
 
 // Function to get URL parameters
 function getUrlParameter(name) {
@@ -115,7 +106,6 @@ map.setLayoutProperty = function(layerId, property, value) {
 
 // Add satellite source and layer
 map.on('load', async () => {
-    relabelLegend();
     zoomControl._update();
 
     // Get the first layer ID from the style to ensure basemaps are at the bottom
