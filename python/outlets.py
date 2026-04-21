@@ -1,4 +1,4 @@
-import subprocess, math, string
+import subprocess, math, string, shutil
 import json, csv
 import sys,os,time
 from io import StringIO
@@ -596,8 +596,8 @@ def outlet_webmap(config, name):
     map_config = webmap_json(config, name, sprite_json)
 
     template_path = versioning.atlas_path(config, version='app') / 'templates'
-    subprocess.run(['cp', '-r', template_path / 'css', webmap_dir / "css"])
-    subprocess.run(['cp', '-r', template_path / 'js',  webmap_dir /  "js"])
+    shutil.copytree(template_path / 'css', webmap_dir / 'css', dirs_exist_ok=True)
+    shutil.copytree(template_path / 'js',  webmap_dir / 'js',  dirs_exist_ok=True)
 
     
     output_path = webmap_dir / "index.html"
@@ -718,8 +718,8 @@ def outlet_webmap_edit(config: dict, name: str):
     
     template_path = versioning.atlas_path(config, version='app') / 'templates'
 
-    subprocess.run(['cp', '-r', template_path / 'css', webedit_dir ])
-    subprocess.run(['cp', '-r', template_path / 'js', webedit_dir ])
+    shutil.copytree(template_path / 'css', webedit_dir / 'css', dirs_exist_ok=True)
+    shutil.copytree(template_path / 'js',  webedit_dir / 'js',  dirs_exist_ok=True)
     # subprocess.run(['cp', '../templates/css/map.css', f"{webedit_dir}/css/"])
     # subprocess.run(['cp', '../templates/css/edit_controls.css', f"{webedit_dir}/css/"])
     
