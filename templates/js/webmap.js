@@ -10,12 +10,22 @@ map.addControl(new maplibregl.ScaleControl({
 // Add legend control
 map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
 
-// Zoom indicator — updates next to the scale bar
-function updateZoomDisplay() {
-    const el = document.getElementById('zoom-indicator');
-    if (el) el.textContent = 'z' + map.getZoom().toFixed(1);
-}
-map.on('zoom', updateZoomDisplay);
+// Zoom indicator — custom MapLibre control at bottom-left (appears below legend/scale)
+const zoomControl = {
+    onAdd(map) {
+        this._map = map;
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl';
+        this._el = document.createElement('span');
+        this._el.id = 'zoom-indicator';
+        this._container.appendChild(this._el);
+        map.on('zoom', () => this._update());
+        return this._container;
+    },
+    onRemove() { this._container.parentNode.removeChild(this._container); },
+    _update() { this._el.textContent = 'z\u2009' + this._map.getZoom().toFixed(1); }
+};
+map.addControl(zoomControl, 'bottom-left');
 
 // Legend filter toggle — replaces "only rendered" checkbox with "showing all / some" text
 function injectLegendToggle() {
@@ -25,10 +35,15 @@ function injectLegendToggle() {
     if (!cb || cb.dataset.toggleInjected) return;
     cb.dataset.toggleInjected = 'true';
 
+    // Hide only this specific checkbox and its immediate label wrapper — not layer checkboxes
+    cb.style.display = 'none';
+    const cbLabel = cb.closest('label');
+    if (cbLabel) cbLabel.style.display = 'none';
+
     const toggle = document.createElement('div');
     toggle.id = 'layer-filter-toggle';
     toggle.innerHTML = 'showing <strong class="tf-all">all</strong> / <strong class="tf-some">some</strong> layers';
-    cb.parentNode.insertBefore(toggle, cb);
+    (cbLabel || cb).parentNode.insertBefore(toggle, cbLabel || cb);
 
     function syncToggle() {
         toggle.querySelector('.tf-all').classList.toggle('active', !cb.checked);
@@ -122,15 +137,8 @@ map.setLayoutProperty = function(layerId, property, value) {
 
 // Add satellite source and layer
 map.on('load', async () => {
-    // Inject zoom indicator next to scale bar
-    const scaleEl = document.querySelector('.maplibregl-ctrl-scale');
-    if (scaleEl) {
-        const zoomEl = document.createElement('span');
-        zoomEl.id = 'zoom-indicator';
-        scaleEl.parentNode.insertBefore(zoomEl, scaleEl);
-        updateZoomDisplay();
-    }
     injectLegendToggle();
+    zoomControl._update();
 
     // Get the first layer ID from the style to ensure basemaps are at the bottom
     const style = map.getStyle();
