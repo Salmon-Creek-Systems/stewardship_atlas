@@ -20,6 +20,9 @@
 - [Advanced Topics](#advanced-topics)
   - [Creating a New Atlas](#creating-a-new-atlas)
   - [Batch-Ingesting Photos from S3](#batch-ingesting-photos-from-s3)
+  - [Adding Private S3 Data Layers](#adding-private-s3-data-layers)
+  - [Layer Zoom Visibility](#layer-zoom-visibility)
+  - [Custom Layer Icons (Sprite System)](#custom-layer-icons-sprite-system)
 - [Technical Details](#technical-details)
   - [System Requirements](#system-requirements)
   - [Data Formats](#data-formats)
@@ -386,6 +389,97 @@ Photos must be publicly readable at their S3 URL for the atlas web map to displa
 
 ---
 
+### Adding Private S3 Data Layers
+
+If your organisation has data in a private S3 bucket — aerial imagery, lidar-derived rasters, species observation exports — you can pull it directly into an atlas layer without making it publicly accessible.
+
+#### Raster layers (GeoTIFF from S3)
+
+Add an entry to `{atlas}_assets.json`:
+
+```json
+"canopy_density": {
+    "type": "inlet",
+    "out_layer": "canopy_density",
+    "config_def": "s3_geotiff",
+    "s3_bucket": "my-org-private",
+    "s3_key": "site/canopy_density_2m.tif"
+}
+```
+
+Add a matching entry in `{atlas}_layers.json`:
+
+```json
+{"name": "canopy_density", "geometry_type": "raster", "vis": {"layout": {"visibility": "none"}}, "paint": {"raster-opacity": 0.7}}
+```
+
+On `atlas.materialize(config, 'canopy_density')` the TIFF is fetched from S3, warped to the atlas CRS, and clipped to the bounding box. It is then served as a georeferenced image overlay in the webmap. Single-band float rasters (e.g. canopy density, fuel load) receive a percentile-stretched grayscale PNG with transparent nodata pixels so they composite cleanly over the basemap.
+
+AWS credentials are handled automatically: the EC2 IAM role is used on the server, the `atlas` AWS profile is used for local development. No credentials appear in configuration files.
+
+#### Vector GeoJSON layers from S3
+
+```json
+"inaturalist": {
+    "type": "inlet",
+    "out_layer": "inaturalist",
+    "config_def": "s3_geojson_inlet",
+    "s3_bucket": "my-org-private",
+    "s3_key": "site/observations.geojson"
+}
+```
+
+Features are filtered to the atlas bounding box automatically. If features carry an `image_url` property it is copied to `URL`, enabling the existing webmap click-to-open-image behaviour. The `name` field is used for map labels — set it on features, or the inlet will derive it from `common_name` if present (useful for iNaturalist exports).
+
+After running the inlet and applying deltas, include the layer name in the webmap asset's `in_layers` list and re-materialise the webmap.
+
+---
+
+### Layer Zoom Visibility
+
+By default layers are visible at all zoom levels. Two options in the layer config let you control when geometry and labels appear independently.
+
+**`vis`** — merged directly into the MapLibre layer spec. Use it to set `minzoom` or `maxzoom` on the geometry layer (circles, lines, fills):
+
+```json
+{"name": "inaturalist", ..., "vis": {"minzoom": 8}}
+```
+
+The same `vis` values are also applied to the label layer unless explicitly overridden (see below).
+
+**`label_minzoom` / `label_maxzoom`** — override zoom thresholds for the label/icon layer only, independently of the geometry layer. Useful when you want markers visible at a wider zoom but labels or icons only when the user is closer in:
+
+```json
+{"name": "inaturalist", ..., "vis": {"minzoom": 8}, "label_minzoom": 12}
+```
+
+This shows dot markers from zoom 8 but defers text labels and flower icons to zoom 12, avoiding clutter at regional scales.
+
+---
+
+### Custom Layer Icons (Sprite System)
+
+Point layers display as plain circles by default. To use a custom PNG icon instead, add a `symbol` entry to the layer config:
+
+```json
+{
+    "name": "inaturalist",
+    "geometry_type": "point",
+    "symbol": {"png": "flower.png", "icon": "flower"},
+    "icon-size": 1.0,
+    ...
+}
+```
+
+Place the PNG file in one of two locations:
+
+- **Atlas-specific**: the atlas's `local/` directory (symlinked from `staging/local/`) — use for icons that belong to one atlas only.
+- **Shared**: `templates/icons/` in the repo — checked in to git and available to all atlases. The sprite loader checks `local/` first and falls back to `templates/icons/` automatically.
+
+Icons are compiled into a sprite sheet (sprite.png + sprite.json) at webmap build time. The `icon` value in the `symbol` key is the sprite symbol name that MapLibre references; it must match the PNG filename without extension.
+
+---
+
 ## Technical Details
 
 ### System Requirements
@@ -473,8 +567,12 @@ Contact your atlas administrator for:
 If a photo email doesn't appear in the atlas within a few minutes, use the `trace_email.py` script to follow it through the pipeline and find where it stopped.
 
 ```bash
-# Show the 3 most recent email submissions and their status
+# Show the 3 most recent email submissions and their status (default)
 python scripts/trace_email.py --profile atlas
+
+# Show more or all submissions (--n 0 fetches everything via paginated CloudWatch queries)
+python scripts/trace_email.py --n 10 --profile atlas
+python scripts/trace_email.py --n 0 --profile atlas
 
 # Trace a specific email by its S3 key (found in the ingress bucket)
 python scripts/trace_email.py incoming/mvjamh5c7rtsvpb3qejlkaa0mhavb8uaj76luo81 --profile atlas
