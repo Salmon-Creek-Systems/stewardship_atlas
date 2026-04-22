@@ -89,11 +89,14 @@ class EmailPhotoStack(Stack):
         ingress_bucket = s3.Bucket(
             self, "AtlasIngressBucket",
             bucket_name="atlas-ingress",
+            versioned=True,
             removal_policy=RemovalPolicy.RETAIN,  # don't delete emails on stack destroy
             lifecycle_rules=[
                 s3.LifecycleRule(
                     # Auto-delete raw emails after 30 days (processed ones deleted by Lambda)
                     expiration=Duration.days(30),
+                    # Expire noncurrent versions after 30 days so deleted objects don't accumulate
+                    noncurrent_version_expiration=Duration.days(30),
                 )
             ],
         )
