@@ -73,8 +73,7 @@ def extract_gps(image_bytes: bytes) -> dict | None:
     }
 
     if "GPSAltitude" in gps_info:
-        alt = gps_info["GPSAltitude"]
-        result["altitude"] = round(float(alt), 2)
+        result["altitude"] = round(safe_float(gps_info["GPSAltitude"]), 2)
 
     result.update(extra)
     return result
