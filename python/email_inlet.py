@@ -9,6 +9,8 @@ import geojson
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
+from utils import safe_float
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,7 @@ def extract_gps(image_bytes: bytes) -> dict | None:
 
     def to_decimal(dms, ref):
         d, m, s = dms
-        decimal = float(d) + float(m) / 60 + float(s) / 3600
+        decimal = safe_float(d) + safe_float(m) / 60 + safe_float(s) / 3600
         if ref in ("S", "W"):
             decimal = -decimal
         return round(decimal, 7)

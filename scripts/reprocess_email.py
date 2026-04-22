@@ -22,9 +22,14 @@ import email
 import io
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 import boto3
 from botocore.exceptions import ClientError
+
+from utils import safe_float
 
 BUCKET = "atlas-ingress"
 PREFIX = "incoming/"
@@ -98,7 +103,7 @@ def inspect(s3, key):
 
         def to_decimal(dms, ref):
             d, m, s = dms
-            dec = float(d) + float(m) / 60 + float(s) / 3600
+            dec = safe_float(d) + safe_float(m) / 60 + safe_float(s) / 3600
             return -dec if ref in ("S", "W") else dec
 
         try:

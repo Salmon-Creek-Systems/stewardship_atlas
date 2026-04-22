@@ -5,6 +5,18 @@ from pathlib import Path
 import gspread, geojson
 
 
+def safe_float(v) -> float:
+    """Convert a value to float, returning 0.0 for zero-denominator rationals.
+
+    Pillow returns IFDRational for EXIF values; some Android devices encode
+    GPS seconds as 0/0 rather than omitting the field, causing ZeroDivisionError.
+    """
+    try:
+        return float(v)
+    except ZeroDivisionError:
+        return 0.0
+
+
 def json_serial(obj):
     """JSON default handler for types not natively serializable.
     Covers datetime/date (from DuckDB) and Path objects.
