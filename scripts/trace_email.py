@@ -299,6 +299,7 @@ def main():
     parser.add_argument("--atlas", default=DEFAULT_ATLAS, help=f"Atlas name (default: {DEFAULT_ATLAS})")
     parser.add_argument("--n", type=int, default=DEFAULT_N, help=f"Number of recent invocations to show (default: {DEFAULT_N}; 0 = all)")
     parser.add_argument("--failed", action="store_true", help="Only show invocations that did not complete successfully")
+    parser.add_argument("--ignore-key", metavar="SUBSTRING", help="Exclude invocations whose S3 key contains this substring")
     parser.add_argument("--data-root", default=os.environ.get("DATASWALE_PATH"), help="Path to atlas data root (for feature verification)")
     args = parser.parse_args()
 
@@ -353,6 +354,8 @@ def main():
 
         # Sort by start time descending, optionally deduplicate by key and filter to failures, take N
         all_invocations.sort(key=lambda i: i["start_ms"] or 0, reverse=True)
+        if args.ignore_key:
+            all_invocations = [i for i in all_invocations if args.ignore_key not in (i["s3_key"] or "")]
         total_checked = len(all_invocations)
         if args.failed:
             # One entry per email: keep only the most recent attempt per s3_key,
