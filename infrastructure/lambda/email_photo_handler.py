@@ -97,14 +97,10 @@ def handler(event, context):
         except Exception:
             detail = resp.text
         if "No GPS" in detail:
-            if "/no-gps/" in key:
-                logger.info(f"Already quarantined at {key} — skipping")
-            else:
-                # Permanently unprocessable — move to no-gps/ so --all reprocess skips it
-                no_gps_key = key.replace("incoming/", "incoming/no-gps/", 1)
-                s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=no_gps_key)
-                s3.delete_object(Bucket=bucket, Key=key)
-                logger.info(f"Moved {key} to {no_gps_key} (no GPS data)")
+            no_gps_key = "quarantine/no-gps/" + key.split("/", 1)[-1]
+            s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=no_gps_key)
+            s3.delete_object(Bucket=bucket, Key=key)
+            logger.info(f"Moved {key} to {no_gps_key} (no GPS data)")
         else:
             logger.error(f"Webapp returned 400 — leaving in bucket for inspection: {detail}")
     else:

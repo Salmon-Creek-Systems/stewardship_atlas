@@ -143,6 +143,7 @@ class EmailPhotoStack(Stack):
         ingress_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED,
             s3n.LambdaDestination(email_lambda),
+            s3.NotificationKeyFilter(prefix="incoming/"),
         )
 
         # --- SES: allow SES to write to the ingress bucket ---
