@@ -115,6 +115,7 @@ On the deployed server:
 ### Starting the Webapp
 
 ```bash
+SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
 /usr/bin/python3 /usr/local/bin/uvicorn --port 9000 --host 0.0.0.0 webapp:app \
   --reload --log-level trace \
   --ssl-certfile /etc/letsencrypt/live/{domain}/fullchain.pem \
