@@ -991,8 +991,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         image_url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
         logging.info(f"S3 upload: {s3_key} content_type={content_type} content_disposition=inline")
 
-        # Build extra properties from EXIF
-        extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
+        extra_props = {"raw_exif": gps.get("raw_exif", {})}
 
         # Build feature and write delta
         feature = email_inlet.build_feature(
@@ -1052,7 +1051,7 @@ async def ingest_web_photo(payload: WebPhotoPayload):
         else:
             lat = gps["lat"]
             lon = gps["lon"]
-            extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
+            extra_props = {"raw_exif": gps.get("raw_exif", {})}
 
         # Upload image to S3
         import boto3

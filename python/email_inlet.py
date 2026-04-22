@@ -31,11 +31,21 @@ def parse_subject(subject: str, default_layer: str = "poi") -> tuple[str, str]:
     return layer_name, title
 
 
+def _exif_to_json(value):
+    """Convert an EXIF value to a JSON-safe type."""
+    if isinstance(value, tuple):
+        return [_exif_to_json(v) for v in value]
+    try:
+        return safe_float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def extract_gps(image_bytes: bytes) -> dict | None:
     """Extract GPS and supplementary EXIF data from image bytes.
 
-    Returns a dict with keys: lat, lon, and optionally altitude,
-    datetime, make, model. Returns None if no GPS data found.
+    Returns a dict with keys: lat, lon, and raw_exif (all extracted EXIF fields).
+    Returns None if no GPS data found.
     """
     img = Image.open(io.BytesIO(image_bytes))
     exif_data = img._getexif()
@@ -43,19 +53,17 @@ def extract_gps(image_bytes: bytes) -> dict | None:
         return None
 
     gps_info = {}
-    extra = {}
+    raw_exif = {}
     for tag_id, value in exif_data.items():
         tag = TAGS.get(tag_id, tag_id)
         if tag == "GPSInfo":
             for gps_tag_id, gps_value in value.items():
                 gps_tag = GPSTAGS.get(gps_tag_id, gps_tag_id)
                 gps_info[gps_tag] = gps_value
-        elif tag == "DateTime":
-            extra["datetime"] = value
-        elif tag == "Make":
-            extra["make"] = value
-        elif tag == "Model":
-            extra["model"] = value
+                raw_exif[gps_tag] = _exif_to_json(gps_value)
+        elif tag in ("DateTime", "Make", "Model", "DateTimeOriginal",
+                     "DateTimeDigitized", "Software", "ImageDescription"):
+            raw_exif[tag] = str(value)
 
     if not gps_info.get("GPSLatitude") or not gps_info.get("GPSLongitude"):
         return None
@@ -70,12 +78,8 @@ def extract_gps(image_bytes: bytes) -> dict | None:
     result = {
         "lat": to_decimal(gps_info["GPSLatitude"], gps_info["GPSLatitudeRef"]),
         "lon": to_decimal(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"]),
+        "raw_exif": raw_exif,
     }
-
-    if "GPSAltitude" in gps_info:
-        result["altitude"] = round(safe_float(gps_info["GPSAltitude"]), 2)
-
-    result.update(extra)
     return result
 
 

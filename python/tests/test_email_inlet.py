@@ -121,7 +121,7 @@ class TestExtractGps(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_altitude_included(self):
+    def test_altitude_in_raw_exif(self):
         from fractions import Fraction
         exif = self._make_fake_exif(
             lat_dms=(38, 7, 0.0), lat_ref="N",
@@ -135,8 +135,24 @@ class TestExtractGps(unittest.TestCase):
 
             result = extract_gps(b"fake-image-bytes")
 
-        self.assertIn("altitude", result)
-        self.assertAlmostEqual(result["altitude"], 142.0, places=1)
+        self.assertIn("raw_exif", result)
+        self.assertAlmostEqual(result["raw_exif"]["GPSAltitude"], 142.0, places=1)
+
+    def test_raw_exif_present(self):
+        exif = self._make_fake_exif(
+            lat_dms=(38, 7, 0.0), lat_ref="N",
+            lon_dms=(122, 27, 0.0), lon_ref="W",
+        )
+        with patch("PIL.Image.open") as mock_open:
+            mock_img = MagicMock()
+            mock_img._getexif.return_value = exif
+            mock_open.return_value = mock_img
+
+            result = extract_gps(b"fake-image-bytes")
+
+        self.assertIn("raw_exif", result)
+        self.assertIn("GPSLatitude", result["raw_exif"])
+        self.assertIn("GPSLongitude", result["raw_exif"])
 
 
 class TestBuildFeature(unittest.TestCase):
