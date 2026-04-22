@@ -298,6 +298,7 @@ def main():
     parser.add_argument("--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION})")
     parser.add_argument("--atlas", default=DEFAULT_ATLAS, help=f"Atlas name (default: {DEFAULT_ATLAS})")
     parser.add_argument("--n", type=int, default=DEFAULT_N, help=f"Number of recent invocations to show (default: {DEFAULT_N}; 0 = all)")
+    parser.add_argument("--failed", action="store_true", help="Only show invocations that did not complete successfully")
     parser.add_argument("--data-root", default=os.environ.get("DATASWALE_PATH"), help="Path to atlas data root (for feature verification)")
     args = parser.parse_args()
 
@@ -327,7 +328,8 @@ def main():
 
     # ── Stage 3: Lambda logs ──
     section("Stage 3 — Lambda invocation log")
-    streams = get_recent_streams(logs, 0 if args.n == 0 else args.n * 3)
+    stream_multiplier = 10 if args.failed else 3
+    streams = get_recent_streams(logs, 0 if args.n == 0 else args.n * stream_multiplier)
     if not streams:
         err("No Lambda log streams found — has the function ever run?")
         sys.exit(1)
@@ -349,18 +351,28 @@ def main():
             invs = parse_invocations_from_stream(logs, stream["logStreamName"])
             all_invocations.extend(invs)
 
-        # Sort by start time descending, take N
+        # Sort by start time descending, optionally filter to failures, take N
         all_invocations.sort(key=lambda i: i["start_ms"] or 0, reverse=True)
+        total_checked = len(all_invocations)
+        if args.failed:
+            all_invocations = [i for i in all_invocations if i["status"] != "success"]
         recent = all_invocations if args.n == 0 else all_invocations[:args.n]
 
         if not recent:
-            warn("No invocations found in recent log streams")
+            if args.failed:
+                ok(f"No failed invocations found in the last {total_checked} checked")
+            else:
+                warn("No invocations found in recent log streams")
         else:
-            info(f"Showing {len(recent)} most recent invocation(s):\n")
+            if args.failed:
+                info(f"Showing {len(recent)} failed invocation(s) (of {total_checked} total checked):\n")
+            else:
+                info(f"Showing {len(recent)} most recent invocation(s):\n")
             for inv in recent:
                 print_invocation(inv)
-                section("Stage 4 — Feature in layer")
-                check_feature(inv, args.atlas, args.data_root)
+                if not args.failed:
+                    section("Stage 4 — Feature in layer")
+                    check_feature(inv, args.atlas, args.data_root)
 
     print()
 
