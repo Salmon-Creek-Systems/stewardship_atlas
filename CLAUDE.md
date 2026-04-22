@@ -84,6 +84,25 @@ stewardship_atlas/
 
 ## Development Environment
 
+### Server Safety Rules
+
+**The server should always be on main.** If it's on any other branch, that's a problem to fix, not work around. Call it out explicitly.
+
+**Never check out an old branch on the server to run a script.** If a script you need isn't on main, stop and get it onto main first (cherry-pick or merge). The five minutes to do that properly is never more expensive than the risk of a stale checkout silently replacing production files like `webapp.py`.
+
+**If a useful script or tool only exists on a feature branch, that's a bug.** Fix it by getting it to main — don't route around it.
+
+**Be explicit about S3 trigger scope.** Any write to a watched prefix fires Lambda. Before writing a handler that moves files within the same bucket, check whether the destination prefix is also watched.
+
+### Pre-Deploy Checklist for Lambda/S3 Changes
+
+Before deploying any change to a Lambda handler or S3 trigger configuration, explicitly answer these questions:
+
+1. **What prefixes does this Lambda watch?** (Check the CDK stack notification filter)
+2. **Does the handler write to the same bucket?** (copies, moves, quarantine operations)
+3. **Does any write destination fall under a watched prefix?** If yes, that write will re-trigger the Lambda — is that intentional?
+4. **What happens if the Lambda is triggered on its own output?** Trace the execution path to confirm it terminates.
+
 ### Current Workflow
 
 Development happens in two locations:
@@ -115,7 +134,8 @@ On the deployed server:
 ### Starting the Webapp
 
 ```bash
-/usr/bin/python3 /usr/local/bin/uvicorn --port 9998 --host 0.0.0.0 webapp:app \
+SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
+/usr/bin/python3 /usr/local/bin/uvicorn --port 9000 --host 0.0.0.0 webapp:app \
   --reload --log-level trace \
   --ssl-certfile /etc/letsencrypt/live/{domain}/fullchain.pem \
   --ssl-keyfile /etc/letsencrypt/live/{domain}/privkey.pem

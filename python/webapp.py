@@ -937,13 +937,20 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
 
         # No sender restriction — anyone can submit photos via email.
         # See issue #61 for splitting photo-submission auth from admin_emails.
+        admin_emails = ac.get("admin_emails", [])
 
         # Parse subject
         default_layer = ac.get("email_photo_default_layer", "processing_sites")
         layer_name, title = email_inlet.parse_subject(payload.subject, default_layer)
 
-        # Validate layer exists
+        # Validate layer exists; fall back to atlas default if subject named an unknown layer
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
+        if layer_name not in layer_names:
+            logging.warning(
+                f"Unknown layer '{layer_name}' for atlas '{payload.atlas_name}'; "
+                f"falling back to '{default_layer}'"
+            )
+            layer_name = default_layer
         if layer_name not in layer_names:
             raise HTTPException(status_code=400, detail=f"Unknown layer: {layer_name}")
 
@@ -952,20 +959,21 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         gps = email_inlet.extract_gps(image_bytes)
         if gps is None:
             atlas_addr = f"{payload.atlas_name}@fireatlas.org"
-            _send_bounce(
-                from_addr=atlas_addr,
-                to_addrs=[payload.sender] + admin_emails,
-                subject=f"Re: {payload.subject or '(no subject)'}",
-                body=(
-                    f"Hi,\n\n"
-                    f"Your photo was received but could not be added to the atlas because "
-                    f"it doesn't contain GPS location data.\n\n"
-                    f"To fix this, please enable location access for the Camera app:\n"
-                    f"  iOS: Settings → Privacy & Security → Location Services → Camera → While Using\n\n"
-                    f"Once enabled, retake the photo and resend it to {atlas_addr}.\n\n"
-                    f"— {payload.atlas_name} Atlas"
-                ),
-            )
+            # _send_bounce disabled — was causing cascade spam during no-GPS quarantine loop
+            # _send_bounce(
+            #     from_addr=atlas_addr,
+            #     to_addrs=[payload.sender] + admin_emails,
+            #     subject=f"Re: {payload.subject or '(no subject)'}",
+            #     body=(
+            #         f"Hi,\n\n"
+            #         f"Your photo was received but could not be added to the atlas because "
+            #         f"it doesn't contain GPS location data.\n\n"
+            #         f"To fix this, please enable location access for the Camera app:\n"
+            #         f"  iOS: Settings → Privacy & Security → Location Services → Camera → While Using\n\n"
+            #         f"Once enabled, retake the photo and resend it to {atlas_addr}.\n\n"
+            #         f"— {payload.atlas_name} Atlas"
+            #     ),
+            # )
             raise HTTPException(status_code=400, detail="No GPS data found in image EXIF")
 
         # Upload image to S3
