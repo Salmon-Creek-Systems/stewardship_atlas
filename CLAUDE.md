@@ -84,6 +84,16 @@ stewardship_atlas/
 
 ## Development Environment
 
+### Server Safety Rules
+
+**The server should always be on main.** If it's on any other branch, that's a problem to fix, not work around. Call it out explicitly.
+
+**Never check out an old branch on the server to run a script.** If a script you need isn't on main, stop and get it onto main first (cherry-pick or merge). The five minutes to do that properly is never more expensive than the risk of a stale checkout silently replacing production files like `webapp.py`.
+
+**If a useful script or tool only exists on a feature branch, that's a bug.** Fix it by getting it to main — don't route around it.
+
+**Be explicit about S3 trigger scope.** Any write to a watched prefix fires Lambda. Before writing a handler that moves files within the same bucket, check whether the destination prefix is also watched.
+
 ### Current Workflow
 
 Development happens in two locations:
