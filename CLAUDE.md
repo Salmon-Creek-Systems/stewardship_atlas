@@ -64,7 +64,8 @@ stewardship_atlas/
 │   ├── atlas.py         # Atlas creation and materialization
 │   ├── webapp.py        # FastAPI REST API
 │   ├── outlets.py       # Output generators (webmap, HTML, etc.)
-│   ├── outlets_qgis.py  # QGIS-based PDF generation
+│   ├── outlets_qgis.py  # QGIS PDF rendering helpers (not the materializer entry point)
+│   ├── outlets_qgis_atlas.py  # QGIS materializer entry point — registers asset_methods
 │   ├── vector_inlets.py # Vector data importers
 │   ├── raster_inlets.py # Raster data importers
 │   ├── eddies.py        # Data transformers
@@ -103,13 +104,48 @@ Before deploying any change to a Lambda handler or S3 trigger configuration, exp
 3. **Does any write destination fall under a watched prefix?** If yes, that write will re-trigger the Lambda — is that intentional?
 4. **What happens if the Lambda is triggered on its own output?** Trace the execution path to confirm it terminates.
 
+### Code Conventions
+
+**Shared helpers go in `utils.py`.** When a utility function is needed in both a `python/` module and a `scripts/` script, put it in `utils.py` once and import it everywhere. Scripts use `sys.path.insert(0, str(Path(__file__).parent.parent / "python"))` — see `build_atlas.py`, `generate_attributions.py`, `ingest_s3_photos.py` for the established pattern.
+
+**Additive changes should be additive.** When asked to add a new field or structure, preserve everything that was already there unless explicitly told to remove it.
+
 ### Current Workflow
 
 Development happens in two locations:
-1. **Local (Cursor on macOS)**: Edit code, commit to git
+1. **Local (Claude Code on macOS)**: Edit code, commit to git
 2. **Remote server (emacs)**: Pull changes, run/test, sometimes edit directly
 
 **Important**: Most functionality cannot be run locally due to QGIS dependencies and data paths. The deployed server at `/root/swales/` or `/root/swales_dev/` is the primary execution environment.
+
+### Service Operation
+
+Screen session names on the server:
+```bash
+screen -r app_{atlas}      # webapp
+screen -r jupyter_{atlas}  # jupyter
+```
+
+Start unified webapp:
+```bash
+cd /root/swales_dev/app/python
+SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
+uvicorn --port 9000 --host 0.0.0.0 webapp:app --reload \
+  --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
+  --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
+```
+
+**`--reload` has a race condition.** If the service was mid-flight during a `git pull`, `--reload` may not pick up the new code. Hard restart (kill screen session + relaunch) is required to guarantee new code is running.
+
+**Ghostty + screen**: The server doesn't have Ghostty's terminfo. Run `TERM=xterm-256color screen` or add `export TERM=xterm-256color` to `~/.bashrc` on the server.
+
+Start Jupyter:
+```bash
+cd /root/swales_dev/{atlas}/staging/outlets/notebook
+jupyter notebook --config /root/swales_dev/{atlas}/staging/outlets/notebook/jupyter_notebook_config.py \
+  --debug --allow-root --port {jupyter_port}
+```
+The `jupyter_notebook_config.py` must exist with SSL cert paths — Jupyter doesn't support SSL cert paths on the CLI.
 
 ### Server Paths
 
@@ -131,15 +167,244 @@ On the deployed server:
 | `POST /import_sheet`, `GET /export_gsheet` | Google Sheets import/export |
 | `POST /sql_query` | DuckDB query across layers |
 
-### Starting the Webapp
+### Git Workflow
 
+1. Edit locally or on server
+2. Commit; push when the server needs to see the changes or at the end of a meaningful working block
+3. SSH to server, pull changes
+4. Test/run on server
+
+Keep commits focused — the deployed server may have uncommitted local changes.
+
+**Plan lifecycle:** When a plan file is complete, move it to `~/.claude/completed_plans/` rather than deleting it.
+
+## Email Inlet Pipeline
+
+Pipeline: `scvfd@fireatlas.org` → SES → S3 `atlas-ingress/incoming/` → Lambda `atlas-email-photo-handler` → POST `/ingest/email_photo` on webapp → delta written → layer refreshed
+
+### Subject Line Format
+
+`<layer>: <title>` — e.g. `hydrants: New hydrant on Miller Rd`
+
+If no colon present, the whole subject is used as the title and the layer defaults to `processing_sites`. Override the default per-atlas with `email_photo_default_layer` in the atlas GeoJSON.
+
+### Authorized Senders
+
+`admin_emails` in atlas config controls who can submit:
+- **Non-empty list** → only those addresses accepted (403 otherwise, no bounce)
+- **Empty list `[]`** → open ingest mode (all senders accepted)
+- **Missing entirely** → treated as non-empty (safe default, allowlist behavior)
+
+Add new senders to `{atlas}.geojson`, commit, pull on server, rebuild config.
+
+### GPS Requirement
+
+Photos must have GPS EXIF data. If missing, webapp returns 400. Bounce emails are currently **disabled** (see Pending Work). Users currently get no feedback when GPS is missing.
+
+To verify GPS before sending: open photo in iOS Photos → swipe up → if a map thumbnail appears, GPS is present. iOS: Settings → Privacy → Location Services → Camera → While Using.
+
+### SES Status
+
+SES sandbox mode is still active (production access requested 2026-03-17). In sandbox mode, bounces fail with AccessDenied on non-verified recipients.
+
+### Operational Scripts
+
+- `scripts/trace_email.py` — trace recent invocations through SES/S3/Lambda/webapp
+- `scripts/reprocess_email.py --list` — show emails stuck in ingress bucket
+- `scripts/reprocess_email.py --inspect <key>` — show sender, subject, GPS status
+- `scripts/reprocess_email.py <key>` — retrigger Lambda by copying S3 object with metadata change
+
+Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces) cover planned improvements.
+
+### SES Auto-Registration
+
+`/create_atlas` automatically appends `{slug}@fireatlas.org` to the `atlas-email-inlet` receipt rule set when a new atlas is created. EC2 role needs `ses:DescribeReceiptRuleSet` + `ses:UpdateReceiptRule` (in CDK stack).
+
+### Technical Console Log
+
+`/log/{swalename}` endpoint queries CloudWatch for recent Lambda invocations. Technical console fetches this live on page load. Implemented in `python/atlas_logs.py`.
+
+## AWS Infrastructure
+
+### Accounts and Profiles
+
+- **Atlas account**: 438886543302, profile name `atlas` in `~/.aws/credentials`
+- **Personal account**: default profile — has Route 53 for fireatlas.org DNS only; nothing else relevant
+
+### CDK Stack
+
+Stack in `infrastructure/cdk/`. Deploy with:
 ```bash
-SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
-/usr/bin/python3 /usr/local/bin/uvicorn --port 9000 --host 0.0.0.0 webapp:app \
-  --reload --log-level trace \
-  --ssl-certfile /etc/letsencrypt/live/{domain}/fullchain.pem \
-  --ssl-keyfile /etc/letsencrypt/live/{domain}/privkey.pem
+cd infrastructure/cdk && npx aws-cdk deploy AtlasEmailPhotoStack --profile atlas
 ```
+(`cdk` is not on PATH — use `npx aws-cdk`.)
+
+Security-sensitive CDK changes (IAM/bucket policy) require `--require-approval broadening` or the deploy will fail non-interactively.
+
+### Lambda Dependency Bundling
+
+No Docker available locally, so CDK `BundlingOptions` doesn't work. Pre-build deps manually:
+```bash
+pip3 install -r infrastructure/lambda/requirements.txt -t infrastructure/lambda_build/
+cp infrastructure/lambda/email_photo_handler.py infrastructure/lambda_build/
+```
+Then `cdk deploy`. The `lambda_build/` dir is gitignored.
+
+### IAM Summary
+
+EC2 role (`atlas-webapp-ec2-role` / `atlas-webapp-instance-profile`, attached to i-088b520a5a06d51ac us-west-1):
+- S3 PutObject on `scs-atlas-data`
+- CloudWatch `logs:DescribeLogStreams` + `logs:GetLogEvents` on Lambda log group
+- SES `ses:SendEmail` + `ses:SendRawEmail`
+- SES `ses:DescribeReceiptRuleSet` + `ses:UpdateReceiptRule`
+
+Lambda role: S3 GetObject + DeleteObject on `atlas-ingress`.
+
+### S3 Buckets
+
+- **`atlas-ingress`**: raw SES emails, 30-day lifecycle, Lambda triggered on OBJECT_CREATED for `incoming/` prefix; quarantine at `quarantine/no-gps/` (not under watched prefix)
+- **`scs-atlas-data`**: permanent photo storage; `*/media/email_photos/*` is public-readable; upload uses `ContentType` + `ContentDisposition: inline` so images display in browser
+
+### Route 53
+
+DNS records for fireatlas.org are in the **personal** AWS account, not the atlas account.
+
+## PMTiles and Terrain
+
+PMTiles is the chosen tile format — single file, S3-compatible range requests, no tile server needed, MapLibre native support via `pmtiles://` protocol. Pre-generate on publish, serve static from nginx/S3. No runtime compute.
+
+Two eddies in `eddies.py`:
+- `hillshade_tiles` — raster basemap PMTiles
+- `terrain_rgb_tiles` — Mapbox terrain-RGB for 3D view
+
+`pip3 install pmtiles` is the only new server dependency (rasterio + gdal2tiles already present).
+
+### Terrain-RGB Encoding
+
+Mapbox format: `height = -10000 + (R*65536 + G*256 + B) * 0.1`
+
+`(0,0,0)` = −10,000m. Any pixel written as zero becomes a 10km-deep pit on the map. Nodata must be handled before encoding. OpenTopography COP30 sometimes has coverage gaps written as exactly `0.0` with `nodata=None` — treat `elevation == 0.0` as nodata for mountainous atlas regions where genuine sea-level elevation won't appear.
+
+### Tile Artifacts and Auto Min-Zoom
+
+`gdal2tiles.py` fills tile area outside the raster extent with zeros (= −10km terrain pits). For a small atlas, a low-zoom tile covers a huge area — mostly zeros.
+
+Fix: `_auto_min_zoom()` raises min_zoom until tiles are at least ~25% covered by the DEM:
+- Formula: `ceil(log2(90 / dem_width_degrees))`
+- 100-acre atlas → z12; county-scale → z8
+
+Even with correct min_zoom, partial tiles at DEM edges still have zero-fill. `terrain_dem_inlet` in `raster_inlets.py` fetches COP30 for the union bbox of all tiles at min_zoom that cover the atlas — terrain-RGB then perfectly fills the tiles.
+
+### 3D Geometry Source
+
+For 3D terrain geometry (not hillshade), a global tile service beats local PMTiles — our atlas PMTiles sit in correct terrain but the surrounding world has a sharp edge. AWS Open Data terrain (Terrarium encoding, free, global) is seamless. Our own PMTiles are valuable for the 2D hillshade basemap only.
+
+### PMTiles Technical Notes
+
+- PMTiles URL must be absolute for HTTP range requests. Use `new URL(relPath, window.location.href).href` — works from staging, CURRENT, or any published version.
+- `pmtiles.writer.Writer.write_tile(tile_id, data)` takes a single tile_id integer. Use `pmtiles.tile.zxy_to_tileid(z, x, y)`.
+- `gdal2tiles.py --xyz` generates XYZ tiles (not TMS y-flipped). Use this for PMTiles.
+- `gdal2tiles.py` is at `/usr/bin/gdal2tiles.py` on server.
+- `3dview.py` can't be imported directly (digit prefix). Use `importlib.import_module('3dview')`.
+
+## Config and Materializer System
+
+### atlas_config.json is Always a Build Artifact
+
+`{atlas}_layers.json`, `{atlas}_assets.json`, and all `shared_*.json` files are **inputs** to `build_atlas.py`. The merged result is `staging/atlas_config.json`, which is the running system's source of truth. **Any change to any of these files requires re-running `build_atlas.py config_only` before the change takes effect.** There is no runtime merge.
+
+### Which QGIS File Does What
+
+Two QGIS outlet files exist — easy to confuse:
+- `outlets_qgis.py` — rendering helpers and shared logic; **not** the materializer entry point
+- `outlets_qgis_atlas.py` — the materializer entry point; imports `outlets_qgis` as a helper; **registers `asset_methods`**
+
+New materializers must be registered in `outlets_qgis_atlas.asset_methods`.
+
+### Common Failure Modes
+
+- `KeyError: 'fetch_type'` — `atlas_config.json` hasn't been rebuilt after a source config change
+- `KeyError: '<fetch_type_name>'` — function registered in wrong module, or missing from `asset_methods`
+- Adding a `config_def` in per-atlas assets but forgetting the corresponding entry in `shared_*.json` — fails silently or partially
+
+Adding a new materializer requires: function → registered in `asset_methods` → `config_def` in `shared_*.json` → reference in per-atlas assets JSON → re-run `build_atlas.py config_only`.
+
+## Unified Webapp Gotchas
+
+- **`apiurl` vs `base_url`**: `base_url` includes the path (`fireatlas.org/scvfd`), so `${base_url}:9000` creates malformed URLs. Pass `apiurl` (from `app_url` in config) separately to templates.
+- **Stale `atlas_config.json`**: always check the live config on the server — it's stale if `build_atlas.py config_only` hasn't been re-run after source changes.
+- **htpasswd cascade**: after any roles change, re-run `build_atlas.py config_only` on server to regenerate htpasswd files.
+- **CDK security changes**: need `--require-approval broadening` flag.
+- **Certbot chicken-and-egg**: comment out SSL nginx directives before first certbot run.
+
+## QGIS Label Filtering
+
+All options live in the per-atlas `{atlas}_layers.json` and are read by `apply_basic_styling()` in `outlets_qgis.py`.
+
+| Option | Type | Effect |
+|---|---|---|
+| `add_labels` | bool | Enable labels at all |
+| `label_deduplicate` | bool | Only label the lowest-`$id` feature per unique label value |
+| `avoid_label_collisions` | bool (default true) | QGIS collision avoidance; false = show all labels |
+| `labels_avoid_features` | bool (default false) | Labels treat features as obstacles |
+| `max_labels` | int | Hard cap on total labels shown for this layer |
+| `label_expression` | string | **Most powerful.** Raw QGIS expression; NULL return suppresses label. Use this first for non-trivial filtering. |
+| `label_color` | [r, g, b] | Overrides default label color |
+| `qgis_width_scale` | float | Multiplies line width (roads, creeks) |
+
+`label_deduplicate` uses PAL expression: `if($id = minimum($id, group_by:="<field>"), "<field>", NULL)` — aggregate runs across the whole layer. Works well for buildings/addresses; less predictable for per-cell gazetteer context.
+
+**WVFD brittleness warning**: Label collision tuning felt brittle. If label layout regresses, likely culprits: `displayAll`/`avoid_label_collisions` interaction, QGIS version PAL differences, `max_labels` stacking with collision avoidance, aggregate expressions behaving differently when atlas clipping is active.
+
+## Feature Branches and Pending Work
+
+### feature/atlas-create (pushed 2026-04-04, not yet merged or deployed)
+
+`/create` page on fireatlas.org: draw a bbox, enter a name, submit → atlas created with starter layers, materialized (html/webmap/webedit), redirect to public console.
+
+Manual step required on server before deploying nginx changes:
+```bash
+htpasswd -bc /root/swales_dev/roles/shared.htpasswd admin admin
+htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
+```
+
+### pmtiles-terrain branch
+
+Not yet merged. SCVFD wired but not tested.
+
+### Pending Issues
+
+| Issue | Area | Status |
+|---|---|---|
+| #70 | Combine `reprocess_email.py` + `trace_email.py` | Open |
+| #71 | Unified logging + re-enable bounce emails | Open |
+| #67 | Legend "only rendered" toggle doesn't restore unchecked-layer state | Open |
+| #64 | Lambda memory 128MB→512MB CDK deploy | Open |
+| #52 | Layer management | Open |
+| #53 | Config simplification | Open |
+| #43 | Email address configurability | Open |
+| #42 | Edit map refresh | Open |
+| #41 | Edit map shows all layers | Open |
+| #40 | Delta /work subdir | Open |
+| #34 | Overture S3 release path auto-update (~monthly) | Open |
+
+### Stuck Emails
+
+Three emails are stuck in the ingress bucket — retrigger after confirming Lambda memory fix (issue #64) is deployed:
+- `a0d6bl15`
+- `dl2t1n7q`
+- `v8a3cpdhj`
+
+Use `scripts/reprocess_email.py <key>` to retrigger.
+
+### Bounce Emails
+
+Currently **disabled** (`_send_bounce` calls commented out in webapp). Users get no feedback when GPS is missing. Issue #71 covers redesign and re-enablement.
+
+### Westport Config Files
+
+- `wvfd_dev_assets.json` is canonical for Westport assets (more complete than `wvfd_assets.json`)
+- `wvfd_dev_layers.json` is canonical for Westport layers (`wvfd_layers.json` is missing `roads_candidates` and `private_notes`)
 
 ## Key Dependencies
 
@@ -153,10 +418,12 @@ SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
 - `Pillow` - Image processing (sprites)
 - `mercantile` - Tile calculations
 - `pystac-client`, `planetary-computer` - Raster data sources
+- `pmtiles` - PMTiles generation
+- `anthropic>=0.25.0` - NL→SQL feature (`POST /sql_generate/{swalename}`)
 
 ### QGIS (System Dependency)
 
-QGIS with Python bindings is required for PDF generation (`outlets_qgis.py`). On the server, QGIS was installed via system packages (not pip). This is a known pain point—getting PyQGIS working requires careful environment setup.
+QGIS with Python bindings is required for PDF generation (`outlets_qgis.py`). On the server, QGIS was installed via system packages (not pip).
 
 Key QGIS notes:
 - Set `QT_QPA_PLATFORM=offscreen` for headless rendering
@@ -181,10 +448,8 @@ Atlases are created by combining:
 import atlas
 import json
 
-# Load the region GeoJSON (defines bbox and properties like name, logo, admin_emails)
 gj = json.load(open("my_region.geojson"))
 
-# Create the atlas
 config = atlas.create(
     feature_collection=gj,
     data_root="/root/swales",
@@ -194,6 +459,8 @@ config = atlas.create(
 )
 ```
 
+`atlas.create_config()` does `config.update(props)` for all GeoJSON feature properties — any new field in `{atlas}.geojson` flows into `atlas_config.json` automatically. Edit the GeoJSON, then `build_atlas.py config_only` — never edit `atlas_config.json` directly.
+
 ### Materializing Assets
 
 ```python
@@ -201,22 +468,16 @@ import atlas
 import json
 
 config = json.load(open("/root/swales/myatlas/staging/atlas_config.json"))
-
-# Run an inlet to fetch data
-atlas.materialize(config, "dem")
-
-# Run an eddy to transform data
-atlas.materialize(config, "gdal_contours")
-
-# Generate an outlet
-atlas.materialize(config, "webmap")
+atlas.materialize(config, "dem")       # inlet
+atlas.materialize(config, "gdal_contours")  # eddy
+atlas.materialize(config, "webmap")    # outlet
 ```
 
-**Known asset method keys** (from `outlets.asset_methods` in `python/outlets.py`):
+**Known asset method keys**:
 
 | Key | What it generates |
 |-----|-------------------|
-| `html` | All console HTML variants: technical, admin, internal, public — all four are generated together by `outlet_html`. To regenerate after template changes, run `atlas.materialize(config, "html")`. **Do not try `technical_console`, `admin_console`, etc. — they don't exist.** |
+| `html` | All console HTML variants (technical, admin, internal, public) — all four generated together. **Do not use `technical_console`, `admin_console`, etc. — they don't exist.** |
 | `webmap` | MapLibre webmap |
 | `webmap_private` | Private variant of webmap |
 | `webedit` | Web editing interface |
@@ -226,10 +487,12 @@ atlas.materialize(config, "webmap")
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
 
+**Outlet build order**: `webmap` must come before `html` — the console HTML checks if `outlets/webmap/index.html` exists at generation time.
+
 ## Current Atlases
 
-- `wvfd` / `wvfd_dev` — Westport Volunteer Fire Department. Recent paying contract; significant code, config, and data changes were made here that need to be propagated back to SCVFD.
-- `scvfd` — Original and anchor customer. Personal connection (community VFD where the team grew up). No current funding but important — friendly testers and the target for interesting new features. Treat as the reference implementation.
+- `wvfd` / `wvfd_dev` — Westport Volunteer Fire Department. Recent paying contract; significant code, config, and data changes that need to be propagated back to SCVFD. Use `wvfd_dev_*` config files as canonical.
+- `scvfd` — Original and anchor customer. Personal connection (community VFD). No current funding but important — friendly testers and the reference implementation.
 - `MineralKinsey` — Fire safe council
 - `kennedy`, `wildwood` — Other customers
 
@@ -237,14 +500,9 @@ Each has corresponding `*_layers.json` and `*_assets.json` in `/configuration`.
 
 ## Architecture Notes
 
-**Static-first**: Once generated, outlet files are static and can be viewed offline. The webapp/API is only needed when modifying data or publishing new versions.
+**Static-first**: Once generated, outlet files are static and can be viewed offline. The webapp/API is only needed when modifying data or publishing.
 
-**Outlet types customers use directly**:
-- `html` — the interactive console customers use day-to-day
-- webmap outlets — live data interaction
-- `notebook` — advanced code-based interaction
-
-**Actual on-disk layout** (not fully visible in the Python code):
+**Actual on-disk layout**:
 ```
 /data/swales/
   {atlas}/
@@ -255,17 +513,17 @@ Each has corresponding `*_layers.json` and `*_assets.json` in `/configuration`.
       local -> ...    ← symlink to shared local data
       deltas/, layers/, outlets/
     2026-02-11/       ← immutable published snapshot
-      atlas_config.json
-      (same subtree as staging)
 ```
 
-**Deployment history**: Started with shared code + shared service + per-atlas subdomains (cross-site headaches). Moved to fully self-contained per-atlas with own `app/` copy and own service/port (eliminates cross-site but creates propagation pain). Future direction: container image for code, S3 for data, nginx/DNS handles routing — essentially the original model done right.
+**Deployment model (current)**: Unified webapp — single uvicorn at `fireatlas.org:9000`, `SWALES_ROOT=/root/swales_dev`, path-based URLs. All atlases served from one process. Per-atlas model retired.
 
-**S3 status**: Partially underway. Currently the system points at files served from S3; the goal is to make S3 a proper backend in the data access layer. Key wrinkle: current structure relies on symlinks (`local ->`, `CURRENT ->`); S3 doesn't support symlinks natively. The `app/` tree should not go to S3 — it belongs in a container image.
+**Future direction**: Scale-to-zero: static data on S3/CloudFront, API/compute only active during edit sessions. Lambda container images or ECS Fargate. Don't make decisions in config/S3/routing work that close this door.
 
-**Logistics eddy**: Exists as a notebook only — not yet a proper eddy in `eddies.py`. Fuel reduction / biochar logistics modeling; commercially interesting.
+**S3 status**: Partially underway. Files currently served from S3; goal is to make S3 a proper data backend. Key wrinkle: current structure relies on symlinks (`local ->`, `CURRENT ->`); S3 doesn't support symlinks. The `app/` tree belongs in a container image, not S3.
 
-**Dagster history**: The system was originally orchestrated with Dagster. The uniform asset method signature and `asset_methods` dict are intentional Dagster scaffolding — preserve this pattern. Old integration code exists in the private repo `Salmon-Creek-Systems/internal`, `python/atlas_dagster.py` (check `__init__.py` there too). When Dagster is restored it will coexist with notebooks (exploration/advanced users) and the web console (user-triggered actions) — it handles recurring maintenance and dependency-driven pipeline orchestration.
+**Logistics eddy**: Exists as a notebook only — not yet a proper eddy in `eddies.py`. Fuel reduction/biochar logistics modeling; commercially interesting.
+
+**Dagster history**: Originally orchestrated with Dagster. The uniform asset method signature and `asset_methods` dict are intentional Dagster scaffolding — preserve this pattern. Old integration code at `Salmon-Creek-Systems/internal`, `python/atlas_dagster.py`. When restored, Dagster coexists with notebooks and the web console — it handles recurring maintenance and dependency-driven orchestration.
 
 ## Commands
 
@@ -275,21 +533,17 @@ cd python
 python -m pytest tests/            # all tests
 python -m pytest tests/test_foo.py # single file
 ```
-Tests are unittest-based. Most can run locally without QGIS or server data paths.
 
 ### Run end-to-end tests (against live server, read-only)
 ```bash
 cd python
+ATLAS_NAME=kennedy \
 ATLAS_BASE_URL=https://fireatlas.org \
 ATLAS_API_URL=https://fireatlas.org:9000 \
-ATLAS_USER=... ATLAS_PASSWORD=... \
+ATLAS_USER=admin ATLAS_PASSWORD=admin \
 pytest tests/test_kennedy_e2e.py -v
 ```
-E2e tests use Playwright + requests. Install deps once:
-```bash
-pip3 install -r requirements-dev.txt --break-system-packages
-playwright install chromium
-```
+Install deps once: `pip3 install -r requirements-dev.txt --break-system-packages && playwright install chromium`
 
 ### Atlas CLI
 ```bash
@@ -298,7 +552,7 @@ python scripts/build_atlas.py --help
 
 ## Testing
 
-Tests exist in `python/tests/` but haven't been run recently. The testing strategy going forward:
+Tests exist in `python/tests/` but haven't been run recently. Strategy going forward:
 
 1. **Priority**: Simple unit tests for core modules first (`utils.py`, `versioning.py`, `deltas_geojson.py`)
 2. **Later**: Integration tests, then system-level tests
@@ -308,43 +562,42 @@ Tests exist in `python/tests/` but haven't been run recently. The testing strate
 
 ### Filesystem Complexity
 
-The system relies heavily on:
-- Symbolic links (`local/` → shared data, `CURRENT/` → active version)
-- Directory creation with specific permissions and `.htpasswd` files
-- Path resolution that differs between local repo and deployed server
-
-When debugging path issues, check `versioning.py` for path construction logic.
+The system relies heavily on symbolic links (`local/` → shared data, `CURRENT/` → active version), directory creation with specific permissions and `.htpasswd` files, and path resolution that differs between local repo and deployed server. When debugging path issues, check `versioning.py`.
 
 ### Config File Manipulation
 
-Atlas configs are built dynamically from multiple sources. The actual runtime config (`atlas_config.json`) may look different from the template files. Use `atlas.create_config()` to see what the merged config looks like.
+Atlas configs are built dynamically. The actual runtime config (`atlas_config.json`) may look different from the template files. Use `atlas.create_config()` to inspect. Always fetch live config from `https://fireatlas.org/{atlas}/staging/atlas_config.json` — the source files are not what the code runs from.
 
 ### QGIS Environment
 
-QGIS Python bindings are finicky:
-- Must be installed at system level (not virtualenv)
-- Requires specific environment variables
-- The `qgis_init()` function in `outlets_qgis.py` handles initialization
+QGIS Python bindings must be installed at system level (not virtualenv). Requires specific environment variables. `qgis_init()` in `outlets_qgis.py` handles initialization.
 
 ### Local vs Remote Paths
 
-Code references paths like `/root/swales/` which don't exist locally. For local development, you may need to:
-- Mock filesystem operations
-- Use test fixtures with relative paths
-- Work on modules that don't require the full data tree
+Code references paths like `/root/swales/` which don't exist locally. For local development: mock filesystem operations, use test fixtures with relative paths, or work on modules that don't require the full data tree.
+
+### Layer Config: Zoom Visibility
+
+- **`vis: {"minzoom": N}`** — applied to both geometry layer AND label layer
+- **`label_minzoom` / `label_maxzoom`** — overrides zoom range on the label/icon layer only
+
+### MapLibre Legend Library (`@watergis/maplibre-gl-legend`)
+
+- "Only rendered" checkbox class: `maplibregl-legend-onlyRendered-checkbox`
+- Default position: `top-right` (our code places it at `bottom-left`)
+- **Known bug**: unchecked layers reappear when toggling "only rendered" off then on (issue #67)
+- Avoid broad CSS selectors on `.maplibregl-ctrl-bottom-left input[type=checkbox]` — hits all layer visibility checkboxes
+
+### Template Copy
+
+`cp -r src dst` when `dst` exists copies `src` INTO `dst`, not over it. Use `shutil.copytree(src, dst, dirs_exist_ok=True)` — already fixed in `outlets.py`.
 
 ## Priority Work Areas
 
-These are areas identified for improvement:
-
-1. **Local Development Setup**: Currently can't run much locally. Need better mocking, fixtures, or containerization to enable local development/testing.
-
-2. **QGIS Deployment**: The QGIS installation is manual and fragile. Consider Docker containers or better orchestration tooling.
-
-3. **Atlas Creation Workflow**: The `create()` and `create_config()` functions in `atlas.py` could be improved. Look at making atlas bootstrapping more streamlined.
-
-4. **Testing Infrastructure**: Get unit tests running again. Start with core utilities (`utils.py`, `versioning.py`), then expand to inlets/outlets.
-
+1. **Local Development Setup**: Currently can't run much locally. Need better mocking, fixtures, or containerization.
+2. **QGIS Deployment**: Installation is manual and fragile. Consider Docker or better orchestration.
+3. **Atlas Creation Workflow**: `create()` and `create_config()` in `atlas.py` could be more streamlined.
+4. **Testing Infrastructure**: Get unit tests running. Start with `utils.py`, `versioning.py`, then expand.
 5. **Documentation**: Keep `documents/` up to date as the system evolves.
 
 ## Common Operations
@@ -372,13 +625,3 @@ atlas.materialize(config, 'webmap')
 import versioning
 versioning.publish(config)  # Creates timestamped version, updates CURRENT symlink
 ```
-
-## Git Workflow
-
-1. Edit locally in Cursor
-2. Commit and push to origin
-3. SSH to server, pull changes
-4. Test/run on server
-5. (Or: edit on server with emacs, commit, pull locally)
-
-Keep commits focused—the deployed server may have uncommitted local changes.
