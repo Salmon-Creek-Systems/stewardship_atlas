@@ -134,7 +134,10 @@ def reprocess(s3, key, dry_run=False):
 
 def reprocess_all(s3, dry_run=False):
     resp = s3.list_objects_v2(Bucket=BUCKET, Prefix=PREFIX)
-    objects = sorted(resp.get("Contents", []), key=lambda o: o["LastModified"])
+    objects = sorted(
+        [o for o in resp.get("Contents", []) if "/no-gps/" not in o["Key"]],
+        key=lambda o: o["LastModified"],
+    )
     if not objects:
         print("No emails currently in ingress bucket.")
         return
