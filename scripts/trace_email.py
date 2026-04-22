@@ -351,11 +351,18 @@ def main():
             invs = parse_invocations_from_stream(logs, stream["logStreamName"])
             all_invocations.extend(invs)
 
-        # Sort by start time descending, optionally filter to failures, take N
+        # Sort by start time descending, optionally deduplicate by key and filter to failures, take N
         all_invocations.sort(key=lambda i: i["start_ms"] or 0, reverse=True)
         total_checked = len(all_invocations)
         if args.failed:
-            all_invocations = [i for i in all_invocations if i["status"] != "success"]
+            # One entry per email: keep only the most recent attempt per s3_key,
+            # then show only those where that most recent attempt failed.
+            seen = {}
+            for inv in all_invocations:
+                key = inv["s3_key"] or inv["request_id"]
+                if key not in seen:
+                    seen[key] = inv
+            all_invocations = [i for i in seen.values() if i["status"] != "success"]
         recent = all_invocations if args.n == 0 else all_invocations[:args.n]
 
         if not recent:
