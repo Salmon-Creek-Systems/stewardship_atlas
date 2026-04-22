@@ -89,8 +89,20 @@ def handler(event, context):
     logger.info(f"Webapp response: {resp.status_code} {resp.text}")
 
     if resp.status_code == 200:
-        # Clean up raw email from ingress bucket
         s3.delete_object(Bucket=bucket, Key=key)
         logger.info(f"Deleted {key} from {bucket}")
+    elif resp.status_code == 400:
+        try:
+            detail = resp.json().get("detail", "")
+        except Exception:
+            detail = resp.text
+        if "No GPS" in detail:
+            # Permanently unprocessable — move to no-gps/ so --all reprocess skips it
+            no_gps_key = key.replace("incoming/", "incoming/no-gps/", 1)
+            s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=no_gps_key)
+            s3.delete_object(Bucket=bucket, Key=key)
+            logger.info(f"Moved {key} to {no_gps_key} (no GPS data)")
+        else:
+            logger.error(f"Webapp returned 400 — leaving in bucket for inspection: {detail}")
     else:
-        logger.error(f"Webapp returned {resp.status_code} — leaving raw email in bucket for inspection")
+        logger.error(f"Webapp returned {resp.status_code} — leaving in bucket for inspection")

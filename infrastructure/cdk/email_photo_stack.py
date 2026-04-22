@@ -109,9 +109,10 @@ class EmailPhotoStack(Stack):
             ],
         )
 
-        # Read + delete from ingress bucket
+        # Read + delete from ingress bucket; write needed to move emails to no-gps/ subdir
         ingress_bucket.grant_read(lambda_role)
         ingress_bucket.grant_delete(lambda_role)
+        ingress_bucket.grant_put(lambda_role)
 
         # --- Lambda function ---
         email_lambda = lambda_.Function(
