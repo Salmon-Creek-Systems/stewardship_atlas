@@ -937,6 +937,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
 
         # No sender restriction — anyone can submit photos via email.
         # See issue #61 for splitting photo-submission auth from admin_emails.
+        admin_emails = ac.get("admin_emails", [])
 
         # Parse subject
         default_layer = ac.get("email_photo_default_layer", "processing_sites")
