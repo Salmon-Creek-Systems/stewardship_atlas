@@ -80,6 +80,14 @@ def extract_gps(image_bytes: bytes) -> dict | None:
         "lon": to_decimal(gps_info["GPSLongitude"], gps_info["GPSLongitudeRef"]),
         "raw_exif": raw_exif,
     }
+
+    if "GPSAltitude" in gps_info:
+        result["altitude"] = round(safe_float(gps_info["GPSAltitude"]), 2)
+
+    for key, exif_tag in (("datetime", "DateTime"), ("make", "Make"), ("model", "Model")):
+        if exif_tag in raw_exif:
+            result[key] = raw_exif[exif_tag]
+
     return result
 
 
