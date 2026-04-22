@@ -6,12 +6,15 @@ Usage:
     python scripts/reprocess_email.py --list                  # show stuck emails
     python scripts/reprocess_email.py --inspect <key>         # show sender, subject, GPS status
     python scripts/reprocess_email.py <key>                   # retrigger Lambda processing
-    python scripts/reprocess_email.py --profile atlas         # AWS profile (default: atlas)
+    python scripts/reprocess_email.py --all                   # retrigger all stuck emails
+    python scripts/reprocess_email.py --all --dry-run         # preview without triggering
 
 Examples:
     python scripts/reprocess_email.py --list
     python scripts/reprocess_email.py --inspect incoming/63hfbll9b84j2...
     python scripts/reprocess_email.py incoming/63hfbll9b84j2...
+    python scripts/reprocess_email.py --all --dry-run
+    python scripts/reprocess_email.py --all
 """
 
 import argparse
@@ -109,8 +112,11 @@ def inspect(s3, key):
         print("           Check iOS Settings → Privacy → Location Services → Camera.")
 
 
-def reprocess(s3, key):
+def reprocess(s3, key, dry_run=False):
     full_key = key if key.startswith(PREFIX) else PREFIX + key
+    if dry_run:
+        print(f"[dry-run] Would retrigger: {full_key}")
+        return
     print(f"Retriggering: {full_key}")
     try:
         s3.copy_object(
@@ -126,11 +132,25 @@ def reprocess(s3, key):
         sys.exit(1)
 
 
+def reprocess_all(s3, dry_run=False):
+    resp = s3.list_objects_v2(Bucket=BUCKET, Prefix=PREFIX)
+    objects = sorted(resp.get("Contents", []), key=lambda o: o["LastModified"])
+    if not objects:
+        print("No emails currently in ingress bucket.")
+        return
+    label = "[dry-run] " if dry_run else ""
+    print(f"{label}Retriggering {len(objects)} email(s):\n")
+    for obj in objects:
+        reprocess(s3, obj["Key"], dry_run=dry_run)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Inspect and retrigger stuck email submissions.")
     parser.add_argument("key", nargs="?", help="S3 object key to reprocess")
     parser.add_argument("--list", action="store_true", help="List stuck emails")
     parser.add_argument("--inspect", metavar="KEY", help="Show sender, subject, and GPS status")
+    parser.add_argument("--all", action="store_true", help="Retrigger all stuck emails")
+    parser.add_argument("--dry-run", action="store_true", help="Print what would be done without triggering")
     parser.add_argument("--profile", default="atlas", help="AWS profile (default: atlas)")
     parser.add_argument("--region", default="us-east-1")
     args = parser.parse_args()
@@ -140,10 +160,12 @@ def main():
 
     if args.inspect:
         inspect(s3, args.inspect)
+    elif args.all:
+        reprocess_all(s3, dry_run=args.dry_run)
     elif args.list or not args.key:
         list_stuck(s3)
     else:
-        reprocess(s3, args.key)
+        reprocess(s3, args.key, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

@@ -942,8 +942,14 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         default_layer = ac.get("email_photo_default_layer", "processing_sites")
         layer_name, title = email_inlet.parse_subject(payload.subject, default_layer)
 
-        # Validate layer exists
+        # Validate layer exists; fall back to atlas default if subject named an unknown layer
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
+        if layer_name not in layer_names:
+            logging.warning(
+                f"Unknown layer '{layer_name}' for atlas '{payload.atlas_name}'; "
+                f"falling back to '{default_layer}'"
+            )
+            layer_name = default_layer
         if layer_name not in layer_names:
             raise HTTPException(status_code=400, detail=f"Unknown layer: {layer_name}")
 

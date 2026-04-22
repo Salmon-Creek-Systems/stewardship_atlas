@@ -124,6 +124,7 @@ class EmailPhotoStack(Stack):
             ),
             role=lambda_role,
             timeout=Duration.seconds(30),
+            memory_size=512,
             environment={
                 "WEBAPP_URL": webapp_url,
             },
