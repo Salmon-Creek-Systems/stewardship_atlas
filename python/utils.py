@@ -342,6 +342,9 @@ def replace_layer_references(config_paths, old_name, new_name, dry_run=False):
             print(f"  {path.name}: not found, skipping")
             continue
         data = json.load(open(path))
+        if not isinstance(data, dict):
+            print(f"  {path.name}: skipping (not a dict)")
+            continue
         changes = 0
         for asset_name, asset in data.items():
             if not isinstance(asset, dict):
