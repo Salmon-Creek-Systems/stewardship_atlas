@@ -159,9 +159,15 @@
      "Rules": [
       {
        "ExpirationInDays": 30,
+       "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 30
+       },
        "Status": "Enabled"
       }
      ]
+    },
+    "VersioningConfiguration": {
+     "Status": "Enabled"
     }
    },
    "UpdateReplacePolicy": "Retain",
@@ -188,6 +194,16 @@
        "Events": [
         "s3:ObjectCreated:*"
        ],
+       "Filter": {
+        "Key": {
+         "FilterRules": [
+          {
+           "Name": "prefix",
+           "Value": "incoming/"
+          }
+         ]
+        }
+       },
        "LambdaFunctionArn": {
         "Fn::GetAtt": [
          "EmailPhotoHandler36FE87FE",
@@ -387,6 +403,31 @@
          ]
         ]
        }
+      },
+      {
+       "Action": [
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "AtlasIngressBucket3A2FE564",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
       }
      ],
      "Version": "2012-10-17"
@@ -407,7 +448,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-438886543302-us-east-1",
-     "S3Key": "c725881a80f04b4156340e0a96c5f1b3dac92a084ed0902a9d07aa50299d721b.zip"
+     "S3Key": "407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3.zip"
     },
     "Environment": {
      "Variables": {
@@ -416,6 +457,7 @@
     },
     "FunctionName": "atlas-email-photo-handler",
     "Handler": "email_photo_handler.handler",
+    "MemorySize": 512,
     "Role": {
      "Fn::GetAtt": [
       "EmailPhotoLambdaRole14C26A5C",
@@ -431,7 +473,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoHandler/Resource",
-    "aws:asset:path": "asset.c725881a80f04b4156340e0a96c5f1b3dac92a084ed0902a9d07aa50299d721b",
+    "aws:asset:path": "asset.407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -590,7 +632,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12OS27CMBCGz8LemRbSCwBSpe6i5ABoMBM6jTOuMrYQsnx3ZNyKltX3PzSPDWze1vC6wos29jQ1jo+QhoB2MnjRQ2KcIfXekdmPcmfnHdtrsQ/1IRpQLHWLH9lRNtpC2kU7USj1j6p4TP3z1exQKRuH8/GEkMoNWmZWZS/mPYoNRexH+dXl0gFVKShsC4ySQurJEn+HPjoa6gtPyR/71OZcA/VxsWTuS4eAZ5ZzNt01fHp5aWHdQrv6UuZmiRJ4Jugrbw3Xe9ZQAQAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/12O24rCMBCGn8X7dKwVH0CFhb0r7QPIGKc6Nk2kkyAS8u4Ss4u7Xn3/gTk00GxqqBd4l0qfxsrwEWLvUY8K73KIjBPEzhlS+8G+2DrD+pHtW31b8Wg1tbMb2FBSsoa4C3okn+sfVfCe+ueL2aFQUgan4wkh5hs0TyzCzqqvYLXPYj/YX50vHVCEvMA2QwkJxI408c13wVBfXvhI/tiPNqUSiAuzJvVa2ns8sz0n1T78xdnlGlY1rJrFVZirOVjPE0FX+ASbR0hXUQEAAA=="
    },
    "Metadata": {
     "aws:cdk:path": "AtlasEmailPhotoStack/CDKMetadata/Default"

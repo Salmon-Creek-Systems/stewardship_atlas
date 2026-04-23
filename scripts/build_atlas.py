@@ -2,326 +2,46 @@
 """
 Build a stewardship atlas from a GeoJSON configuration file.
 
-This script creates a new atlas or regenerates the config for an existing one.
-All configuration parameters are read from the first feature's properties in
-the input GeoJSON file.
-
 Usage:
-    python build_atlas.py /path/to/extent.geojson
+    python build_atlas.py <geojson_path>          # full atlas creation
+    python build_atlas.py config_only <geojson_path>  # regenerate config only
 
-The GeoJSON file should have this structure:
-{
-  "type": "FeatureCollection",
-  "features": [{
-    "type": "Feature",
-    "geometry": { "type": "Polygon", "coordinates": [[...]] },
-    "properties": {
-      "name": "myatlas",
-      "assets_path": "/path/to/assets.json",
-      "layers_path": "/path/to/layers.json",
-      "data_root": "/root/swales",
-      "shared_dir": "/root/data",
-      "admin_emails": ["admin@example.com"],
-      "base_url": "https://myatlas.fireatlas.org",
-      "port": 9997,
-      "versioned_outlets": ["html", "webmap", "runbook"],
-      "logo_url": "https://example.com/logo.png",
-      "config_only": false
-    }
-  }]
-}
+To call from Python or a notebook:
+    import atlas
+    atlas.build_atlas_from_geojson('/path/to/scvfd.geojson', config_only=True)
 """
 
-import json
-import os
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
 
-# Add python directory to path for imports
 script_dir = Path(__file__).parent
-python_dir = script_dir.parent / 'python'
-sys.path.insert(0, str(python_dir))
+sys.path.insert(0, str(script_dir.parent / 'python'))
 
 import atlas
-import utils
-
-DEFAULT_ROLES = {"internal": "internal", "admin": "admin"}
-
-
-def setup_role_htpasswds(data_root: str, atlas_name: str):
-    """Create per-role htpasswd files used by nginx for auth.
-
-    Creates {data_root}/roles/{atlas_name}/{role}.htpasswd for each role,
-    reading passwords from {data_root}/roles/{atlas_name}_roles.json.
-
-    Falls back (in order) to:
-      infrastructure/htpasswd/roles/{atlas_name}_roles.json in the repo,
-      then DEFAULT_ROLES.
-    """
-    roles_dir = Path(data_root) / "roles" / atlas_name
-    roles_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find the roles JSON
-    data_root_roles_json = Path(data_root) / "roles" / f"{atlas_name}_roles.json"
-    infra_roles_json = script_dir.parent / "infrastructure" / "htpasswd" / "roles" / f"{atlas_name}_roles.json"
-
-    if data_root_roles_json.exists():
-        roles_json = data_root_roles_json
-    elif infra_roles_json.exists():
-        roles_json = infra_roles_json
-        print(f"Using roles from repo: {infra_roles_json}", file=sys.stderr)
-    else:
-        roles_json = None
-        print(f"Warning: no roles file found for {atlas_name}, using defaults", file=sys.stderr)
-
-    roles = DEFAULT_ROLES
-    if roles_json:
-        with open(roles_json) as f:
-            roles = json.load(f)
-
-    # Ensure roles JSON exists in data_root for atlas.py's add_htpasswds()
-    if not data_root_roles_json.exists():
-        data_root_roles_json.parent.mkdir(parents=True, exist_ok=True)
-        with open(data_root_roles_json, 'w') as f:
-            json.dump(roles, f, indent=2)
-
-    # Create one htpasswd file per role (e.g. admin.htpasswd, internal.htpasswd).
-    # Admin user is also added to every non-admin file so a single admin login
-    # grants access to all access-controlled consoles.
-    admin_password = roles.get("admin")
-
-    for role, password in roles.items():
-        htpasswd_file = roles_dir / f"{role}.htpasswd"
-        flag = "bc" if not htpasswd_file.exists() else "b"
-        os.system(f"htpasswd -{flag} {htpasswd_file} {role} {password}")
-        if role != "admin" and admin_password:
-            os.system(f"htpasswd -b {htpasswd_file} admin {admin_password}")
-        print(f"Wrote {htpasswd_file}", file=sys.stderr)
-
-
-# Required properties that must be in the GeoJSON or passed to build_atlas()
-REQUIRED_PROPERTIES = [
-    'name',
-    'assets_path',
-    'layers_path', 
-    'data_root',
-    'shared_dir',
-    'admin_emails',
-    'base_url',
-    'port',
-    'versioned_outlets',
-    'logo_url',
-]
-
-
-def build_atlas(
-    name: str,
-    assets_path: str,
-    layers_path: str,
-    data_root: str,
-    shared_dir: str,
-    admin_emails: List[str],
-    base_url: str,
-    app_url: str,
-    port: int,
-    versioned_outlets: List[str],
-    logo_url: str,
-    geometry: Dict[str, Any],
-    config_only: bool = False,
-    extra_props: Dict[str, Any] = None
-) -> Tuple[Dict[str, Any], Path]:
-    """
-    Build a new atlas or regenerate config for an existing one.
-    
-    Args:
-        name: Atlas/swale name
-        assets_path: Path to assets definition JSON file
-        layers_path: Path to layers definition JSON file
-        data_root: Root directory for atlas data
-        shared_dir: Directory for shared/external resources
-        admin_emails: List of admin email addresses
-        base_url: Base URL for the atlas (e.g., https://myatlas.fireatlas.org)
-        port: Webapp port number
-        versioned_outlets: List of outlet names to version
-        logo_url: URL to logo image
-        geometry: Polygon geometry dict defining the atlas extent
-        config_only: If True, only regenerate config (backup existing)
-        
-    Returns:
-        Tuple of (atlas_config dict, Path to written config file)
-        
-    Raises:
-        ValueError: If required parameters are missing or invalid
-        FileNotFoundError: If required files don't exist
-    """
-    # Validate inputs
-    if not name:
-        raise ValueError("name is required")
-    if not assets_path:
-        raise ValueError("assets_path is required")
-    if not layers_path:
-        raise ValueError("layers_path is required")
-    if not data_root:
-        raise ValueError("data_root is required")
-    if not shared_dir:
-        raise ValueError("shared_dir is required")
-    if not base_url:
-        raise ValueError("base_url is required")
-    if not geometry:
-        raise ValueError("geometry is required")
-    
-    # Validate file paths exist
-    if not Path(assets_path).exists():
-        raise FileNotFoundError(f"Assets file not found: {assets_path}")
-    if not Path(layers_path).exists():
-        raise FileNotFoundError(f"Layers file not found: {layers_path}")
-    if not Path(data_root).exists():
-        raise FileNotFoundError(f"Data root directory not found: {data_root}")
-    if not Path(shared_dir).exists():
-        raise FileNotFoundError(f"Shared directory not found: {shared_dir}")
-    
-    # Build the feature collection structure expected by atlas.create/create_config
-    feature_collection = {
-        "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "geometry": geometry,
-            "properties": {
-                **(extra_props or {}),
-                "name": name,
-                "admin_emails": admin_emails or [],
-                "base_url": base_url,
-                "app_url": app_url,
-                "atlasappport": port,
-                "logo": logo_url,
-                "versioned_outlets": versioned_outlets or []
-            }
-        }]
-    }
-    
-    # Determine config path
-    config_path = Path(data_root) / name / 'staging' / 'atlas_config.json'
-    
-    # Always create role htpasswd files regardless of config_only
-    setup_role_htpasswds(data_root, name)
-
-    if config_only:
-        # Only regenerate config, backup existing
-        if config_path.exists():
-            # Create backup with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = config_path.parent / f"atlas_config-BACKUP-{timestamp}.json"
-            config_path.rename(backup_path)
-            print(f"Backed up existing config to: {backup_path}", file=sys.stderr)
-
-        # Generate config only (no directory creation)
-        config = atlas.create_config(
-            layers_path=layers_path,
-            assets_path=assets_path,
-            data_root=data_root,
-            feature_collection=feature_collection
-        )
-
-        # Ensure staging directory exists for writing config
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write the config
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
-    else:
-        # Full atlas creation
-        config = atlas.create(
-            layers_path=layers_path,
-            assets_path=assets_path,
-            data_root=data_root,
-            shared_dir=Path(shared_dir),
-            feature_collection=feature_collection
-        )
-        # Create per-role htpasswd files for nginx auth
-        setup_role_htpasswds(data_root, name)
-        # Bootstrap core outlets
-        atlas.materialize(config, 'notebook')
-        atlas.materialize(config, 'html')
-        # atlas.materialize(config, 'webmap')
-
-    return config, config_path
 
 
 def main():
-    """CLI entry point - reads GeoJSON and builds atlas."""
-    if len(sys.argv) == 3:
-        print(f"Generating new config (only)")
+    if len(sys.argv) == 3 and sys.argv[1] == 'config_only':
         geojson_path = Path(sys.argv[2])
         config_only = True
-    
-    elif len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <geojson_path>", file=sys.stderr)
-        sys.exit(1)
-    else:
-        print(f"Generating new entire atlas)")
+    elif len(sys.argv) == 2:
         geojson_path = Path(sys.argv[1])
         config_only = False
-        
+    else:
+        print(f"Usage: {sys.argv[0]} <geojson_path>", file=sys.stderr)
+        print(f"       {sys.argv[0]} config_only <geojson_path>", file=sys.stderr)
+        sys.exit(1)
+
     if not geojson_path.exists():
         print(f"Error: GeoJSON file not found: {geojson_path}", file=sys.stderr)
         sys.exit(1)
-    
-    # Load GeoJSON
-    with open(geojson_path) as f:
-        geojson_data = json.load(f)
-    
-    # Validate structure
-    if geojson_data.get('type') != 'FeatureCollection':
-        print("Error: GeoJSON must be a FeatureCollection", file=sys.stderr)
-        sys.exit(1)
-    
-    features = geojson_data.get('features', [])
-    if not features:
-        print("Error: GeoJSON must have at least one feature", file=sys.stderr)
-        sys.exit(1)
-    
-    feature = features[0]
-    geometry = feature.get('geometry')
-    properties = feature.get('properties', {})
-    
-    if not geometry:
-        print("Error: First feature must have a geometry", file=sys.stderr)
-        sys.exit(1)
-    
-    # Check for required properties
-    missing = [prop for prop in REQUIRED_PROPERTIES if prop not in properties]
-    if missing:
-        print(f"Error: Missing required properties: {', '.join(missing)}", file=sys.stderr)
-        sys.exit(1)
-    
-    # Extract all parameters from properties
-    known_props = set(REQUIRED_PROPERTIES) | {'app_url', 'config_only'}
-    extra_props = {k: v for k, v in properties.items() if k not in known_props}
 
     try:
-        config, config_path = build_atlas(
-            name=properties['name'],
-            assets_path=properties['assets_path'],
-            layers_path=properties['layers_path'],
-            data_root=properties['data_root'],
-            shared_dir=properties['shared_dir'],
-            admin_emails=properties['admin_emails'],
-            base_url=properties['base_url'],
-            app_url=properties['app_url'],
-            port=properties['port'],
-            versioned_outlets=properties['versioned_outlets'],
-            logo_url=properties['logo_url'],
-            geometry=geometry,
-            config_only=config_only,
-            extra_props=extra_props
-        )
+        config, config_path = atlas.build_atlas_from_geojson(geojson_path, config_only=config_only)
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
-    
-    # Print only the path on success
+
     print(config_path)
 
 

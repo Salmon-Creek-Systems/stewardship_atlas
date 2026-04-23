@@ -93,8 +93,8 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
                     str(bbox['east']), str(bbox['north'])])
         args.extend(['-spat_srs', config['dataswale']['crs']])
     args.extend([str(outpath), str(inpath)])
-    if 'layer' in inlet_config:
-        args.append(inlet_config['layer'])
+    if 'source_sublayer' in inlet_config:
+        args.append(inlet_config['source_sublayer'])
     
     print(f"Running ogr2ogr with args: {args}")
     subprocess.check_output(args)

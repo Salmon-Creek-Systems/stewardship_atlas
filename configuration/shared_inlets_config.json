@@ -571,7 +571,7 @@
 	"description": "External creek vector source",
 	"feature_type": "linestring",
 	"color": [110, 110, 255],
-	"layer": "NHDFlowline",
+	"source_sublayer": "NHDFlowline",
 	"inpath_template": "NHD_H_California_State_GPKG.gpkg",
 	"geometry": "dataswale",
 	"alterations": {

@@ -87,11 +87,13 @@ stewardship_atlas/
 
 ### Server Safety Rules
 
-**The server should always be on main.** If it's on any other branch, that's a problem to fix, not work around. Call it out explicitly.
+**Never silently switch the server to an unrelated or old branch to access a script.** This is what the server-branch rules are protecting against: a prior incident where Claude checked out an old branch to reach a script that wasn't on main, and in doing so silently replaced live service files (`webapp.py` etc.) with stale versions. The five minutes to get the script onto main properly is never more expensive than that risk.
 
-**Never check out an old branch on the server to run a script.** If a script you need isn't on main, stop and get it onto main first (cherry-pick or merge). The five minutes to do that properly is never more expensive than the risk of a stale checkout silently replacing production files like `webapp.py`.
+**If a script you need isn't on main, get it onto main first** (cherry-pick or merge) before running it on the server. Don't route around it.
 
-**If a useful script or tool only exists on a feature branch, that's a bug.** Fix it by getting it to main — don't route around it.
+**Temporarily checking out a feature branch for intentional testing is fine**, as long as it's deliberate and you switch back when done. The risk is silent, unintended branch switches — not intentional testing checkouts.
+
+**Long-term goal: a proper staging environment** so testing doesn't require touching the production server at all. Not yet in place — work around it carefully for now.
 
 **Be explicit about S3 trigger scope.** Any write to a watched prefix fires Lambda. Before writing a handler that moves files within the same bucket, check whether the destination prefix is also watched.
 

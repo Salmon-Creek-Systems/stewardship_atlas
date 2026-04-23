@@ -1,5 +1,5 @@
 {
-  "version": "52.0.0",
+  "version": "53.0.0",
   "artifacts": {
     "AtlasEmailPhotoStack.assets": {
       "type": "cdk:asset-manifest",
@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-deploy-role-438886543302-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-cfn-exec-role-438886543302-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/3d9ddd0c3db63a881beae92bbc99bba39777818a29ef6b4d5c93195a52e0af38.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-east-1/fe75d71697861468357cf220fdd1e02c66b304f0b1236b3de5dd7be58103b935.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -33,134 +33,7 @@
       "dependencies": [
         "AtlasEmailPhotoStack.assets"
       ],
-      "metadata": {
-        "/AtlasEmailPhotoStack/AtlasWebappEC2Role/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasWebappEC2Role0D03F116"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasWebappEC2Role/DefaultPolicy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasWebappEC2RoleDefaultPolicyC7C6BED7"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasWebappInstanceProfile": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasWebappInstanceProfile"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasDataBucket/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasDataBucket4CD05197"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasDataBucket/Policy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasDataBucketPolicyAAAF6F3C"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasIngressBucket/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasIngressBucket3A2FE564"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasIngressBucket/Notifications/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasIngressBucketNotificationsD19E2D74"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasIngressBucket/AllowBucketNotificationsToAtlasEmailPhotoStackEmailPhotoHandler17AFDF87": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasIngressBucketAllowBucketNotificationsToAtlasEmailPhotoStackEmailPhotoHandler17AFDF876B6870E1"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasIngressBucket/Policy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasIngressBucketPolicyB74B598C"
-          }
-        ],
-        "/AtlasEmailPhotoStack/EmailPhotoLambdaRole/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EmailPhotoLambdaRole14C26A5C"
-          }
-        ],
-        "/AtlasEmailPhotoStack/EmailPhotoLambdaRole/DefaultPolicy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EmailPhotoLambdaRoleDefaultPolicy590C0344"
-          }
-        ],
-        "/AtlasEmailPhotoStack/EmailPhotoHandler/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EmailPhotoHandler36FE87FE"
-          }
-        ],
-        "/AtlasEmailPhotoStack/EmailPhotoHandler/AllowS3Invoke": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EmailPhotoHandlerAllowS3Invoke9B930501"
-          }
-        ],
-        "/AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
-          }
-        ],
-        "/AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36"
-          }
-        ],
-        "/AtlasEmailPhotoStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasReceiptRuleSet/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasReceiptRuleSet19F64974"
-          }
-        ],
-        "/AtlasEmailPhotoStack/AtlasReceiptRuleSet/DeliverToS3/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasReceiptRuleSetDeliverToS314AFDBC3"
-          }
-        ],
-        "/AtlasEmailPhotoStack/CDKMetadata/Default": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CDKMetadata"
-          }
-        ],
-        "/AtlasEmailPhotoStack/BootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BootstrapVersion"
-          }
-        ],
-        "/AtlasEmailPhotoStack/CheckBootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CheckBootstrapVersion"
-          }
-        ]
-      },
+      "additionalMetadataFile": "AtlasEmailPhotoStack.metadata.json",
       "displayName": "AtlasEmailPhotoStack"
     },
     "KennedyDns.assets": {
@@ -180,7 +53,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-deploy-role-280439772481-us-east-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::280439772481:role/cdk-hnb659fds-cfn-exec-role-280439772481-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-280439772481-us-east-1/6a09b8d098dd2d513a90bad1bd6cf546cb732cf90ad85030032b5a62ca870dc2.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-280439772481-us-east-1/51fd8fc8e37626bc43d6eab3546c5a9b3871333595526fab5b7720ec5789e59e.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -195,32 +68,7 @@
       "dependencies": [
         "KennedyDns.assets"
       ],
-      "metadata": {
-        "/KennedyDns/kennedyARecord/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "kennedyARecord29AFDC85"
-          }
-        ],
-        "/KennedyDns/CDKMetadata/Default": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CDKMetadata"
-          }
-        ],
-        "/KennedyDns/BootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BootstrapVersion"
-          }
-        ],
-        "/KennedyDns/CheckBootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CheckBootstrapVersion"
-          }
-        ]
-      },
+      "additionalMetadataFile": "KennedyDns.metadata.json",
       "displayName": "KennedyDns"
     },
     "KennedySecurityGroup.assets": {
@@ -240,7 +88,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-deploy-role-438886543302-us-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-cfn-exec-role-438886543302-us-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-west-1/0b054d3bb2e4841e021b033a0d962e71a7764b08c04454b9f0128fe57e688fe0.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-438886543302-us-west-1/0d4f345f3e1ce84cc2e786e2c6974308e47ed6753545fc442704f2a601dbdba4.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -255,38 +103,7 @@
       "dependencies": [
         "KennedySecurityGroup.assets"
       ],
-      "metadata": {
-        "/KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:8887": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasEC2SGfrom000008887D96F38E8"
-          }
-        ],
-        "/KennedySecurityGroup/AtlasEC2SG/from 0.0.0.0_0:9997": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AtlasEC2SGfrom000009997B012C898"
-          }
-        ],
-        "/KennedySecurityGroup/CDKMetadata/Default": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CDKMetadata"
-          }
-        ],
-        "/KennedySecurityGroup/BootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "BootstrapVersion"
-          }
-        ],
-        "/KennedySecurityGroup/CheckBootstrapVersion": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "CheckBootstrapVersion"
-          }
-        ]
-      },
+      "additionalMetadataFile": "KennedySecurityGroup.metadata.json",
       "displayName": "KennedySecurityGroup"
     },
     "Tree": {
@@ -712,16 +529,28 @@
             "recommendedValue": true,
             "explanation": "Use the `Distribution` resource instead of `CloudFrontWebDistribution`"
           },
+          "@aws-cdk/aws-cloudfront:defaultFunctionRuntimeV2_0": {
+            "recommendedValue": true,
+            "explanation": "Use cloudfront-js-2.0 as the default runtime for CloudFront Functions"
+          },
+          "@aws-cdk/aws-elasticloadbalancingv2:usePostQuantumTlsPolicy": {
+            "recommendedValue": true,
+            "explanation": "When enabled, HTTPS/TLS listeners use post-quantum TLS policy by default"
+          },
           "@aws-cdk/core:automaticL1Traits": {
             "recommendedValue": true,
             "explanation": "Automatically use the default L1 traits for L1 constructs`",
             "unconfiguredBehavesLike": {
               "v2": true
             }
+          },
+          "@aws-cdk/aws-batch:defaultToAL2023": {
+            "recommendedValue": true,
+            "explanation": "Use AL2023 as the default imageType for EC2 Batch compute environments instead of the deprecated AL2"
           }
         }
       }
     }
   },
-  "minimumCliVersion": "2.1107.0"
+  "minimumCliVersion": "2.1118.3"
 }

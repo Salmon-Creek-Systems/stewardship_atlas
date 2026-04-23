@@ -69,6 +69,34 @@ Scope:
 
 **Unblocks**: faster customer onboarding, federation (which requires clean per-atlas boundaries), easier maintenance.
 
+#### Design tension: build artifact vs. direct editing
+
+`atlas_config.json` is documented as a build artifact (CLAUDE.md), but the "edit source → run build_atlas.py config_only → forget and get confused" workflow is persistent friction. Two clean directions worth deciding between:
+
+**Option A — fully lean into build model.** Source files (GeoJSON + layers.json + assets.json + shared_*.json) are the authoritative truth. `atlas_config.json` is always generated — either triggered automatically on source file change, or rebuilt inline whenever config is read. The shared-template inheritance system pays off at multi-atlas scale. Resolves the footgun by eliminating the manual rebuild step entirely.
+
+**Option B — go back to direct editing.** Source files are for initial creation only. After that, `atlas_config.json` is the truth and changes are made through Python mutation functions (e.g. `atlas.rename_layer()`) rather than hand-editing source files and rebuilding. No build step means no footgun. The `rename_layer()` utility (2026-04-23) is a prototype of this pattern — it operated directly on the config rather than going through the build pipeline.
+
+**Current instinct**: Option B is closer to the original design intent and is more tractable at current scale (handful of atlases, changes are intentional). Option A makes more sense if configs are being programmatically generated or diff'd across many atlases. The two approaches are not mutually exclusive — the mutation-function API works regardless of whether source files exist.
+
+**What this implies for tooling**: If Option B, invest in a richer set of `atlas.*` mutation functions (set_layer_color, add_asset, etc.) so `atlas_config.json` is never hand-edited. Source files become reference-only and the build step recedes. If Option A, invest in auto-rebuild and source file validation (config linter that checks all `in_layers` references resolve, etc.).
+
+#### Agreed direction (2026-04-23 discussion)
+
+**Option B is the target.** Shared templates (`shared_*.json`) stay in the stewardship_atlas repo — they're genuinely code, and the template system is valuable precisely so you don't have to redefine USGS topo, OSM roads, etc. every time. The creation-time build step earns its keep.
+
+**Per-atlas configs don't belong in this repo.** They crept in because there was a lot to type and no better home, but they're deployment configuration, not code. As shared templates get richer and per-atlas files get lighter (just thin overrides), this becomes more viable. Long-term they belong either in a separate deployment config repo or stored alongside the atlas data. They should never have lived in stewardship_atlas.
+
+**`rename_layer()` is a prototype of a "meta tools" class.** Tools that manage running instance configuration — rename_layer, add_layer, remove_layer, set_layer_color, etc. — should operate on `atlas_config.json` directly. The awkwardness of `rename_layer()` also modifying git-tracked source files (and requiring a commit back from the server) points toward the same answer: once per-atlas configs are out of the repo, these tools only touch data, never source.
+
+**The ideal flow**: shared templates (in git) + thin per-atlas overrides (stored as data) → `atlas_config.json` generated at creation time and then edited directly via mutation functions. No ongoing build step. The complexity of inheritance is front-loaded to creation, where it's wanted.
+
+**Current workaround**: run rename on server, commit updated per-atlas configs from there, then regenerate `atlas_config.json`. Pragmatic until per-atlas configs move out of the repo.
+
+#### Inconsistent container types across config files
+
+The config file family mixes lists and dicts with no clear rule: `{atlas}_layers.json` and `shared_layers_config.json` are lists of dicts; `{atlas}_assets.json` and `shared_inlets/eddies/outlets_config.json` are dicts of dicts. Code that operates across config files (e.g. `replace_layer_references()`) has to defensively check `isinstance(data, dict)` to avoid crashing on list-format files. The distinction isn't semantically meaningful — layers are keyed by `name` field rather than dict key purely for historical reasons. A uniform format (all dicts keyed by name, or all lists) would make generic config tooling much cleaner.
+
 ### 5. Domain and routing architecture
 
 Consolidate the current per-atlas nginx/SSL/port setup into a simpler, more provisionable model.

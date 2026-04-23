@@ -1,31 +1,31 @@
 {
-  "version": "52.0.0",
+  "version": "53.0.0",
   "files": {
-    "c725881a80f04b4156340e0a96c5f1b3dac92a084ed0902a9d07aa50299d721b": {
+    "407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3": {
       "displayName": "EmailPhotoHandler/Code",
       "source": {
-        "path": "asset.c725881a80f04b4156340e0a96c5f1b3dac92a084ed0902a9d07aa50299d721b",
+        "path": "asset.407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3",
         "packaging": "zip"
       },
       "destinations": {
-        "438886543302-us-east-1-0c0bd3b3": {
+        "438886543302-us-east-1-4c89d030": {
           "bucketName": "cdk-hnb659fds-assets-438886543302-us-east-1",
-          "objectKey": "c725881a80f04b4156340e0a96c5f1b3dac92a084ed0902a9d07aa50299d721b.zip",
+          "objectKey": "407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3.zip",
           "region": "us-east-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-east-1"
         }
       }
     },
-    "3d9ddd0c3db63a881beae92bbc99bba39777818a29ef6b4d5c93195a52e0af38": {
+    "fe75d71697861468357cf220fdd1e02c66b304f0b1236b3de5dd7be58103b935": {
       "displayName": "AtlasEmailPhotoStack Template",
       "source": {
         "path": "AtlasEmailPhotoStack.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "438886543302-us-east-1-017ad276": {
+        "438886543302-us-east-1-16725ac9": {
           "bucketName": "cdk-hnb659fds-assets-438886543302-us-east-1",
-          "objectKey": "3d9ddd0c3db63a881beae92bbc99bba39777818a29ef6b4d5c93195a52e0af38.json",
+          "objectKey": "fe75d71697861468357cf220fdd1e02c66b304f0b1236b3de5dd7be58103b935.json",
           "region": "us-east-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::438886543302:role/cdk-hnb659fds-file-publishing-role-438886543302-us-east-1"
         }

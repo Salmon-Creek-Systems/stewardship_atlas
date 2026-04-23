@@ -5,7 +5,7 @@
         "config_def": "opentopo_dem"
     },
     "gdal_contours": {
-        "type": "eddy",            
+        "type": "eddy",
         "in_layer": "elevation",
         "out_layer": "contours",
         "config_def": "gdal_contours"
@@ -42,92 +42,136 @@
         "type": "outlet",
         "name": "3dview",
         "config_def": "3dview",
-        "access": ["public", "internal", "admin"]
+        "access": [
+            "public",
+            "internal",
+            "admin"
+        ]
     },
-    "public_poi" : {
-	"type": "inlet",
-	"out_layer": "poi",
-	"config_def": "osm_poi"
+    "public_poi": {
+        "type": "inlet",
+        "out_layer": "poi",
+        "config_def": "osm_poi"
     },
-    "public_buildings" : {
-	"type": "inlet",
-	"out_layer": "buildings",
-	"config_def": "overture_buildings"
+    "public_buildings": {
+        "type": "inlet",
+        "out_layer": "buildings",
+        "config_def": "overture_buildings"
     },
-    "public_addresses" : {
-	"type": "inlet",
-	"out_layer": "parcels",
-	"config_def": "overture_addresses"
+    "public_addresses": {
+        "type": "inlet",
+        "out_layer": "parcels",
+        "config_def": "overture_addresses"
     },
-    "oa_parcels" : {
-	"type": "inlet",
-	"out_layer": "parcels",
-	"config_def": "local_humboldt_parcels"
+    "oa_parcels": {
+        "type": "inlet",
+        "out_layer": "parcels",
+        "config_def": "local_humboldt_parcels"
     },
-    "public_roads" : {
+    "public_roads": {
         "type": "inlet",
         "out_layer": "roads",
         "config_def": "overture_roads"
     },
-    "humtrans_roads" : {
+    "humtrans_roads": {
         "type": "inlet",
         "out_layer": "roads",
         "config_def": "humtrans_roads"
     },
-
-    "public_creeks" : {
+    "public_creeks": {
         "type": "inlet",
         "out_layer": "creeks",
         "config_def": "nhd_creeks"
     },
-
-    "local_watertanks" : {
+    "local_watertanks": {
         "type": "inlet",
         "out_layer": "watertanks",
         "config_def": "local_watertanks"
     },
-    "local_ponds" : {
+    "local_ponds": {
         "type": "inlet",
         "out_layer": "ponds",
         "config_def": "local_ponds"
     },
-    "local_lpss" : {
+    "local_lpss": {
         "type": "inlet",
         "out_layer": "lpss",
         "config_def": "local_lpss"
     },
-    "local_turnouts" : {
+    "local_turnouts": {
         "type": "inlet",
         "out_layer": "turnouts",
         "config_def": "local_turnouts"
     },
-
-    "webmap" : {
-	"type": "outlet",
-	"name": "webmap",
-	"in_layers": ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss"],
-	"config_def": "webmap",
-	"access": ["public", "internal", "admin"]
+    "webmap": {
+        "type": "outlet",
+        "name": "webmap",
+        "in_layers": [
+            "basemap",
+            "ponds",
+            "contours",
+            "roads",
+            "creeks",
+            "buildings",
+            "hydrants",
+            "watertanks",
+            "poi",
+            "lpss"
+        ],
+        "config_def": "webmap",
+        "access": [
+            "public",
+            "internal",
+            "admin"
+        ]
     },
     "private_webmap": {
         "type": "outlet",
         "name": "private_webmap",
-        "in_layers": ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "private_notes"],
+        "in_layers": [
+            "basemap",
+            "ponds",
+            "contours",
+            "roads",
+            "creeks",
+            "buildings",
+            "hydrants",
+            "watertanks",
+            "poi",
+            "lpss",
+            "photos"
+        ],
         "config_def": "webmap",
-        "access": ["admin", "technical"]
+        "access": [
+            "admin",
+            "technical"
+        ]
     },
-    "spreadsheet_export" : {
-	"type": "outlet",
-	"name": "spreadsheet_export",
-	"config_def": "gsheet_export",
-	"in_layers": ["ponds", "poi"]
+    "spreadsheet_export": {
+        "type": "outlet",
+        "name": "spreadsheet_export",
+        "config_def": "gsheet_export",
+        "in_layers": [
+            "ponds",
+            "poi"
+        ]
     },
-
-    "webedit" : {
-	"type": "outlet",
-	"name": "webedit",
-	"in_layers": ["basemap", "lidar_basemap", "roads", "creeks", "buildings", "hydrants", "poi", "ponds", "watertanks", "private_notes"],
-	"config_def": "webedit"
+    "webedit": {
+        "type": "outlet",
+        "name": "webedit",
+        "in_layers": [
+            "basemap",
+            "lidar_basemap",
+            "roads",
+            "creeks",
+            "buildings",
+            "hydrants",
+            "poi",
+            "ponds",
+            "watertanks",
+            "photos"
+        ],
+        "config_def": "webedit"
     },
     "runbook": {
         "type": "outlet",
@@ -137,8 +181,22 @@
         "regions_layer": "regions",
         "feature_scale": 0.5,
         "blend_percent": 50,
-        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds"],
-        "access": ["technical"],
+        "in_layers": [
+            "lidar_basemap",
+            "basemap",
+            "contours",
+            "roads",
+            "creeks",
+            "buildings",
+            "hydrants",
+            "watertanks",
+            "poi",
+            "lpss",
+            "ponds"
+        ],
+        "access": [
+            "technical"
+        ],
         "regions": []
     },
     "private_runbook": {
@@ -149,23 +207,45 @@
         "regions_layer": "regions",
         "feature_scale": 0.5,
         "blend_percent": 50,
-        "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds", "private_notes"],
-        "access": ["technical"]
+        "in_layers": [
+            "lidar_basemap",
+            "basemap",
+            "contours",
+            "roads",
+            "creeks",
+            "buildings",
+            "hydrants",
+            "watertanks",
+            "poi",
+            "lpss",
+            "ponds",
+            "photos"
+        ],
+        "access": [
+            "technical"
+        ]
     },
     "html": {
         "type": "outlet",
         "name": "html",
-        "config_def": "static_html"},
+        "config_def": "static_html"
+    },
     "sqldb": {
-	"type": "outlet",
-	"config_def": "sqldb",
-	"layers": ["basemap", "roads", "creeks"]
+        "type": "outlet",
+        "config_def": "sqldb",
+        "layers": [
+            "basemap",
+            "roads",
+            "creeks"
+        ]
     },
     "sqlquery": {
-	"type": "outlet",
-	"name": "sqlquery",
-	"config_def": "sqlquery",
-	"access": ["technical"]
+        "type": "outlet",
+        "name": "sqlquery",
+        "config_def": "sqlquery",
+        "access": [
+            "technical"
+        ]
     },
     "gazetteer_grid": {
         "type": "inlet",
@@ -181,8 +261,23 @@
         "regions_layer": "gazetteer_regions",
         "feature_scale": 0.5,
         "blend_percent": 40,
-        "in_layers": ["lidar_basemap", "usgs_hillshade", "contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "watertanks"],
-        "access": ["public", "internal", "admin"],
+        "in_layers": [
+            "lidar_basemap",
+            "usgs_hillshade",
+            "contours",
+            "roads",
+            "creeks",
+            "ponds",
+            "buildings",
+            "lpss",
+            "poi",
+            "watertanks"
+        ],
+        "access": [
+            "public",
+            "internal",
+            "admin"
+        ],
         "multipage_pdf": false
     },
     "notebook": {
