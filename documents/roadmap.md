@@ -81,6 +81,10 @@ Scope:
 
 **What this implies for tooling**: If Option B, invest in a richer set of `atlas.*` mutation functions (set_layer_color, add_asset, etc.) so `atlas_config.json` is never hand-edited. Source files become reference-only and the build step recedes. If Option A, invest in auto-rebuild and source file validation (config linter that checks all `in_layers` references resolve, etc.).
 
+#### Inconsistent container types across config files
+
+The config file family mixes lists and dicts with no clear rule: `{atlas}_layers.json` and `shared_layers_config.json` are lists of dicts; `{atlas}_assets.json` and `shared_inlets/eddies/outlets_config.json` are dicts of dicts. Code that operates across config files (e.g. `replace_layer_references()`) has to defensively check `isinstance(data, dict)` to avoid crashing on list-format files. The distinction isn't semantically meaningful — layers are keyed by `name` field rather than dict key purely for historical reasons. A uniform format (all dicts keyed by name, or all lists) would make generic config tooling much cleaner.
+
 ### 5. Domain and routing architecture
 
 Consolidate the current per-atlas nginx/SSL/port setup into a simpler, more provisionable model.
