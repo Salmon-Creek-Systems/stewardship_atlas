@@ -204,7 +204,41 @@ def refresh_document_layer(config, name, delta_queue_builder=DQB):
 
 
 
-def layer_as_featurecollection(config:Dict[str, Any], name:str):    
+def rename_layer_file(staging_path, old_name, new_name, dry_run=False):
+    """Rename the layer directory and GeoJSON file within the dataswale."""
+    staging_path = Path(staging_path)
+    src_dir = staging_path / 'layers' / old_name
+    dst_dir = staging_path / 'layers' / new_name
+    if dry_run:
+        print(f"  [dry_run] layers/{old_name}/ → layers/{new_name}/")
+        print(f"  [dry_run] layers/{new_name}/{old_name}.geojson → layers/{new_name}/{new_name}.geojson")
+        return
+    if not src_dir.exists():
+        raise FileNotFoundError(f"Layer directory not found: {src_dir}")
+    src_dir.rename(dst_dir)
+    geojson_file = dst_dir / f'{old_name}.geojson'
+    if geojson_file.exists():
+        geojson_file.rename(dst_dir / f'{new_name}.geojson')
+    print(f"  layers/{old_name}/ → layers/{new_name}/")
+    print(f"  layers/{new_name}/{old_name}.geojson → layers/{new_name}/{new_name}.geojson")
+
+
+def rename_deltas_dir(staging_path, old_name, new_name, dry_run=False):
+    """Rename the deltas directory for a layer (includes work/ subdir)."""
+    staging_path = Path(staging_path)
+    src = staging_path / 'deltas' / old_name
+    dst = staging_path / 'deltas' / new_name
+    if dry_run:
+        print(f"  [dry_run] deltas/{old_name}/ → deltas/{new_name}/")
+        return
+    if src.exists():
+        src.rename(dst)
+        print(f"  deltas/{old_name}/ → deltas/{new_name}/")
+    else:
+        print(f"  deltas/{old_name}/ not found, skipping")
+
+
+def layer_as_featurecollection(config:Dict[str, Any], name:str):
     layer_path = layer_as_path(config, name)
     return geojson.load(open(layer_path))
 

@@ -285,6 +285,94 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
         json.dump(data, f)
 
 
+_LAYER_REFERENCE_FIELDS = {
+    'in_layer': 'str',
+    'in_layers': 'list',
+    'out_layer': 'str',
+    'layers': 'list',
+    'regions_layer': 'str',
+}
+
+def _detect_indent(path):
+    """Return indent value for json.dump matching the file's existing indentation."""
+    import re
+    with open(path) as f:
+        content = f.read()
+    m = re.search(r'\n(\s+)\S', content)
+    if not m:
+        return 4
+    indent_str = m.group(1)
+    return '\t' if '\t' in indent_str else len(indent_str)
+
+
+def rename_layer_key(layers_json_path, old_name, new_name, dry_run=False):
+    """Update layer name in {atlas}_layers.json (a list of layer dicts with a 'name' field)."""
+    path = Path(layers_json_path)
+    layers = json.load(open(path))
+    changed = False
+    for layer in layers:
+        if isinstance(layer, dict) and layer.get('name') == old_name:
+            if dry_run:
+                print(f"  [dry_run] {path.name}: layer name '{old_name}' → '{new_name}'")
+            else:
+                layer['name'] = new_name
+                print(f"  {path.name}: layer name '{old_name}' → '{new_name}'")
+            changed = True
+    if not changed:
+        print(f"  WARNING: layer '{old_name}' not found in {path.name}")
+    if not dry_run and changed:
+        with open(path, 'w') as f:
+            json.dump(layers, f, indent=_detect_indent(path))
+    return changed
+
+
+def replace_layer_references(config_paths, old_name, new_name, dry_run=False):
+    """Scan JSON asset config files for internal layer references and replace old_name.
+
+    Checks fields: in_layer, in_layers, out_layer, layers, regions_layer.
+    Skips external-source fields: wms_layer, landfire_layer, source_sublayer.
+
+    Note: shared_*.json changes affect all atlases using those templates — review the
+    diff carefully when shared configs are touched.
+    """
+    total = 0
+    for path in config_paths:
+        path = Path(path)
+        if not path.exists():
+            print(f"  {path.name}: not found, skipping")
+            continue
+        data = json.load(open(path))
+        changes = 0
+        for asset_name, asset in data.items():
+            if not isinstance(asset, dict):
+                continue
+            for field, kind in _LAYER_REFERENCE_FIELDS.items():
+                if field not in asset:
+                    continue
+                val = asset[field]
+                if kind == 'str' and val == old_name:
+                    if dry_run:
+                        print(f"  [dry_run] {path.name}: {asset_name}.{field} '{old_name}' → '{new_name}'")
+                    else:
+                        asset[field] = new_name
+                        print(f"  {path.name}: {asset_name}.{field} '{old_name}' → '{new_name}'")
+                    changes += 1
+                elif kind == 'list' and isinstance(val, list) and old_name in val:
+                    if dry_run:
+                        print(f"  [dry_run] {path.name}: {asset_name}.{field}[] '{old_name}' → '{new_name}'")
+                    else:
+                        asset[field] = [new_name if v == old_name else v for v in val]
+                        print(f"  {path.name}: {asset_name}.{field}[] '{old_name}' → '{new_name}'")
+                    changes += 1
+        if changes and not dry_run:
+            with open(path, 'w') as f:
+                json.dump(data, f, indent=_detect_indent(path))
+        qualifier = 'would be ' if dry_run else ''
+        print(f"  {path.name}: {changes} reference(s) {qualifier}updated")
+        total += changes
+    return total
+
+
 def read_gsheet(config, sheet_name=None):
     """Read a sigle-worksheet Google Sheet into a list of dictionaries"""
     logger.info(f"Reading Google Sheet: {sheet_name}")

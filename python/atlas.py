@@ -369,6 +369,58 @@ def delete():
 def new_version():
     pass
 
+def rename_layer(config, old_name, new_name, dry_run=False):
+    """Rename a layer across all dataswale files and source config files.
+
+    Updates: layer data directory, deltas directory, {atlas}_layers.json,
+    and all in_layer/in_layers/out_layer/layers/regions_layer references in
+    {atlas}_assets.json and all shared_*.json config files.
+
+    After running (non-dry-run):
+      1. python scripts/build_atlas.py config_only
+      2. Rematerialize 'webmap' and 'html'
+      3. grep -r '<old_name>' configuration/  (sanity check on built config)
+
+    Note: shared_*.json updates affect all atlases using those templates.
+    """
+    import dataswale_geojson
+
+    name = config['name']
+    staging_path = Path(config['data_root']) / name / 'staging'
+    config_dir = Path(config['data_root']) / name / 'app' / 'configuration'
+
+    layer_names = [l['name'] for l in config['dataswale']['layers']]
+    if old_name not in layer_names:
+        raise ValueError(f"Layer '{old_name}' not found. Available: {layer_names}")
+    if new_name in layer_names:
+        raise ValueError(f"Layer '{new_name}' already exists in config.")
+
+    prefix = "[DRY RUN] " if dry_run else ""
+    print(f"{prefix}Renaming layer '{old_name}' → '{new_name}' in atlas '{name}'\n")
+
+    print("Filesystem:")
+    dataswale_geojson.rename_layer_file(staging_path, old_name, new_name, dry_run=dry_run)
+    dataswale_geojson.rename_deltas_dir(staging_path, old_name, new_name, dry_run=dry_run)
+
+    print("\nConfig files:")
+    layers_json = config_dir / f'{name}_layers.json'
+    utils.rename_layer_key(layers_json, old_name, new_name, dry_run=dry_run)
+
+    asset_configs = ([config_dir / f'{name}_assets.json']
+                     + list(config_dir.glob('shared_*.json')))
+    utils.replace_layer_references(asset_configs, old_name, new_name, dry_run=dry_run)
+
+    if config.get('email_photo_default_layer') == old_name:
+        print(f"\nWARNING: email_photo_default_layer='{old_name}' in {name}.geojson"
+              f" — update manually to '{new_name}'.")
+
+    if not dry_run:
+        print(f"\nNext steps:")
+        print(f"  1. python scripts/build_atlas.py config_only")
+        print(f"  2. Rematerialize 'webmap' and 'html'")
+        print(f"  3. grep -r '{old_name}' {config_dir}")
+
+
 def materialize(config: Dict[str, Any], asset_name: str, materializers: Dict[str, Any]=DEFAULT_MATERIALIZERS):
     materializer_name = config['assets'][asset_name]['config']['fetch_type']
     return materializers[materializer_name](config, asset_name)
