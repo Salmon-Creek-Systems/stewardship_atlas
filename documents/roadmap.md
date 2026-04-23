@@ -69,6 +69,18 @@ Scope:
 
 **Unblocks**: faster customer onboarding, federation (which requires clean per-atlas boundaries), easier maintenance.
 
+#### Design tension: build artifact vs. direct editing
+
+`atlas_config.json` is documented as a build artifact (CLAUDE.md), but the "edit source → run build_atlas.py config_only → forget and get confused" workflow is persistent friction. Two clean directions worth deciding between:
+
+**Option A — fully lean into build model.** Source files (GeoJSON + layers.json + assets.json + shared_*.json) are the authoritative truth. `atlas_config.json` is always generated — either triggered automatically on source file change, or rebuilt inline whenever config is read. The shared-template inheritance system pays off at multi-atlas scale. Resolves the footgun by eliminating the manual rebuild step entirely.
+
+**Option B — go back to direct editing.** Source files are for initial creation only. After that, `atlas_config.json` is the truth and changes are made through Python mutation functions (e.g. `atlas.rename_layer()`) rather than hand-editing source files and rebuilding. No build step means no footgun. The `rename_layer()` utility (2026-04-23) is a prototype of this pattern — it operated directly on the config rather than going through the build pipeline.
+
+**Current instinct**: Option B is closer to the original design intent and is more tractable at current scale (handful of atlases, changes are intentional). Option A makes more sense if configs are being programmatically generated or diff'd across many atlases. The two approaches are not mutually exclusive — the mutation-function API works regardless of whether source files exist.
+
+**What this implies for tooling**: If Option B, invest in a richer set of `atlas.*` mutation functions (set_layer_color, add_asset, etc.) so `atlas_config.json` is never hand-edited. Source files become reference-only and the build step recedes. If Option A, invest in auto-rebuild and source file validation (config linter that checks all `in_layers` references resolve, etc.).
+
 ### 5. Domain and routing architecture
 
 Consolidate the current per-atlas nginx/SSL/port setup into a simpler, more provisionable model.

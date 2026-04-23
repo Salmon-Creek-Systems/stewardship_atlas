@@ -369,6 +369,192 @@ def delete():
 def new_version():
     pass
 
+_BUILD_DEFAULT_ROLES = {"internal": "internal", "admin": "admin"}
+
+REQUIRED_ATLAS_PROPERTIES = [
+    'name', 'assets_path', 'layers_path', 'data_root', 'shared_dir',
+    'admin_emails', 'base_url', 'port', 'versioned_outlets', 'logo_url',
+]
+
+
+def setup_role_htpasswds(data_root: str, atlas_name: str):
+    """Create per-role htpasswd files used by nginx for auth.
+
+    Reads passwords from {data_root}/roles/{atlas_name}_roles.json, falling
+    back to infrastructure/htpasswd/roles/{atlas_name}_roles.json in the repo,
+    then to built-in defaults.
+    """
+    data_root = Path(data_root)
+    roles_dir = data_root / "roles" / atlas_name
+    roles_dir.mkdir(parents=True, exist_ok=True)
+
+    data_root_roles_json = data_root / "roles" / f"{atlas_name}_roles.json"
+    repo_root = Path(__file__).parent.parent
+    infra_roles_json = repo_root / "infrastructure" / "htpasswd" / "roles" / f"{atlas_name}_roles.json"
+
+    if data_root_roles_json.exists():
+        roles_json = data_root_roles_json
+    elif infra_roles_json.exists():
+        roles_json = infra_roles_json
+        logger.warning(f"Using roles from repo: {infra_roles_json}")
+    else:
+        roles_json = None
+        logger.warning(f"No roles file found for {atlas_name}, using defaults")
+
+    roles = dict(_BUILD_DEFAULT_ROLES)
+    if roles_json:
+        with open(roles_json) as f:
+            roles = json.load(f)
+
+    if not data_root_roles_json.exists():
+        data_root_roles_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(data_root_roles_json, 'w') as f:
+            json.dump(roles, f, indent=2)
+
+    admin_password = roles.get("admin")
+    for role, password in roles.items():
+        htpasswd_file = roles_dir / f"{role}.htpasswd"
+        flag = "bc" if not htpasswd_file.exists() else "b"
+        os.system(f"htpasswd -{flag} {htpasswd_file} {role} {password}")
+        if role != "admin" and admin_password:
+            os.system(f"htpasswd -b {htpasswd_file} admin {admin_password}")
+        logger.info(f"Wrote {htpasswd_file}")
+
+
+def build_atlas(
+    name: str,
+    assets_path: str,
+    layers_path: str,
+    data_root: str,
+    shared_dir: str,
+    admin_emails: List[str],
+    base_url: str,
+    app_url: str,
+    port: int,
+    versioned_outlets: List[str],
+    logo_url: str,
+    geometry: Dict[str, Any],
+    config_only: bool = False,
+    extra_props: Dict[str, Any] = None,
+):
+    """Build a new atlas or regenerate config for an existing one.
+
+    Returns (atlas_config dict, Path to written atlas_config.json).
+    Equivalent to running: python scripts/build_atlas.py [config_only] <geojson>
+    """
+    from datetime import datetime as _dt
+
+    if not Path(assets_path).exists():
+        raise FileNotFoundError(f"Assets file not found: {assets_path}")
+    if not Path(layers_path).exists():
+        raise FileNotFoundError(f"Layers file not found: {layers_path}")
+    if not Path(data_root).exists():
+        raise FileNotFoundError(f"Data root not found: {data_root}")
+    if not Path(shared_dir).exists():
+        raise FileNotFoundError(f"Shared dir not found: {shared_dir}")
+
+    feature_collection = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                **(extra_props or {}),
+                "name": name,
+                "admin_emails": admin_emails or [],
+                "base_url": base_url,
+                "app_url": app_url,
+                "atlasappport": port,
+                "logo": logo_url,
+                "versioned_outlets": versioned_outlets or [],
+            },
+        }],
+    }
+
+    config_path = Path(data_root) / name / 'staging' / 'atlas_config.json'
+    setup_role_htpasswds(data_root, name)
+
+    if config_only:
+        if config_path.exists():
+            timestamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = config_path.parent / f"atlas_config-BACKUP-{timestamp}.json"
+            config_path.rename(backup_path)
+            logger.info(f"Backed up existing config to: {backup_path}")
+
+        config = create_config(
+            layers_path=layers_path,
+            assets_path=assets_path,
+            data_root=data_root,
+            feature_collection=feature_collection,
+        )
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+    else:
+        config = create(
+            layers_path=layers_path,
+            assets_path=assets_path,
+            data_root=data_root,
+            shared_dir=Path(shared_dir),
+            feature_collection=feature_collection,
+        )
+        materialize(config, 'notebook')
+        materialize(config, 'html')
+
+    return config, config_path
+
+
+def build_atlas_from_geojson(geojson_path, config_only: bool = False):
+    """Build or regenerate an atlas from its GeoJSON config file.
+
+    Equivalent to: python scripts/build_atlas.py [config_only] <geojson_path>
+
+    Returns (atlas_config dict, Path to written atlas_config.json).
+    """
+    geojson_path = Path(geojson_path)
+    with open(geojson_path) as f:
+        geojson_data = json.load(f)
+
+    if geojson_data.get('type') != 'FeatureCollection':
+        raise ValueError("GeoJSON must be a FeatureCollection")
+    features = geojson_data.get('features', [])
+    if not features:
+        raise ValueError("GeoJSON must have at least one feature")
+
+    feature = features[0]
+    geometry = feature.get('geometry')
+    if not geometry:
+        raise ValueError("First feature must have a geometry")
+
+    props = feature.get('properties', {})
+    missing = [p for p in REQUIRED_ATLAS_PROPERTIES if p not in props]
+    if missing:
+        raise ValueError(f"Missing required properties: {', '.join(missing)}")
+
+    known = set(REQUIRED_ATLAS_PROPERTIES) | {'app_url', 'config_only'}
+    extra_props = {k: v for k, v in props.items() if k not in known}
+
+    mode = "config only" if config_only else "full atlas"
+    logger.info(f"Building {mode} for '{props['name']}' from {geojson_path.name}")
+
+    return build_atlas(
+        name=props['name'],
+        assets_path=props['assets_path'],
+        layers_path=props['layers_path'],
+        data_root=props['data_root'],
+        shared_dir=props['shared_dir'],
+        admin_emails=props['admin_emails'],
+        base_url=props['base_url'],
+        app_url=props.get('app_url', props['base_url']),
+        port=props['port'],
+        versioned_outlets=props['versioned_outlets'],
+        logo_url=props['logo_url'],
+        geometry=geometry,
+        config_only=config_only,
+        extra_props=extra_props,
+    )
+
+
 def rename_layer(config, old_name, new_name, dry_run=False):
     """Rename a layer across all dataswale files and source config files.
 
