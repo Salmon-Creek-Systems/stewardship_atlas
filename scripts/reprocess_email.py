@@ -133,7 +133,7 @@ def remove(s3, ses, key):
     original_subject = msg.get("Subject", "(no subject)")
 
     # Strip headers that would break re-sending, then re-route
-    for header in ("DKIM-Signature", "To", "Cc", "From"):
+    for header in ("DKIM-Signature", "To", "Cc", "From", "Subject"):
         while header in msg:
             del msg[header]
     msg["From"] = FORWARD_FROM
