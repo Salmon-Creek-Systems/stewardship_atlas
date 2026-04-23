@@ -123,8 +123,17 @@ def inspect(s3, key):
 
 
 def remove(s3, ses, key):
-    """Quarantine an email and forward it to the admin address for inspection."""
-    full_key = key if key.startswith(PREFIX) else PREFIX + key
+    """Quarantine an email and forward it to the admin address for inspection.
+
+    If the key is already outside incoming/ (e.g. in quarantine/), just forwards
+    without moving.
+    """
+    if key.startswith(PREFIX) or "/" not in key:
+        full_key = key if key.startswith(PREFIX) else PREFIX + key
+        in_incoming = True
+    else:
+        full_key = key
+        in_incoming = False
 
     obj = s3.get_object(Bucket=BUCKET, Key=full_key)
     raw = obj["Body"].read()
@@ -150,15 +159,18 @@ def remove(s3, ses, key):
     except ClientError as e:
         print(f"Warning: could not forward email: {e}", file=sys.stderr)
 
-    filename = full_key.split("/", 1)[-1]
-    quarantine_key = QUARANTINE_NO_ATTACHMENT + filename
-    s3.copy_object(
-        Bucket=BUCKET,
-        CopySource={"Bucket": BUCKET, "Key": full_key},
-        Key=quarantine_key,
-    )
-    s3.delete_object(Bucket=BUCKET, Key=full_key)
-    print(f"Moved to {quarantine_key}")
+    if full_key.startswith(PREFIX):
+        filename = full_key.split("/", 1)[-1]
+        quarantine_key = QUARANTINE_NO_ATTACHMENT + filename
+        s3.copy_object(
+            Bucket=BUCKET,
+            CopySource={"Bucket": BUCKET, "Key": full_key},
+            Key=quarantine_key,
+        )
+        s3.delete_object(Bucket=BUCKET, Key=full_key)
+        print(f"Moved to {quarantine_key}")
+    else:
+        print(f"(Already outside incoming/ — not moved)")
 
 
 def reprocess(s3, key, dry_run=False):
