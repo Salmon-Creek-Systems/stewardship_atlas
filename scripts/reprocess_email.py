@@ -5,6 +5,7 @@ Inspect and retrigger emails stuck in the S3 ingress bucket.
 Usage:
     python scripts/reprocess_email.py --list                  # show stuck emails
     python scripts/reprocess_email.py --inspect <key>         # show sender, subject, GPS status
+    python scripts/reprocess_email.py --remove <key>          # quarantine + forward to admin
     python scripts/reprocess_email.py <key>                   # retrigger Lambda processing
     python scripts/reprocess_email.py --all                   # retrigger all stuck emails
     python scripts/reprocess_email.py --all --dry-run         # preview without triggering
@@ -12,6 +13,7 @@ Usage:
 Examples:
     python scripts/reprocess_email.py --list
     python scripts/reprocess_email.py --inspect incoming/63hfbll9b84j2...
+    python scripts/reprocess_email.py --remove incoming/63hfbll9b84j2...
     python scripts/reprocess_email.py incoming/63hfbll9b84j2...
     python scripts/reprocess_email.py --all --dry-run
     python scripts/reprocess_email.py --all
@@ -33,6 +35,9 @@ from utils import safe_float
 
 BUCKET = "atlas-ingress"
 PREFIX = "incoming/"
+QUARANTINE_NO_ATTACHMENT = "quarantine/no-attachment/"
+FORWARD_FROM = "scvfd@fireatlas.org"
+FORWARD_TO = "gateless@gmail.com"
 
 
 def list_stuck(s3):
@@ -117,6 +122,45 @@ def inspect(s3, key):
         print("           Check iOS Settings → Privacy → Location Services → Camera.")
 
 
+def remove(s3, ses, key):
+    """Quarantine an email and forward it to the admin address for inspection."""
+    full_key = key if key.startswith(PREFIX) else PREFIX + key
+
+    obj = s3.get_object(Bucket=BUCKET, Key=full_key)
+    raw = obj["Body"].read()
+    msg = email.message_from_bytes(raw)
+
+    original_subject = msg.get("Subject", "(no subject)")
+
+    # Strip headers that would break re-sending, then re-route
+    for header in ("DKIM-Signature", "To", "Cc", "From"):
+        while header in msg:
+            del msg[header]
+    msg["From"] = FORWARD_FROM
+    msg["To"] = FORWARD_TO
+    msg["Subject"] = f"[FWD] {original_subject}"
+
+    try:
+        ses.send_raw_email(
+            Source=FORWARD_FROM,
+            Destinations=[FORWARD_TO],
+            RawMessage={"Data": msg.as_bytes()},
+        )
+        print(f"Forwarded to {FORWARD_TO}")
+    except ClientError as e:
+        print(f"Warning: could not forward email: {e}", file=sys.stderr)
+
+    filename = full_key.split("/", 1)[-1]
+    quarantine_key = QUARANTINE_NO_ATTACHMENT + filename
+    s3.copy_object(
+        Bucket=BUCKET,
+        CopySource={"Bucket": BUCKET, "Key": full_key},
+        Key=quarantine_key,
+    )
+    s3.delete_object(Bucket=BUCKET, Key=full_key)
+    print(f"Moved to {quarantine_key}")
+
+
 def reprocess(s3, key, dry_run=False):
     full_key = key if key.startswith(PREFIX) else PREFIX + key
     if dry_run:
@@ -157,6 +201,7 @@ def main():
     parser.add_argument("key", nargs="?", help="S3 object key to reprocess")
     parser.add_argument("--list", action="store_true", help="List stuck emails")
     parser.add_argument("--inspect", metavar="KEY", help="Show sender, subject, and GPS status")
+    parser.add_argument("--remove", metavar="KEY", help="Quarantine email and forward to admin")
     parser.add_argument("--all", action="store_true", help="Retrigger all stuck emails")
     parser.add_argument("--dry-run", action="store_true", help="Print what would be done without triggering")
     parser.add_argument("--profile", default="atlas", help="AWS profile (default: atlas)")
@@ -165,9 +210,12 @@ def main():
 
     session = boto3.Session(profile_name=args.profile, region_name=args.region)
     s3 = session.client("s3")
+    ses = session.client("ses")
 
     if args.inspect:
         inspect(s3, args.inspect)
+    elif args.remove:
+        remove(s3, ses, args.remove)
     elif args.all:
         reprocess_all(s3, dry_run=args.dry_run)
     elif args.list or not args.key:
