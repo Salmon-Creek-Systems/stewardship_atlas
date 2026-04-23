@@ -243,10 +243,16 @@ def print_invocation(inv):
         code, body = inv["webapp_response"]
         info(f"Webapp: HTTP {code}  {body}")
 
-    # Print any ERROR lines
-    for line in inv["lines"]:
-        if "[ERROR]" in line or "Error" in line and "Webapp" not in line:
-            err(f"  {line.split(']', 2)[-1].strip()}")
+    # For failures, dump all non-boilerplate lines; for success, only print ERROR lines
+    boilerplate = ("START RequestId:", "END RequestId:", "REPORT RequestId:")
+    if inv["status"] != "success":
+        for line in inv["lines"]:
+            if not any(line.startswith(p) for p in boilerplate):
+                info(f"  {line}")
+    else:
+        for line in inv["lines"]:
+            if "[ERROR]" in line or ("Error" in line and "Webapp" not in line):
+                err(f"  {line.split(']', 2)[-1].strip()}")
 
 
 # ── stage 4: feature in layer ─────────────────────────────────────────────────
