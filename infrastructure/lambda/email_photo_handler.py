@@ -24,6 +24,21 @@ s3 = boto3.client("s3")
 WEBAPP_URL = os.environ["WEBAPP_URL"]
 
 
+def extract_body_text(msg) -> str:
+    """Extract plain text body from a parsed email message.
+
+    Prefers text/plain; falls back to text/html. Returns empty string if none found.
+    """
+    for content_type in ("text/plain", "text/html"):
+        for part in msg.walk():
+            if part.get_content_type() == content_type:
+                try:
+                    return part.get_payload(decode=True).decode("utf-8", errors="replace").strip()
+                except Exception:
+                    pass
+    return ""
+
+
 def extract_atlas_name(msg) -> str | None:
     """Derive atlas name from the To: header.
 
@@ -76,6 +91,8 @@ def handler(event, context):
     logger.info(f"Subject: {subject}")
     logger.info(f"From: {sender}")
 
+    body_text = extract_body_text(msg)
+
     payload = {
         "subject": subject,
         "sender": sender,
@@ -83,6 +100,7 @@ def handler(event, context):
         "image_data": image_data,
         "filename": filename,
         "received_at": datetime.now(timezone.utc).isoformat(),
+        "body_text": body_text,
     }
 
     resp = requests.post(f"{WEBAPP_URL}/ingest/email_photo", json=payload, timeout=30)

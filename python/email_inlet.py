@@ -14,21 +14,69 @@ from utils import safe_float
 logger = logging.getLogger(__name__)
 
 
-def parse_subject(subject: str, default_layer: str = "poi") -> tuple[str, str]:
-    """Parse email subject into (layer_name, title).
+def parse_subject(subject: str) -> str:
+    """Return email subject as the feature title.
 
-    Format: "<layer_name>: <title>"
-    If no colon is present, the entire subject is used as the title
-    and the layer defaults to default_layer.
+    Layer is no longer extracted from the subject — use the email body instead.
     """
-    if ":" in subject:
-        layer_name, _, title = subject.partition(":")
-        layer_name = layer_name.strip().lower()
-        title = title.strip() or "Photo submission"
-    else:
-        layer_name = default_layer
-        title = subject.strip() or "Photo submission"
-    return layer_name, title
+    return subject.strip() or "Photo submission"
+
+
+def parse_body(body_text: str, layer_names: list, editable_columns: list) -> dict:
+    """Parse email body for layer selection and editable field values.
+
+    Returns {"layer": str|None, "props": dict, "raw": str}.
+
+    Layer detection (first match wins):
+    - Any line with "layer: <value>" or "layer=<value>" (case-insensitive key)
+    - First non-empty line with no separator that matches a known layer name
+
+    All other lines are scanned for "key: value" or "key=value" pairs whose
+    keys match editable column names (case-insensitive). Unknown keys ignored.
+
+    Never raises — returns {"layer": None, "props": {}, "raw": body_text or ""}
+    on any error.
+    """
+    raw = body_text or ""
+    try:
+        col_names = {c["name"].lower(): c["name"] for c in (editable_columns or [])}
+        layer_set = {n.lower() for n in (layer_names or [])}
+
+        layer = None
+        props = {}
+        first_line_checked = False
+
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            sep_pos = -1
+            for sep in (":", "="):
+                pos = line.find(sep)
+                if pos != -1 and (sep_pos == -1 or pos < sep_pos):
+                    sep_pos = pos
+
+            if sep_pos == -1:
+                # No separator — check if first non-empty line matches a layer name
+                if not first_line_checked and line.lower() in layer_set:
+                    layer = line.lower()
+                first_line_checked = True
+                continue
+
+            first_line_checked = True
+            key = line[:sep_pos].strip().lower()
+            value = line[sep_pos + 1:].strip()
+
+            if key == "layer":
+                if value.lower() in layer_set:
+                    layer = value.lower()
+            elif key in col_names:
+                props[col_names[key]] = value
+
+        return {"layer": layer, "props": props, "raw": raw}
+    except Exception:
+        return {"layer": None, "props": {}, "raw": raw}
 
 
 def _exif_to_json(value):
@@ -93,21 +141,28 @@ def extract_gps(image_bytes: bytes) -> dict | None:
 
 def build_feature(lat: float, lon: float, title: str, sender: str,
                   timestamp: str, image_url: str,
+                  body_props: dict = None,
                   extra_props: dict = None) -> geojson.Feature:
     """Build a GeoJSON Point feature from extracted data.
 
     GeoJSON coordinate order is [lon, lat].
+    body_props (parsed from email body) are applied first; extra_props (EXIF/GPS)
+    follow so GPS metadata wins over body values. Hardcoded fields always take
+    precedence over both.
     """
-    properties = {
+    properties = {}
+    if body_props:
+        properties.update(body_props)
+    if extra_props:
+        properties.update(extra_props)
+    properties.update({
         "name": title,
         "timestamp": timestamp,
         "source": "email",
         "sender": sender,
         "image_url": image_url,
         "URL": image_url,
-    }
-    if extra_props:
-        properties.update(extra_props)
+    })
 
     return geojson.Feature(
         geometry=geojson.Point((lon, lat)),
