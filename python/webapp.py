@@ -948,6 +948,7 @@ class EmailPhotoPayload(BaseModel):
     image_data: str       # base64-encoded image bytes
     filename: str
     received_at: str
+    body_text: str | None = None
 
 
 class WebPhotoPayload(BaseModel):
@@ -1006,12 +1007,21 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
         # See issue #61 for splitting photo-submission auth from admin_emails.
         admin_emails = ac.get("admin_emails", [])
 
-        # Parse subject
+        # Parse subject — now just the title; layer comes from body or config default
         default_layer = ac.get("email_photo_default_layer", "processing_sites")
-        layer_name, title = email_inlet.parse_subject(payload.subject, default_layer)
+        title = email_inlet.parse_subject(payload.subject)
 
-        # Validate layer exists; fall back to atlas default if subject named an unknown layer
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
+
+        # Parse body for layer override and editable field values
+        default_layer_cfg = next(
+            (l for l in ac["dataswale"]["layers"] if l["name"] == default_layer), {}
+        )
+        editable_columns = default_layer_cfg.get("editable_columns", [])
+        body = email_inlet.parse_body(payload.body_text, layer_names, editable_columns)
+
+        # Layer resolution: body > config default
+        layer_name = body["layer"] or default_layer
         if layer_name not in layer_names:
             logging.warning(
                 f"Unknown layer '{layer_name}' for atlas '{payload.atlas_name}'; "
@@ -1060,6 +1070,10 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
 
         extra_props = {k: v for k, v in gps.items() if k not in ("lat", "lon")}
 
+        body_props = dict(body["props"])
+        if body["raw"]:
+            body_props["email_body"] = body["raw"]
+
         # Build feature and write delta
         feature = email_inlet.build_feature(
             lat=gps["lat"],
@@ -1068,6 +1082,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             sender=payload.sender,
             timestamp=payload.received_at,
             image_url=image_url,
+            body_props=body_props,
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
