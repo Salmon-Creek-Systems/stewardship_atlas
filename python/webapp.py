@@ -85,6 +85,11 @@ class CreateAtlasRequest(BaseModel):
     slug: str   # atlas ID / directory name (e.g. "scvfd")
     bbox: BBox
 
+class MovePayload(BaseModel):
+    source_layer: str
+    target_layer: str
+    selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of selection polygon(s)
+
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
     import re
@@ -315,6 +320,68 @@ async def json_upload(payload: JSONPayload, swalename: str):
         print(f"ERROR in json_upload. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(traceback_str)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/move_features/{swalename}")
+async def move_features(payload: MovePayload, swalename: str):
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+
+        source_path = versioning.atlas_path(ac, "layers") / payload.source_layer / f"{payload.source_layer}.geojson"
+        target_path = versioning.atlas_path(ac, "layers") / payload.target_layer / f"{payload.target_layer}.geojson"
+
+        source_snapshot = source_path.read_text()
+        target_snapshot = target_path.read_text() if target_path.exists() else None
+
+        sel = payload.selection
+        if sel.get("type") == "Feature":
+            sel_fc = {"type": "FeatureCollection", "features": [sel]}
+        elif sel.get("type") == "FeatureCollection":
+            sel_fc = sel
+        else:
+            raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+
+        moved = deltas_geojson.extract_intersecting_features(source_path, sel_fc)
+        if not moved:
+            return {"moved": 0, "source_remaining": len(json.loads(source_snapshot)["features"])}
+
+        delta_files_written = []
+        try:
+            create_fc = {"type": "FeatureCollection", "layer": payload.target_layer, "action": "create", "features": [dict(f) for f in moved]}
+            target_delta = deltas_geojson.delta_path_from_layer(ac, payload.target_layer, "create")
+            with open(target_delta, "w") as f:
+                json.dump(create_fc, f)
+            delta_files_written.append(Path(target_delta))
+            dataswale_geojson.refresh_vector_layer(ac, payload.target_layer)
+
+            delete_fc = dict(sel_fc)
+            delete_fc["layer"] = payload.source_layer
+            delete_fc["action"] = "delete"
+            source_delta = deltas_geojson.delta_path_from_layer(ac, payload.source_layer, "delete")
+            with open(source_delta, "w") as f:
+                json.dump(delete_fc, f)
+            delta_files_written.append(Path(source_delta))
+            dataswale_geojson.refresh_vector_layer(ac, payload.source_layer)
+
+            source_remaining = len(json.loads(source_path.read_text())["features"])
+            return {"moved": len(moved), "source_remaining": source_remaining}
+
+        except Exception as e:
+            for p in delta_files_written:
+                if p.exists():
+                    p.unlink()
+            source_path.write_text(source_snapshot)
+            if target_snapshot is not None:
+                target_path.write_text(target_snapshot)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(f"ERROR in move_features: {e}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

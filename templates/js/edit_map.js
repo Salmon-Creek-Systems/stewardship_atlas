@@ -11,6 +11,22 @@ const modeMap = {
     'polygon': 'TerraDrawPolygonMode'
 };
 
+// Populate the move target dropdown and hide the move section if no targets exist
+(function initMoveTargets() {
+    const select = document.getElementById('move-target-select');
+    const group = document.getElementById('move-button-group');
+    if (!MOVE_TARGETS || MOVE_TARGETS.length === 0) {
+        if (group) group.style.display = 'none';
+        return;
+    }
+    MOVE_TARGETS.forEach(function(name) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.text = name;
+        select.appendChild(opt);
+    });
+})();
+
 // Initialize Terra Draw with all possible modes
 const td = new terraDraw.TerraDraw({
     adapter: new terraDraw.TerraDrawMapLibreGLAdapter({
@@ -389,6 +405,61 @@ if (uploadPhotoBtn) {
         fileInput.click();
     });
 }
+
+// Move to Layer — show confirm panel
+document.getElementById('move-button').addEventListener('click', function() {
+    const features = td.getSnapshot();
+    if (features.length === 0) {
+        showErrorPopup('No area drawn. Please draw a polygon to select features to move.');
+        return;
+    }
+    document.getElementById('move-confirm').style.display = 'block';
+});
+
+document.getElementById('move-cancel-button').addEventListener('click', function() {
+    document.getElementById('move-confirm').style.display = 'none';
+});
+
+document.getElementById('move-confirm-button').addEventListener('click', function() {
+    const features = td.getSnapshot();
+    if (features.length === 0) {
+        showErrorPopup('No area drawn.');
+        return;
+    }
+    const targetLayer = document.getElementById('move-target-select').value;
+    if (!targetLayer) {
+        showErrorPopup('Please select a target layer.');
+        return;
+    }
+
+    const selection = features.length === 1
+        ? features[0]
+        : {"type": "FeatureCollection", "features": features};
+
+    const payload = {
+        source_layer: EDIT_CONFIG.layerName,
+        target_layer: targetLayer,
+        selection: selection
+    };
+
+    fetch(EDIT_CONFIG.appUrl + '/move_features/' + EDIT_CONFIG.swalename, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).then(function(r) {
+        return r.json().then(function(data) { return {ok: r.ok, data: data}; });
+    }).then(function(result) {
+        if (result.ok) {
+            document.getElementById('move-confirm').style.display = 'none';
+            td.clear();
+            showSuccessNotification('Moved ' + result.data.moved + ' feature(s) to ' + targetLayer);
+        } else {
+            showErrorPopup('Move failed: ' + (result.data.detail || 'unknown error'));
+        }
+    }).catch(function(err) {
+        showErrorPopup('Move error: ' + err.message);
+    });
+});
 
 // Add upload button functionality
 document.getElementById('upload-button').addEventListener('click', function() {

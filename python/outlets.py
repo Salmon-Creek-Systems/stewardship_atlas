@@ -606,6 +606,23 @@ def outlet_webmap(config, name):
   
     return output_path
 
+def candidate_move_targets(config: dict, source_layer_name: str) -> list:
+    """Return layer names that can receive features moved from source_layer_name.
+
+    Currently filters by matching geometry_type and excludes the source layer.
+    Isolated as a function so richer logic can be added without touching call sites.
+    """
+    source_def = next((l for l in config['dataswale']['layers'] if l['name'] == source_layer_name), None)
+    if not source_def:
+        return []
+    source_geom = source_def.get('geometry_type', '')
+    return [
+        l['name']
+        for l in config['dataswale']['layers']
+        if l['name'] != source_layer_name and l.get('geometry_type') == source_geom
+    ]
+
+
 def generate_edit_controls_html(editable_attributes, geometry_type='point'):
     """Generate HTML for edit controls based on attribute configuration"""
     select_html = ""
@@ -653,6 +670,15 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
             <button id="delete-cancel-button" class="button">Cancel</button>
             <button id="delete-confirm-button" class="warning-button">Delete</button>
         </div>
+        <div class="button-group" id="move-button-group">
+            <button id="move-button" class="button">Move to Layer</button>
+        </div>
+        <div id="move-confirm" style="display:none; margin-top: 8px;">
+            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
+            <select id="move-target-select" class="input-field" style="margin-bottom: 8px;"></select>
+            <button id="move-cancel-button" class="button">Cancel</button>
+            <button id="move-confirm-button" class="button">Move Features</button>
+        </div>
     """
 
     return select_html + string_html + buttons_html
@@ -690,6 +716,8 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
     basemap_is_raster_edit = bool(webedit_in_layers) and layers_dict_edit.get(webedit_in_layers[0], {}).get('geometry_type') == 'raster'
     lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if basemap_is_raster_edit else ''
 
+    move_targets = candidate_move_targets(config, ea['name'])
+
     # Format template
     return template.format(
         swale_name=config['name'],
@@ -702,7 +730,8 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         mode_string=mode_string,
         controls_config=json.dumps(controls_config),
         legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2),
-        lidar_basemap_option=lidar_basemap_option)
+        lidar_basemap_option=lidar_basemap_option,
+        move_targets=json.dumps(move_targets))
 
 def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""

@@ -144,6 +144,37 @@ def add_deltas_from_features(
     return [ str(outpath) ]
 
 
+def extract_intersecting_features(layer_path: Path, polygon_fc: dict) -> List[Feature]:
+    """Return features from layer_path whose geometry intersects any polygon in polygon_fc.
+
+    polygon_fc must be a GeoJSON FeatureCollection dict (not a path).
+    """
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.geojson', delete=False) as f:
+        json.dump(polygon_fc, f)
+        sel_path = f.name
+    try:
+        duckdb.sql("INSTALL spatial; LOAD spatial;")
+        duckdb.sql(f"DROP TABLE IF EXISTS _sel_poly; CREATE TABLE _sel_poly AS SELECT * FROM ST_Read('{sel_path}');")
+        duckdb.sql(f"DROP TABLE IF EXISTS _src_feats; CREATE TABLE _src_feats AS SELECT COLUMNS('.*') AS \"feat_\\0\" FROM ST_Read('{layer_path}');")
+        res = duckdb.sql("""
+            SELECT ST_AsGeoJSON(feat_geom) AS geometry, * EXCLUDE (feat_geom)
+            FROM _src_feats
+            WHERE EXISTS (
+                SELECT 1 FROM _sel_poly WHERE ST_Intersects(_sel_poly.geom, feat_geom)
+            )
+        """)
+        return [
+            Feature(
+                geometry=geojson.loads(row[0]),
+                properties={col[len("feat_"):]: val for col, val in zip(res.columns[1:], row[1:])}
+            )
+            for row in res.fetchall()
+        ]
+    finally:
+        os.unlink(sel_path)
+
+
 def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
     """Remove layer features that intersect the drawn polygon in the delete delta.
 
