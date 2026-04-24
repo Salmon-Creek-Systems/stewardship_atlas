@@ -14,6 +14,15 @@ import utils
 _VECTOR_INCLUDE_TYPES = {'linestring', 'point', 'polygon'}
 _INDEX_SUFFIXES = ('_index',)
 _TERRAIN_URL_PLACEHOLDER = '__TERRAIN_URL__'
+_GLYPHS_URL = 'https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf'
+
+# Layer names containing any of these substrings start visible; all others start hidden.
+_DEFAULT_VISIBLE_PATTERNS = ('road', 'creek', 'stream', 'photo')
+
+
+def _is_default_visible(name: str) -> bool:
+    name_lower = name.lower()
+    return any(p in name_lower for p in _DEFAULT_VISIBLE_PATTERNS)
 
 
 def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
@@ -21,6 +30,7 @@ def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
     Build MapLibre sources, layers, and toggle info for non-index vector layers.
     Returns (sources_dict, layers_list, toggle_list).
     Layer order: polygons first, then lines, then points.
+    Each toggle_list item: {ids, label, visible} where ids covers geometry + label layers.
     """
     sources = {}
     polygon_layers: List[dict] = []
@@ -36,31 +46,40 @@ def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
         if any(name.endswith(s) for s in _INDEX_SUFFIXES):
             continue
 
+        visible = _is_default_visible(name)
+        visibility = 'visible' if visible else 'none'
+
         sources[name] = {'type': 'geojson', 'data': f'../../layers/{name}/{name}.geojson'}
         color = utils.rgb_to_css(layer.get('color', [150, 150, 150]))
         layer_id = f'{name}-layer'
+        toggle_ids = [layer_id]
 
         if geom_type == 'polygon':
             fill_color = utils.rgb_to_css(layer.get('fill_color', layer.get('color', [150, 150, 150])))
             polygon_layers.append({
                 'id': layer_id, 'type': 'fill', 'source': name,
+                'layout': {'visibility': visibility},
                 'paint': {
                     'fill-color': fill_color,
                     'fill-opacity': layer.get('fill_opacity', 0.4),
                     'fill-outline-color': color,
                 }
             })
+            symbol_placement = 'point'
         elif geom_type == 'linestring':
             line_layers.append({
                 'id': layer_id, 'type': 'line', 'source': name,
+                'layout': {'visibility': visibility},
                 'paint': {
                     'line-color': color,
                     'line-width': ['coalesce', ['get', 'vector_width'], 2],
                 }
             })
+            symbol_placement = 'line'
         elif geom_type == 'point':
             point_layers.append({
                 'id': layer_id, 'type': 'circle', 'source': name,
+                'layout': {'visibility': visibility},
                 'paint': {
                     'circle-color': color,
                     'circle-radius': 5,
@@ -68,8 +87,45 @@ def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
                     'circle-stroke-color': '#ffffff',
                 }
             })
+            symbol_placement = 'point'
 
-        toggle_list.append({'id': layer_id, 'label': name.replace('_', ' ').title()})
+        # Add label layer for layers that opt in and don't use sprites
+        if layer.get('add_labels') and not layer.get('symbol'):
+            label_id = f'{name}-label-layer'
+            label_layer = {
+                'id': label_id,
+                'type': 'symbol',
+                'source': name,
+                'minzoom': layer.get('label_minzoom', 13),
+                'layout': {
+                    'visibility': visibility,
+                    'symbol-placement': symbol_placement,
+                    'text-field': ['get', 'name'],
+                    'text-font': ['Open Sans Regular'],
+                    'text-size': 12,
+                },
+                'paint': {
+                    'text-color': '#ffffff',
+                    'text-halo-color': 'rgba(0,0,0,0.7)',
+                    'text-halo-width': 2,
+                }
+            }
+            if 'label_maxzoom' in layer:
+                label_layer['maxzoom'] = layer['label_maxzoom']
+            # Append label after the geometry layer bucket it belongs to
+            if geom_type == 'polygon':
+                polygon_layers.append(label_layer)
+            elif geom_type == 'linestring':
+                line_layers.append(label_layer)
+            else:
+                point_layers.append(label_layer)
+            toggle_ids.append(label_id)
+
+        toggle_list.append({
+            'ids': toggle_ids,
+            'label': name.replace('_', ' ').title(),
+            'visible': visible,
+        })
 
     return sources, polygon_layers + line_layers + point_layers, toggle_list
 
@@ -85,9 +141,11 @@ def _build_toggle_panel_html(toggle_list: list) -> str:
         '    <div class="layer-panel-list">',
     ]
     for t in toggle_list:
+        ids_attr = ','.join(t['ids'])
+        checked = ' checked' if t['visible'] else ''
         lines.append(
             f'        <label>'
-            f'<input type="checkbox" data-layer="{t["id"]}" checked> '
+            f'<input type="checkbox" data-layers="{ids_attr}"{checked}> '
             f'{t["label"]}</label>'
         )
     lines += ['    </div>', '</div>']
@@ -121,6 +179,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     style = {
         "version": 8,
+        "glyphs": _GLYPHS_URL,
         "sources": {
             "satellite": {
                 "type": "raster",
@@ -139,7 +198,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         },
         "layers": [
             {"id": "satellite", "type": "raster", "source": "satellite",
-             "paint": {"raster-opacity": 0.9}},
+             "paint": {"raster-opacity": 1.0}},
             *vector_layers,
         ],
         "terrain": {"source": "terrain", "exaggeration": 1.5},
@@ -151,15 +210,13 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     layer_toggle_js = ""
     if toggle_list:
         layer_toggle_js = """
-        // Wire up layer toggles after map loads
         map.on('load', () => {
             document.querySelectorAll('.layer-panel-list input[type=checkbox]').forEach(cb => {
                 cb.addEventListener('change', e => {
-                    map.setLayoutProperty(
-                        e.target.dataset.layer,
-                        'visibility',
-                        e.target.checked ? 'visible' : 'none'
-                    );
+                    const vis = e.target.checked ? 'visible' : 'none';
+                    e.target.dataset.layers.split(',').forEach(id => {
+                        map.setLayoutProperty(id, 'visibility', vis);
+                    });
                 });
             });
         });"""
@@ -226,8 +283,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         }}
         .layer-panel {{
             position: absolute;
-            top: 110px;
-            right: 10px;
+            bottom: 10px;
+            left: 10px;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
             border-radius: 5px;
@@ -268,7 +325,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         .back-link {{
             position: absolute;
             bottom: 10px;
-            left: 10px;
+            right: 10px;
             background: rgba(255, 255, 255, 0.9);
             padding: 8px 15px;
             border-radius: 5px;
