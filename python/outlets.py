@@ -139,26 +139,45 @@ def webmap_json(config, name, sprite_json=None):
         map_layers.append(map_layer)
 
         if layer.get('conversations_enabled'):
-            conv_indicator = {
-                'id': f"{layer_name}-conversations-indicator",
-                'type': 'symbol',
-                'source': layer_name,
-                'filter': ['all',
-                    ['has', 'conversations'],
-                    ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
-                ],
-                'layout': {
-                    'text-field': '💬',
-                    'text-size': 14,
-                    'text-offset': [1.2, -1.2],
-                    'text-anchor': 'center',
-                    'text-allow-overlap': True,
+            # Two layers: a white halo ring and a coloured dot, forming a badge.
+            # Circle layers need no glyph source so they render reliably.
+            for badge_layer in [
+                {
+                    'id': f"{layer_name}-conv-badge-halo",
+                    'type': 'circle',
+                    'source': layer_name,
+                    'filter': ['all',
+                        ['has', 'conversations'],
+                        ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
+                    ],
+                    'paint': {
+                        'circle-radius': 7,
+                        'circle-color': '#ffffff',
+                        'circle-translate': [10, -10],
+                        'circle-translate-anchor': 'viewport',
+                    },
+                    'metadata': {'legend': {'hidden': True}}
                 },
-                'metadata': {'legend': {'hidden': True}}
-            }
-            if vis := layer.get('vis'):
-                conv_indicator |= vis
-            map_layers.append(conv_indicator)
+                {
+                    'id': f"{layer_name}-conv-badge-dot",
+                    'type': 'circle',
+                    'source': layer_name,
+                    'filter': ['all',
+                        ['has', 'conversations'],
+                        ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
+                    ],
+                    'paint': {
+                        'circle-radius': 5,
+                        'circle-color': '#2196F3',
+                        'circle-translate': [10, -10],
+                        'circle-translate-anchor': 'viewport',
+                    },
+                    'metadata': {'legend': {'hidden': True}}
+                },
+            ]:
+                if vis := layer.get('vis'):
+                    badge_layer |= vis
+                map_layers.append(badge_layer)
 
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
