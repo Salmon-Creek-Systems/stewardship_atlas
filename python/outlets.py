@@ -157,7 +157,7 @@ def webmap_json(config, name, sprite_json=None):
                         'icon-allow-overlap': True,
                         'icon-ignore-placement': True,
                     },
-                    'metadata': {'legend': {'hidden': True}}
+                    'metadata': {'legend': {'hidden': True}, 'conversations_enabled': True}
                 }
                 if vis := layer.get('vis'):
                     badge_layer |= vis
