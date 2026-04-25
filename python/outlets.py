@@ -139,45 +139,62 @@ def webmap_json(config, name, sprite_json=None):
         map_layers.append(map_layer)
 
         if layer.get('conversations_enabled'):
-            # Two layers: a white halo ring and a coloured dot, forming a badge.
-            # Circle layers need no glyph source so they render reliably.
-            for badge_layer in [
-                {
-                    'id': f"{layer_name}-conv-badge-halo",
-                    'type': 'circle',
+            badge_filter = ['all',
+                ['has', 'conversations'],
+                ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
+            ]
+            if sprite_json and 'speech_bubble' in sprite_json:
+                badge_layer = {
+                    'id': f"{layer_name}-conv-badge",
+                    'type': 'symbol',
                     'source': layer_name,
-                    'filter': ['all',
-                        ['has', 'conversations'],
-                        ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
-                    ],
-                    'paint': {
-                        'circle-radius': 7,
-                        'circle-color': '#ffffff',
-                        'circle-translate': [10, -10],
-                        'circle-translate-anchor': 'viewport',
+                    'filter': badge_filter,
+                    'layout': {
+                        'icon-image': 'speech_bubble',
+                        'icon-size': 0.5,
+                        'icon-offset': [12, -12],
+                        'icon-anchor': 'center',
+                        'icon-allow-overlap': True,
+                        'icon-ignore-placement': True,
                     },
                     'metadata': {'legend': {'hidden': True}}
-                },
-                {
-                    'id': f"{layer_name}-conv-badge-dot",
-                    'type': 'circle',
-                    'source': layer_name,
-                    'filter': ['all',
-                        ['has', 'conversations'],
-                        ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
-                    ],
-                    'paint': {
-                        'circle-radius': 5,
-                        'circle-color': '#2196F3',
-                        'circle-translate': [10, -10],
-                        'circle-translate-anchor': 'viewport',
-                    },
-                    'metadata': {'legend': {'hidden': True}}
-                },
-            ]:
+                }
                 if vis := layer.get('vis'):
                     badge_layer |= vis
                 map_layers.append(badge_layer)
+            else:
+                # Fallback: two circle layers (no sprite available)
+                for badge_layer in [
+                    {
+                        'id': f"{layer_name}-conv-badge-halo",
+                        'type': 'circle',
+                        'source': layer_name,
+                        'filter': badge_filter,
+                        'paint': {
+                            'circle-radius': 7,
+                            'circle-color': '#ffffff',
+                            'circle-translate': [10, -10],
+                            'circle-translate-anchor': 'viewport',
+                        },
+                        'metadata': {'legend': {'hidden': True}}
+                    },
+                    {
+                        'id': f"{layer_name}-conv-badge-dot",
+                        'type': 'circle',
+                        'source': layer_name,
+                        'filter': badge_filter,
+                        'paint': {
+                            'circle-radius': 5,
+                            'circle-color': '#2196F3',
+                            'circle-translate': [10, -10],
+                            'circle-translate-anchor': 'viewport',
+                        },
+                        'metadata': {'legend': {'hidden': True}}
+                    },
+                ]:
+                    if vis := layer.get('vis'):
+                        badge_layer |= vis
+                    map_layers.append(badge_layer)
 
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
@@ -501,10 +518,11 @@ def generate_sprite_from_layers(config, webmap_dir):
         if layer.get('add_labels') and layer.get('symbol', {}).get('png'):
             sprite_layers.append(layer)
     
-    if not sprite_layers:
+    has_conversations = any(l.get('conversations_enabled') for l in layers_config)
+    if not sprite_layers and not has_conversations:
         return None
 
-    
+
     # Collect all unique PNG files
     png_files = {}
     for layer in sprite_layers:
@@ -512,12 +530,12 @@ def generate_sprite_from_layers(config, webmap_dir):
         if png_path not in png_files:
             png_files[png_path] = []
         png_files[png_path].append(layer['name'])
-    
+
     # Create sprite image and JSON
     sprite_images = []
     sprite_json_1x = {}
     sprite_json_2x = {}
-    
+
     # Standard sprite dimensions - we'll use 32x32 for each icon (1x) and 64x64 for 2x
     icon_size_1x = 32
     icon_size_2x = 64
@@ -526,7 +544,7 @@ def generate_sprite_from_layers(config, webmap_dir):
     total_width_2x = 0
     max_height_1x = 0
     max_height_2x = 0
-    
+
     # First pass: calculate dimensions and load images
     for png_path, layer_names in png_files.items():
         try:
@@ -549,7 +567,23 @@ def generate_sprite_from_layers(config, webmap_dir):
                 logger.warning(f"PNG file not found: {full_path}")
         except Exception as e:
             logger.error(f"Failed to load PNG file {png_path}: {e}")
-    
+
+    # Always include speech bubble in sprite when any layer uses conversations
+    if has_conversations:
+        bubble_path = versioning.atlas_path(config, version='app') / 'templates' / 'icons' / 'speech_bubble.png'
+        if bubble_path.exists():
+            try:
+                img = Image.open(bubble_path)
+                img_1x = img.resize((icon_size_1x, icon_size_1x), Image.Resampling.LANCZOS)
+                img_2x = img.resize((icon_size_2x, icon_size_2x), Image.Resampling.LANCZOS)
+                sprite_images.append((img_1x, img_2x, ['speech_bubble']))
+                total_width_1x += icon_size_1x + padding
+                total_width_2x += icon_size_2x + padding
+                max_height_1x = max(max_height_1x, icon_size_1x)
+                max_height_2x = max(max_height_2x, icon_size_2x)
+            except Exception as e:
+                logger.error(f"Failed to load speech_bubble.png: {e}")
+
     if not sprite_images:
         return None
     
