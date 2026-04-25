@@ -90,6 +90,12 @@ class MovePayload(BaseModel):
     target_layer: str
     selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of selection polygon(s)
 
+class CommentPayload(BaseModel):
+    text: str
+    author: str
+    geometry: Dict[str, Any]
+    existing_conversations: list = []
+
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
     import re
@@ -382,6 +388,42 @@ async def move_features(payload: MovePayload, swalename: str):
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(f"ERROR in move_features: {e}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/comment/{swalename}/{layer_name}")
+async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+
+        new_comment = {
+            "text": payload.text,
+            "author": payload.author,
+            "ts": datetime.utcnow().isoformat() + "Z"
+        }
+        updated_conversations = list(payload.existing_conversations) + [new_comment]
+
+        delta_fc = {
+            "type": "FeatureCollection",
+            "layer": layer_name,
+            "action": "annotate",
+            "features": [{
+                "type": "Feature",
+                "geometry": payload.geometry,
+                "properties": {"conversations": json.dumps(updated_conversations)}
+            }]
+        }
+        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "annotate")
+        with open(delta_path, "w") as f:
+            json.dump(delta_fc, f)
+
+        dataswale_geojson.refresh_vector_layer(ac, layer_name)
+
+        return {"status": "success", "conversations": updated_conversations}
+    except Exception as e:
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(f"ERROR in add_comment: {e}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

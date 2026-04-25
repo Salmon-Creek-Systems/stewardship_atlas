@@ -130,10 +130,12 @@ def webmap_json(config, name, sprite_json=None):
             map_layer |= vis
         if paint := layer.get('paint'):
             if not 'paint' in map_layer:
-                map_layer['paint'] = {}            
+                map_layer['paint'] = {}
             map_layer['paint'] |=  paint
-            
-                
+
+        if layer.get('conversations_enabled'):
+            map_layer.setdefault('metadata', {})['conversations_enabled'] = True
+
         map_layers.append(map_layer)
 
         # Maybe add label/icon layer:
@@ -186,6 +188,8 @@ def webmap_json(config, name, sprite_json=None):
                 #label_layer['paint'] = layer.get('paint', {})
                 if layer.get('selective_label') or layer.get('label_deduplicate'):
                     label_layer['filter'] = ['==', ['get', 'show_label'], True]
+                if layer.get('conversations_enabled'):
+                    label_layer.setdefault('metadata', {})['conversations_enabled'] = True
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -251,10 +255,14 @@ def webmap_json(config, name, sprite_json=None):
                     
                     # Debug logging for sprite-based label layer
                     logger.info(f"Adding sprite-based label layer: {label_layer['id']} with icon-image: {label_layer['layout'].get('icon-image')}")
-                    
+
+                    if layer.get('conversations_enabled'):
+                        label_layer.setdefault('metadata', {})['conversations_enabled'] = True
                     map_layers.append(label_layer)
                 else:
                     # Keep as dynamic layer for loadImage approach
+                    if layer.get('conversations_enabled'):
+                        label_layer.setdefault('metadata', {})['conversations_enabled'] = True
                     dynamic_layers.append(label_layer)
     
     map_config['style']['sources'] = map_sources
@@ -424,6 +432,7 @@ void await map.loadImage('{im_uri}',
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
             webmap_help=help_html,
             app_url=app_url,
+            swalename=config.get('name', ''),
             lidar_basemap_option=lidar_basemap_option)
 
     with open(output_path, 'w') as f_out:

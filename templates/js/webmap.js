@@ -210,39 +210,101 @@ map.on('load', async () => {
 
     // Add click handler for features and coordinates
     map.on('click', (e) => {
-        console.log('Map click event fired', {
-            ctrlKey: e.originalEvent.ctrlKey,
-            metaKey: e.originalEvent.metaKey,
-            shiftKey: e.originalEvent.shiftKey,
-            altKey: e.originalEvent.altKey,
-            type: e.originalEvent.type,
-            target: e.originalEvent.target.tagName
-        });
-        
-        // Check if meta, alt, or ctrl key is pressed for location sharing
         if (e.originalEvent.metaKey || e.originalEvent.altKey || e.originalEvent.ctrlKey) {
-            console.log('Modifier key pressed (Meta/Alt/Ctrl), processing click');
             handleLocationShare(e.lngLat);
-        } else {
-            // Check if we clicked on any features with a URL
-            const features = map.queryRenderedFeatures(e.point);
-            
-            if (features.length > 0) {
-                // Look for the first feature with a URL
-                for (const feature of features) {
-                    const url = feature.properties.URL;
-                    if (url && url.trim() !== '') {
-                        // Open URL in new tab
-                        window.open(url, '_blank');
-                        console.log('Opening URL:', url);
-                        break; // Only open the first URL found
-                    }
-                }
+            return;
+        }
+
+        const features = map.queryRenderedFeatures(e.point);
+        for (const feature of features) {
+            if (feature.layer.metadata && feature.layer.metadata.conversations_enabled) {
+                showConversationPopup(e.lngLat, feature);
+                return;
             }
-            
-            console.log('No modifier key pressed, checked for features with URLs');
+            const url = feature.properties.URL;
+            if (url && url.trim() !== '') {
+                window.open(url, '_blank');
+                return;
+            }
         }
     });
+
+    function parseConversations(val) {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        try { return JSON.parse(val); } catch(e) { return []; }
+    }
+
+    function renderConversationList(convos) {
+        if (!convos.length) return '<p style="color:#888;font-size:0.85em;margin:4px 0">No comments yet.</p>';
+        return convos.map(c => {
+            const ts = c.ts ? new Date(c.ts).toLocaleString() : '';
+            return `<div style="border-bottom:1px solid #eee;padding:6px 0;font-size:0.85em">
+                <strong>${c.author || 'Anonymous'}</strong> <span style="color:#888">${ts}</span>
+                <div>${c.text}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function showConversationPopup(lngLat, feature) {
+        const layerSource = feature.layer.source;
+        const imageUrl = feature.properties.URL || '';
+        const convos = parseConversations(feature.properties.conversations);
+
+        const imageHtml = imageUrl
+            ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" style="max-width:100%;max-height:120px;object-fit:cover;display:block;margin-bottom:8px"></a>`
+            : '';
+
+        const popupContent = `
+            <div style="width:260px;font-family:sans-serif">
+                ${imageHtml}
+                <div id="conv-list" style="max-height:200px;overflow-y:auto;margin-bottom:8px">
+                    ${renderConversationList(convos)}
+                </div>
+                <div style="border-top:1px solid #ddd;padding-top:8px">
+                    <textarea id="conv-text" placeholder="Add a comment..." style="width:100%;box-sizing:border-box;height:60px;resize:vertical;font-size:0.85em"></textarea>
+                    <input id="conv-author" placeholder="Your name" style="width:100%;box-sizing:border-box;margin-top:4px;font-size:0.85em">
+                    <button id="conv-submit" style="margin-top:6px;padding:4px 12px;cursor:pointer">Submit</button>
+                    <span id="conv-status" style="font-size:0.8em;margin-left:8px;color:#666"></span>
+                </div>
+            </div>`;
+
+        const popup = new maplibregl.Popup({ maxWidth: '300px' })
+            .setLngLat(lngLat)
+            .setHTML(popupContent)
+            .addTo(map);
+
+        popup.getElement().querySelector('#conv-submit').addEventListener('click', async () => {
+            const text = popup.getElement().querySelector('#conv-text').value.trim();
+            const author = popup.getElement().querySelector('#conv-author').value.trim();
+            const status = popup.getElement().querySelector('#conv-status');
+            if (!text) { status.textContent = 'Please enter a comment.'; return; }
+
+            status.textContent = 'Saving...';
+            try {
+                const resp = await fetch(`${API_URL}/comment/${SWALENAME}/${layerSource}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text,
+                        author: author || 'Anonymous',
+                        geometry: feature.geometry,
+                        existing_conversations: convos
+                    })
+                });
+                if (!resp.ok) throw new Error(await resp.text());
+                const data = await resp.json();
+                popup.getElement().querySelector('#conv-list').innerHTML =
+                    renderConversationList(data.conversations);
+                popup.getElement().querySelector('#conv-text').value = '';
+                popup.getElement().querySelector('#conv-author').value = '';
+                status.textContent = '';
+            } catch(err) {
+                status.textContent = 'Error saving comment.';
+                console.error(err);
+            }
+        });
+    }
 
     // Mobile long-press for location sharing
     let longPressTimer = null;
