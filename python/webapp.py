@@ -1013,11 +1013,16 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
 
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
 
-        # Parse body for layer override and editable field values
-        default_layer_cfg = next(
-            (l for l in ac["dataswale"]["layers"] if l["name"] == default_layer), {}
+        # Pre-scan body: if the first non-empty line names a layer, use that
+        # layer's editable_columns; otherwise fall back to the default layer's.
+        layer_set_lower = {n.lower() for n in layer_names}
+        body_lines = [l.strip() for l in payload.body_text.splitlines() if l.strip()]
+        prescan_layer = body_lines[0].lower() if body_lines and body_lines[0].lower() in layer_set_lower else None
+        editable_columns_source = prescan_layer or default_layer
+        editable_layer_cfg = next(
+            (l for l in ac["dataswale"]["layers"] if l["name"] == editable_columns_source), {}
         )
-        editable_columns = default_layer_cfg.get("editable_columns", [])
+        editable_columns = editable_layer_cfg.get("editable_columns", [])
         body = email_inlet.parse_body(payload.body_text, layer_names, editable_columns)
 
         # Layer resolution: body > config default
