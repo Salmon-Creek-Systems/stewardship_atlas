@@ -288,8 +288,7 @@ map.on('load', async () => {
                     body: JSON.stringify({
                         text,
                         author: author || 'Anonymous',
-                        geometry: feature.geometry,
-                        existing_conversations: convos
+                        geometry: feature.geometry
                     })
                 });
                 if (!resp.ok) throw new Error(await resp.text());

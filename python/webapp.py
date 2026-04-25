@@ -94,7 +94,6 @@ class CommentPayload(BaseModel):
     text: str
     author: str
     geometry: Dict[str, Any]
-    existing_conversations: list = []
 
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
@@ -397,30 +396,38 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
 
+        layer_path = versioning.atlas_path(ac, "layers") / layer_name / f"{layer_name}.geojson"
+        fc = json.load(open(layer_path))
+
+        target_coords = payload.geometry.get("coordinates")
+        target = next(
+            (f for f in fc["features"] if f["geometry"].get("coordinates") == target_coords),
+            None
+        )
+        if target is None:
+            raise HTTPException(status_code=404, detail="Feature not found by coordinates")
+
+        existing = target["properties"].get("conversations", [])
+        if isinstance(existing, str):
+            try:
+                existing = json.loads(existing)
+            except Exception:
+                existing = []
+
         new_comment = {
             "text": payload.text,
             "author": payload.author,
             "ts": datetime.utcnow().isoformat() + "Z"
         }
-        updated_conversations = list(payload.existing_conversations) + [new_comment]
+        updated = list(existing) + [new_comment]
+        target["properties"]["conversations"] = json.dumps(updated)
 
-        delta_fc = {
-            "type": "FeatureCollection",
-            "layer": layer_name,
-            "action": "annotate",
-            "features": [{
-                "type": "Feature",
-                "geometry": payload.geometry,
-                "properties": {"conversations": json.dumps(updated_conversations)}
-            }]
-        }
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "annotate")
-        with open(delta_path, "w") as f:
-            json.dump(delta_fc, f)
+        with open(layer_path, "w") as f:
+            json.dump(fc, f)
 
-        dataswale_geojson.refresh_vector_layer(ac, layer_name)
-
-        return {"status": "success", "conversations": updated_conversations}
+        return {"status": "success", "conversations": updated}
+    except HTTPException:
+        raise
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(f"ERROR in add_comment: {e}\n{traceback_str}")
