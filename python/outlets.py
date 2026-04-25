@@ -138,6 +138,28 @@ def webmap_json(config, name, sprite_json=None):
 
         map_layers.append(map_layer)
 
+        if layer.get('conversations_enabled'):
+            conv_indicator = {
+                'id': f"{layer_name}-conversations-indicator",
+                'type': 'symbol',
+                'source': layer_name,
+                'filter': ['all',
+                    ['has', 'conversations'],
+                    ['>', ['length', ['coalesce', ['get', 'conversations'], '']], 2]
+                ],
+                'layout': {
+                    'text-field': '💬',
+                    'text-size': 14,
+                    'text-offset': [1.2, -1.2],
+                    'text-anchor': 'center',
+                    'text-allow-overlap': True,
+                },
+                'metadata': {'legend': {'hidden': True}}
+            }
+            if vis := layer.get('vis'):
+                conv_indicator |= vis
+            map_layers.append(conv_indicator)
+
         # Maybe add label/icon layer:
         if layer.get('add_labels', False):            
             label_layer = {
