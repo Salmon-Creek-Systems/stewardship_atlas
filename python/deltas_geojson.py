@@ -271,6 +271,27 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
                 anno_in_path=filepath,
                 anno_type= "deltas")
 
+        # ID-based property update — finds features by atlas_id, no spatial join needed
+        elif action == "match":
+            with open(layer_filepath, mode="rt") as infile:
+                layer = geojson.load(infile)
+            with open(filepath, mode="rt") as infile:
+                delta = geojson.load(infile)
+            delta_by_id = {
+                f['properties']['atlas_id']: f
+                for f in delta['features']
+                if f.get('properties', {}).get('atlas_id')
+            }
+            for feature in layer['features']:
+                fid = feature.get('properties', {}).get('atlas_id')
+                if fid in delta_by_id:
+                    for k, v in delta_by_id[fid]['properties'].items():
+                        if k != 'atlas_id' and v is not None:
+                            feature.setdefault('properties', {})[k] = v
+            with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
+                geojson.dump(FeatureCollection(features=layer['features']), outfile)
+            filepath.rename(filepath.parent / 'work' / filepath.name)
+
         # This is a Delta containing a drawn polygon — remove all layer features it intersects
         elif action == "delete":
             _apply_delete_delta(layer_filepath, filepath)

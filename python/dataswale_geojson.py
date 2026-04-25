@@ -1,6 +1,7 @@
 import geojson
 import logging, json
 import shutil
+import uuid
 from typing import Iterator, Dict, Any, List, Tuple
 import eddies
 import deltas_geojson as deltas
@@ -135,6 +136,8 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
         elif feature['geometry']['type'] in ['LineString', 'Polygon', 'MultiLineString'] and len(feature['geometry']['coordinates'][0]) < 2:
             logger.warning(f"Feature {feature} has insufficient  coordinates")
         else:
+            if not feature.get('properties', {}).get('atlas_id'):
+                feature.setdefault('properties', {})['atlas_id'] = str(uuid.uuid4())
             new_features.append(feature)
     fc['features'] = new_features
     # Add webmap URLs to each feature

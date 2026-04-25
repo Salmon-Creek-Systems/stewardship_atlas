@@ -279,6 +279,7 @@ map.on('load', async () => {
             const author = popup.getElement().querySelector('#conv-author').value.trim();
             const status = popup.getElement().querySelector('#conv-status');
             if (!text) { status.textContent = 'Please enter a comment.'; return; }
+            if (!feature.properties.atlas_id) { status.textContent = 'This feature has no ID yet — try refreshing the map.'; return; }
 
             status.textContent = 'Saving...';
             try {
@@ -288,7 +289,8 @@ map.on('load', async () => {
                     body: JSON.stringify({
                         text,
                         author: author || 'Anonymous',
-                        geometry: feature.geometry
+                        atlas_id: feature.properties.atlas_id,
+                        existing_conversations: convos
                     })
                 });
                 if (!resp.ok) throw new Error(await resp.text());

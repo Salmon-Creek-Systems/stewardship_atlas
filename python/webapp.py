@@ -93,7 +93,8 @@ class MovePayload(BaseModel):
 class CommentPayload(BaseModel):
     text: str
     author: str
-    geometry: Dict[str, Any]
+    atlas_id: str
+    existing_conversations: list = []
 
 def extract_coordinates_from_url(url: str) -> tuple[float, float]:
     """Extract latitude and longitude from a Google Maps URL."""
@@ -393,25 +394,10 @@ async def move_features(payload: MovePayload, swalename: str):
 @app.post("/comment/{swalename}/{layer_name}")
 async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
     try:
-        from shapely.geometry import shape, mapping
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
 
-        # Read layer to find the feature and get authoritative conversations.
-        # Use Shapely distance to handle minor float differences from MapLibre's render round-trip.
-        layer_path = versioning.atlas_path(ac, "layers") / layer_name / f"{layer_name}.geojson"
-        fc = json.load(open(layer_path))
-        client_geom = shape(payload.geometry)
-
-        target = min(
-            fc["features"],
-            key=lambda f: client_geom.distance(shape(f["geometry"])),
-            default=None
-        )
-        if target is None or client_geom.distance(shape(target["geometry"])) > 1e-4:
-            raise HTTPException(status_code=404, detail="Feature not found by coordinates")
-
-        existing = target["properties"].get("conversations", [])
+        existing = payload.existing_conversations
         if isinstance(existing, str):
             try:
                 existing = json.loads(existing)
@@ -425,30 +411,20 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
         }
         updated = list(existing) + [new_comment]
 
-        # Build a tiny polygon around the stored coordinates so ST_Intersects
-        # matches exactly — same pattern as webedit annotate deltas.
-        stored_geom = shape(target["geometry"])
-        d = 1e-5  # ~1m buffer
-        lng, lat = stored_geom.x, stored_geom.y
-        delta_polygon = {
-            "type": "Polygon",
-            "coordinates": [[
-                [lng - d, lat - d], [lng + d, lat - d],
-                [lng + d, lat + d], [lng - d, lat + d],
-                [lng - d, lat - d]
-            ]]
-        }
         delta_fc = {
             "type": "FeatureCollection",
             "layer": layer_name,
-            "action": "annotate",
+            "action": "match",
             "features": [{
                 "type": "Feature",
-                "geometry": delta_polygon,
-                "properties": {"conversations": json.dumps(updated)}
+                "geometry": None,
+                "properties": {
+                    "atlas_id": payload.atlas_id,
+                    "conversations": json.dumps(updated)
+                }
             }]
         }
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "annotate")
+        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "match")
         with open(delta_path, "w") as f:
             json.dump(delta_fc, f)
 
