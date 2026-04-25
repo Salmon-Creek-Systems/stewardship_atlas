@@ -1,0 +1,163 @@
+{
+    "public_roads": {
+        "type": "inlet",
+        "out_layer": "roads",
+        "config_def": "overture_roads"
+    },
+    "public_creeks": {
+        "type": "inlet",
+        "out_layer": "creeks",
+        "config_def": "nhd_creeks"
+    },
+    "public_landmarks": {
+        "type": "inlet",
+        "out_layer": "landmarks",
+        "config_def": "osm_poi"
+    },
+    "roads_h3": {
+        "type": "eddy",
+        "config_def": "h3_cells",
+        "in_layer": "roads",
+        "out_layer": "roads_index",
+        "starting_resolution": 11
+    },
+    "creeks_h3": {
+        "type": "eddy",
+        "config_def": "h3_cells",
+        "in_layer": "creeks",
+        "out_layer": "creeks_index",
+        "starting_resolution": 11,
+        "max_cells": 100
+    },
+    "terrain_dem": {
+        "type": "inlet",
+        "out_layer": "terrain_dem",
+        "config_def": "terrain_dem"
+    },
+    "derived_hillshade": {
+        "type": "eddy",
+        "in_layer": "terrain_dem",
+        "out_layer": "basemap",
+        "config_def": "derived_hillshade"
+    },
+    "terrain_rgb_tiles": {
+        "type": "eddy",
+        "in_layer": "terrain_dem",
+        "out_layer": "terrain_rgb_tiles",
+        "config_def": "terrain_rgb_tiles"
+    },
+    "hillshade_tiles": {
+        "type": "eddy",
+        "in_layer": "basemap",
+        "out_layer": "hillshade_tiles",
+        "config_def": "hillshade_tiles"
+    },
+    "3dview": {
+        "type": "outlet",
+        "name": "3dview",
+        "config_def": "3dview",
+        "access": [
+            "public",
+            "internal",
+            "admin"
+        ]
+    },
+    "canopy_density": {
+        "type": "inlet",
+        "out_layer": "canopy_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/canopy_density_2m.tif"
+    },
+    "ladder_fuel_density": {
+        "type": "inlet",
+        "out_layer": "ladder_fuel_density",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/ladder_fuel_density_2m.tif"
+    },
+    "inaturalist": {
+        "type": "inlet",
+        "out_layer": "inaturalist",
+        "config_def": "s3_geojson_inlet",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/INaturalist_export.geojson"
+    },
+    "webmap": {
+        "type": "outlet",
+        "name": "webmap",
+        "in_layers": [
+            "regions",
+            "roads",
+            "creeks",
+            "landmarks",
+            "inaturalist",
+            "landfire_evc",
+            "landfire_evt",
+            "canopy_density",
+            "ladder_fuel_density",
+            "roads_index",
+            "creeks_index",
+            "processing_sites_index",
+            "photos"
+        ],
+        "config_def": "webmap",
+        "access": [
+            "public",
+            "internal",
+            "admin"
+        ]
+    },
+    "webedit": {
+        "type": "outlet",
+        "name": "webedit",
+        "in_layers": [
+            "regions",
+            "roads",
+            "creeks",
+            "landmarks",
+            "photos"
+        ],
+        "config_def": "webedit"
+    },
+    "html": {
+        "type": "outlet",
+        "name": "html",
+        "config_def": "static_html"
+    },
+    "notebook": {
+        "type": "outlet",
+        "name": "notebook",
+        "config_def": "jupyter_notebook",
+        "access": [
+            "technical"
+        ]
+    },
+    "sqldb": {
+        "type": "outlet",
+        "config_def": "sqldb",
+        "layers": [
+            "roads",
+            "creeks",
+            "burns",
+            "photos"
+        ]
+    },
+    "sqlquery": {
+        "type": "outlet",
+        "name": "sqlquery",
+        "config_def": "sqlquery",
+        "access": [
+            "admin"
+        ]
+    },
+    "config_edit": {
+        "type": "outlet",
+        "name": "config_edit",
+        "access": [
+            "technical"
+        ],
+        "interaction": "interface",
+        "config_def": "config_editor"
+    }
+}

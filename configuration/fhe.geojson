@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.531286005,
+              39.631881338
+            ],
+            [
+              -123.468261099,
+              39.631881338
+            ],
+            [
+              -123.468261099,
+              39.692989591
+            ],
+            [
+              -123.531286005,
+              39.692989591
+            ],
+            [
+              -123.531286005,
+              39.631881338
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "fhe",
+        "description": "Foreest Health Extravaganza",
+        "app_url": "https://fireatlas.org:9000",
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "default_h3_resolution": 10,
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "layers_path": "/root/swales_dev/app/configuration/fhe_layers.json",
+        "assets_path": "/root/swales_dev/app/configuration/fhe_assets.json",
+        "base_url": "https://fireatlas.org/fhe",
+        "port": 9000,
+        "admin_emails": [],
+        "logo_url": ""
+      }
+    }
+  ]
+}

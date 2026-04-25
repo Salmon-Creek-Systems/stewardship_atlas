@@ -448,7 +448,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-438886543302-us-east-1",
-     "S3Key": "407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3.zip"
+     "S3Key": "80033e272623b647fa928f932192b5bd94516207a1be2db0952929213e99c137.zip"
     },
     "Environment": {
      "Variables": {
@@ -473,7 +473,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "AtlasEmailPhotoStack/EmailPhotoHandler/Resource",
-    "aws:asset:path": "asset.407621e2ac0f726d3432621508d121c9420d4ccc7b813170be96fb8efa6f24b3",
+    "aws:asset:path": "asset.80033e272623b647fa928f932192b5bd94516207a1be2db0952929213e99c137",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }

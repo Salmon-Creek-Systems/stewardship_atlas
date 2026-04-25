@@ -17,7 +17,11 @@
     },
     "gdal_contours": {
         "name": "gdal_contours",
-        "color": [2, 219, 9],
+        "color": [
+            2,
+            219,
+            9
+        ],
         "interval": 50,
         "vector_width": 2,
         "asset_type": "eddy",
@@ -26,9 +30,17 @@
         "data_type": "geojson",
         "add_labels": false,
         "alterations": {
-            "vector_width": {"default": 5},
+            "vector_width": {
+                "default": 5
+            },
             "label_attribute": "elevation",
-            "canonicalize": [{"to": "name", "from": "elevation", "default": ""}]
+            "canonicalize": [
+                {
+                    "to": "name",
+                    "from": "elevation",
+                    "default": ""
+                }
+            ]
         },
         "attribution": {
             "url": "https://www.scvfd.fireatlas.org",
@@ -76,7 +88,7 @@
     "processing_sites_h3": {
         "type": "eddy",
         "fetch_type": "h3_cells",
-        "in_layer": "processing_sites",
+        "in_layer": "photos",
         "out_layer": "processing_sites_index",
         "starting_resolution": 8,
         "algorithm": "max_num_cells",
@@ -104,8 +116,13 @@
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",
-        "in_layers": ["burns_index", "roads_index", "creeks_index", "processing_sites_index"],
-        "out_layer": "processing_sites",
+        "in_layers": [
+            "burns_index",
+            "roads_index",
+            "creeks_index",
+            "processing_sites_index"
+        ],
+        "out_layer": "photos",
         "treatments_file": "configuration/treatments/default_treatments.json",
         "biomass_price": 0.001,
         "biochar_price": 0.01
