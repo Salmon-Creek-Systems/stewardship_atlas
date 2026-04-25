@@ -393,18 +393,22 @@ async def move_features(payload: MovePayload, swalename: str):
 @app.post("/comment/{swalename}/{layer_name}")
 async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
     try:
+        from shapely.geometry import shape, mapping
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
 
+        # Read layer to find the feature and get authoritative conversations.
+        # Use Shapely distance to handle minor float differences from MapLibre's render round-trip.
         layer_path = versioning.atlas_path(ac, "layers") / layer_name / f"{layer_name}.geojson"
         fc = json.load(open(layer_path))
+        client_geom = shape(payload.geometry)
 
-        target_coords = payload.geometry.get("coordinates")
-        target = next(
-            (f for f in fc["features"] if f["geometry"].get("coordinates") == target_coords),
-            None
+        target = min(
+            fc["features"],
+            key=lambda f: client_geom.distance(shape(f["geometry"])),
+            default=None
         )
-        if target is None:
+        if target is None or client_geom.distance(shape(target["geometry"])) > 1e-4:
             raise HTTPException(status_code=404, detail="Feature not found by coordinates")
 
         existing = target["properties"].get("conversations", [])
@@ -420,10 +424,35 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
             "ts": datetime.utcnow().isoformat() + "Z"
         }
         updated = list(existing) + [new_comment]
-        target["properties"]["conversations"] = json.dumps(updated)
 
-        with open(layer_path, "w") as f:
-            json.dump(fc, f)
+        # Build a tiny polygon around the stored coordinates so ST_Intersects
+        # matches exactly — same pattern as webedit annotate deltas.
+        stored_geom = shape(target["geometry"])
+        d = 1e-5  # ~1m buffer
+        lng, lat = stored_geom.x, stored_geom.y
+        delta_polygon = {
+            "type": "Polygon",
+            "coordinates": [[
+                [lng - d, lat - d], [lng + d, lat - d],
+                [lng + d, lat + d], [lng - d, lat + d],
+                [lng - d, lat - d]
+            ]]
+        }
+        delta_fc = {
+            "type": "FeatureCollection",
+            "layer": layer_name,
+            "action": "annotate",
+            "features": [{
+                "type": "Feature",
+                "geometry": delta_polygon,
+                "properties": {"conversations": json.dumps(updated)}
+            }]
+        }
+        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "annotate")
+        with open(delta_path, "w") as f:
+            json.dump(delta_fc, f)
+
+        dataswale_geojson.refresh_vector_layer(ac, layer_name)
 
         return {"status": "success", "conversations": updated}
     except HTTPException:
