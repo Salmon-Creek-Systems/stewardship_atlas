@@ -116,7 +116,8 @@
             "hydrants",
             "watertanks",
             "poi",
-            "lpss"
+            "lpss",
+            "hazards"
         ],
         "hidden_layers": ["lpss"],
         "config_def": "webmap",
@@ -140,7 +141,8 @@
             "watertanks",
             "poi",
             "lpss",
-            "photos"
+            "photos",
+            "hazards"
         ],
         "hidden_layers": ["lpss"],
         "config_def": "webmap",
@@ -171,7 +173,8 @@
             "poi",
             "ponds",
             "watertanks",
-            "photos"
+            "photos",
+            "hazards"
         ],
         "config_def": "webedit"
     },
