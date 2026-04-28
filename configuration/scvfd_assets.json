@@ -142,6 +142,7 @@
             "poi",
             "lpss",
             "photos",
+            "private_notes",
             "hazards"
         ],
         "hidden_layers": ["lpss"],
@@ -174,6 +175,7 @@
             "ponds",
             "watertanks",
             "photos",
+            "private_notes",
             "hazards"
         ],
         "config_def": "webedit"
