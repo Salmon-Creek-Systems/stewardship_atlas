@@ -417,7 +417,7 @@ def webmap_json(config, name, sprite_json=None):
   
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets}
 
-def generate_map_page(config, title, map_config_data, output_path, sprite_json=None):
+def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     source_root = versioning.atlas_path(config, version='app') 
@@ -490,6 +490,24 @@ void await map.loadImage('{im_uri}',
     basemap_is_raster = bool(webmap_in_layers) and layers_dict.get(webmap_in_layers[0], {}).get('geometry_type') == 'raster'
     lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if basemap_is_raster else ''
 
+    # Generate QR code if a page URL was supplied
+    qr_code_html = ''
+    if page_url:
+        try:
+            import qrcode
+            import io
+            import base64
+            qr = qrcode.QRCode(version=None, box_size=2, border=2)
+            qr.add_data(page_url)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color='black', back_color='white')
+            buf = io.BytesIO()
+            qr_img.save(buf, format='PNG')
+            b64 = base64.b64encode(buf.getvalue()).decode()
+            qr_code_html = f'<img src="data:image/png;base64,{b64}" class="title-qr" alt="QR code" title="{page_url}">'
+        except ImportError:
+            logger.warning('qrcode package not installed; skipping QR code generation')
+
     processed_template = template.format(
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
@@ -498,7 +516,8 @@ void await map.loadImage('{im_uri}',
             webmap_help=help_html,
             app_url=app_url,
             swalename=config.get('name', ''),
-            lidar_basemap_option=lidar_basemap_option)
+            lidar_basemap_option=lidar_basemap_option,
+            qr_code=qr_code_html)
 
     with open(output_path, 'w') as f_out:
       f_out.write(processed_template)
@@ -693,7 +712,8 @@ def outlet_webmap(config, name):
     
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
-    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json)  
+    page_url = f"{config['base_url']}/staging/outlets/{name}/"
+    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json, page_url=page_url)
   
     return output_path
 
