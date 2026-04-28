@@ -118,6 +118,7 @@
             "poi",
             "lpss"
         ],
+        "hidden_layers": ["lpss"],
         "config_def": "webmap",
         "access": [
             "public",
@@ -141,6 +142,7 @@
             "lpss",
             "photos"
         ],
+        "hidden_layers": ["lpss"],
         "config_def": "webmap",
         "access": [
             "admin",

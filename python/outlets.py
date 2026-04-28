@@ -323,9 +323,16 @@ def webmap_json(config, name, sprite_json=None):
                         label_layer.setdefault('metadata', {})['conversations_enabled'] = True
                     dynamic_layers.append(label_layer)
     
+    # Apply hidden_layers: start with visibility off but remain accessible in legend
+    hidden_layers_set = set(outlet_config.get('hidden_layers', []))
+    if hidden_layers_set:
+        for ml in map_layers:
+            if ml.get('source') in hidden_layers_set:
+                ml.setdefault('layout', {})['visibility'] = 'none'
+
     map_config['style']['sources'] = map_sources
     map_config['style']['layers'] = map_layers
-    
+
     # Build legend targets for grouped visibility
     legend_targets = {}
     
