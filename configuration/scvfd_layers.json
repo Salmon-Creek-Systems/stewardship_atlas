@@ -382,7 +382,7 @@
             "png": "camera.png",
             "icon": "camera"
         },
-        "icon-size": 2.0,
+        "icon-size": 1.0,
         "access": [
             "admin"
         ],
@@ -414,7 +414,7 @@
             "png": "eye.png",
             "icon": "eye"
         },
-        "icon-size": 2.0,
+        "icon-size": 1.0,
         "access": [
             "admin"
         ],
@@ -446,7 +446,7 @@
             "png": "incident.png",
             "icon": "basic/pushpin"
         },
-        "icon-size": 2.0,
+        "icon-size": 1.0,
         "access": [
             "public",
             "internal",
