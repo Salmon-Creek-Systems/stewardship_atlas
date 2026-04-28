@@ -115,5 +115,19 @@
         const LEGEND_TARGETS = {legend_targets};
     </script>
     <script src="js/webmap.js"></script>
+    <script>
+        (function() {{
+            var toggle = document.getElementById('qr-toggle');
+            var popup  = document.getElementById('qr-popup');
+            if (!toggle) return;
+            toggle.addEventListener('click', function(e) {{
+                e.stopPropagation();
+                popup.classList.toggle('visible');
+            }});
+            document.addEventListener('click', function() {{
+                popup.classList.remove('visible');
+            }});
+        }})();
+    </script>
 </body>
 </html>

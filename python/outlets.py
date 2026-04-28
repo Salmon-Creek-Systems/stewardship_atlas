@@ -504,7 +504,12 @@ void await map.loadImage('{im_uri}',
             buf = io.BytesIO()
             qr_img.save(buf, format='PNG')
             b64 = base64.b64encode(buf.getvalue()).decode()
-            qr_code_html = f'<img src="data:image/png;base64,{b64}" class="title-qr" alt="QR code" title="{page_url}">'
+            qr_code_html = (
+                f'<button class="qr-toggle" id="qr-toggle">(QR)</button>'
+                f'<div class="qr-popup" id="qr-popup">'
+                f'<img src="data:image/png;base64,{b64}" alt="QR code" title="{page_url}">'
+                f'</div>'
+            )
         except ImportError:
             logger.warning('qrcode package not installed; skipping QR code generation')
 
