@@ -221,6 +221,10 @@ map.on('load', async () => {
                 showConversationPopup(e.lngLat, feature);
                 return;
             }
+            if (feature.layer.metadata && feature.layer.metadata.show_attributes) {
+                showAttributesPopup(e.lngLat, feature);
+                return;
+            }
             const url = feature.properties.URL;
             if (url && url.trim() !== '') {
                 window.open(url, '_blank');
@@ -305,6 +309,49 @@ map.on('load', async () => {
                 console.error(err);
             }
         });
+    }
+
+    function showAttributesPopup(lngLat, feature) {
+        const meta = feature.layer.metadata || {};
+        const cols = meta.editable_columns || [];
+        const props = feature.properties;
+
+        const rawUrl = props.image_url || props.URL || '';
+        const url = rawUrl && rawUrl.trim() ? rawUrl.trim() : null;
+        let urlHtml = '';
+        if (url) {
+            const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url);
+            if (isImage) {
+                urlHtml = `<a href="${url}" target="_blank"><img src="${url}" style="max-width:100%;max-height:120px;object-fit:cover;display:block;margin-bottom:8px;border-radius:3px"></a>`;
+            } else {
+                urlHtml = `<a href="${url}" target="_blank" style="display:block;margin-bottom:8px;font-size:0.8em;word-break:break-all">${url}</a>`;
+            }
+        }
+
+        const nameHtml = props.name
+            ? `<div style="font-weight:bold;margin-bottom:6px">${props.name}</div>`
+            : '';
+
+        const attrsHtml = cols.map(col => {
+            const val = props[col];
+            const display = (val !== null && val !== undefined && val !== '') ? val : '<span style="color:#bbb">—</span>';
+            return `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:0.85em">
+                <span style="color:#888;min-width:70px;flex-shrink:0">${col}</span>
+                <span>${display}</span>
+            </div>`;
+        }).join('');
+
+        const popupContent = `
+            <div style="width:220px;font-family:sans-serif;padding:2px">
+                ${urlHtml}
+                ${nameHtml}
+                ${attrsHtml || '<span style="color:#aaa;font-size:0.85em">No attributes</span>'}
+            </div>`;
+
+        new maplibregl.Popup({ maxWidth: '260px' })
+            .setLngLat(lngLat)
+            .setHTML(popupContent)
+            .addTo(map);
     }
 
     // Mobile long-press for location sharing

@@ -176,6 +176,7 @@
             "icon": "custom/octy"
         },
         "icon-size": 1.0,
+        "show_attributes": true,
         "interaction": "interface",
         "editable_columns": [
             {

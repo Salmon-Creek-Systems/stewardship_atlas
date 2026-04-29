@@ -136,6 +136,11 @@ def webmap_json(config, name, sprite_json=None):
         if layer.get('conversations_enabled'):
             map_layer.setdefault('metadata', {})['conversations_enabled'] = True
 
+        if layer.get('show_attributes'):
+            meta = map_layer.setdefault('metadata', {})
+            meta['show_attributes'] = True
+            meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+
         map_layers.append(map_layer)
 
         if layer.get('conversations_enabled'):
@@ -248,6 +253,10 @@ def webmap_json(config, name, sprite_json=None):
                     label_layer['filter'] = ['==', ['get', 'show_label'], True]
                 if layer.get('conversations_enabled'):
                     label_layer.setdefault('metadata', {})['conversations_enabled'] = True
+                if layer.get('show_attributes'):
+                    meta = label_layer.setdefault('metadata', {})
+                    meta['show_attributes'] = True
+                    meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -316,11 +325,19 @@ def webmap_json(config, name, sprite_json=None):
 
                     if layer.get('conversations_enabled'):
                         label_layer.setdefault('metadata', {})['conversations_enabled'] = True
+                    if layer.get('show_attributes'):
+                        meta = label_layer.setdefault('metadata', {})
+                        meta['show_attributes'] = True
+                        meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
                     map_layers.append(label_layer)
                 else:
                     # Keep as dynamic layer for loadImage approach
                     if layer.get('conversations_enabled'):
                         label_layer.setdefault('metadata', {})['conversations_enabled'] = True
+                    if layer.get('show_attributes'):
+                        meta = label_layer.setdefault('metadata', {})
+                        meta['show_attributes'] = True
+                        meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
                     dynamic_layers.append(label_layer)
     
     # Apply hidden_layers: start with visibility off but remain accessible in legend
