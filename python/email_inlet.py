@@ -58,7 +58,14 @@ def parse_body(body_text: str, layer_names: list, editable_columns: list) -> dic
                     sep_pos = pos
 
             if sep_pos == -1:
-                # No separator — check if first non-empty line matches a layer name
+                # No : or = — try whitespace split if left token is a known column name
+                parts = line.split(None, 1)
+                if len(parts) == 2 and parts[0].lower() in col_names:
+                    key = parts[0].lower()
+                    props[col_names[key]] = parts[1]
+                    first_line_checked = True
+                    continue
+                # Otherwise check if first non-empty line matches a layer name
                 if not first_line_checked and line.lower() in layer_set:
                     layer = line.lower()
                 first_line_checked = True
