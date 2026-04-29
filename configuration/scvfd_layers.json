@@ -179,30 +179,19 @@
         "interaction": "interface",
         "editable_columns": [
             {
-                "name": "size",
-                "type": "radio",
-                "values": [
-                    {
-                        "size": "< 2.5k gals.",
-                        "capacity": 2500
-                    },
-                    {
-                        "size": "2.5k-5k gals",
-                        "capacity": 5000
-                    },
-                    {
-                        "size": "5-10k gals",
-                        "capacity": 10000
-                    },
-                    {
-                        "size": "> 10k gals",
-                        "capacity": 20000
-                    }
-                ],
-                "default": {
-                    "size": "2.5k-5k gals",
-                    "capacity": 5000
-                }
+                "name": "capacity",
+                "type": "string",
+                "default": ""
+            },
+            {
+                "name": "access",
+                "type": "string",
+                "default": "no"
+            },
+            {
+                "name": "fitting",
+                "type": "string",
+                "default": "no"
             }
         ]
     },
