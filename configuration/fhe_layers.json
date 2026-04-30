@@ -127,6 +127,7 @@
     {
         "name": "canopy_density",
         "geometry_type": "raster",
+        "cog": true,
         "vis": {
             "layout": {
                 "visibility": "none"
@@ -139,6 +140,7 @@
     {
         "name": "ladder_fuel_density",
         "geometry_type": "raster",
+        "cog": true,
         "vis": {
             "layout": {
                 "visibility": "none"

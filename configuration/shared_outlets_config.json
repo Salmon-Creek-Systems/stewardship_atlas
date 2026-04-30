@@ -1,4 +1,9 @@
 {
+    "s3_upload": {
+        "asset_type": "outlet",
+        "fetch_type": "s3_upload",
+        "s3_bucket": "scs-atlas-data"
+    },
     "gsheet_export": {
         "name": "sheet_export",
         "asset_type": "outlet",

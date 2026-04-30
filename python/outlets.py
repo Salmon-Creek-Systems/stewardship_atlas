@@ -63,14 +63,24 @@ def webmap_json(config, name, sprite_json=None):
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
         if layer['geometry_type'] == 'raster':
-            layer_dir = versioning.atlas_path(config, "layers") / layer_name
-            raster_filename = (f"{layer_name}.tiff.png"
-                               if (layer_dir / f"{layer_name}.tiff.png").exists()
-                               else f"{layer_name}.tiff.jpg")
-            map_sources[layer_name] = {
-                'type': 'image',
-                'url': f"../../layers/{layer_name}/{raster_filename}",
-                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
+            if layer.get('cog'):
+                s3_bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
+                cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
+                           f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+                map_sources[layer_name] = {
+                    'type': 'raster',
+                    'url': f"cog://{cog_url}",
+                    'tileSize': 256,
+                }
+            else:
+                layer_dir = versioning.atlas_path(config, "layers") / layer_name
+                raster_filename = (f"{layer_name}.tiff.png"
+                                   if (layer_dir / f"{layer_name}.tiff.png").exists()
+                                   else f"{layer_name}.tiff.jpg")
+                map_sources[layer_name] = {
+                    'type': 'image',
+                    'url': f"../../layers/{layer_name}/{raster_filename}",
+                    'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
             #map_sources[layer_name] =  {
@@ -712,6 +722,9 @@ def outlet_webmap(config, name):
     for layer_name in config['assets'][name]['in_layers']:
         layer_def = layers_dict.get(layer_name, {})
         if layer_def.get('geometry_type') == 'raster':
+            if layer_def.get('cog'):
+                logger.info(f"Skipping TIFF->image conversion for COG layer: {layer_name}")
+                continue
             layer_dir = versioning.atlas_path(config, "layers") / layer_name
             tiff_path = layer_dir / f"{layer_name}.tiff"
             png_path = layer_dir / f"{layer_name}.tiff.png"
@@ -2955,6 +2968,42 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
                   
     return statefile_path
 
+def s3_upload(config: Dict[str, Any], outlet_name: str) -> Path:
+    """Upload a layer's COG to S3 for public delivery.
+
+    Uploads the .cog.tif produced by the tiff_to_cog eddy to S3 with public-read
+    access, enabling webmap (maplibre-cog-protocol) and QGIS (/vsicurl/) delivery.
+
+    Config keys:
+        in_layer:   layer whose .cog.tif to upload
+        s3_bucket:  destination bucket (default: scs-atlas-data)
+    """
+    import boto3
+
+    outlet_config = config['assets'][outlet_name]['config']
+    in_layer = outlet_config['in_layer']
+    s3_bucket = outlet_config.get('s3_bucket', 'scs-atlas-data')
+    atlas_name = config['name']
+
+    cog_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.cog.tif'
+    if not cog_path.exists():
+        raise FileNotFoundError(
+            f"COG not found at {cog_path} — run tiff_to_cog eddy first"
+        )
+
+    s3_key = f"{atlas_name}/rasters/{in_layer}/{in_layer}.cog.tif"
+    logger.info(f"s3_upload: {cog_path} -> s3://{s3_bucket}/{s3_key}")
+
+    boto3.client('s3').upload_file(
+        str(cog_path), s3_bucket, s3_key,
+        ExtraArgs={'ContentType': 'image/tiff', 'ACL': 'public-read'}
+    )
+
+    s3_url = f"https://{s3_bucket}.s3.us-west-1.amazonaws.com/{s3_key}"
+    logger.info(f"s3_upload complete: {s3_url}")
+    return cog_path
+
+
 asset_methods = {
     #'outlet_gpkg': outlet_gpkg,
     #'tiff': outlet_tiff,
@@ -2970,4 +3019,5 @@ asset_methods = {
     'jupyter_notebook' : outlet_notebook_jupyter,
     'config_editor': outlet_config_editor,
     '3dview': outlet_3dview,
+    's3_upload': s3_upload,
 }

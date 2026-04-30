@@ -5,6 +5,7 @@
     <title>{title}</title>
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol/dist/index.js'></script>
     <link href='css/map.css' rel='stylesheet' />
     <link href='css/shared_controls.css' rel='stylesheet' />
     <link href='css/console.css' rel='stylesheet' />
@@ -72,6 +73,8 @@
     </div>
     <script src="js/shared_utils.js"></script>
     <script>
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
+
         // API URL for backend calls
         const API_URL = "{app_url}";
         const SWALENAME = "{swalename}";

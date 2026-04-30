@@ -257,12 +257,18 @@ def load_full_layer(layer_config, config):
         logger.info(f"Loaded WMS layer: {layer_name} ({wms_url})")
         return layer
     elif geometry_type == 'raster':
-        layer_format = 'tiff'
-        layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
-
-        layer = QgsRasterLayer(str(layer_path), layer_name)
+        if layer_config.get('cog'):
+            s3_bucket = layer_config.get('cog_s3_bucket', 'scs-atlas-data')
+            cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
+                       f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+            layer = QgsRasterLayer(f'/vsicurl/{cog_url}', layer_name)
+            source_desc = f"/vsicurl/{cog_url}"
+        else:
+            layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.tiff"
+            layer = QgsRasterLayer(str(layer_path), layer_name)
+            source_desc = str(layer_path)
         if not layer.isValid():
-            logger.warning(f"Failed to load raster layer: {layer_name} from {layer_path}")
+            logger.warning(f"Failed to load raster layer: {layer_name} from {source_desc}")
             return None
         logger.info(f"Loaded raster layer: {layer_name}")
         return layer
