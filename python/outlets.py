@@ -2996,7 +2996,7 @@ def s3_upload(config: Dict[str, Any], outlet_name: str) -> Path:
 
     boto3.client('s3').upload_file(
         str(cog_path), s3_bucket, s3_key,
-        ExtraArgs={'ContentType': 'image/tiff', 'ACL': 'public-read'}
+        ExtraArgs={'ContentType': 'image/tiff'}
     )
 
     s3_url = f"https://{s3_bucket}.s3.us-west-1.amazonaws.com/{s3_key}"

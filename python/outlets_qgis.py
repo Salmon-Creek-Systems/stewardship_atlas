@@ -354,10 +354,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     # Create raster marker layer
                     raster_marker = QgsRasterMarkerSymbolLayer(str(icon_path))
                     
-                    # Set size from config (icon-size, defaults to 1.0)
                     icon_size = layer_config.get('icon-size', 1.0)
-                    # Convert to mm for print output (scale factor)
-                    size_mm = icon_size * 5 * feature_scale  # Base size of 5mm scaled by icon-size and feature_scale
+                    print_icon_mm = (config or {}).get('print_icon_mm', 15)
+                    size_mm = icon_size * print_icon_mm * feature_scale
                     raster_marker.setSize(size_mm)
                     raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
                     
