@@ -296,6 +296,10 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
         results = export_atlas(layout, output_dir, config.get('name', 'atlas'), multipage_pdf=multipage_pdf)
         # generate index
 
+        if outlet_config.get('grid_layers'):
+            logger.info("Generating simplified grid thumbnails...")
+            _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate)
+
         logger.info(f"Atlas PDF generation complete: {results}")
         #return results
 
@@ -962,6 +966,95 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     
     logger.info(f"Atlas export complete: {page_num} pages")
     return results
+
+
+def _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate=[]):
+    """
+    Second render pass producing simplified PNG thumbnails for the grid index.
+
+    Loads only the layers listed in outlet_config['grid_layers'] at
+    outlet_config['grid_feature_scale'], renders a square full-page atlas (no
+    collar), and overwrites individual_pages/{safe_name}.png with the cleaner images.
+    """
+    grid_layers_list = outlet_config.get('grid_layers', [])
+    grid_feature_scale = outlet_config.get('grid_feature_scale', 3.0)
+    thumbnail_dpi = outlet_config.get('thumbnail_dpi', 72)
+
+    logger.info(f"Simplified thumbnails: layers={grid_layers_list}, scale={grid_feature_scale}")
+
+    project = QgsProject.instance()
+    project.clear()
+
+    layers_config = {x['name']: x for x in config['dataswale']['layers']}
+    for layer_name in grid_layers_list:
+        if layer_name not in layers_config:
+            logger.warning(f"grid_layers: {layer_name} not in layer config, skipping")
+            continue
+        layer = outlets_qgis.load_full_layer(layers_config[layer_name], config)
+        if layer is None:
+            logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
+            continue
+        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_feature_scale)
+        project.addMapLayer(layer)
+        logger.info(f"  ✓ grid layer loaded: {layer_name}")
+
+    regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
+    if not regions_layer.isValid():
+        logger.error(f"Simplified thumbnails: failed to load regions from {regions_path}")
+        return
+    if only_generate:
+        escaped = [n.replace("'", "''") for n in only_generate]
+        quoted = "', '".join(escaped)
+        regions_layer.setSubsetString(f'"name" IN (\'{quoted}\')')
+    project.addMapLayer(regions_layer, False)
+
+    # Minimal square layout — full-page map item, no collar
+    layout = QgsPrintLayout(project)
+    layout.initializeDefaults()
+    page = layout.pageCollection().page(0)
+    page.setPageSize(QgsLayoutSize(200, 200, QgsUnitTypes.LayoutMillimeters))
+
+    map_item = QgsLayoutItemMap(layout)
+    map_item.attemptMove(QgsLayoutPoint(0, 0, QgsUnitTypes.LayoutMillimeters))
+    map_item.attemptResize(QgsLayoutSize(200, 200, QgsUnitTypes.LayoutMillimeters))
+    map_item.setAtlasDriven(True)
+    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
+    map_item.setAtlasMargin(0.05)
+    map_item.setKeepLayerSet(True)
+    layout.addLayoutItem(map_item)
+
+    atlas = layout.atlas()
+    atlas.setCoverageLayer(regions_layer)
+    atlas.setEnabled(True)
+    atlas.setHideCoverage(True)
+
+    exporter = QgsLayoutExporter(layout)
+    individual_dir = output_dir / "individual_pages"
+    individual_dir.mkdir(exist_ok=True)
+
+    img_settings = QgsLayoutExporter.ImageExportSettings()
+    img_settings.dpi = thumbnail_dpi
+
+    atlas.beginRender()
+    page_num = 0
+    while atlas.next():
+        page_num += 1
+        feature = atlas.layout().reportContext().feature()
+        try:
+            region_name = feature.attribute('name') or f"region_{page_num}"
+        except Exception:
+            region_name = f"region_{page_num}"
+        safe_name = utils.canonicalize_name(
+            "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
+        )
+        png_path = individual_dir / f"{safe_name}.png"
+        result = exporter.exportToImage(str(png_path), img_settings)
+        if result == QgsLayoutExporter.Success:
+            logger.info(f"  ✓ Simplified thumbnail {page_num}: {png_path.name}")
+        else:
+            logger.warning(f"  ✗ Simplified thumbnail failed for {region_name}: {get_export_error_message(result)}")
+    atlas.endRender()
+    logger.info(f"Simplified thumbnails complete: {page_num} pages")
 
 
 def get_export_error_message(error_code):

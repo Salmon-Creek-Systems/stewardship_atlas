@@ -497,16 +497,16 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             label_qcolor = QColor(lc[0], lc[1], lc[2]) if lc else None
 
             if geometry_type == 'linestring':
-                text_format.setSize(14)
+                text_format.setSize(14 * feature_scale)
                 text_format.setColor(label_qcolor if label_qcolor else QColor(255, 255, 255))
                 font = QFont()
-                font.setPointSize(14)
+                font.setPointSize(int(14 * feature_scale))
                 font.setBold(True)
             else:
-                text_format.setSize(10)
+                text_format.setSize(10 * feature_scale)
                 text_format.setColor(label_qcolor if label_qcolor else qcolor)
                 font = QFont()
-                font.setPointSize(10)
+                font.setPointSize(int(10 * feature_scale))
             
             text_format.setFont(font)
             
