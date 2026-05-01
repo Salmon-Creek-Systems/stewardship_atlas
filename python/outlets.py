@@ -2968,7 +2968,7 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
                   
     return statefile_path
 
-def s3_upload(config: Dict[str, Any], outlet_name: str) -> Path:
+def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
     """Upload a layer's COG to S3 for public delivery.
 
     Uploads the .cog.tif produced by the tiff_to_cog eddy to S3 with public-read
