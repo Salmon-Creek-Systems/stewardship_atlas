@@ -321,7 +321,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
     """
     if isinstance(layer, QgsRasterLayer):
         # Raster styling - just set opacity if configured
-        opacity = layer_config.get('opacity', 1.0)
+        opacity = layer_config.get('qgis_opacity', layer_config.get('opacity', 1.0))
         layer.setOpacity(opacity)
         return
     
