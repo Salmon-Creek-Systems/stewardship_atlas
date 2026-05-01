@@ -994,7 +994,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         if layer is None:
             logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
             continue
-        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_feature_scale)
+        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_feature_scale, line_scale=grid_feature_scale)
         project.addMapLayer(layer)
         logger.info(f"  ✓ grid layer loaded: {layer_name}")
 

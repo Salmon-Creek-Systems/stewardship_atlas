@@ -309,15 +309,16 @@ def load_full_layer(layer_config, config):
         return layer
 
 
-def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
+def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, line_scale=1.0):
     """
     Apply basic styling to a QGIS layer based on configuration.
-    
+
     Args:
         layer: QgsVectorLayer or QgsRasterLayer
         layer_config: Layer configuration dict with color, width, labels, etc.
         config: Optional atlas configuration (needed for loading custom icon PNG files)
-        feature_scale: Scale factor for feature sizes (default 1.0)
+        feature_scale: Scale factor for icon/font sizes (default 1.0)
+        line_scale: Scale factor for line widths (default 1.0)
     """
     if isinstance(layer, QgsRasterLayer):
         # Raster styling - just set opacity if configured
@@ -405,8 +406,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     if hasattr(symbol_layer, 'setWidthUnit'):
                         symbol_layer.setWidthUnit(QgsUnitTypes.RenderMapUnits)
 
-                    width_expr = f'"vector_width" * {qgis_width_scale}' if qgis_width_scale != 1.0 else '"vector_width"'
-                    logger.info(f"Using per-feature vector_width for {layer.name()} (scale={qgis_width_scale})")
+                    effective_scale = qgis_width_scale * line_scale
+                    width_expr = f'"vector_width" * {effective_scale}' if effective_scale != 1.0 else '"vector_width"'
+                    logger.info(f"Using per-feature vector_width for {layer.name()} (scale={effective_scale})")
                     symbol_layer.setDataDefinedProperty(
                         QgsSymbolLayer.PropertyStrokeWidth,
                         QgsProperty.fromExpression(width_expr)
@@ -414,12 +416,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             else:
                 logger.warning(f"Layer {layer.name()} config has 'vector_width' but features don't have that attribute")
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * 0.1 * qgis_width_scale)
+                symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
         else:
             # Use constant width from config
             width = layer_config.get('constant_width', 2)
-            symbol.setWidth(width * 0.1 * qgis_width_scale)
-            logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale})")
+            symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
+            logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale * line_scale})")
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
