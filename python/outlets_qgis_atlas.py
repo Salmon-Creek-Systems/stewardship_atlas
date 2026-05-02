@@ -298,7 +298,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
 
         if outlet_config.get('grid_layers'):
             logger.info("Generating simplified grid thumbnails...")
-            _export_simplified_thumbnails(config, outlet_config, regions_layer, output_dir, only_generate)
+            _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate)
 
         logger.info(f"Atlas PDF generation complete: {results}")
         #return results
@@ -968,16 +968,63 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     return results
 
 
-def _export_simplified_thumbnails(config, outlet_config, regions_layer, output_dir, only_generate=[]):
+def _prepare_regions_layer(regions_path, only_generate=[]):
+    """
+    Load, reproject to EPSG:3857, and square the regions layer.
+    Returns an in-memory QgsVectorLayer ready for atlas use.
+    """
+    project = QgsProject.instance()
+    regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
+    if not regions_layer.isValid():
+        raise RuntimeError(f"Failed to load regions from {regions_path}")
+
+    if only_generate:
+        escaped = [n.replace("'", "''") for n in only_generate]
+        quoted = "', '".join(escaped)
+        regions_layer.setSubsetString(f'"name" IN (\'{quoted}\')')
+
+    render_crs = QgsCoordinateReferenceSystem("EPSG:3857")
+    if regions_layer.crs() != render_crs:
+        reprojected = QgsVectorLayer(f"Polygon?crs={render_crs.authid()}", "regions_reprojected", "memory")
+        prov = reprojected.dataProvider()
+        prov.addAttributes(regions_layer.fields())
+        reprojected.updateFields()
+        transform = QgsCoordinateTransform(regions_layer.crs(), render_crs, QgsCoordinateTransformContext())
+        feats = []
+        for feat in regions_layer.getFeatures():
+            new_feat = QgsFeature(feat)
+            geom = feat.geometry()
+            geom.transform(transform)
+            new_feat.setGeometry(geom)
+            feats.append(new_feat)
+        prov.addFeatures(feats)
+        reprojected.updateExtents()
+        regions_layer = reprojected
+
+    regions_layer.startEditing()
+    for feat in regions_layer.getFeatures():
+        bbox = feat.geometry().boundingBox()
+        size = max(bbox.width(), bbox.height())
+        cx = bbox.xMinimum() + bbox.width() / 2
+        cy = bbox.yMinimum() + bbox.height() / 2
+        square = QgsGeometry.fromRect(QgsRectangle(cx - size/2, cy - size/2, cx + size/2, cy + size/2))
+        regions_layer.changeGeometry(feat.id(), square)
+    regions_layer.commitChanges()
+
+    project.addMapLayer(regions_layer, False)
+    return regions_layer
+
+
+def _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate=[]):
     """
     Second render pass producing simplified PNG thumbnails for the grid index.
 
-    Loads only the layers listed in outlet_config['grid_layers'] at
-    outlet_config['grid_feature_scale'] into the existing project (no project.clear),
-    uses setLayers() to pin the layout to just those layers, and uses the already-
-    reprojected/squared regions_layer from the main pass so thumbnails are square
-    and road widths (stored in map units / meters) are correct.
+    Accepts a regions_path (Path or str) — reprojects and squares it internally —
+    or a pre-processed QgsVectorLayer. Loads only grid_layers at grid_feature_scale
+    into the existing project, uses setLayers() to pin the layout to just those
+    layers so other project layers don't bleed in.
     """
+    from pathlib import Path as _Path
     grid_layers_list = outlet_config.get('grid_layers', [])
     grid_feature_scale = outlet_config.get('grid_feature_scale', 3.0)
     thumbnail_dpi = outlet_config.get('thumbnail_dpi', 72)
@@ -985,6 +1032,15 @@ def _export_simplified_thumbnails(config, outlet_config, regions_layer, output_d
     logger.info(f"Simplified thumbnails: layers={grid_layers_list}, scale={grid_feature_scale}")
 
     project = QgsProject.instance()
+
+    # Accept either a file path or an already-processed QgsVectorLayer
+    if isinstance(regions_path, (str, _Path)):
+        regions_layer = _prepare_regions_layer(regions_path, only_generate)
+        _regions_layer_owned = True
+    else:
+        regions_layer = regions_path  # caller passed a QgsVectorLayer directly
+        _regions_layer_owned = False
+
     layers_config = {x['name']: x for x in config['dataswale']['layers']}
 
     grid_layer_objects = []
@@ -1053,6 +1109,8 @@ def _export_simplified_thumbnails(config, outlet_config, regions_layer, output_d
 
     for layer in grid_layer_objects:
         project.removeMapLayer(layer)
+    if _regions_layer_owned:
+        project.removeMapLayer(regions_layer)
     logger.info(f"Simplified thumbnails complete: {page_num} pages")
 
 
