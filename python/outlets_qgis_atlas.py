@@ -298,7 +298,7 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
 
         if outlet_config.get('grid_layers'):
             logger.info("Generating simplified grid thumbnails...")
-            _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate)
+            _export_simplified_thumbnails(config, outlet_config, regions_layer, output_dir, only_generate)
 
         logger.info(f"Atlas PDF generation complete: {results}")
         #return results
@@ -968,13 +968,15 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     return results
 
 
-def _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate=[]):
+def _export_simplified_thumbnails(config, outlet_config, regions_layer, output_dir, only_generate=[]):
     """
     Second render pass producing simplified PNG thumbnails for the grid index.
 
     Loads only the layers listed in outlet_config['grid_layers'] at
-    outlet_config['grid_feature_scale'], renders a square full-page atlas (no
-    collar), and overwrites individual_pages/{safe_name}.png with the cleaner images.
+    outlet_config['grid_feature_scale'] into the existing project (no project.clear),
+    uses setLayers() to pin the layout to just those layers, and uses the already-
+    reprojected/squared regions_layer from the main pass so thumbnails are square
+    and road widths (stored in map units / meters) are correct.
     """
     grid_layers_list = outlet_config.get('grid_layers', [])
     grid_feature_scale = outlet_config.get('grid_feature_scale', 3.0)
@@ -983,9 +985,9 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
     logger.info(f"Simplified thumbnails: layers={grid_layers_list}, scale={grid_feature_scale}")
 
     project = QgsProject.instance()
-    project.clear()
-
     layers_config = {x['name']: x for x in config['dataswale']['layers']}
+
+    grid_layer_objects = []
     for layer_name in grid_layers_list:
         if layer_name not in layers_config:
             logger.warning(f"grid_layers: {layer_name} not in layer config, skipping")
@@ -996,19 +998,12 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
             continue
         outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_feature_scale, line_scale=grid_feature_scale)
         project.addMapLayer(layer)
+        grid_layer_objects.append(layer)
         logger.info(f"  ✓ grid layer loaded: {layer_name}")
 
-    regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
-    if not regions_layer.isValid():
-        logger.error(f"Simplified thumbnails: failed to load regions from {regions_path}")
-        return
-    if only_generate:
-        escaped = [n.replace("'", "''") for n in only_generate]
-        quoted = "', '".join(escaped)
-        regions_layer.setSubsetString(f'"name" IN (\'{quoted}\')')
-    project.addMapLayer(regions_layer, False)
-
-    # Minimal square layout — full-page map item, no collar
+    # Minimal square layout — full-page map item, no collar.
+    # setLayers pins rendering to only the grid layer objects so other project
+    # layers (from the main pass) don't bleed into the thumbnails.
     layout = QgsPrintLayout(project)
     layout.initializeDefaults()
     page = layout.pageCollection().page(0)
@@ -1021,6 +1016,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
     map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
     map_item.setAtlasMargin(0.05)
     map_item.setKeepLayerSet(True)
+    map_item.setLayers(grid_layer_objects)
     layout.addLayoutItem(map_item)
 
     atlas = layout.atlas()
@@ -1054,6 +1050,9 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         else:
             logger.warning(f"  ✗ Simplified thumbnail failed for {region_name}: {get_export_error_message(result)}")
     atlas.endRender()
+
+    for layer in grid_layer_objects:
+        project.removeMapLayer(layer)
     logger.info(f"Simplified thumbnails complete: {page_num} pages")
 
 
