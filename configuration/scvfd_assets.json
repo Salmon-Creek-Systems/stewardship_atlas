@@ -288,7 +288,8 @@
         ],
         "multipage_pdf": false,
         "grid_layers": ["lidar_basemap", "roads", "creeks", "ponds", "hydrants"],
-        "grid_feature_scale": 5.0
+        "grid_feature_scale": 5.0,
+        "grid_font_scale": 2.0
     },
     "notebook": {
         "type": "outlet",

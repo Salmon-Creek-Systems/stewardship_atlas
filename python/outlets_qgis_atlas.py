@@ -1027,6 +1027,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
     from pathlib import Path as _Path
     grid_layers_list = outlet_config.get('grid_layers', [])
     grid_feature_scale = outlet_config.get('grid_feature_scale', 3.0)
+    grid_font_scale = outlet_config.get('grid_font_scale', 2.0)
     thumbnail_dpi = outlet_config.get('thumbnail_dpi', 72)
 
     logger.info(f"Simplified thumbnails: layers={grid_layers_list}, scale={grid_feature_scale}")
@@ -1052,7 +1053,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         if layer is None:
             logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
             continue
-        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_feature_scale, line_scale=grid_feature_scale)
+        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_font_scale, line_scale=grid_feature_scale)
         project.addMapLayer(layer)
         grid_layer_objects.append(layer)
         logger.info(f"  ✓ grid layer loaded: {layer_name}")
