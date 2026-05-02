@@ -1056,31 +1056,13 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         if layer is None:
             logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
             continue
-        # Force displayAll=True (no PAL collision suppression) and rotate labels
-        # along roads/creeks to match the full PDF style.
+        # Force displayAll=True (no PAL collision suppression), rotate labels along
+        # roads/creeks, and deduplicate so each road name appears at most once.
         layer_cfg = dict(layers_config[layer_name])
         layer_cfg['avoid_label_collisions'] = False
         layer_cfg['rotate_labels'] = True
+        layer_cfg['label_deduplicate'] = True
         outlets_qgis.apply_basic_styling(layer, layer_cfg, config, grid_font_scale, line_scale=grid_feature_scale)
-
-        # Per-cell label deduplication: among all features with the same name that
-        # intersect the current atlas cell, only the minimum-$id one gets a label.
-        # This scopes the aggregate to the current cell via @atlas_geometry, unlike
-        # label_deduplicate which uses minimum($id) globally across the whole layer.
-        if isinstance(layer, QgsVectorLayer) and layer.labelsEnabled():
-            label_attr = layer_cfg.get('alterations', {}).get('label_attribute', 'name')
-            labeling_obj = layer.labeling()
-            if labeling_obj is not None and isinstance(labeling_obj, QgsVectorLayerSimpleLabeling):
-                pal = labeling_obj.settings()
-                dedup_expr = (
-                    f'$id = minimum($id, "{label_attr}", '
-                    f'intersects($geometry, @atlas_geometry) AND "{label_attr}" IS NOT NULL)'
-                )
-                pal.dataDefinedProperties().setProperty(
-                    QgsPalLayerSettings.Show,
-                    QgsProperty.fromExpression(dedup_expr)
-                )
-                layer.setLabeling(QgsVectorLayerSimpleLabeling(pal))
         project.addMapLayer(layer)
         grid_layer_objects.append(layer)
         logger.info(f"  ✓ grid layer loaded: {layer_name}")
