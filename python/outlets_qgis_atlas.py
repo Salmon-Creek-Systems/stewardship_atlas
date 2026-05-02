@@ -1056,21 +1056,8 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         if layer is None:
             logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
             continue
-        # Force displayAll=True (no PAL collision suppression), rotate labels along
-        # roads/creeks, and deduplicate so each road name appears at most once per cell.
         layer_cfg = dict(layers_config[layer_name])
-        layer_cfg['avoid_label_collisions'] = False
-        layer_cfg['rotate_labels'] = True
-        # Dedup via label_expression override — label_deduplicate is bypassed when
-        # label_expression is already set (the if/elif chain in apply_basic_styling
-        # gives label_expression priority). Override it directly with a dedup form.
-        if layer_cfg.get('add_labels'):
-            label_attr = layer_cfg.get('alterations', {}).get('label_attribute', 'name')
-            layer_cfg['label_expression'] = (
-                f'if($id = minimum($id, "{label_attr}") AND "{label_attr}" IS NOT NULL'
-                f' AND "{label_attr}" != \'\', "{label_attr}", NULL)'
-            )
-            layer_cfg.pop('label_deduplicate', None)
+        layer_cfg['add_labels'] = False
         outlets_qgis.apply_basic_styling(layer, layer_cfg, config, grid_font_scale, line_scale=grid_feature_scale)
         project.addMapLayer(layer)
         grid_layer_objects.append(layer)
