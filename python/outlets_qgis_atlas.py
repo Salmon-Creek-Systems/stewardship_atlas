@@ -1072,7 +1072,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
     map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
     map_item.setAtlasMargin(0.05)
     map_item.setKeepLayerSet(True)
-    map_item.setLayers(grid_layer_objects)
+    map_item.setLayers(list(reversed(grid_layer_objects)))
     map_item.setCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
     layout.addLayoutItem(map_item)
 
