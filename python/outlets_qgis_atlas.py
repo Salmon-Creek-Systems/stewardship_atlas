@@ -1073,6 +1073,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
     map_item.setAtlasMargin(0.05)
     map_item.setKeepLayerSet(True)
     map_item.setLayers(grid_layer_objects)
+    map_item.setCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
     layout.addLayoutItem(map_item)
 
     atlas = layout.atlas()
@@ -1100,6 +1101,8 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
             "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
         )
         png_path = individual_dir / f"{safe_name}.png"
+        if png_path.exists():
+            png_path.unlink()
         result = exporter.exportToImage(str(png_path), img_settings)
         if result == QgsLayoutExporter.Success:
             logger.info(f"  ✓ Simplified thumbnail {page_num}: {png_path.name}")
