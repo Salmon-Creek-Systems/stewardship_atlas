@@ -1067,7 +1067,7 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         # intersect the current atlas cell, only the minimum-$id one gets a label.
         # This scopes the aggregate to the current cell via @atlas_geometry, unlike
         # label_deduplicate which uses minimum($id) globally across the whole layer.
-        if layer.labelsEnabled():
+        if isinstance(layer, QgsVectorLayer) and layer.labelsEnabled():
             label_attr = layer_cfg.get('alterations', {}).get('label_attribute', 'name')
             labeling_obj = layer.labeling()
             if labeling_obj is not None and isinstance(labeling_obj, QgsVectorLayerSimpleLabeling):
