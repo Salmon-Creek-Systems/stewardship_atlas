@@ -1053,7 +1053,11 @@ def _export_simplified_thumbnails(config, outlet_config, regions_path, output_di
         if layer is None:
             logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
             continue
-        outlets_qgis.apply_basic_styling(layer, layers_config[layer_name], config, grid_font_scale, line_scale=grid_feature_scale)
+        # Force displayAll=True so PAL collision avoidance doesn't suppress labels
+        # on small grid cells where large fonts would otherwise cause everything to be dropped.
+        layer_cfg = dict(layers_config[layer_name])
+        layer_cfg['avoid_label_collisions'] = False
+        outlets_qgis.apply_basic_styling(layer, layer_cfg, config, grid_font_scale, line_scale=grid_feature_scale)
         project.addMapLayer(layer)
         grid_layer_objects.append(layer)
         logger.info(f"  ✓ grid layer loaded: {layer_name}")

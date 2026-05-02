@@ -287,7 +287,7 @@
             "admin"
         ],
         "multipage_pdf": false,
-        "grid_layers": ["lidar_basemap", "roads", "creeks", "ponds", "hydrants"],
+        "grid_layers": ["lidar_basemap", "roads", "creeks", "ponds"],
         "grid_feature_scale": 5.0,
         "grid_font_scale": 2.0
     },
