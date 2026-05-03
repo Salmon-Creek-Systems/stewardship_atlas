@@ -51,10 +51,7 @@ from qgis.core import (
     QgsPointXY,
     QgsFillSymbol,
     QgsVectorFileWriter,
-    QgsFeature,
-    QgsVectorLayerSimpleLabeling,
-    QgsPalLayerSettings,
-    QgsProperty
+    QgsFeature
 )
 from qgis.PyQt.QtGui import QColor, QFont
 from qgis.PyQt.QtCore import Qt
@@ -118,8 +115,8 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
     outlets.make_regions_index(config, outlet_name, regions)
     
     if not outlet_config.get('generate_pdf', True):
-        logger.info(f"Skipping PDF refresh for {outlet_name}...")
-        return {}
+        logger.info(f"PDF generation disabled for {outlet_name}, thumbnails only")
+        refresh_pdfs = False
     
     # Initialize QGIS using singleton pattern (safe for repeated calls in notebooks)
         
@@ -135,31 +132,28 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
         # Load all data layers
         in_layers = outlet_config.get('in_layers', [])
         layers_config = {x['name']: x for x in config['dataswale']['layers']}
-        # layers_config = config['dataswale']['layers']
-        
+        feature_scale = outlet_config.get('feature_scale', 1.0)
+
+        loaded_layers = {}
         for layer_name in in_layers:
             print(f"Loading layer: {layer_name}")
             if layer_name not in layers_config:
                 logger.warning(f"⚠ Layer {layer_name} not found in config {layers_config.keys()}")
                 continue
-            
+
             layer_config = layers_config[layer_name]
-            
+
             try:
-                # Load layer using outlets_qgis function
                 layer = outlets_qgis.load_full_layer(layer_config, config)
                 if layer is None:
                     logger.warning(f"⚠ Skipping layer {layer_name} - failed to load")
                     continue
-                
-                # Apply styling (pass config for custom icons and feature_scale)
-                feature_scale = outlet_config.get('feature_scale', 1.0)
+
                 outlets_qgis.apply_basic_styling(layer, layer_config, config, feature_scale)
-                
-                # Add to project
                 project.addMapLayer(layer)
+                loaded_layers[layer_name] = layer
                 logger.info(f"✓ Loaded layer: {layer_name}")
-                
+
             except Exception as e:
                 logger.error(f"✗ Error loading layer {layer_name}: {e}")
                 continue
@@ -296,12 +290,15 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
         output_dir.mkdir(parents=True, exist_ok=True)
         
         multipage_pdf = outlet_config.get('multipage_pdf', True)
-        results = export_atlas(layout, output_dir, config.get('name', 'atlas'), multipage_pdf=multipage_pdf)
-        # generate index
-
-        if outlet_config.get('grid_layers'):
-            logger.info("Generating simplified grid thumbnails...")
-            _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate)
+        results = export_atlas(
+            layout, output_dir, config.get('name', 'atlas'),
+            multipage_pdf=multipage_pdf,
+            outlet_config=outlet_config,
+            layers_config=layers_config,
+            loaded_layers=loaded_layers,
+            atlas_config=config,
+            refresh_pdfs=refresh_pdfs,
+        )
 
         logger.info(f"Atlas PDF generation complete: {results}")
         #return results
@@ -835,10 +832,16 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
     layout.addLayoutItem(legend)
 
 
-def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf=True):
+def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf=True,
+                 outlet_config=None, layers_config=None, loaded_layers=None,
+                 atlas_config=None, refresh_pdfs=True):
     """
     Export atlas to both multi-page PDF and individual PDFs per region.
     Also exports a PNG thumbnail per page (map area only, collar cropped out).
+
+    When outlet_config contains grid_layers, the thumbnail is rendered with only
+    those layers and at grid_feature_scale line width (thicker roads/creeks).
+    When refresh_pdfs=False, PDFs are skipped and only thumbnails are exported.
 
     Args:
         layout: QgsPrintLayout with atlas enabled
@@ -846,6 +849,11 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
         atlas_name: Base name for output files
         thumbnail_dpi: DPI for PNG thumbnails (default 72)
         multipage_pdf: Whether to generate the combined multi-page PDF (default True)
+        outlet_config: Outlet asset config dict (for grid_layers, grid_feature_scale)
+        layers_config: Dict of layer_name -> layer config
+        loaded_layers: Dict of layer_name -> QgsMapLayer
+        atlas_config: Full atlas config dict (passed to apply_basic_styling for icons etc.)
+        refresh_pdfs: If False, skip all PDF exports and only generate thumbnails
 
     Returns:
         dict with status and output paths
@@ -875,15 +883,29 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
         'total_pages': 0
     }
     
+    # Resolve grid thumbnail parameters (used inside the per-page loop)
+    map_item = next(
+        (i for i in layout.items() if isinstance(i, QgsLayoutItemMap) and i.atlasDriven()),
+        None
+    )
+    grid_layers_list = (outlet_config or {}).get('grid_layers', [])
+    grid_feature_scale = (outlet_config or {}).get('grid_feature_scale', 1.0)
+    feature_scale = (outlet_config or {}).get('feature_scale', 1.0)
+    grid_layer_objects = []
+    if grid_layers_list and loaded_layers:
+        grid_layer_objects = [loaded_layers[n] for n in grid_layers_list if n in loaded_layers]
+    # QGIS setLayers renders in reverse order (first item = top visually)
+    grid_layers_reversed = list(reversed(grid_layer_objects))
+
     # PDF export settings
     pdf_settings = QgsLayoutExporter.PdfExportSettings()
     pdf_settings.dpi = 300
     pdf_settings.rasterizeWholeImage = False
     pdf_settings.forceVectorOutput = True
     pdf_settings.exportMetadata = True
-    
+
     # Export multi-page PDF (optional — slow, can be disabled via asset config)
-    if multipage_pdf:
+    if multipage_pdf and refresh_pdfs:
         multi_pdf_path = output_dir / f"{atlas_name}_runbook.pdf"
         logger.info(f"Exporting multi-page PDF to: {multi_pdf_path}")
 
@@ -905,13 +927,16 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
             logger.error(f"✗ Multi-page PDF export failed: {error_msg}")
             results['status'] = 'partial'
     else:
-        logger.info("Skipping multi-page PDF (multipage_pdf=False in asset config)")
-    
-    # Export individual PDFs per region
+        if not refresh_pdfs:
+            logger.info("Skipping multi-page PDF (refresh_pdfs=False)")
+        else:
+            logger.info("Skipping multi-page PDF (multipage_pdf=False in asset config)")
+
+    # Export individual pages
     individual_dir = output_dir / "individual_pages"
     individual_dir.mkdir(exist_ok=True)
-    
-    logger.info(f"Exporting individual PDFs to: {individual_dir}")
+
+    logger.info(f"Exporting individual pages to: {individual_dir}")
     
     # Iterate through atlas features
     atlas.beginRender()
@@ -931,27 +956,54 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
         
         logger.info(f"Exporting page {page_num}: {region_name}")
         
-        # Clean region name for filename
-        safe_name =  utils.canonicalize_name("".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name))
+        safe_name = utils.canonicalize_name(
+            "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
+        )
         individual_pdf_path = individual_dir / f"{safe_name}.pdf"
-        
-        result = exporter.exportToPdf(str(individual_pdf_path), pdf_settings)
 
-        if result == QgsLayoutExporter.Success:
-            results['individual_pdfs'].append(str(individual_pdf_path))
-            logger.info(f"  ✓ Page {page_num}: {region_name}")
-        else:
-            error_msg = get_export_error_message(result)
-            logger.error(f"  ✗ Page {page_num} ({region_name}) failed: {error_msg}")
-            results['status'] = 'partial'
+        if refresh_pdfs:
+            result = exporter.exportToPdf(str(individual_pdf_path), pdf_settings)
+            if result == QgsLayoutExporter.Success:
+                results['individual_pdfs'].append(str(individual_pdf_path))
+                logger.info(f"  ✓ PDF {page_num}: {region_name}")
+            else:
+                error_msg = get_export_error_message(result)
+                logger.error(f"  ✗ PDF {page_num} ({region_name}) failed: {error_msg}")
+                results['status'] = 'partial'
 
-        # PNG thumbnail — map area only (collar cropped out)
+        # PNG thumbnail — swap to grid layers/styling, export, then restore.
         try:
             from PIL import Image as PilImage
             png_path = individual_dir / f"{safe_name}.png"
             img_settings = QgsLayoutExporter.ImageExportSettings()
             img_settings.dpi = thumbnail_dpi
+
+            # Swap to grid view: fewer layers, thicker lines, no labels
+            original_layers = None
+            if grid_layer_objects and map_item:
+                original_layers = map_item.layers()
+                for lname in grid_layers_list:
+                    layer = (loaded_layers or {}).get(lname)
+                    if layer and isinstance(layer, QgsVectorLayer):
+                        lc = dict((layers_config or {})[lname])
+                        lc['add_labels'] = False
+                        outlets_qgis.apply_basic_styling(
+                            layer, lc, atlas_config or {}, feature_scale,
+                            line_scale=grid_feature_scale)
+                map_item.setLayers(grid_layers_reversed)
+
             img_result = exporter.exportToImage(str(png_path), img_settings)
+
+            # Restore full PDF view
+            if original_layers is not None and map_item:
+                map_item.setLayers(original_layers)
+                for lname in grid_layers_list:
+                    layer = (loaded_layers or {}).get(lname)
+                    if layer and isinstance(layer, QgsVectorLayer):
+                        outlets_qgis.apply_basic_styling(
+                            layer, (layers_config or {})[lname],
+                            atlas_config or {}, feature_scale, line_scale=1.0)
+
             if img_result == QgsLayoutExporter.Success:
                 img = PilImage.open(png_path)
                 crop_w = int(img.width * map_fraction_x)
@@ -970,157 +1022,6 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     logger.info(f"Atlas export complete: {page_num} pages")
     return results
 
-
-def _prepare_regions_layer(regions_path, only_generate=[]):
-    """
-    Load, reproject to EPSG:3857, and square the regions layer.
-    Returns an in-memory QgsVectorLayer ready for atlas use.
-    """
-    project = QgsProject.instance()
-    regions_layer = QgsVectorLayer(str(regions_path), "regions", "ogr")
-    if not regions_layer.isValid():
-        raise RuntimeError(f"Failed to load regions from {regions_path}")
-
-    if only_generate:
-        escaped = [n.replace("'", "''") for n in only_generate]
-        quoted = "', '".join(escaped)
-        regions_layer.setSubsetString(f'"name" IN (\'{quoted}\')')
-
-    render_crs = QgsCoordinateReferenceSystem("EPSG:3857")
-    if regions_layer.crs() != render_crs:
-        reprojected = QgsVectorLayer(f"Polygon?crs={render_crs.authid()}", "regions_reprojected", "memory")
-        prov = reprojected.dataProvider()
-        prov.addAttributes(regions_layer.fields())
-        reprojected.updateFields()
-        transform = QgsCoordinateTransform(regions_layer.crs(), render_crs, QgsCoordinateTransformContext())
-        feats = []
-        for feat in regions_layer.getFeatures():
-            new_feat = QgsFeature(feat)
-            geom = feat.geometry()
-            geom.transform(transform)
-            new_feat.setGeometry(geom)
-            feats.append(new_feat)
-        prov.addFeatures(feats)
-        reprojected.updateExtents()
-        regions_layer = reprojected
-
-    regions_layer.startEditing()
-    for feat in regions_layer.getFeatures():
-        bbox = feat.geometry().boundingBox()
-        size = max(bbox.width(), bbox.height())
-        cx = bbox.xMinimum() + bbox.width() / 2
-        cy = bbox.yMinimum() + bbox.height() / 2
-        square = QgsGeometry.fromRect(QgsRectangle(cx - size/2, cy - size/2, cx + size/2, cy + size/2))
-        regions_layer.changeGeometry(feat.id(), square)
-    regions_layer.commitChanges()
-
-    project.addMapLayer(regions_layer, False)
-    return regions_layer
-
-
-def _export_simplified_thumbnails(config, outlet_config, regions_path, output_dir, only_generate=[]):
-    """
-    Second render pass producing simplified PNG thumbnails for the grid index.
-
-    Accepts a regions_path (Path or str) — reprojects and squares it internally —
-    or a pre-processed QgsVectorLayer. Loads only grid_layers at grid_feature_scale
-    into the existing project, uses setLayers() to pin the layout to just those
-    layers so other project layers don't bleed in.
-    """
-    from pathlib import Path as _Path
-    grid_layers_list = outlet_config.get('grid_layers', [])
-    grid_feature_scale = outlet_config.get('grid_feature_scale', 3.0)
-    grid_font_scale = outlet_config.get('grid_font_scale', 2.0)
-    thumbnail_dpi = outlet_config.get('thumbnail_dpi', 72)
-
-    logger.info(f"Simplified thumbnails: layers={grid_layers_list}, scale={grid_feature_scale}")
-
-    project = QgsProject.instance()
-
-    # Accept either a file path or an already-processed QgsVectorLayer
-    if isinstance(regions_path, (str, _Path)):
-        regions_layer = _prepare_regions_layer(regions_path, only_generate)
-        _regions_layer_owned = True
-    else:
-        regions_layer = regions_path  # caller passed a QgsVectorLayer directly
-        _regions_layer_owned = False
-
-    layers_config = {x['name']: x for x in config['dataswale']['layers']}
-
-    grid_layer_objects = []
-    for layer_name in grid_layers_list:
-        if layer_name not in layers_config:
-            logger.warning(f"grid_layers: {layer_name} not in layer config, skipping")
-            continue
-        layer = outlets_qgis.load_full_layer(layers_config[layer_name], config)
-        if layer is None:
-            logger.warning(f"grid_layers: failed to load {layer_name}, skipping")
-            continue
-        layer_cfg = dict(layers_config[layer_name])
-        layer_cfg['add_labels'] = False
-        outlets_qgis.apply_basic_styling(layer, layer_cfg, config, grid_font_scale, line_scale=grid_feature_scale)
-        project.addMapLayer(layer)
-        grid_layer_objects.append(layer)
-        logger.info(f"  ✓ grid layer loaded: {layer_name}")
-
-    # Minimal square layout — full-page map item, no collar.
-    # setLayers pins rendering to only the grid layer objects so other project
-    # layers (from the main pass) don't bleed into the thumbnails.
-    layout = QgsPrintLayout(project)
-    layout.initializeDefaults()
-    page = layout.pageCollection().page(0)
-    page.setPageSize(QgsLayoutSize(200, 200, QgsUnitTypes.LayoutMillimeters))
-
-    map_item = QgsLayoutItemMap(layout)
-    map_item.attemptMove(QgsLayoutPoint(0, 0, QgsUnitTypes.LayoutMillimeters))
-    map_item.attemptResize(QgsLayoutSize(200, 200, QgsUnitTypes.LayoutMillimeters))
-    map_item.setAtlasDriven(True)
-    map_item.setAtlasScalingMode(QgsLayoutItemMap.Auto)
-    map_item.setAtlasMargin(0.05)
-    map_item.setKeepLayerSet(True)
-    map_item.setLayers(list(reversed(grid_layer_objects)))
-    map_item.setCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
-    layout.addLayoutItem(map_item)
-
-    atlas = layout.atlas()
-    atlas.setCoverageLayer(regions_layer)
-    atlas.setEnabled(True)
-    atlas.setHideCoverage(True)
-
-    exporter = QgsLayoutExporter(layout)
-    individual_dir = output_dir / "individual_pages"
-    individual_dir.mkdir(exist_ok=True)
-
-    img_settings = QgsLayoutExporter.ImageExportSettings()
-    img_settings.dpi = thumbnail_dpi
-
-    atlas.beginRender()
-    page_num = 0
-    while atlas.next():
-        page_num += 1
-        feature = atlas.layout().reportContext().feature()
-        try:
-            region_name = feature.attribute('name') or f"region_{page_num}"
-        except Exception:
-            region_name = f"region_{page_num}"
-        safe_name = utils.canonicalize_name(
-            "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in region_name)
-        )
-        png_path = individual_dir / f"{safe_name}.png"
-        if png_path.exists():
-            png_path.unlink()
-        result = exporter.exportToImage(str(png_path), img_settings)
-        if result == QgsLayoutExporter.Success:
-            logger.info(f"  ✓ Simplified thumbnail {page_num}: {png_path.name}")
-        else:
-            logger.warning(f"  ✗ Simplified thumbnail failed for {region_name}: {get_export_error_message(result)}")
-    atlas.endRender()
-
-    for layer in grid_layer_objects:
-        project.removeMapLayer(layer)
-    if _regions_layer_owned:
-        project.removeMapLayer(regions_layer)
-    logger.info(f"Simplified thumbnails complete: {page_num} pages")
 
 
 def get_export_error_message(error_code):
