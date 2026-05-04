@@ -111,6 +111,7 @@
             "ponds",
             "contours",
             "roads",
+            "roads_lrs",
             "creeks",
             "buildings",
             "hydrants",
@@ -119,7 +120,7 @@
             "lpss",
             "hazards"
         ],
-        "hidden_layers": ["lpss"],
+        "hidden_layers": ["lpss", "roads_lrs"],
         "config_def": "webmap",
         "access": [
             "public",
