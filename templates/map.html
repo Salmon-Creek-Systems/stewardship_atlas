@@ -73,7 +73,7 @@
     </div>
     <script src="js/shared_utils.js"></script>
     <script>
-        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol || MaplibreCOGProtocol.default);
 
         // API URL for backend calls
         const API_URL = "{app_url}";

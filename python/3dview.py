@@ -385,7 +385,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <script>
         const protocol = new pmtiles.Protocol();
         maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
-        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol || MaplibreCOGProtocol.default);
 
         {terrain_url_js_line}
 
