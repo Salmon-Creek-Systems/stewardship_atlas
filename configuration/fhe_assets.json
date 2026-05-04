@@ -69,12 +69,34 @@
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/canopy_density_2m.tif"
     },
+    "canopy_density_cog": {
+        "type": "eddy",
+        "config_def": "tiff_to_cog",
+        "in_layer": "canopy_density",
+        "out_layer": "canopy_density"
+    },
+    "canopy_density_s3": {
+        "type": "outlet",
+        "config_def": "s3_upload",
+        "in_layer": "canopy_density"
+    },
     "ladder_fuel_density": {
         "type": "inlet",
         "out_layer": "ladder_fuel_density",
         "config_def": "s3_geotiff",
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/ladder_fuel_density_2m.tif"
+    },
+    "ladder_fuel_density_cog": {
+        "type": "eddy",
+        "config_def": "tiff_to_cog",
+        "in_layer": "ladder_fuel_density",
+        "out_layer": "ladder_fuel_density"
+    },
+    "ladder_fuel_density_s3": {
+        "type": "outlet",
+        "config_def": "s3_upload",
+        "in_layer": "ladder_fuel_density"
     },
     "inaturalist": {
         "type": "inlet",

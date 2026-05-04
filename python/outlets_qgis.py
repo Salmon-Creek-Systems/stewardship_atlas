@@ -257,12 +257,18 @@ def load_full_layer(layer_config, config):
         logger.info(f"Loaded WMS layer: {layer_name} ({wms_url})")
         return layer
     elif geometry_type == 'raster':
-        layer_format = 'tiff'
-        layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.{layer_format}"
-
-        layer = QgsRasterLayer(str(layer_path), layer_name)
+        if layer_config.get('cog'):
+            s3_bucket = layer_config.get('cog_s3_bucket', 'scs-atlas-data')
+            cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
+                       f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+            layer = QgsRasterLayer(f'/vsicurl/{cog_url}', layer_name)
+            source_desc = f"/vsicurl/{cog_url}"
+        else:
+            layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.tiff"
+            layer = QgsRasterLayer(str(layer_path), layer_name)
+            source_desc = str(layer_path)
         if not layer.isValid():
-            logger.warning(f"Failed to load raster layer: {layer_name} from {layer_path}")
+            logger.warning(f"Failed to load raster layer: {layer_name} from {source_desc}")
             return None
         logger.info(f"Loaded raster layer: {layer_name}")
         return layer
@@ -303,19 +309,20 @@ def load_full_layer(layer_config, config):
         return layer
 
 
-def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
+def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, line_scale=1.0):
     """
     Apply basic styling to a QGIS layer based on configuration.
-    
+
     Args:
         layer: QgsVectorLayer or QgsRasterLayer
         layer_config: Layer configuration dict with color, width, labels, etc.
         config: Optional atlas configuration (needed for loading custom icon PNG files)
-        feature_scale: Scale factor for feature sizes (default 1.0)
+        feature_scale: Scale factor for icon/font sizes (default 1.0)
+        line_scale: Scale factor for line widths (default 1.0)
     """
     if isinstance(layer, QgsRasterLayer):
         # Raster styling - just set opacity if configured
-        opacity = layer_config.get('opacity', 1.0)
+        opacity = layer_config.get('qgis_opacity', layer_config.get('opacity', 1.0))
         layer.setOpacity(opacity)
         return
     
@@ -348,10 +355,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     # Create raster marker layer
                     raster_marker = QgsRasterMarkerSymbolLayer(str(icon_path))
                     
-                    # Set size from config (icon-size, defaults to 1.0)
                     icon_size = layer_config.get('icon-size', 1.0)
-                    # Convert to mm for print output (scale factor)
-                    size_mm = icon_size * 5 * feature_scale  # Base size of 5mm scaled by icon-size and feature_scale
+                    print_icon_mm = (config or {}).get('print_icon_mm', 15)
+                    size_mm = icon_size * print_icon_mm * feature_scale
                     raster_marker.setSize(size_mm)
                     raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
                     
@@ -400,8 +406,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                     if hasattr(symbol_layer, 'setWidthUnit'):
                         symbol_layer.setWidthUnit(QgsUnitTypes.RenderMapUnits)
 
-                    width_expr = f'"vector_width" * {qgis_width_scale}' if qgis_width_scale != 1.0 else '"vector_width"'
-                    logger.info(f"Using per-feature vector_width for {layer.name()} (scale={qgis_width_scale})")
+                    effective_scale = qgis_width_scale * line_scale
+                    width_expr = f'"vector_width" * {effective_scale}' if effective_scale != 1.0 else '"vector_width"'
+                    logger.info(f"Using per-feature vector_width for {layer.name()} (scale={effective_scale})")
                     symbol_layer.setDataDefinedProperty(
                         QgsSymbolLayer.PropertyStrokeWidth,
                         QgsProperty.fromExpression(width_expr)
@@ -409,12 +416,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             else:
                 logger.warning(f"Layer {layer.name()} config has 'vector_width' but features don't have that attribute")
                 width = layer_config.get('constant_width', 2)
-                symbol.setWidth(width * 0.1 * qgis_width_scale)
+                symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
         else:
             # Use constant width from config
             width = layer_config.get('constant_width', 2)
-            symbol.setWidth(width * 0.1 * qgis_width_scale)
-            logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale})")
+            symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
+            logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale * line_scale})")
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
@@ -492,16 +499,16 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
             label_qcolor = QColor(lc[0], lc[1], lc[2]) if lc else None
 
             if geometry_type == 'linestring':
-                text_format.setSize(14)
+                text_format.setSize(14 * feature_scale)
                 text_format.setColor(label_qcolor if label_qcolor else QColor(255, 255, 255))
                 font = QFont()
-                font.setPointSize(14)
+                font.setPointSize(int(14 * feature_scale))
                 font.setBold(True)
             else:
-                text_format.setSize(10)
+                text_format.setSize(10 * feature_scale)
                 text_format.setColor(label_qcolor if label_qcolor else qcolor)
                 font = QFont()
-                font.setPointSize(10)
+                font.setPointSize(int(10 * feature_scale))
             
             text_format.setFont(font)
             
@@ -526,20 +533,16 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0):
                 pal_settings.placement = QgsPalLayerSettings.Line
                 
                 # Optional rotation: can be enabled per-layer with 'rotate_labels': true
+                # Use pal_settings.placementFlags directly — lineSettings().setPlacementFlags()
+                # returns a copy in the Python SIP binding and changes don't persist back.
                 if layer_config.get('rotate_labels', False):
-                    # Rotate labels to follow line direction - use OnLine flag ONLY
-                    # (MapOrientation actually PREVENTS rotation, keeping labels horizontal)
-                    flags = QgsLabeling.LinePlacementFlags()
-                    flags |= QgsLabeling.LinePlacementFlag.OnLine
-                    pal_settings.lineSettings().setPlacementFlags(flags)
+                    pal_settings.placementFlags = int(QgsLabeling.LinePlacementFlag.OnLine)
                     logger.info(f"Configured line placement with rotation for {layer.name()}")
                 else:
-                    # Keep labels horizontal - use MapOrientation flag
-                    # MapOrientation = keep labels aligned with map coordinates (horizontal)
-                    flags = QgsLabeling.LinePlacementFlags()
-                    flags |= QgsLabeling.LinePlacementFlag.OnLine
-                    flags |= QgsLabeling.LinePlacementFlag.MapOrientation
-                    pal_settings.lineSettings().setPlacementFlags(flags)
+                    pal_settings.placementFlags = (
+                        int(QgsLabeling.LinePlacementFlag.OnLine) |
+                        int(QgsLabeling.LinePlacementFlag.MapOrientation)
+                    )
                     logger.info(f"Configured line placement (horizontal) for {layer.name()}")
                 
                 # Optional: Repeat labels along long lines (off by default)

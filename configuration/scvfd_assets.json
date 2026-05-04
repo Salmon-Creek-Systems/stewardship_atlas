@@ -270,7 +270,6 @@
         "blend_percent": 40,
         "in_layers": [
             "lidar_basemap",
-            "usgs_hillshade",
             "contours",
             "roads",
             "creeks",
@@ -278,6 +277,8 @@
             "buildings",
             "lpss",
             "poi",
+            "hydrants",
+            "hazards",
             "watertanks"
         ],
         "access": [
@@ -285,7 +286,9 @@
             "internal",
             "admin"
         ],
-        "multipage_pdf": false
+        "multipage_pdf": false,
+        "grid_layers": ["lidar_basemap", "roads", "creeks", "ponds"],
+        "grid_feature_scale": 5.0
     },
     "notebook": {
         "type": "outlet",

@@ -871,6 +871,75 @@ def terrain_rgb_to_pmtiles(config: Dict[str, Any], eddy_name: str):
     return out_path
 
 
+def terrain_rgb_tiff(config: Dict[str, Any], eddy_name: str) -> Path:
+    """Convert a DEM to Mapbox terrain-RGB GeoTIFF saved on disk.
+
+    Unlike terrain_rgb_tiles (which discards the RGB TIFF after tiling),
+    this eddy writes it to the layers directory so tiff_to_cog can consume it.
+    Use when serving 3D terrain as a COG from S3 instead of as PMTiles.
+
+    Per-atlas config keys:
+        in_layer:  elevation layer (e.g. "terrain_dem")
+        out_layer: output layer name (e.g. "terrain_rgb_tiles")
+    """
+    import rasterio  # noqa: F401 — imported by _dem_to_terrain_rgb
+
+    eddy = config['assets'][eddy_name]
+    in_layer = eddy['in_layer']
+    out_layer = eddy.get('out_layer', eddy_name)
+
+    in_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.tiff'
+    out_dir = versioning.atlas_path(config, 'layers') / out_layer
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f'{out_layer}.tiff'
+
+    logger.info(f"terrain_rgb_tiff: {in_path} -> {out_path}")
+    _dem_to_terrain_rgb(in_path, out_path)
+    logger.info(f"terrain_rgb_tiff complete: {out_path}")
+    return out_path
+
+
+def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
+    """Convert a GeoTIFF layer to a Cloud-Optimized GeoTIFF (COG).
+
+    Produces a .cog.tif suitable for serving via HTTP range requests from S3,
+    consumed by maplibre-cog-protocol in the webmap/3D view and GDAL /vsicurl/
+    in QGIS PDF generation. Run before s3_upload.
+
+    Per-atlas config keys:
+        in_layer:  source raster layer name
+        out_layer: output layer name (defaults to in_layer)
+    """
+    eddy = config['assets'][eddy_name]
+    in_layer = eddy['in_layer']
+    out_layer = eddy.get('out_layer', in_layer)
+
+    layers_path = versioning.atlas_path(config, 'layers')
+    in_path = layers_path / in_layer / f'{in_layer}.tiff'
+    out_dir = layers_path / out_layer
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f'{out_layer}.cog.tif'
+
+    logger.info(f"tiff_to_cog: {in_path} -> {out_path}")
+
+    # gdalwarp reprojects to EPSG:3857 (required by maplibre-cog-protocol) and
+    # produces a COG in one pass. -r bilinear is appropriate for continuous rasters.
+    result = subprocess.run(
+        ['gdalwarp', '-t_srs', 'EPSG:3857', '-r', 'bilinear',
+         '-of', 'COG',
+         '-co', 'COMPRESS=DEFLATE',
+         '-co', 'BLOCKSIZE=512',
+         '-co', 'OVERVIEW_RESAMPLING=BILINEAR',
+         str(in_path), str(out_path)],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"gdalwarp COG failed:\n{result.stderr}")
+
+    logger.info(f"tiff_to_cog complete: {out_path}")
+    return out_path
+
+
 def fuel_mass_from_landfire(config: Dict[str, Any], asset_name: str):
     """
     Annotates burns_index H3 cells with fuel_mass (tons/acre) derived from LANDFIRE EVC.
@@ -1131,4 +1200,6 @@ asset_methods = {
     "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
     "fuel_mass_landfire": fuel_mass_from_landfire,
     "biochar_simulation": biochar_simulation,
+    "tiff_to_cog": tiff_to_cog,
+    "terrain_rgb_tiff": terrain_rgb_tiff,
 }

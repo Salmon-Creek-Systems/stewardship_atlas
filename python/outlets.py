@@ -55,22 +55,47 @@ def webmap_json(config, name, sprite_json=None):
     map_sources = {}
     map_layers = []
     dynamic_layers = []
+    cog_sources = {}
+    cog_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
-    
+
     logger.info(f"In webedit, got Outlet Conf: {outlet_config}")
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
         layer = layers_dict[layer_name]
         if layer['geometry_type'] == 'raster':
-            layer_dir = versioning.atlas_path(config, "layers") / layer_name
-            raster_filename = (f"{layer_name}.tiff.png"
-                               if (layer_dir / f"{layer_name}.tiff.png").exists()
-                               else f"{layer_name}.tiff.jpg")
-            map_sources[layer_name] = {
-                'type': 'image',
-                'url': f"../../layers/{layer_name}/{raster_filename}",
-                'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
+            if layer.get('cog'):
+                s3_bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
+                s3_region = layer.get('cog_s3_region', 'us-east-1')
+                cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
+                           f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+                cog_color = layer.get('cog_color')
+                cog_source_url = f"cog://{cog_url}" + (f"#color:{cog_color}" if cog_color else "")
+                cog_sources[layer_name] = {
+                    'type': 'raster',
+                    'url': cog_source_url,
+                    'tileSize': 256,
+                }
+                cog_layer_def = {
+                    'id': f'{layer_name}-layer',
+                    'source': layer_name,
+                    'type': 'raster',
+                    'layout': layer.get('vis', {}).get('layout', {'visibility': 'visible'}),
+                    'paint': {**{'raster-opacity': 0.8, 'raster-contrast': 0.0}, **layer.get('paint', {})},
+                    'metadata': {'name': layer_name, 'group': layer_name},
+                }
+                cog_layers.append(cog_layer_def)
+                continue  # source and layer added dynamically after load
+            else:
+                layer_dir = versioning.atlas_path(config, "layers") / layer_name
+                raster_filename = (f"{layer_name}.tiff.png"
+                                   if (layer_dir / f"{layer_name}.tiff.png").exists()
+                                   else f"{layer_name}.tiff.jpg")
+                map_sources[layer_name] = {
+                    'type': 'image',
+                    'url': f"../../layers/{layer_name}/{raster_filename}",
+                    'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
             #map_sources[layer_name] =  {
@@ -432,7 +457,12 @@ def webmap_json(config, name, sprite_json=None):
     logger.info(f"Dynamic layers: {[layer.get('name', 'no-name') for layer in dynamic_layers]}")
     logger.info(f"Legend targets: {len(legend_targets)} layers")
   
-    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets}
+    for cog_layer in cog_layers:
+        legend_targets[cog_layer['id']] = cog_layer['metadata']['name']
+
+    logger.info(f"COG layers (dynamic): {[l['id'] for l in cog_layers]}")
+    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
+            "cog_sources": cog_sources, "cog_layers": cog_layers}
 
 def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None):
     """Generate the complete HTML page for viewing a map"""
@@ -534,6 +564,8 @@ void await map.loadImage('{im_uri}',
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
+            cog_sources=json.dumps(map_config_data.get('cog_sources', {}), indent=2),
+            cog_layers=json.dumps(map_config_data.get('cog_layers', []), indent=2),
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
             webmap_help=help_html,
             app_url=app_url,
@@ -712,6 +744,9 @@ def outlet_webmap(config, name):
     for layer_name in config['assets'][name]['in_layers']:
         layer_def = layers_dict.get(layer_name, {})
         if layer_def.get('geometry_type') == 'raster':
+            if layer_def.get('cog'):
+                logger.info(f"Skipping TIFF->image conversion for COG layer: {layer_name}")
+                continue
             layer_dir = versioning.atlas_path(config, "layers") / layer_name
             tiff_path = layer_dir / f"{layer_name}.tiff"
             png_path = layer_dir / f"{layer_name}.tiff.png"
@@ -2955,6 +2990,43 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
                   
     return statefile_path
 
+def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
+    """Upload a layer's COG to S3 for public delivery.
+
+    Uploads the .cog.tif produced by the tiff_to_cog eddy to S3 with public-read
+    access, enabling webmap (maplibre-cog-protocol) and QGIS (/vsicurl/) delivery.
+
+    Config keys:
+        in_layer:   layer whose .cog.tif to upload
+        s3_bucket:  destination bucket (default: scs-atlas-data)
+    """
+    import boto3
+
+    outlet_config = config['assets'][outlet_name]['config']
+    in_layer = outlet_config['in_layer']
+    s3_bucket = outlet_config.get('s3_bucket', 'scs-atlas-data')
+    s3_region = outlet_config.get('s3_region', 'us-east-1')
+    atlas_name = config['name']
+
+    cog_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.cog.tif'
+    if not cog_path.exists():
+        raise FileNotFoundError(
+            f"COG not found at {cog_path} — run tiff_to_cog eddy first"
+        )
+
+    s3_key = f"{atlas_name}/rasters/{in_layer}/{in_layer}.cog.tif"
+    logger.info(f"s3_upload: {cog_path} -> s3://{s3_bucket}/{s3_key}")
+
+    boto3.client('s3').upload_file(
+        str(cog_path), s3_bucket, s3_key,
+        ExtraArgs={'ContentType': 'image/tiff'}
+    )
+
+    s3_url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{s3_key}"
+    logger.info(f"s3_upload complete: {s3_url}")
+    return cog_path
+
+
 asset_methods = {
     #'outlet_gpkg': outlet_gpkg,
     #'tiff': outlet_tiff,
@@ -2970,4 +3042,5 @@ asset_methods = {
     'jupyter_notebook' : outlet_notebook_jupyter,
     'config_editor': outlet_config_editor,
     '3dview': outlet_3dview,
+    's3_upload': s3_upload,
 }

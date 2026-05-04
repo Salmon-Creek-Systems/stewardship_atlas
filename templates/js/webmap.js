@@ -7,8 +7,7 @@ map.addControl(new maplibregl.ScaleControl({
     unit: 'metric'
 }));
 
-// Add legend control
-map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
+// Legend is added inside map.on('load') so dynamically-added layers (COG) exist when it initializes
 
 // Zoom indicator — custom MapLibre control at bottom-left (appears below legend/scale)
 const zoomControl = {
@@ -205,6 +204,19 @@ map.on('load', async () => {
     if (basemapValueToLayer[initialBasemap]) {
         map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
     }
+    // Add COG sources and layers dynamically (protocol requires post-load addition)
+    if (typeof COG_SOURCES !== 'undefined') {
+        for (const [sourceId, sourceDef] of Object.entries(COG_SOURCES)) {
+            map.addSource(sourceId, sourceDef);
+        }
+        for (const layerDef of COG_LAYERS) {
+            map.addLayer(layerDef);
+        }
+    }
+
+    // Add legend after all layers exist (including dynamically-added COG layers)
+    map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
+
     // layers we need to load dynamically follow:
     // {dynamic_layers}
 

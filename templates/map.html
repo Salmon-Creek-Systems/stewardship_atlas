@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <title>{title}</title>
-    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
-    <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol@0.8.0/dist/index.js'></script>
     <link href='css/map.css' rel='stylesheet' />
     <link href='css/shared_controls.css' rel='stylesheet' />
     <link href='css/console.css' rel='stylesheet' />
@@ -72,6 +73,8 @@
     </div>
     <script src="js/shared_utils.js"></script>
     <script>
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
+
         // API URL for backend calls
         const API_URL = "{app_url}";
         const SWALENAME = "{swalename}";
@@ -113,6 +116,8 @@
         // Initialize the map
         const MAP_CONFIG = {map_config};
         const LEGEND_TARGETS = {legend_targets};
+        const COG_SOURCES = {cog_sources};
+        const COG_LAYERS = {cog_layers};
     </script>
     <script src="js/webmap.js"></script>
     <script>

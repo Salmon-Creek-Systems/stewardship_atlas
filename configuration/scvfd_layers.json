@@ -52,7 +52,8 @@
     {
         "name": "lidar_basemap",
         "geometry_type": "raster",
-        "opacity": 0.0
+        "opacity": 0.0,
+        "qgis_opacity": 1.0
     },
     {
         "name": "usgs_hillshade",

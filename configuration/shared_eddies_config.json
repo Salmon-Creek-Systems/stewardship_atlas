@@ -49,6 +49,16 @@
             "citation": "https://www.scvfd.fireatlas.org"
         }
     },
+    "tiff_to_cog": {
+        "asset_type": "eddy",
+        "fetch_type": "tiff_to_cog",
+        "data_type": "tiff"
+    },
+    "terrain_rgb_tiff": {
+        "asset_type": "eddy",
+        "fetch_type": "terrain_rgb_tiff",
+        "data_type": "tiff"
+    },
     "hillshade_tiles": {
         "asset_type": "eddy",
         "fetch_type": "hillshade_tiles",

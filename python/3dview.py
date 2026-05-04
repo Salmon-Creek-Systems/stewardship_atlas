@@ -162,13 +162,27 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     atlas_name = config['name']
     atlas_path = versioning.atlas_path(config)
 
-    terrain_rgb_file = atlas_path / "layers" / "terrain_rgb_tiles" / "terrain_rgb_tiles.pmtiles"
-    if not terrain_rgb_file.exists():
-        raise FileNotFoundError(
-            f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
-            "run the terrain_rgb_tiles eddy first"
+    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+    terrain_layer_config = layers_dict.get('terrain_rgb_tiles', {})
+
+    if terrain_layer_config.get('cog'):
+        s3_bucket = terrain_layer_config.get('cog_s3_bucket', 'scs-atlas-data')
+        s3_region = terrain_layer_config.get('cog_s3_region', 'us-east-1')
+        terrain_cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
+                           f"/{atlas_name}/rasters/terrain_rgb_tiles/terrain_rgb_tiles.cog.tif")
+        terrain_url_js_line = f"const terrainUrl = 'cog://{terrain_cog_url}';"
+    else:
+        terrain_rgb_file = atlas_path / "layers" / "terrain_rgb_tiles" / "terrain_rgb_tiles.pmtiles"
+        if not terrain_rgb_file.exists():
+            raise FileNotFoundError(
+                f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
+                "run the terrain_rgb_tiles eddy first"
+            )
+        terrain_rgb_rel_path = "../../layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
+        terrain_url_js_line = (
+            f"const terrainUrl = 'pmtiles://' + "
+            f"new URL('{terrain_rgb_rel_path}', window.location.href).href;"
         )
-    terrain_rgb_rel_path = "../../layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
 
     bbox = config['dataswale']['bbox']
     center_lng = (bbox['west'] + bbox['east']) / 2
@@ -227,9 +241,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <title>3D Terrain - {atlas_name.title()}</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' />
-    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
-    <script src='https://unpkg.com/pmtiles@3/dist/pmtiles.js'></script>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <script src='https://unpkg.com/pmtiles@4/dist/pmtiles.js'></script>
+    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol@0.8.0/dist/index.js'></script>
     <style>
         body {{
             margin: 0;
@@ -369,9 +384,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     <script>
         const protocol = new pmtiles.Protocol();
-        maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+        maplibregl.addProtocol('pmtiles', protocol.tile);
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
 
-        const terrainUrl = 'pmtiles://' + new URL('{terrain_rgb_rel_path}', window.location.href).href;
+        {terrain_url_js_line}
 
         const map = new maplibregl.Map({{
             container: 'map',
