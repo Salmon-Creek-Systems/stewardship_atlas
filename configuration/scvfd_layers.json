@@ -112,6 +112,17 @@
         ]
     },
     {
+        "name": "roads_lrs",
+        "geometry_type": "linestring",
+        "color": [255, 140, 0],
+        "constant_width": 5,
+        "interaction": "interface",
+        "show_attributes": true,
+        "paint": {
+            "line-opacity": 0.7
+        }
+    },
+    {
         "name": "lpss",
         "geometry_type": "point",
         "color": [
