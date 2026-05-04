@@ -167,7 +167,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     if terrain_layer_config.get('cog'):
         s3_bucket = terrain_layer_config.get('cog_s3_bucket', 'scs-atlas-data')
-        terrain_cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
+        s3_region = terrain_layer_config.get('cog_s3_region', 'us-east-1')
+        terrain_cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
                            f"/{atlas_name}/rasters/terrain_rgb_tiles/terrain_rgb_tiles.cog.tif")
         terrain_url_js_line = f"const terrainUrl = 'cog://{terrain_cog_url}';"
     else:

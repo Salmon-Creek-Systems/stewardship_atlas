@@ -65,7 +65,8 @@ def webmap_json(config, name, sprite_json=None):
         if layer['geometry_type'] == 'raster':
             if layer.get('cog'):
                 s3_bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
-                cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
+                s3_region = layer.get('cog_s3_region', 'us-east-1')
+                cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
                            f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
                 map_sources[layer_name] = {
                     'type': 'raster',
@@ -2983,6 +2984,7 @@ def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
     outlet_config = config['assets'][outlet_name]['config']
     in_layer = outlet_config['in_layer']
     s3_bucket = outlet_config.get('s3_bucket', 'scs-atlas-data')
+    s3_region = outlet_config.get('s3_region', 'us-east-1')
     atlas_name = config['name']
 
     cog_path = versioning.atlas_path(config, 'layers') / in_layer / f'{in_layer}.cog.tif'
@@ -2999,7 +3001,7 @@ def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
         ExtraArgs={'ContentType': 'image/tiff'}
     )
 
-    s3_url = f"https://{s3_bucket}.s3.us-west-1.amazonaws.com/{s3_key}"
+    s3_url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{s3_key}"
     logger.info(f"s3_upload complete: {s3_url}")
     return cog_path
 
