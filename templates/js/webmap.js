@@ -205,6 +205,16 @@ map.on('load', async () => {
     if (basemapValueToLayer[initialBasemap]) {
         map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
     }
+    // Add COG sources and layers dynamically (protocol requires post-load addition)
+    if (typeof COG_SOURCES !== 'undefined') {
+        for (const [sourceId, sourceDef] of Object.entries(COG_SOURCES)) {
+            map.addSource(sourceId, sourceDef);
+        }
+        for (const layerDef of COG_LAYERS) {
+            map.addLayer(layerDef);
+        }
+    }
+
     // layers we need to load dynamically follow:
     // {dynamic_layers}
 

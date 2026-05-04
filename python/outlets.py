@@ -55,9 +55,11 @@ def webmap_json(config, name, sprite_json=None):
     map_sources = {}
     map_layers = []
     dynamic_layers = []
+    cog_sources = {}
+    cog_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
-    
+
     logger.info(f"In webedit, got Outlet Conf: {outlet_config}")
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
     for layer_name in outlet_config['in_layers']:
@@ -68,11 +70,20 @@ def webmap_json(config, name, sprite_json=None):
                 s3_region = layer.get('cog_s3_region', 'us-east-1')
                 cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
                            f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
-                map_sources[layer_name] = {
+                cog_sources[layer_name] = {
                     'type': 'raster',
                     'url': f"cog://{cog_url}",
                     'tileSize': 256,
                 }
+                cog_layers.append({
+                    'id': f'{layer_name}-layer',
+                    'source': layer_name,
+                    'type': 'raster',
+                    'layout': {'visibility': layer.get('hidden', False) and 'none' or 'visible'},
+                    'paint': {'raster-opacity': layer.get('opacity', 0.8), 'raster-contrast': 0.0},
+                    'metadata': {'name': layer_name, 'group': layer_name},
+                })
+                continue  # source and layer added dynamically after load
             else:
                 layer_dir = versioning.atlas_path(config, "layers") / layer_name
                 raster_filename = (f"{layer_name}.tiff.png"
@@ -443,7 +454,9 @@ def webmap_json(config, name, sprite_json=None):
     logger.info(f"Dynamic layers: {[layer.get('name', 'no-name') for layer in dynamic_layers]}")
     logger.info(f"Legend targets: {len(legend_targets)} layers")
   
-    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets}
+    logger.info(f"COG layers (dynamic): {[l['id'] for l in cog_layers]}")
+    return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
+            "cog_sources": cog_sources, "cog_layers": cog_layers}
 
 def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None):
     """Generate the complete HTML page for viewing a map"""
@@ -545,6 +558,8 @@ void await map.loadImage('{im_uri}',
             title=title,
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
+            cog_sources=json.dumps(map_config_data.get('cog_sources', {}), indent=2),
+            cog_layers=json.dumps(map_config_data.get('cog_layers', []), indent=2),
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
             webmap_help=help_html,
             app_url=app_url,
