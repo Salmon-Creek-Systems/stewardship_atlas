@@ -70,19 +70,22 @@ def webmap_json(config, name, sprite_json=None):
                 s3_region = layer.get('cog_s3_region', 'us-east-1')
                 cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
                            f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+                cog_color = layer.get('cog_color')
+                cog_source_url = f"cog://{cog_url}" + (f"#color:{cog_color}" if cog_color else "")
                 cog_sources[layer_name] = {
                     'type': 'raster',
-                    'url': f"cog://{cog_url}",
+                    'url': cog_source_url,
                     'tileSize': 256,
                 }
-                cog_layers.append({
+                cog_layer_def = {
                     'id': f'{layer_name}-layer',
                     'source': layer_name,
                     'type': 'raster',
-                    'layout': {'visibility': layer.get('hidden', False) and 'none' or 'visible'},
-                    'paint': {'raster-opacity': layer.get('opacity', 0.8), 'raster-contrast': 0.0},
+                    'layout': layer.get('vis', {}).get('layout', {'visibility': 'visible'}),
+                    'paint': {**{'raster-opacity': 0.8, 'raster-contrast': 0.0}, **layer.get('paint', {})},
                     'metadata': {'name': layer_name, 'group': layer_name},
-                })
+                }
+                cog_layers.append(cog_layer_def)
                 continue  # source and layer added dynamically after load
             else:
                 layer_dir = versioning.atlas_path(config, "layers") / layer_name
