@@ -922,8 +922,11 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
 
     logger.info(f"tiff_to_cog: {in_path} -> {out_path}")
 
+    # gdalwarp reprojects to EPSG:3857 (required by maplibre-cog-protocol) and
+    # produces a COG in one pass. -r bilinear is appropriate for continuous rasters.
     result = subprocess.run(
-        ['gdal_translate', '-of', 'COG',
+        ['gdalwarp', '-t_srs', 'EPSG:3857', '-r', 'bilinear',
+         '-of', 'COG',
          '-co', 'COMPRESS=DEFLATE',
          '-co', 'BLOCKSIZE=512',
          '-co', 'OVERVIEW_RESAMPLING=BILINEAR',
@@ -931,7 +934,7 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
         capture_output=True, text=True
     )
     if result.returncode != 0:
-        raise RuntimeError(f"gdal_translate COG failed:\n{result.stderr}")
+        raise RuntimeError(f"gdalwarp COG failed:\n{result.stderr}")
 
     logger.info(f"tiff_to_cog complete: {out_path}")
     return out_path
