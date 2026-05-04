@@ -454,6 +454,9 @@ def webmap_json(config, name, sprite_json=None):
     logger.info(f"Dynamic layers: {[layer.get('name', 'no-name') for layer in dynamic_layers]}")
     logger.info(f"Legend targets: {len(legend_targets)} layers")
   
+    for cog_layer in cog_layers:
+        legend_targets[cog_layer['id']] = cog_layer['metadata']['name']
+
     logger.info(f"COG layers (dynamic): {[l['id'] for l in cog_layers]}")
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
             "cog_sources": cog_sources, "cog_layers": cog_layers}
