@@ -123,6 +123,18 @@
             "license": "Public Domain"
         }
     },
+    "road_lrs": {
+        "type": "eddy",
+        "fetch_type": "road_lrs",
+        "interaction": "backend",
+        "in_layer": "roads",
+        "out_layer": "roads_lrs",
+        "h3_resolution": 12,
+        "lrs_anchor_coordinates": null,
+        "attribution": {
+            "description": "Road LRS — cumulative network distance from anchor via H3 graph"
+        }
+    },
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",

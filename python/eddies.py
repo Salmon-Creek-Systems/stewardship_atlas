@@ -17,6 +17,9 @@ import h3
 from datetime import datetime
 
 import dataswale_geojson as dataswale
+import networkx as nx
+from pyproj import Geod
+from shapely.geometry import shape
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -659,6 +662,99 @@ def h3_cells(config, asset_name):
         raise Exception(f"H3 cells eddy failed: {str(e)}")
 
 
+def road_lrs(config, asset_name):
+    """
+    Eddy: annotate road segments with cumulative network distance from an anchor point.
+
+    Uses H3 cell IDs as topology nodes — each segment's start and end coordinates are
+    snapped to H3 cells at `h3_resolution`. Dijkstra from the anchor cell assigns
+    m_start/m_end (meters) to every reachable segment.
+
+    Required config: lrs_anchor_coordinates [lat, lng]
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config.get('in_layer', 'roads')
+    out_layer = asset_config.get('out_layer', 'roads_lrs')
+    anchor_coords = asset_config.get('lrs_anchor_coordinates')
+    resolution = asset_config.get('h3_resolution', 12)
+
+    if not anchor_coords:
+        raise ValueError(f"road_lrs: lrs_anchor_coordinates [lat, lng] is required in asset config for '{asset_name}'")
+
+    anchor_lat, anchor_lng = anchor_coords
+
+    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not layer_data or 'features' not in layer_data:
+        raise Exception(f"road_lrs: could not load layer '{in_layer}'")
+
+    features = layer_data['features']
+    geod = Geod(ellps='WGS84')
+    G = nx.Graph()
+    segment_nodes = []  # (start_cell, end_cell) per feature index
+
+    for feature in features:
+        geom = feature.get('geometry')
+        if not geom or geom.get('type') != 'LineString':
+            segment_nodes.append((None, None))
+            continue
+
+        coords = geom['coordinates']  # GeoJSON: [lng, lat]
+        start_lng, start_lat = coords[0][0], coords[0][1]
+        end_lng, end_lat = coords[-1][0], coords[-1][1]
+
+        start_cell = h3.latlng_to_cell(start_lat, start_lng, resolution)
+        end_cell = h3.latlng_to_cell(end_lat, end_lng, resolution)
+
+        length_m = abs(geod.geometry_length(shape(geom)))
+
+        if not G.has_edge(start_cell, end_cell):
+            G.add_edge(start_cell, end_cell, weight=length_m)
+        elif length_m < G[start_cell][end_cell]['weight']:
+            G[start_cell][end_cell]['weight'] = length_m
+
+        segment_nodes.append((start_cell, end_cell))
+
+    # Find the graph node nearest to the anchor
+    anchor_cell = h3.latlng_to_cell(anchor_lat, anchor_lng, resolution)
+    if anchor_cell not in G:
+        found = False
+        for ring in range(1, 30):
+            for candidate in h3.grid_disk(anchor_cell, ring):
+                if candidate in G:
+                    anchor_cell = candidate
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            raise Exception("road_lrs: no graph node found within 30 rings of anchor — check lrs_anchor_coordinates and road data")
+
+    logger.info(f"road_lrs: anchor={anchor_cell} resolution={resolution} nodes={G.number_of_nodes()} edges={G.number_of_edges()}")
+
+    distances = nx.single_source_dijkstra_path_length(G, anchor_cell, weight='weight')
+
+    annotated = []
+    for feature, (start_cell, end_cell) in zip(features, segment_nodes):
+        props = dict(feature.get('properties') or {})
+        props['m_start'] = distances.get(start_cell)
+        props['m_end'] = distances.get(end_cell)
+        props['lrs_anchor'] = anchor_cell
+        annotated.append({
+            'type': 'Feature',
+            'geometry': feature['geometry'],
+            'properties': props
+        })
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fc = geojson.FeatureCollection(annotated)
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+
+    logger.info(f"road_lrs: wrote {len(annotated)} features to {out_path}")
+    return str(out_path)
+
+
 def _auto_min_zoom(bounds: dict, configured_min: int) -> int:
     """Compute a safe minimum zoom level based on the DEM's extent.
 
@@ -1202,4 +1298,5 @@ asset_methods = {
     "biochar_simulation": biochar_simulation,
     "tiff_to_cog": tiff_to_cog,
     "terrain_rgb_tiff": terrain_rgb_tiff,
+    "road_lrs": road_lrs,
 }

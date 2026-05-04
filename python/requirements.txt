@@ -21,3 +21,7 @@ boto3>=1.34.0
 
 # Anthropic API (used by sql_generate endpoint for NL→SQL)
 anthropic>=0.25.0
+
+# Road LRS eddy
+networkx>=3.0
+pyproj>=3.0

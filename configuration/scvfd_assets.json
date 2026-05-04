@@ -297,5 +297,10 @@
         "access": [
             "technical"
         ]
+    },
+    "road_lrs": {
+        "type": "eddy",
+        "config_def": "road_lrs",
+        "lrs_anchor_coordinates": [40.205889035286134, -123.89681666989158]
     }
 }
