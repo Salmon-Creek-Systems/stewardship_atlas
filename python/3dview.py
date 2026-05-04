@@ -244,7 +244,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' />
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <script src='https://unpkg.com/pmtiles@3/dist/pmtiles.js'></script>
-    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol/dist/index.js'></script>
+    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol@0.5.0/dist/index.js'></script>
     <style>
         body {{
             margin: 0;
