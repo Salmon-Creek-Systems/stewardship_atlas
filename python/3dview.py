@@ -241,10 +241,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <title>3D Terrain - {atlas_name.title()}</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' />
-    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
-    <script src='https://unpkg.com/pmtiles@3/dist/pmtiles.js'></script>
-    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol@0.5.0/dist/index.js'></script>
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <script src='https://unpkg.com/pmtiles@4/dist/pmtiles.js'></script>
+    <script src='https://unpkg.com/@geomatico/maplibre-cog-protocol@0.8.0/dist/index.js'></script>
     <style>
         body {{
             margin: 0;
@@ -384,8 +384,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     <script>
         const protocol = new pmtiles.Protocol();
-        maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
-        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol || MaplibreCOGProtocol.default);
+        maplibregl.addProtocol('pmtiles', protocol.tile);
+        maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
 
         {terrain_url_js_line}
 
