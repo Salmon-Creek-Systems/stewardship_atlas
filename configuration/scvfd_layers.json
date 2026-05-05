@@ -144,7 +144,7 @@
         "fill_color": [50, 50, 50],
         "add_labels": true,
         "symbol": {"png": "map_marker.png"},
-        "icon-size": 0.5,
+        "icon-size": 1.5,
         "icon-anchor": "bottom",
         "interaction": "interface",
         "show_attributes": true,
