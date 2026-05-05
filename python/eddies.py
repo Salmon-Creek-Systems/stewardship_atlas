@@ -778,11 +778,13 @@ def road_lrs_markers(config, asset_name):
     features = layer_data['features']
     if road_names:
         # Prefix match: "Thomas" matches "Thomas Road", "Thomas Drive", etc.
+        road_names_lower = [p.lower() for p in road_names]
         def _name_matches(feature_name):
             if not feature_name:
                 return False
-            for prefix in road_names:
-                if feature_name == prefix or feature_name.startswith(prefix + ' '):
+            n = feature_name.lower()
+            for prefix in road_names_lower:
+                if n == prefix or n.startswith(prefix + ' '):
                     return True
             return False
         all_names = sorted({f.get('properties', {}).get('name') for f in features if f.get('properties', {}).get('name')})
