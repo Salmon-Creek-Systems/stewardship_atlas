@@ -785,7 +785,13 @@ def road_lrs_markers(config, asset_name):
                 if feature_name == prefix or feature_name.startswith(prefix + ' '):
                     return True
             return False
+        all_names = sorted({f.get('properties', {}).get('name') for f in features if f.get('properties', {}).get('name')})
         features = [f for f in features if _name_matches(f.get('properties', {}).get('name'))]
+        if not features:
+            raise Exception(
+                f"road_lrs_markers: road_names filter matched 0 segments. "
+                f"Available road names in '{in_layer}': {all_names}"
+            )
         logger.info(f"road_lrs_markers: road_names filter active, {len(features)} segments match {road_names}")
 
     # Determine maximum reachable distance
