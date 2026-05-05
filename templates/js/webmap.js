@@ -33,6 +33,15 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
+// Map state encoding: ?s=<base64(JSON)>
+// Keys: a=lat, o=lng, z=zoom, b=basemap, l=visible layer names
+function encodeMapState(lat, lng, zoom, basemap, layers) {
+    return btoa(JSON.stringify({a: lat, o: lng, z: zoom, b: basemap, l: layers}));
+}
+function decodeMapState(s) {
+    try { return JSON.parse(atob(s)); } catch(e) { return null; }
+}
+
 // Function to add a marker at specified coordinates
 function addLocationMarker(lat, lng) {
     // Create a marker element
@@ -111,29 +120,34 @@ map.on('load', async () => {
     const style = map.getStyle();
     const firstLayerId = style.layers[0].id;
 
-    // Handle URL parameters after map is loaded
-    if (urlLat && urlLng) {
-        const lat = parseFloat(urlLat);
-        const lng = parseFloat(urlLng);
-        const zoom = urlZoom ? parseFloat(urlZoom) : 14; // Default zoom if not specified
-        
-        console.log('Processing URL parameters:', { lat, lng, zoom });
-        
-        // Validate coordinates
+    // Handle URL parameters after map is loaded.
+    // ?s= param: base64-encoded JSON state (preferred, set by internal share link).
+    // ?lat=&lng=&zoom= params: legacy fallback so old links continue to work.
+    const urlState = decodeMapState(getUrlParameter('s'));
+    let targetLat, targetLng, targetZoom;
+    if (urlState) {
+        targetLat = urlState.a;
+        targetLng = urlState.o;
+        targetZoom = urlState.z;
+        if (urlState.b) {
+            const basemapSelect = document.getElementById('basemap-select');
+            if (basemapSelect) basemapSelect.value = urlState.b;
+        }
+    } else if (urlLat && urlLng) {
+        targetLat = parseFloat(urlLat);
+        targetLng = parseFloat(urlLng);
+        targetZoom = urlZoom ? parseFloat(urlZoom) : 14;
+    }
+
+    if (targetLat !== undefined && targetLng !== undefined) {
+        const lat = targetLat;
+        const lng = targetLng;
+        const zoom = targetZoom !== undefined ? targetZoom : 14;
         if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-            // Validate zoom level (0-22)
             const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 14;
-            
-            console.log('Valid coordinates, centering map...');
-            
-            // Center map on the specified location
             map.setCenter([lng, lat]);
-            map.setZoom(validZoom); // Use the specified or validated zoom level
-            
-            // Add a marker at the location
+            map.setZoom(validZoom);
             addLocationMarker(lat, lng);
-            
-            console.log(`Map centered at: ${lat}, ${lng} with zoom: ${validZoom}`);
         } else {
             console.warn('Invalid coordinates in URL parameters');
         }
@@ -211,6 +225,16 @@ map.on('load', async () => {
         }
         for (const layerDef of COG_LAYERS) {
             map.addLayer(layerDef);
+        }
+    }
+
+    // Restore layer visibility from ?s= state before legend initializes (so checkboxes render correctly)
+    if (urlState && urlState.l) {
+        const visibleSet = new Set(urlState.l);
+        for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
+            if (map.getLayer(layerId)) {
+                map.setLayoutProperty(layerId, 'visibility', visibleSet.has(layerName) ? 'visible' : 'none');
+            }
         }
     }
 
@@ -494,7 +518,15 @@ map.on('load', async () => {
         } else if (format === 'google') { // Google Maps link with pin
             textToCopy = `https://www.google.com/maps?q=${lngLat.lat},${lngLat.lng}`;
         } else if (format === 'internal') { // Internal map link
-            textToCopy = `https://${window.location.hostname}${window.location.pathname}?lat=${lngLat.lat}&lng=${lngLat.lng}&zoom=${map.getZoom()}`;
+            const basemap = document.getElementById('basemap-select').value;
+            const visibleLayers = [];
+            for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
+                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') === 'visible') {
+                    visibleLayers.push(layerName);
+                }
+            }
+            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers);
+            textToCopy = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
         }
         
         console.log('Text to copy:', textToCopy);
