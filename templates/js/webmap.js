@@ -249,7 +249,7 @@ map.on('load', async () => {
     // Add click handler for features and coordinates
     map.on('click', (e) => {
         if (e.originalEvent.metaKey || e.originalEvent.altKey || e.originalEvent.ctrlKey) {
-            handleLocationShare(e.lngLat);
+            handleLocationShare(e.lngLat, true);
             return;
         }
 
@@ -430,7 +430,7 @@ map.on('load', async () => {
             try {
                 // Convert screen coordinates directly to map coordinates
                 const lngLat = map.unproject([touchStartPos.x, touchStartPos.y]);
-                handleLocationShare(lngLat);
+                handleLocationShare(lngLat, true);
             } catch (error) {
                 console.error('Error in coordinate conversion:', error);
             }
@@ -503,8 +503,8 @@ map.on('load', async () => {
         }
     });
 
-    // Function to handle location sharing
-    function handleLocationShare(lngLat) {
+    // Function to handle location sharing. isPoint=true adds a marker for the recipient (alt-click use case).
+    function handleLocationShare(lngLat, isPoint = false) {
         console.log('Location sharing triggered at:', lngLat);
         
         const coords = {
@@ -527,7 +527,7 @@ map.on('load', async () => {
                     visibleLayers.push(layerName);
                 }
             }
-            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers, true);
+            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers, isPoint);
             textToCopy = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
         }
         
@@ -576,27 +576,12 @@ map.on('load', async () => {
         window.location.href = url;
     }
     
-    // Share current view button — encodes center+zoom+layers+basemap, no point marker
+    // Share button — same formats as alt-click point share, but using map center as coordinates
     const shareViewBtn = document.getElementById('share-view-btn');
     if (shareViewBtn) {
         shareViewBtn.addEventListener('click', () => {
             const center = map.getCenter();
-            const basemap = document.getElementById('basemap-select').value;
-            const visibleLayers = [];
-            for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
-                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') === 'visible') {
-                    visibleLayers.push(layerName);
-                }
-            }
-            const state = encodeMapState(center.lat, center.lng, map.getZoom(), basemap, visibleLayers);
-            const url = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(() => {
-                    showSuccessNotification('View link copied to clipboard!');
-                }).catch(() => { alert(`Share this link:\n\n${url}`); });
-            } else {
-                alert(`Share this link:\n\n${url}`);
-            }
+            handleLocationShare(center);
         });
     }
 
