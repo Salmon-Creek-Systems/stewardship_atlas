@@ -112,6 +112,45 @@
         ]
     },
     {
+        "name": "roads_lrs",
+        "geometry_type": "linestring",
+        "color": [255, 140, 0],
+        "interaction": "interface",
+        "show_attributes": true,
+        "editable_columns": [
+            {"name": "m_start", "type": "string", "default": ""},
+            {"name": "m_end", "type": "string", "default": ""}
+        ],
+        "paint": {
+            "line-color": ["interpolate", ["linear"],
+                ["min",
+                    ["coalesce", ["get", "m_start"], 14000],
+                    ["coalesce", ["get", "m_end"], 14000]
+                ],
+                0, "#00c800",
+                5000, "#ffff00",
+                9000, "#ffa500",
+                13000, "#c80000",
+                14000, "#888888"
+            ],
+            "line-width": 5,
+            "line-opacity": 0.85
+        }
+    },
+    {
+        "name": "lrs_markers",
+        "geometry_type": "point",
+        "color": [255, 255, 255],
+        "fill_color": [50, 50, 50],
+        "add_labels": true,
+        "interaction": "interface",
+        "show_attributes": true,
+        "editable_columns": [
+            {"name": "d_m", "type": "string", "default": ""},
+            {"name": "d_km", "type": "string", "default": ""}
+        ]
+    },
+    {
         "name": "lpss",
         "geometry_type": "point",
         "color": [

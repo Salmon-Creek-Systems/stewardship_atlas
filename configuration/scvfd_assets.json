@@ -111,6 +111,8 @@
             "ponds",
             "contours",
             "roads",
+            "roads_lrs",
+            "lrs_markers",
             "creeks",
             "buildings",
             "hydrants",
@@ -119,7 +121,7 @@
             "lpss",
             "hazards"
         ],
-        "hidden_layers": ["lpss"],
+        "hidden_layers": ["lpss", "roads_lrs", "lrs_markers"],
         "config_def": "webmap",
         "access": [
             "public",
@@ -297,5 +299,14 @@
         "access": [
             "technical"
         ]
+    },
+    "road_lrs": {
+        "type": "eddy",
+        "config_def": "road_lrs",
+        "lrs_anchor_coordinates": [40.205889035286134, -123.89681666989158]
+    },
+    "road_lrs_markers": {
+        "type": "eddy",
+        "config_def": "road_lrs_markers"
     }
 }
