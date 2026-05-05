@@ -149,6 +149,7 @@
         "interaction": "interface",
         "show_attributes": true,
         "editable_columns": [
+            {"name": "name", "type": "string", "default": ""},
             {"name": "d_m", "type": "string", "default": ""},
             {"name": "d_km", "type": "string", "default": ""}
         ]

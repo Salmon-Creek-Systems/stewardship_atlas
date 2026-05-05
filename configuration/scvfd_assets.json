@@ -178,7 +178,8 @@
             "watertanks",
             "photos",
             "private_notes",
-            "hazards"
+            "hazards",
+            "lrs_markers"
         ],
         "config_def": "webedit"
     },
