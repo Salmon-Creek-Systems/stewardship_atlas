@@ -34,9 +34,11 @@ function getUrlParameter(name) {
 }
 
 // Map state encoding: ?s=<base64(JSON)>
-// Keys: a=lat, o=lng, z=zoom, b=basemap, l=visible layer names
-function encodeMapState(lat, lng, zoom, basemap, layers) {
-    return btoa(JSON.stringify({a: lat, o: lng, z: zoom, b: basemap, l: layers}));
+// Keys: a=lat, o=lng, z=zoom, b=basemap, l=visible layer names, p=point marker (omit for view-only links)
+function encodeMapState(lat, lng, zoom, basemap, layers, isPoint = false) {
+    const state = {a: lat, o: lng, z: zoom, b: basemap, l: layers};
+    if (isPoint) state.p = true;
+    return btoa(JSON.stringify(state));
 }
 function decodeMapState(s) {
     try { return JSON.parse(atob(s)); } catch(e) { return null; }
@@ -147,7 +149,7 @@ map.on('load', async () => {
             const validZoom = !isNaN(zoom) && zoom >= 0 && zoom <= 22 ? zoom : 14;
             map.setCenter([lng, lat]);
             map.setZoom(validZoom);
-            addLocationMarker(lat, lng);
+            if (!urlState || urlState.p) addLocationMarker(lat, lng); // marker only for point links or legacy ?lat= links
         } else {
             console.warn('Invalid coordinates in URL parameters');
         }
@@ -525,7 +527,7 @@ map.on('load', async () => {
                     visibleLayers.push(layerName);
                 }
             }
-            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers);
+            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers, true);
             textToCopy = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
         }
         
@@ -574,6 +576,30 @@ map.on('load', async () => {
         window.location.href = url;
     }
     
+    // Share current view button — encodes center+zoom+layers+basemap, no point marker
+    const shareViewBtn = document.getElementById('share-view-btn');
+    if (shareViewBtn) {
+        shareViewBtn.addEventListener('click', () => {
+            const center = map.getCenter();
+            const basemap = document.getElementById('basemap-select').value;
+            const visibleLayers = [];
+            for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
+                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') === 'visible') {
+                    visibleLayers.push(layerName);
+                }
+            }
+            const state = encodeMapState(center.lat, center.lng, map.getZoom(), basemap, visibleLayers);
+            const url = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showSuccessNotification('View link copied to clipboard!');
+                }).catch(() => { alert(`Share this link:\n\n${url}`); });
+            } else {
+                alert(`Share this link:\n\n${url}`);
+            }
+        });
+    }
+
     // Add event listeners for the Go button and Enter key
     const goBtn = document.getElementById('go-location-btn');
     const locationInput = document.getElementById('location-input');
