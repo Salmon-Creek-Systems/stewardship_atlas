@@ -769,12 +769,17 @@ def road_lrs_markers(config, asset_name):
     interval = asset_config.get('marker_interval_m', 1000)
     label_template = asset_config.get('label_template', '{d_km:.0f} km')
     marker_bbox = asset_config.get('marker_bbox')  # [west, south, east, north] or None
+    road_names = asset_config.get('road_names')    # list of road names to include, or null for all
 
     layer_data = dataswale.layer_as_featurecollection(config, in_layer)
     if not layer_data or 'features' not in layer_data:
         raise Exception(f"road_lrs_markers: could not load layer '{in_layer}'")
 
     features = layer_data['features']
+    if road_names:
+        road_names_set = set(road_names)
+        features = [f for f in features if f.get('properties', {}).get('name') in road_names_set]
+        logger.info(f"road_lrs_markers: road_names filter active, {len(features)} segments match {road_names}")
 
     # Determine maximum reachable distance
     max_d = 0.0

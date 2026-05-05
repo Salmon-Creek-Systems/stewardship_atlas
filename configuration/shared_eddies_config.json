@@ -144,6 +144,7 @@
         "marker_interval_m": 1000,
         "label_template": "{d_km:.0f} km",
         "marker_bbox": null,
+        "road_names": null,
         "attribution": {
             "description": "Distance markers derived from road LRS"
         }

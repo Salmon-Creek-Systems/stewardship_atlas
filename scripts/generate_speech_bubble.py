@@ -4,6 +4,7 @@ Outputs to templates/icons/:
   speech_bubble.png  — conversation badge overlay (blue, 80x80)
   camera.png         — photos layer marker (bright green, 80x80)
   eye.png            — notes layer marker (bright blue, 80x80)
+  map_marker.png     — generic map pin (black/white, 80x80)
 
 Run from repo root: python3 scripts/generate_speech_bubble.py
 """
@@ -95,10 +96,30 @@ def draw_eye():
     return img
 
 
+def draw_map_marker():
+    img = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    black = (20, 20, 20, 255)
+    white = (255, 255, 255, 255)
+
+    # Teardrop body: filled circle on top + triangle tail pointing down
+    # Circle: center (40, 26), radius 22
+    draw.ellipse([18, 4, 62, 48], fill=black)
+    # Triangle from the equator of the circle down to a point
+    draw.polygon([(18, 26), (62, 26), (40, 70)], fill=black)
+
+    # Inner white circle — hollow centre of the pin
+    draw.ellipse([29, 15, 51, 37], fill=white)
+
+    return img
+
+
 icons = [
     ('speech_bubble.png', draw_speech_bubble),
     ('camera.png',        draw_camera),
     ('eye.png',           draw_eye),
+    ('map_marker.png',    draw_map_marker),
 ]
 
 for filename, fn in icons:
