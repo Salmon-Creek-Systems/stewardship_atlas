@@ -135,6 +135,19 @@
             "description": "Road LRS — cumulative network distance from anchor via H3 graph"
         }
     },
+    "road_lrs_markers": {
+        "type": "eddy",
+        "fetch_type": "road_lrs_markers",
+        "interaction": "backend",
+        "in_layer": "roads_lrs",
+        "out_layer": "lrs_markers",
+        "marker_interval_m": 1000,
+        "label_template": "{d_km:.0f} km",
+        "marker_bbox": null,
+        "attribution": {
+            "description": "Distance markers derived from road LRS"
+        }
+    },
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",

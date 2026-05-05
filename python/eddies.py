@@ -755,6 +755,95 @@ def road_lrs(config, asset_name):
     return str(out_path)
 
 
+def road_lrs_markers(config, asset_name):
+    """
+    Eddy: generate a point layer of distance markers at regular intervals along a road LRS layer.
+
+    Reads an roads_lrs-style layer (with m_start/m_end per segment), then for each marker
+    distance d uses shapely interpolation to place a point at the exact position on each
+    segment that spans that distance.
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config.get('in_layer', 'roads_lrs')
+    out_layer = asset_config.get('out_layer', 'lrs_markers')
+    interval = asset_config.get('marker_interval_m', 1000)
+    label_template = asset_config.get('label_template', '{d_km:.0f} km')
+    marker_bbox = asset_config.get('marker_bbox')  # [west, south, east, north] or None
+
+    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not layer_data or 'features' not in layer_data:
+        raise Exception(f"road_lrs_markers: could not load layer '{in_layer}'")
+
+    features = layer_data['features']
+
+    # Determine maximum reachable distance
+    max_d = 0.0
+    for feature in features:
+        props = feature.get('properties') or {}
+        m_start = props.get('m_start')
+        m_end = props.get('m_end')
+        if m_start is not None:
+            max_d = max(max_d, m_start)
+        if m_end is not None:
+            max_d = max(max_d, m_end)
+
+    if max_d == 0:
+        raise Exception(f"road_lrs_markers: no reachable distances found in '{in_layer}' — run road_lrs first")
+
+    marker_distances = range(0, int(max_d) + interval, interval)
+    logger.info(f"road_lrs_markers: {len(features)} segments, max_d={max_d:.0f}m, {len(marker_distances)} marker distances")
+
+    points = []
+    for d in marker_distances:
+        for feature in features:
+            props = feature.get('properties') or {}
+            m_start = props.get('m_start')
+            m_end = props.get('m_end')
+            geom = feature.get('geometry')
+
+            if m_start is None or m_end is None or not geom:
+                continue
+            if m_start == m_end:
+                continue
+
+            lo, hi = min(m_start, m_end), max(m_start, m_end)
+            if not (lo <= d <= hi):
+                continue
+
+            if m_start <= m_end:
+                frac = (d - m_start) / (m_end - m_start)
+            else:
+                frac = 1.0 - (d - m_end) / (m_start - m_end)
+
+            pt = shape(geom).interpolate(frac, normalized=True)
+
+            if marker_bbox:
+                west, south, east, north = marker_bbox
+                lng, lat = pt.x, pt.y
+                if not (west <= lng <= east and south <= lat <= north):
+                    continue
+
+            label = label_template.format(d_m=int(d), d_km=d / 1000, d_mi=d / 1609.34)
+            points.append({
+                'type': 'Feature',
+                'geometry': {'type': 'Point', 'coordinates': [pt.x, pt.y]},
+                'properties': {
+                    'name': label,
+                    'd_m': int(d),
+                    'd_km': round(d / 1000, 3),
+                }
+            })
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fc = geojson.FeatureCollection(points)
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+
+    logger.info(f"road_lrs_markers: wrote {len(points)} markers to {out_path}")
+    return str(out_path)
+
+
 def _auto_min_zoom(bounds: dict, configured_min: int) -> int:
     """Compute a safe minimum zoom level based on the DEM's extent.
 
@@ -1299,4 +1388,5 @@ asset_methods = {
     "tiff_to_cog": tiff_to_cog,
     "terrain_rgb_tiff": terrain_rgb_tiff,
     "road_lrs": road_lrs,
+    "road_lrs_markers": road_lrs_markers,
 }
