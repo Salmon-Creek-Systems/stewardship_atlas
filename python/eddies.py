@@ -777,8 +777,15 @@ def road_lrs_markers(config, asset_name):
 
     features = layer_data['features']
     if road_names:
-        road_names_set = set(road_names)
-        features = [f for f in features if f.get('properties', {}).get('name') in road_names_set]
+        # Prefix match: "Thomas" matches "Thomas Road", "Thomas Drive", etc.
+        def _name_matches(feature_name):
+            if not feature_name:
+                return False
+            for prefix in road_names:
+                if feature_name == prefix or feature_name.startswith(prefix + ' '):
+                    return True
+            return False
+        features = [f for f in features if _name_matches(f.get('properties', {}).get('name'))]
         logger.info(f"road_lrs_markers: road_names filter active, {len(features)} segments match {road_names}")
 
     # Determine maximum reachable distance

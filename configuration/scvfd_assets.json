@@ -307,6 +307,14 @@
     },
     "road_lrs_markers": {
         "type": "eddy",
-        "config_def": "road_lrs_markers"
+        "config_def": "road_lrs_markers",
+        "road_names": [
+            "Thomas",
+            "Upper Samuels Ranch",
+            "Lower Samuels Ranch",
+            "Flicker",
+            "Early Ranch",
+            "Upper Thomas"
+        ]
     }
 }
