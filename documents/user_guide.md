@@ -23,6 +23,7 @@
   - [Adding Private S3 Data Layers](#adding-private-s3-data-layers)
   - [Layer Zoom Visibility](#layer-zoom-visibility)
   - [Custom Layer Icons (Sprite System)](#custom-layer-icons-sprite-system)
+  - [Layer Interaction Options](#layer-interaction-options)
 - [Technical Details](#technical-details)
   - [System Requirements](#system-requirements)
   - [Data Formats](#data-formats)
@@ -477,6 +478,77 @@ Place the PNG file in one of two locations:
 - **Shared**: `templates/icons/` in the repo — checked in to git and available to all atlases. The sprite loader checks `local/` first and falls back to `templates/icons/` automatically.
 
 Icons are compiled into a sprite sheet (sprite.png + sprite.json) at webmap build time. The `icon` value in the `symbol` key is the sprite symbol name that MapLibre references; it must match the PNG filename without extension.
+
+---
+
+### Layer Interaction Options
+
+These layer config fields control how a layer behaves in the webmap and admin console. They go in `{atlas}_layers.json`.
+
+#### Click popups (`show_attributes` + `editable_columns`)
+
+To make clicking a feature open a popup showing its properties, set **both**:
+
+```json
+{
+    "name": "hydrants",
+    "geometry_type": "point",
+    "show_attributes": true,
+    "editable_columns": [
+        {"name": "capacity", "type": "string", "default": ""},
+        {"name": "access",   "type": "string", "default": "no"}
+    ]
+}
+```
+
+`show_attributes` alone is not enough — `editable_columns` must also be present and list the fields to display. Fields listed here appear in both the webmap popup and the web editor. The layer also needs to be in the `webedit` asset's `in_layers` for editing to work; `show_attributes` in the webmap popup works independently of that.
+
+#### Conversations (`conversations_enabled`)
+
+Enables a comment/annotation thread on individual features. Clicking a feature opens a popup with the comment history and a form to add a new comment. Comments are stored as a delta on the feature.
+
+```json
+{"name": "photos", ..., "conversations_enabled": true}
+```
+
+A speech-bubble badge is automatically overlaid on the feature's icon when comments exist. `conversations_enabled` must be present on the layer; it is also propagated to badge overlay layers automatically.
+
+#### Admin console list (`interaction`)
+
+Controls whether the layer appears in the admin console's layer list (and therefore the web editor layer picker):
+
+```json
+{"name": "roads", ..., "interaction": "interface"}
+```
+
+Layers without `interaction: "interface"` are invisible in the console UI even if they are present in the atlas. Most editable layers should have this set.
+
+#### Initially hidden in webmap (`hidden_layers`)
+
+A layer can be included in the webmap but hidden by default — still accessible via the legend toggle. Configure this in the **asset** config (not the layer config), under the `webmap` or `private_webmap` asset:
+
+```json
+"webmap": {
+    "type": "outlet",
+    "in_layers": ["roads", "roads_lrs", "lrs_markers", ...],
+    "hidden_layers": ["roads_lrs", "lrs_markers"],
+    ...
+}
+```
+
+Hidden layers are fully rendered and clickable once toggled on; they just start invisible. Useful for supplementary or technical layers that shouldn't clutter the default view.
+
+#### Summary table
+
+| Field | Where | Effect |
+|---|---|---|
+| `show_attributes: true` | layer config | Enables click popup (requires `editable_columns`) |
+| `editable_columns: [...]` | layer config | Fields shown in popup and web editor |
+| `conversations_enabled: true` | layer config | Enables per-feature comment threads |
+| `interaction: "interface"` | layer config | Layer appears in admin console list and editor |
+| `hidden_layers: [...]` | asset config | Layer present in webmap but hidden by default |
+
+All of these require re-running `build_atlas.py config_only` and then rematerialising the relevant outlet (`webmap`, `webedit`, or `html`) before they take effect.
 
 ---
 
