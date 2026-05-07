@@ -149,6 +149,17 @@
             "description": "Distance markers derived from road LRS"
         }
     },
+    "ssurgo_enrich": {
+        "type": "eddy",
+        "fetch_type": "ssurgo_enrich",
+        "interaction": "backend",
+        "in_layer": "sites",
+        "attribution": {
+            "url": "https://sdmdataaccess.nrcs.usda.gov/",
+            "description": "USDA-NRCS SSURGO soil properties via Soil Data Access REST API",
+            "license": "Public Domain"
+        }
+    },
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",
