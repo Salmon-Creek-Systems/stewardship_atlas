@@ -45,11 +45,16 @@
         "editable_columns": [{"name": "name", "type": "string", "default": "Treatment Area"}],
         "vis": {
             "layout": {
-                "visibility": "true"
+                "visibility": "visible"
             }
         }
     },
     {"name": "burn_sites", "geometry_type": "point", "color": [128, 0, 128],
      "add_labels": true, "interaction": "interface", "access": ["admin"],
-     "editable_columns": [{"name": "name", "type": "string", "default": "Processing Site"}]}
+     "editable_columns": [{"name": "name", "type": "string", "default": "Processing Site"}],
+    "vis": {
+            "layout": {
+                "visibility": "visible"
+            }
+        }}
 ]
