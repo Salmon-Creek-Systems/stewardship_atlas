@@ -1419,6 +1419,17 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     features = layer_data['features']
     logger.info(f"ssurgo_enrich: looking up {len(features)} points")
 
+    def _sda_post(sql, timeout):
+        body = {'query': sql, 'format': 'JSON+COLUMNNAMES'}
+        resp = requests.post(SDA_URL, json=body, timeout=timeout)
+        if not resp.ok:
+            raise Exception(
+                f"HTTP {resp.status_code}\n"
+                f"  request body: {json.dumps(body)}\n"
+                f"  response: {resp.text[:500]}"
+            )
+        return resp.json().get('Table', [])
+
     # Phase 1: per-point mukey lookup
     mukeys = {}
     for i, feature in enumerate(features):
@@ -1426,12 +1437,14 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
         if geom.get('type') != 'Point':
             mukeys[i] = None
             continue
-        lon, lat = geom['coordinates'][0], geom['coordinates'][1]
-        sql = f"SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT({lon} {lat})')"
+        coords = geom['coordinates']
+        lon, lat = coords[0], coords[1]
+        if lon is None or lat is None:
+            mukeys[i] = None
+            continue
+        sql = f"SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT({float(lon):.8f} {float(lat):.8f})')"
         try:
-            resp = requests.post(SDA_URL, json={'query': sql, 'format': 'JSON+COLUMNNAMES'}, timeout=15)
-            resp.raise_for_status()
-            rows = resp.json().get('Table', [])
+            rows = _sda_post(sql, timeout=15)
             mukeys[i] = rows[1][0] if len(rows) > 1 else None
         except Exception as e:
             logger.warning(f"ssurgo_enrich: mukey lookup failed for feature {i}: {e}")
@@ -1453,9 +1466,7 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
             ORDER BY co.mukey, co.comppct_r DESC
         """
         try:
-            resp = requests.post(SDA_URL, json={'query': sql, 'format': 'JSON+COLUMNNAMES'}, timeout=30)
-            resp.raise_for_status()
-            rows = resp.json().get('Table', [])
+            rows = _sda_post(sql, timeout=30)
             if len(rows) > 1:
                 headers = rows[0]
                 seen = set()
