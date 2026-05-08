@@ -153,7 +153,7 @@
         "type": "eddy",
         "fetch_type": "ssurgo_enrich",
         "interaction": "backend",
-        "in_layer": "sites",
+        "in_layer": "burn_sites",
         "attribution": {
             "url": "https://sdmdataaccess.nrcs.usda.gov/",
             "description": "USDA-NRCS SSURGO soil properties via Soil Data Access REST API",
