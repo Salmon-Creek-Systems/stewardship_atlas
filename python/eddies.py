@@ -1420,7 +1420,7 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     logger.info(f"ssurgo_enrich: looking up {len(features)} points")
 
     def _sda_post(sql, timeout):
-        body = {'query': sql, 'format': 'JSON+COLUMNNAMES'}
+        body = {'query': sql, 'format': 'json+columnname'}
         resp = requests.post(SDA_URL, json=body, timeout=timeout)
         if not resp.ok:
             raise Exception(
