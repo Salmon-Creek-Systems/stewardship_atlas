@@ -16,6 +16,7 @@ import outlets
 import h3
 from datetime import datetime
 
+import requests
 import dataswale_geojson as dataswale
 import networkx as nx
 from pyproj import Geod
@@ -1396,6 +1397,119 @@ def biochar_simulation(config, asset_name):
         logger.warning("biochar_simulation: processing_sites layer not found or empty, skipping annotation")
 
 
+def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
+    """
+    Enrich a point layer with SSURGO soil properties via NRCS Soil Data Access REST API.
+
+    Two-phase: per-point spatial query to resolve mukey, then one batched SQL query
+    for component/horizon properties across all unique mukeys. Features that fail
+    lookup get ssurgo_error instead of soil fields.
+
+    Config: in_layer (required), out_layer (optional, defaults to in_layer)
+    """
+    SDA_URL = 'https://sdmdataaccess.nrcs.usda.gov/tabular/post.rest'
+
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config['in_layer']
+    out_layer = asset_config.get('out_layer', in_layer)
+
+    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not layer_data or not layer_data.get('features'):
+        raise Exception(f"ssurgo_enrich: could not load layer '{in_layer}'")
+    features = layer_data['features']
+    logger.info(f"ssurgo_enrich: looking up {len(features)} points")
+
+    def _sda_post(sql, timeout):
+        body = {'query': sql, 'format': 'json+columnname'}
+        resp = requests.post(SDA_URL, json=body, timeout=timeout)
+        if not resp.ok:
+            raise Exception(
+                f"HTTP {resp.status_code}\n"
+                f"  request body: {json.dumps(body)}\n"
+                f"  response: {resp.text[:500]}"
+            )
+        return resp.json().get('Table', [])
+
+    # Phase 1: per-point mukey lookup
+    mukeys = {}
+    for i, feature in enumerate(features):
+        geom = feature.get('geometry', {})
+        if geom.get('type') != 'Point':
+            mukeys[i] = None
+            continue
+        coords = geom['coordinates']
+        lon, lat = coords[0], coords[1]
+        if lon is None or lat is None:
+            mukeys[i] = None
+            continue
+        sql = f"SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT({float(lon):.8f} {float(lat):.8f})')"
+        try:
+            rows = _sda_post(sql, timeout=15)
+            mukeys[i] = rows[1][0] if len(rows) > 1 else None
+        except Exception as e:
+            logger.warning(f"ssurgo_enrich: mukey lookup failed for feature {i}: {e}")
+            mukeys[i] = None
+
+    # Phase 2: batch properties query for all unique mukeys
+    unique_mukeys = [m for m in set(mukeys.values()) if m is not None]
+    props_by_mukey = {}
+    if unique_mukeys:
+        mukey_list = ','.join(f"'{m}'" for m in unique_mukeys)
+        sql = f"""
+            SELECT co.mukey, co.compname, co.drainagecl,
+                   ch.ph1to1h2o_r, ch.om_r, ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r
+            FROM component co
+            INNER JOIN chorizon ch ON co.cokey = ch.cokey
+            WHERE co.mukey IN ({mukey_list})
+            AND co.majcompflag = 'Yes'
+            AND ch.hzdept_r = (SELECT MIN(h2.hzdept_r) FROM chorizon h2 WHERE h2.cokey = co.cokey)
+            ORDER BY co.mukey, co.comppct_r DESC
+        """
+        try:
+            rows = _sda_post(sql, timeout=30)
+            if len(rows) > 1:
+                headers = rows[0]
+                seen = set()
+                for row in rows[1:]:
+                    row_dict = dict(zip(headers, row))
+                    mk = row_dict.get('mukey')
+                    if mk and mk not in seen:
+                        seen.add(mk)
+                        props_by_mukey[mk] = row_dict
+        except Exception as e:
+            logger.warning(f"ssurgo_enrich: batch properties query failed: {e}")
+
+    # Phase 3: annotate features
+    enriched = []
+    for i, feature in enumerate(features):
+        props = dict(feature.get('properties') or {})
+        mukey = mukeys.get(i)
+        if mukey is None:
+            props['ssurgo_error'] = 'no mukey found'
+        elif mukey not in props_by_mukey:
+            props['ssurgo_mukey'] = mukey
+            props['ssurgo_error'] = 'no component data'
+        else:
+            soil = props_by_mukey[mukey]
+            props['ssurgo_mukey'] = mukey
+            props['ssurgo_compname'] = soil.get('compname')
+            props['ssurgo_drainagecl'] = soil.get('drainagecl')
+            props['ssurgo_ph'] = soil.get('ph1to1h2o_r')
+            props['ssurgo_om'] = soil.get('om_r')
+            props['ssurgo_sand'] = soil.get('sandtotal_r')
+            props['ssurgo_silt'] = soil.get('silttotal_r')
+            props['ssurgo_clay'] = soil.get('claytotal_r')
+        enriched.append({'type': 'Feature', 'geometry': feature['geometry'], 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fc = geojson.FeatureCollection(enriched)
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+    logger.info(f"ssurgo_enrich: wrote {len(enriched)} features to {out_path}")
+    return str(out_path)
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -1409,4 +1523,5 @@ asset_methods = {
     "terrain_rgb_tiff": terrain_rgb_tiff,
     "road_lrs": road_lrs,
     "road_lrs_markers": road_lrs_markers,
+    "ssurgo_enrich": ssurgo_enrich,
 }
