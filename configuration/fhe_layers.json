@@ -302,13 +302,24 @@
     {
         "name": "h3_grid_r9",
         "geometry_type": "polygon",
-        "color": [139, 90, 43],
-        "fill_color": [139, 90, 43],
-        "fill_opacity": 0.3,
+        "color": [150, 150, 150],
+        "fill_opacity": 0.5,
         "vis": {
             "layout": {
                 "visibility": "none"
             }
+        },
+        "paint": {
+            "fill-color": ["match", ["get", "drainagecl"],
+                "Excessively drained",          "rgb(210,180,100)",
+                "Somewhat excessively drained", "rgb(200,210,120)",
+                "Well drained",                 "rgb(100,180,80)",
+                "Moderately well drained",       "rgb(120,200,140)",
+                "Somewhat poorly drained",       "rgb(180,220,150)",
+                "Poorly drained",               "rgb(80,140,220)",
+                "Very poorly drained",          "rgb(40,80,180)",
+                "rgb(180,180,180)"
+            ]
         }
     },
     {
