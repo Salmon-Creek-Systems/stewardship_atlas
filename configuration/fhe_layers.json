@@ -310,7 +310,7 @@
             }
         },
         "paint": {
-            "fill-color": ["match", ["get", "drainagecl"],
+            "fill-color": ["match", ["get", "ssurgo_drainagecl"],
                 "Excessively drained",          "rgb(210,180,100)",
                 "Somewhat excessively drained", "rgb(200,210,120)",
                 "Well drained",                 "rgb(100,180,80)",
