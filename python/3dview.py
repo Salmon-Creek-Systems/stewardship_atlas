@@ -13,8 +13,8 @@ import utils
 
 _VECTOR_INCLUDE_TYPES = {'linestring', 'point', 'polygon'}
 _INDEX_SUFFIXES = ('_index',)
-_TERRAIN_URL_PLACEHOLDER = '__TERRAIN_URL__'
 _GLYPHS_URL = 'https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf'
+_AWS_TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 
 # Layer names containing any of these substrings start visible; all others start hidden.
 _DEFAULT_VISIBLE_PATTERNS = ('road', 'creek', 'stream', 'photo')
@@ -154,35 +154,9 @@ def _build_toggle_panel_html(toggle_list: list) -> str:
 
 def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     """
-    Generate a 3D terrain HTML page using MapLibre GL JS + PMTiles.
-
-    Requires terrain_rgb_tiles eddy to have been run first to produce
-    layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles.
+    Generate a 3D terrain HTML page using MapLibre GL JS with AWS Open Data terrain.
     """
     atlas_name = config['name']
-    atlas_path = versioning.atlas_path(config)
-
-    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
-    terrain_layer_config = layers_dict.get('terrain_rgb_tiles', {})
-
-    if terrain_layer_config.get('cog'):
-        s3_bucket = terrain_layer_config.get('cog_s3_bucket', 'scs-atlas-data')
-        s3_region = terrain_layer_config.get('cog_s3_region', 'us-east-1')
-        terrain_cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
-                           f"/{atlas_name}/rasters/terrain_rgb_tiles/terrain_rgb_tiles.cog.tif")
-        terrain_url_js_line = f"const terrainUrl = 'cog://{terrain_cog_url}';"
-    else:
-        terrain_rgb_file = atlas_path / "layers" / "terrain_rgb_tiles" / "terrain_rgb_tiles.pmtiles"
-        if not terrain_rgb_file.exists():
-            raise FileNotFoundError(
-                f"terrain_rgb_tiles.pmtiles not found at {terrain_rgb_file} — "
-                "run the terrain_rgb_tiles eddy first"
-            )
-        terrain_rgb_rel_path = "../../layers/terrain_rgb_tiles/terrain_rgb_tiles.pmtiles"
-        terrain_url_js_line = (
-            f"const terrainUrl = 'pmtiles://' + "
-            f"new URL('{terrain_rgb_rel_path}', window.location.href).href;"
-        )
 
     bbox = config['dataswale']['bbox']
     center_lng = (bbox['west'] + bbox['east']) / 2
@@ -204,9 +178,11 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             },
             "terrain": {
                 "type": "raster-dem",
-                "url": _TERRAIN_URL_PLACEHOLDER,
-                "encoding": "mapbox",
+                "tiles": [_AWS_TERRAIN_TILES],
+                "encoding": "terrarium",
                 "tileSize": 256,
+                "maxzoom": 15,
+                "attribution": "Terrain &copy; Mapzen/AWS Open Data",
             },
             **vector_sources,
         },
@@ -217,9 +193,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         ],
         "terrain": {"source": "terrain", "exaggeration": 1.5},
     }
-    style_json = json.dumps(style, indent=4).replace(
-        f'"{_TERRAIN_URL_PLACEHOLDER}"', 'terrainUrl'
-    )
+    style_json = json.dumps(style, indent=4)
 
     layer_toggle_js = ""
     if toggle_list:
@@ -387,8 +361,6 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         maplibregl.addProtocol('pmtiles', protocol.tile);
         maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
 
-        {terrain_url_js_line}
-
         const map = new maplibregl.Map({{
             container: 'map',
             zoom: 14,
@@ -435,7 +407,6 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         {layer_toggle_js}
         map.on('load', () => {{
             console.log('3D Terrain map loaded — atlas: {atlas_name}');
-            console.log('Terrain PMTiles:', terrainUrl);
         }});
 
         map.on('error', (e) => {{

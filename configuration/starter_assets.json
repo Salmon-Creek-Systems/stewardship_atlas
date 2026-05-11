@@ -71,12 +71,6 @@
         "out_layer": "basemap",
         "config_def": "derived_hillshade"
     },
-    "terrain_rgb_tiles": {
-        "type": "eddy",
-        "in_layer": "terrain_dem",
-        "out_layer": "terrain_rgb_tiles",
-        "config_def": "terrain_rgb_tiles"
-    },
     "hillshade_tiles": {
         "type": "eddy",
         "in_layer": "basemap",
