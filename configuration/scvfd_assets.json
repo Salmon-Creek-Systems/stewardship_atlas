@@ -21,22 +21,11 @@
         "out_layer": "lidar_basemap",
         "config_def": "local_hillshade"
     },
-    "terrain_dem": {
-        "type": "inlet",
-        "out_layer": "terrain_dem",
-        "config_def": "terrain_dem"
-    },
     "hillshade_tiles": {
         "type": "eddy",
         "in_layer": "lidar_basemap",
         "out_layer": "hillshade_tiles",
         "config_def": "hillshade_tiles"
-    },
-    "terrain_rgb_tiles": {
-        "type": "eddy",
-        "in_layer": "terrain_dem",
-        "out_layer": "terrain_rgb_tiles",
-        "config_def": "terrain_rgb_tiles"
     },
     "3dview": {
         "type": "outlet",

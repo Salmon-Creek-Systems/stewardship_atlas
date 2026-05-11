@@ -299,7 +299,9 @@ Even with correct min_zoom, partial tiles at DEM edges still have zero-fill. `te
 
 ### 3D Geometry Source
 
-For 3D terrain geometry (not hillshade), a global tile service beats local PMTiles — our atlas PMTiles sit in correct terrain but the surrounding world has a sharp edge. AWS Open Data terrain (Terrarium encoding, free, global) is seamless. Our own PMTiles are valuable for the 2D hillshade basemap only.
+The 3D view uses the AWS Open Data global terrain tile service (Terrarium encoding, `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`, max z15). This gives seamless terrain at atlas boundaries and ~10m resolution for US atlases. No local terrain-RGB tiles are generated or stored.
+
+Hillshade PMTiles (for the 2D basemap visual texture) remain local and are unaffected — they are a separate pipeline from terrain geometry.
 
 ### PMTiles Technical Notes
 
@@ -372,7 +374,7 @@ htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
 
 ### pmtiles-terrain branch
 
-Not yet merged. SCVFD wired but not tested.
+Superseded by `feature/aws-terrain` — switched directly to AWS Open Data terrain instead of local PMTiles. Merged to main via that branch.
 
 ### Pending Issues
 
