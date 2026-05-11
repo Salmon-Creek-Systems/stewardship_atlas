@@ -300,6 +300,18 @@
         ]
     },
     {
+        "name": "h3_grid_r9",
+        "geometry_type": "polygon",
+        "color": [139, 90, 43],
+        "fill_color": [139, 90, 43],
+        "fill_opacity": 0.3,
+        "vis": {
+            "layout": {
+                "visibility": "none"
+            }
+        }
+    },
+    {
         "name": "photos",
         "conversations_enabled": true,
 	"geometry_type": "point",

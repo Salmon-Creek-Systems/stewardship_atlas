@@ -238,10 +238,41 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
     delta_queue.add_deltas_from_features(config, name, filtered, 'create')
 
 
+def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Generate an H3 hexagonal grid covering the atlas bbox at a fixed resolution."""
+    import h3
+
+    inlet_config = config['assets'][name]['config']
+    resolution = inlet_config['resolution']
+    bbox = config['dataswale']['bbox']
+    west, south, east, north = bbox['west'], bbox['south'], bbox['east'], bbox['north']
+
+    bbox_poly = h3.LatLngPoly([
+        (north, west), (north, east), (south, east), (south, west), (north, west)
+    ])
+    cells = h3.geo_to_cells(bbox_poly, resolution)
+
+    features = []
+    for cell in cells:
+        boundary = h3.cell_to_boundary(cell)  # [(lat, lng), ...]
+        coords = [[lng, lat] for lat, lng in boundary]
+        coords.append(coords[0])
+        features.append(geojson.Feature(
+            geometry=geojson.Polygon([coords]),
+            properties={'h3_index': cell, 'h3_resolution': resolution}
+        ))
+
+    out_layer = inlet_config.get('out_layer', f'h3_grid_r{resolution}')
+    fc = geojson.FeatureCollection(features)
+    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+    logger.info(f"h3_grid_inlet: generated {len(features)} cells at resolution {resolution}")
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
     "gazetteer_grid": gazetteer_grid,
     "fetch_osm": fetch_osm,
     "s3_geojson": s3_geojson,
+    "h3_grid": h3_grid_inlet,
     }

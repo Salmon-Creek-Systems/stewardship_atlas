@@ -1434,11 +1434,16 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     mukeys = {}
     for i, feature in enumerate(features):
         geom = feature.get('geometry', {})
-        if geom.get('type') != 'Point':
+        geom_type = geom.get('type')
+        if geom_type == 'Point':
+            coords = geom['coordinates']
+            lon, lat = coords[0], coords[1]
+        elif geom_type in ('Polygon', 'MultiPolygon'):
+            centroid = shape(geom).centroid
+            lon, lat = centroid.x, centroid.y
+        else:
             mukeys[i] = None
             continue
-        coords = geom['coordinates']
-        lon, lat = coords[0], coords[1]
         if lon is None or lat is None:
             mukeys[i] = None
             continue

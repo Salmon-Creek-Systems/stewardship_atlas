@@ -29,6 +29,17 @@
         "starting_resolution": 11,
         "max_cells": 100
     },
+    "h3_grid": {
+        "type": "inlet",
+        "config_def": "h3_grid",
+        "resolution": 9
+    },
+    "h3_grid_ssurgo": {
+        "type": "eddy",
+        "config_def": "ssurgo_enrich",
+        "in_layer": "h3_grid_r9",
+        "out_layer": "h3_grid_r9"
+    },
     "terrain_dem": {
         "type": "inlet",
         "out_layer": "terrain_dem",
@@ -115,7 +126,8 @@
             "roads_index",
             "creeks_index",
             "processing_sites_index",
-            "photos"
+            "photos",
+            "h3_grid_r9"
         ],
         "config_def": "webmap",
         "access": [

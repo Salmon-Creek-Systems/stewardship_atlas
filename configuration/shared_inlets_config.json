@@ -647,5 +647,17 @@
         "fetch_type": "s3_geojson",
         "interaction": "import",
         "data_type": "geojson"
+    },
+    "h3_grid": {
+        "name": "h3_grid",
+        "asset_type": "inlet",
+        "fetch_type": "h3_grid",
+        "resolution": 8,
+        "attribution": {
+            "url": "https://h3geo.org/",
+            "description": "H3 hexagonal grid covering atlas bbox at fixed resolution",
+            "license": "Apache 2.0",
+            "citation": "Uber H3"
+        }
     }
 }
