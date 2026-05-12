@@ -215,6 +215,7 @@ SES sandbox mode is still active (production access requested 2026-03-17). In sa
 - `scripts/reprocess_email.py --list` — show emails stuck in ingress bucket
 - `scripts/reprocess_email.py --inspect <key>` — show sender, subject, GPS status
 - `scripts/reprocess_email.py <key>` — retrigger Lambda by copying S3 object with metadata change
+- `scripts/ingest_s3_photos.py <atlas> s3://bucket/prefix/` — batch-ingest geotagged photos from an S3 directory; accepts `s3://bucket/path/to/batch.zip` to process a zip directly (images are extracted in-memory and uploaded to `scs-atlas-data`)
 
 Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces) cover planned improvements.
 
@@ -311,6 +312,45 @@ Hillshade PMTiles (for the 2D basemap visual texture) remain local and are unaff
 - `gdal2tiles.py` is at `/usr/bin/gdal2tiles.py` on server.
 - `3dview.py` can't be imported directly (digit prefix). Use `importlib.import_module('3dview')`.
 
+## COG Raster Layers
+
+Cloud-Optimised GeoTIFFs (COGs) are the mechanism for serving custom raster data (canopy density, ladder fuel, flow accumulation, etc.) via MapLibre. The pipeline is a three-step asset sequence in the per-atlas assets JSON:
+
+```
+s3_geotiff inlet  →  tiff_to_cog eddy  →  s3_upload outlet
+```
+
+Each step must be a separate named asset. Example from `fhe_assets.json`:
+
+```json
+"canopy_density":       { "type": "inlet", "config_def": "s3_geotiff", "s3_bucket": "...", "s3_key": "..." },
+"canopy_density_cog":   { "type": "eddy",  "config_def": "tiff_to_cog", "in_layer": "canopy_density", "out_layer": "canopy_density" },
+"canopy_density_s3":    { "type": "outlet","config_def": "s3_upload",   "in_layer": "canopy_density" }
+```
+
+The layer definition in `{atlas}_layers.json` needs `"cog": true` and a `cog_color` string:
+
+```json
+{ "name": "canopy_density", "geometry_type": "raster", "cog": true, "cog_color": "BrewerYlGn9,0,100,c" }
+```
+
+### `cog_color` format
+
+`"{BrewerPalette},{min},{max},{mode}"` where mode `c` = continuous ramp. Min/max are the data range mapped to the palette endpoints. Use `auto` for either value to read from a `stats.json` sidecar (written by `tiff_to_cog` alongside the layer file); this is the preferred approach for data with unknown or wide value ranges.
+
+### Nodata handling
+
+`tiff_to_cog` propagates the source raster's nodata value into the COG. MapLibre renders nodata pixels as transparent. If the source has no nodata metadata but contains sentinel values (e.g. 0 in a flow accumulation layer), the nodata value must be set explicitly in the inlet config or pre-processing step.
+
+### Materialization order
+
+```
+atlas.materialize(config, 'canopy_density')      # fetch from S3
+atlas.materialize(config, 'canopy_density_cog')  # convert to COG + write stats.json
+atlas.materialize(config, 'canopy_density_s3')   # upload to scs-atlas-data
+atlas.materialize(config, 'webmap')              # picks up new layer
+```
+
 ## Config and Materializer System
 
 ### atlas_config.json is Always a Build Artifact
@@ -374,7 +414,7 @@ htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
 
 ### pmtiles-terrain branch
 
-Superseded by `feature/aws-terrain` — switched directly to AWS Open Data terrain instead of local PMTiles. Merged to main via that branch.
+Superseded by `feature/aws-terrain` — switched directly to AWS Open Data terrain instead of local PMTiles. Both branches merged to main.
 
 ### Pending Issues
 
