@@ -336,11 +336,25 @@ The layer definition in `{atlas}_layers.json` needs `"cog": true` and a `cog_col
 
 ### `cog_color` format
 
-`"{BrewerPalette},{min},{max},{mode}"` where mode `c` = continuous ramp. Min/max are the data range mapped to the palette endpoints. Use `auto` for either value to read from a `stats.json` sidecar (written by `tiff_to_cog` alongside the layer file); this is the preferred approach for data with unknown or wide value ranges.
+`"{BrewerPalette},{min},{max},{mode}"` where mode `c` = continuous ramp. Min/max are the data range mapped to the palette endpoints.
+
+Use `auto` for either value to read from a `stats.json` sidecar written by `tiff_to_cog`. `_resolve_cog_color()` in `outlets.py` substitutes the values before building the COG source URL. `auto` is the preferred approach for data with unknown or wide value ranges.
+
+### `stats.json` sidecar
+
+Written by `tiff_to_cog` at `layers/{layer_name}/stats.json` after every COG conversion:
+
+```json
+{ "min": 6.9078, "max": 13.122, "nodata": -9999.0, "log_transformed": true }
+```
+
+### Log transform
+
+For rasters with heavily skewed distributions (e.g. flow accumulation), set `"log_transform": true` in the per-atlas eddy asset config. `tiff_to_cog` applies `log1p` to valid pixels before gdalwarp and stores log-space values in the COG. `stats.json` reflects the log-space range, so `auto` in `cog_color` maps correctly. The stored pixel values are transformed — see issue #97 for the planned `setColorFunction` fix that avoids data modification.
 
 ### Nodata handling
 
-`tiff_to_cog` propagates the source raster's nodata value into the COG. MapLibre renders nodata pixels as transparent. If the source has no nodata metadata but contains sentinel values (e.g. 0 in a flow accumulation layer), the nodata value must be set explicitly in the inlet config or pre-processing step.
+`tiff_to_cog` propagates the source raster's nodata value into the COG. MapLibre renders nodata pixels as transparent. If the source has no nodata metadata but contains sentinel values, the nodata value must be set explicitly in the inlet config or pre-processing step.
 
 ### Materialization order
 
@@ -348,7 +362,7 @@ The layer definition in `{atlas}_layers.json` needs `"cog": true` and a `cog_col
 atlas.materialize(config, 'canopy_density')      # fetch from S3
 atlas.materialize(config, 'canopy_density_cog')  # convert to COG + write stats.json
 atlas.materialize(config, 'canopy_density_s3')   # upload to scs-atlas-data
-atlas.materialize(config, 'webmap')              # picks up new layer
+atlas.materialize(config, 'webmap')              # picks up new layer; resolves auto range
 ```
 
 ## Config and Materializer System
@@ -532,6 +546,14 @@ atlas.materialize(config, "webmap")    # outlet
 | `3dview` | 3D terrain view |
 
 **Outlet build order**: `webmap` must come before `html` — the console HTML checks if `outlets/webmap/index.html` exists at generation time.
+
+### Notable fetch_types
+
+**`h3_grid`** (`vector_inlets.py`) — generates a hexagonal H3 grid covering the atlas bbox at a fixed resolution. No input layer required. Config: `resolution` (int, required), optional `out_layer` (defaults to `h3_grid_r{resolution}`). Each hex feature carries `h3_index` and `h3_resolution` properties — the join key for downstream aggregation.
+
+**`ssurgo_enrich`** (`eddies.py`) — enriches a layer with NRCS soil properties via the SDA REST API. Writes `ssurgo_mukey`, `ssurgo_compname`, `ssurgo_drainagecl`, `ssurgo_ph`, `ssurgo_om`, `ssurgo_sand/silt/clay` onto each feature. Works on Point layers (direct lookup) and Polygon/MultiPolygon layers (centroid used for lookup). Config: `in_layer` (required), `out_layer` (defaults to `in_layer`, i.e. enriches in place).
+
+**`h3_cells`** (`eddies.py`) — indexes an existing vector layer by H3 cells. Takes `in_layer`, produces a new polygon layer of hex geometries, one per H3 cell, with all original feature properties copied. Use `h3_grid` instead if you just want a blank coverage grid.
 
 ## Current Atlases
 
