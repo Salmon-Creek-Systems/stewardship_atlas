@@ -648,6 +648,12 @@
         "interaction": "import",
         "data_type": "geojson"
     },
+    "s3_gpkg": {
+        "asset_type": "inlet",
+        "fetch_type": "s3_gpkg",
+        "interaction": "import",
+        "data_type": "gpkg"
+    },
     "h3_grid": {
         "name": "h3_grid",
         "asset_type": "inlet",

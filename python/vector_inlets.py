@@ -195,6 +195,48 @@ def gazetteer_grid(config=None, name=None, delta_queue=DELTA_QUEUE):
     logger.info(f"Generated {len(features)} gazetteer grid cells ({num_cols}x{num_rows})")
 
 
+def s3_gpkg(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Fetch a GeoPackage from S3, extract in_layer filtered to atlas bbox, write to delta queue."""
+    import boto3, tempfile
+
+    inlet_config = config['assets'][name]['config']
+    bucket = inlet_config['s3_bucket']
+    key = inlet_config['s3_key']
+    in_layer = inlet_config['in_layer']
+    bbox = config['dataswale']['bbox']
+
+    with tempfile.NamedTemporaryFile(suffix='.gpkg', delete=False) as tmp:
+        tmp_path = tmp.name
+
+    logger.info(f"Fetching s3://{bucket}/{key}")
+    try:
+        boto3.client('s3').download_file(bucket, key, tmp_path)
+    except Exception as e:
+        logger.error(f"Failed to fetch s3://{bucket}/{key}: {e}")
+        raise
+
+    try:
+        outpath = delta_queue.delta_path(config, name, 'create')
+        args = [
+            'ogr2ogr', '-f', 'GeoJSON',
+            '-t_srs', config['dataswale']['crs'],
+            '-spat',
+            str(bbox['west']), str(bbox['south']),
+            str(bbox['east']), str(bbox['north']),
+            '-spat_srs', 'EPSG:4326',
+            str(outpath), tmp_path, in_layer,
+        ]
+        logger.info(f"s3_gpkg: extracting layer '{in_layer}' from {key}")
+        subprocess.check_output(args, stderr=subprocess.STDOUT)
+        if 'alterations' in inlet_config:
+            utils.alter_geojson(outpath, inlet_config['alterations'])
+    finally:
+        import os
+        os.unlink(tmp_path)
+
+    return outpath
+
+
 def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch a GeoJSON file from a private S3 bucket, filter to atlas bbox, write to delta queue.
     Copies image_url → URL on each feature to enable webmap click-to-open behavior."""
@@ -274,5 +316,6 @@ asset_methods = {
     "gazetteer_grid": gazetteer_grid,
     "fetch_osm": fetch_osm,
     "s3_geojson": s3_geojson,
+    "s3_gpkg": s3_gpkg,
     "h3_grid": h3_grid_inlet,
     }
