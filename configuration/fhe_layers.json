@@ -177,6 +177,20 @@
         }
     },
     {
+        "name": "flow_accumulation",
+        "geometry_type": "raster",
+        "cog": true,
+        "cog_color": "BrewerPuBu9,auto,auto,c",
+        "vis": {
+            "layout": {
+                "visibility": "none"
+            }
+        },
+        "paint": {
+            "raster-opacity": 0.7
+        }
+    },
+    {
         "name": "terrain_dem",
         "geometry_type": "raster"
     },

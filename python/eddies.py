@@ -1113,8 +1113,10 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
     in QGIS PDF generation. Run before s3_upload.
 
     Per-atlas config keys:
-        in_layer:  source raster layer name
-        out_layer: output layer name (defaults to in_layer)
+        in_layer:      source raster layer name
+        out_layer:     output layer name (defaults to in_layer)
+        log_transform: if true, apply log1p to pixel values before COG conversion
+                       (stopgap for skewed distributions; see issue #97 for setColorFunction approach)
     """
     eddy = config['assets'][eddy_name]
     in_layer = eddy['in_layer']
@@ -1128,6 +1130,21 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
 
     logger.info(f"tiff_to_cog: {in_path} -> {out_path}")
 
+    in_path_for_warp = in_path
+    temp_path = None
+
+    if eddy.get('log_transform'):
+        temp_path = out_dir / f'{out_layer}_log_tmp.tif'
+        with rasterio.open(in_path) as src:
+            profile = src.profile.copy()
+            data = src.read(1, masked=True)
+            log_data = np.log1p(data.astype(np.float32))
+            profile.update(dtype='float32', nodata=-9999.0)
+            with rasterio.open(temp_path, 'w', **profile) as dst:
+                dst.write(log_data.filled(-9999.0), 1)
+        in_path_for_warp = temp_path
+        logger.info(f"tiff_to_cog: log1p transform applied, temp={temp_path}")
+
     # gdalwarp reprojects to EPSG:3857 (required by maplibre-cog-protocol) and
     # produces a COG in one pass. -r bilinear is appropriate for continuous rasters.
     result = subprocess.run(
@@ -1136,13 +1153,26 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
          '-co', 'COMPRESS=DEFLATE',
          '-co', 'BLOCKSIZE=512',
          '-co', 'OVERVIEW_RESAMPLING=BILINEAR',
-         str(in_path), str(out_path)],
+         str(in_path_for_warp), str(out_path)],
         capture_output=True, text=True
     )
+
+    if temp_path:
+        temp_path.unlink()
+
     if result.returncode != 0:
         raise RuntimeError(f"gdalwarp COG failed:\n{result.stderr}")
 
-    logger.info(f"tiff_to_cog complete: {out_path}")
+    with rasterio.open(out_path) as ds:
+        data = ds.read(1, masked=True)
+        stats = {
+            'min': float(data.min()),
+            'max': float(data.max()),
+            'nodata': ds.nodata,
+            'log_transformed': bool(eddy.get('log_transform', False)),
+        }
+    (out_dir / 'stats.json').write_text(json.dumps(stats, indent=2))
+    logger.info(f"tiff_to_cog complete: {out_path}, stats={stats}")
     return out_path
 
 

@@ -27,6 +27,21 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+def _resolve_cog_color(config, layer_name, cog_color):
+    """Substitute 'auto' min/max in cog_color with values from stats.json sidecar."""
+    stats_path = versioning.atlas_path(config, 'layers') / layer_name / 'stats.json'
+    if not stats_path.exists():
+        logger.warning(f"cog_color has 'auto' but no stats.json for '{layer_name}'")
+        return cog_color
+    stats = json.loads(stats_path.read_text())
+    parts = cog_color.split(',')
+    if parts[1] == 'auto':
+        parts[1] = str(round(stats['min'], 4))
+    if parts[2] == 'auto':
+        parts[2] = str(round(stats['max'], 4))
+    return ','.join(parts)
+
+
 def webmap_json(config, name, sprite_json=None):
     """Generate a JSON object for a web map in MapLibre.
     We will set up sources and layers as static content loaded initially in HTML where possible.
@@ -71,6 +86,8 @@ def webmap_json(config, name, sprite_json=None):
                 cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
                            f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
                 cog_color = layer.get('cog_color')
+                if cog_color and 'auto' in cog_color:
+                    cog_color = _resolve_cog_color(config, layer_name, cog_color)
                 cog_source_url = f"cog://{cog_url}" + (f"#color:{cog_color}" if cog_color else "")
                 cog_sources[layer_name] = {
                     'type': 'raster',

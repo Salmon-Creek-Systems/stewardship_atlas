@@ -40,6 +40,25 @@
         "in_layer": "h3_grid_r9",
         "out_layer": "h3_grid_r9"
     },
+    "flow_accumulation": {
+        "type": "inlet",
+        "out_layer": "flow_accumulation",
+        "config_def": "s3_geotiff",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/2018_flow_acc1000_Uint2"
+    },
+    "flow_accumulation_cog": {
+        "type": "eddy",
+        "config_def": "tiff_to_cog",
+        "in_layer": "flow_accumulation",
+        "out_layer": "flow_accumulation",
+        "log_transform": true
+    },
+    "flow_accumulation_s3": {
+        "type": "outlet",
+        "config_def": "s3_upload",
+        "in_layer": "flow_accumulation"
+    },
     "terrain_dem": {
         "type": "inlet",
         "out_layer": "terrain_dem",
@@ -127,7 +146,8 @@
             "creeks_index",
             "processing_sites_index",
             "photos",
-            "h3_grid_r9"
+            "h3_grid_r9",
+            "flow_accumulation"
         ],
         "config_def": "webmap",
         "access": [
