@@ -149,22 +149,16 @@
         "type": "outlet",
         "name": "webmap",
         "in_layers": [
-            "regions",
-            "roads",
             "creeks",
-            "landmarks",
-            "inaturalist",
             "landfire_evc",
             "landfire_evt",
-            "canopy_density",
-            "ladder_fuel_density",
-            "roads_index",
-            "creeks_index",
-            "processing_sites_index",
-            "photos",
             "h3_grid_r9",
+            "canopy_density",
+            "ladder_fuel_density", 
             "flow_accumulation",
-            "lidar_metrics"
+            "lidar_metrics",
+            "photos",
+            "inaturalist"
         ],
         "config_def": "webmap",
         "access": [
