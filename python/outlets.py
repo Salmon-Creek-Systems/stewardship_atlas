@@ -181,7 +181,10 @@ def webmap_json(config, name, sprite_json=None):
         if layer.get('show_attributes'):
             meta = map_layer.setdefault('metadata', {})
             meta['show_attributes'] = True
-            meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+
+        if layer.get('editable_columns'):
+            meta = map_layer.setdefault('metadata', {})
+            meta['editable_columns'] = [c['name'] for c in layer['editable_columns']]
 
         map_layers.append(map_layer)
 

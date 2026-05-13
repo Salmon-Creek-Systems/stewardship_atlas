@@ -292,14 +292,36 @@ map.on('load', async () => {
         const layerSource = feature.layer.source;
         const imageUrl = feature.properties.URL || '';
         const convos = parseConversations(feature.properties.conversations);
+        const editableCols = (feature.layer.metadata && feature.layer.metadata.editable_columns) || [];
 
         const imageHtml = imageUrl
-            ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" style="max-width:100%;max-height:120px;object-fit:cover;display:block;margin-bottom:8px"></a>`
+            ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" style="max-width:100%;max-height:120px;object-fit:cover;display:block"></a>`
             : '';
 
+        const attrRows = editableCols
+            .filter(col => { const v = feature.properties[col]; return v !== null && v !== undefined && v !== ''; })
+            .map(col => `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:0.85em">
+                <span style="color:#888;min-width:60px;flex-shrink:0">${col}</span>
+                <span>${feature.properties[col]}</span>
+            </div>`).join('');
+
+        let topHtml;
+        if (imageHtml && attrRows) {
+            topHtml = `<div style="display:flex;gap:8px;margin-bottom:8px">
+                <div style="flex:1;min-width:0">${imageHtml}</div>
+                <div style="flex:1;min-width:0;max-height:120px;overflow-y:auto">${attrRows}</div>
+            </div>`;
+        } else if (imageHtml) {
+            topHtml = `<div style="margin-bottom:8px">${imageHtml}</div>`;
+        } else if (attrRows) {
+            topHtml = `<div style="margin-bottom:8px">${attrRows}</div>`;
+        } else {
+            topHtml = '';
+        }
+
         const popupContent = `
-            <div style="width:260px;font-family:sans-serif">
-                ${imageHtml}
+            <div style="width:300px;font-family:sans-serif">
+                ${topHtml}
                 <div id="conv-list" style="max-height:200px;overflow-y:auto;margin-bottom:8px">
                     ${renderConversationList(convos)}
                 </div>
