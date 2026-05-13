@@ -352,7 +352,7 @@
         },
         "paint": {
             "fill-outline-color": "#333333",
-            "fill-color": ["step", ["get", "zh95"],
+            "fill-color": ["step", ["get", "zq95"],
                 "#f7fcf5",
                 3.33,  "#e5f5e0",
                 6.67,  "#c7e9c0",
