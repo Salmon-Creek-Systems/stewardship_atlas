@@ -128,7 +128,7 @@
         "name": "canopy_density",
         "geometry_type": "raster",
         "cog": true,
-        "cog_color": "BrewerYlGn9,0,100,c",
+        "cog_color": "BrewerBuGn9,0,50,c",
         "vis": {
             "layout": {
                 "visibility": "none"
@@ -142,7 +142,7 @@
         "name": "ladder_fuel_density",
         "geometry_type": "raster",
         "cog": true,
-        "cog_color": "BrewerYlOrRd9,0,100,c",
+        "cog_color": "BrewerOrRd9,0,20,c",
         "vis": {
             "layout": {
                 "visibility": "none"
