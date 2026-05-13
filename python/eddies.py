@@ -21,6 +21,7 @@ import dataswale_geojson as dataswale
 import networkx as nx
 from pyproj import Geod
 from shapely.geometry import shape
+import rasterio
 
 # Configure logging
 logger = logging.getLogger(__name__)
