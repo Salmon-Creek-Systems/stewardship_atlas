@@ -136,6 +136,15 @@
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/metrics_h3_r12.gpkg"
     },
+    "photos_h3_merge": {
+        "type": "eddy",
+        "config_def": "merge_h3",
+        "h3_layers": ["h3_grid_r9", "lidar_metrics"],
+        "in_layer": "photos",
+        "out_layer": "photos",
+        "merge_operation": "exclude",
+        "properties": ["id", "atlas_id", "h3_resolution", "h3_index", "webmap_url", "index"]
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",

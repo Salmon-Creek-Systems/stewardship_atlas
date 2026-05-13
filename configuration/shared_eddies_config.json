@@ -160,6 +160,11 @@
             "license": "Public Domain"
         }
     },
+    "merge_h3": {
+        "type": "eddy",
+        "fetch_type": "merge_h3",
+        "interaction": "backend"
+    },
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",
