@@ -226,7 +226,7 @@ map.on('load', async () => {
             map.addSource(sourceId, sourceDef);
         }
         for (const layerDef of COG_LAYERS) {
-            map.addLayer(layerDef);
+            map.addLayer(layerDef, layerDef.before_layer_id || undefined);
         }
     }
 

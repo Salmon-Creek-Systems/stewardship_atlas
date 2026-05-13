@@ -75,9 +75,21 @@ def webmap_json(config, name, sprite_json=None):
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
 
+    # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
+    in_layers_list = outlet_config['in_layers']
+    cog_before_ids = {}
+    for i, ln in enumerate(in_layers_list):
+        lyr = layers_dict.get(ln, {})
+        if lyr.get('geometry_type') == 'raster' and lyr.get('cog'):
+            for j in range(i + 1, len(in_layers_list)):
+                next_lyr = layers_dict.get(in_layers_list[j], {})
+                if not (next_lyr.get('geometry_type') == 'raster' and next_lyr.get('cog')):
+                    cog_before_ids[ln] = f"{in_layers_list[j]}-layer"
+                    break
+
     logger.info(f"In webedit, got Outlet Conf: {outlet_config}")
     # for each layer used in outlet, we add a source and display layer, and possibly a label layer
-    for layer_name in outlet_config['in_layers']:
+    for layer_name in in_layers_list:
         layer = layers_dict[layer_name]
         if layer['geometry_type'] == 'raster':
             if layer.get('cog'):
@@ -101,6 +113,7 @@ def webmap_json(config, name, sprite_json=None):
                     'layout': layer.get('vis', {}).get('layout', {'visibility': 'visible'}),
                     'paint': {**{'raster-opacity': 0.8, 'raster-contrast': 0.0}, **layer.get('paint', {})},
                     'metadata': {'name': layer_name, 'group': layer_name},
+                    'before_layer_id': cog_before_ids.get(layer_name),
                 }
                 cog_layers.append(cog_layer_def)
                 continue  # source and layer added dynamically after load
