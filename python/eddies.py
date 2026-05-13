@@ -1545,6 +1545,87 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def merge_h3(config: Dict[str, Any], asset_name: str):
+    """
+    Enrich a vector layer's features with properties from one or more H3 polygon layers.
+
+    For each feature, computes its centroid, maps it to an H3 cell index at each
+    source layer's resolution, and copies matching cell properties onto the feature.
+    Features with no H3 match pass through unchanged.
+
+    Config:
+      h3_layers: list of H3 layer names to source properties from (required)
+      in_layer: vector layer to enrich (required)
+      out_layer: output layer name, defaults to in_layer
+      merge_operation: "include" or "exclude" (default "exclude")
+      properties: list of property names used by merge_operation (default [])
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    h3_layer_names = asset_config['h3_layers']
+    in_layer = asset_config['in_layer']
+    out_layer = asset_config.get('out_layer', in_layer)
+    merge_operation = asset_config.get('merge_operation', 'exclude')
+    properties_set = set(asset_config.get('properties', []))
+
+    def _filter_props(props):
+        if merge_operation == 'include':
+            return {k: v for k, v in props.items() if k in properties_set}
+        return {k: v for k, v in props.items() if k not in properties_set}
+
+    # Build per-layer lookup: {h3_index: filtered_props}
+    h3_lookups = []
+    for layer_name in h3_layer_names:
+        layer_data = dataswale.layer_as_featurecollection(config, layer_name)
+        if not layer_data or not layer_data.get('features'):
+            logger.warning(f"merge_h3: H3 layer '{layer_name}' is empty or missing, skipping")
+            continue
+        h3_features = layer_data['features']
+        first_idx = (h3_features[0].get('properties') or {}).get('h3_index')
+        if not first_idx:
+            logger.warning(f"merge_h3: H3 layer '{layer_name}' has no h3_index property, skipping")
+            continue
+        resolution = h3.get_resolution(first_idx)
+        lookup = {
+            props['h3_index']: _filter_props(props)
+            for f in h3_features
+            if (props := (f.get('properties') or {})) and props.get('h3_index')
+        }
+        h3_lookups.append((resolution, lookup))
+        logger.info(f"merge_h3: loaded {len(lookup)} cells from '{layer_name}' (r{resolution})")
+
+    target_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not target_data or not target_data.get('features'):
+        raise Exception(f"merge_h3: could not load target layer '{in_layer}'")
+    features = target_data['features']
+    logger.info(f"merge_h3: enriching {len(features)} features from '{in_layer}'")
+
+    enriched = []
+    n_enriched = 0
+    for feature in features:
+        props = dict(feature.get('properties') or {})
+        geom = feature.get('geometry')
+        got_match = False
+        if geom:
+            centroid = shape(geom).centroid
+            lat, lng = centroid.y, centroid.x
+            for resolution, lookup in h3_lookups:
+                cell = h3.latlng_to_cell(lat, lng, resolution)
+                if cell in lookup:
+                    props.update(lookup[cell])
+                    got_match = True
+        if got_match:
+            n_enriched += 1
+        enriched.append({'type': 'Feature', 'geometry': geom, 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fc = geojson.FeatureCollection(enriched)
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+    logger.info(f"merge_h3: wrote {len(enriched)} features to {out_path} ({n_enriched} enriched)")
+    return str(out_path)
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -1559,4 +1640,5 @@ asset_methods = {
     "road_lrs": road_lrs,
     "road_lrs_markers": road_lrs_markers,
     "ssurgo_enrich": ssurgo_enrich,
+    "merge_h3": merge_h3,
 }
