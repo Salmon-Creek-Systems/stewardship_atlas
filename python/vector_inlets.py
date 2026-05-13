@@ -202,7 +202,7 @@ def s3_gpkg(config=None, name=None, delta_queue=DELTA_QUEUE):
     inlet_config = config['assets'][name]['config']
     bucket = inlet_config['s3_bucket']
     key = inlet_config['s3_key']
-    in_layer = inlet_config['in_layer']
+    in_layer = inlet_config.get('in_layer')
     bbox = config['dataswale']['bbox']
 
     with tempfile.NamedTemporaryFile(suffix='.gpkg', delete=False) as tmp:
@@ -224,9 +224,11 @@ def s3_gpkg(config=None, name=None, delta_queue=DELTA_QUEUE):
             str(bbox['west']), str(bbox['south']),
             str(bbox['east']), str(bbox['north']),
             '-spat_srs', 'EPSG:4326',
-            str(outpath), tmp_path, in_layer,
+            str(outpath), tmp_path,
         ]
-        logger.info(f"s3_gpkg: extracting layer '{in_layer}' from {key}")
+        if in_layer:
+            args.append(in_layer)
+        logger.info(f"s3_gpkg: extracting {'layer ' + repr(in_layer) if in_layer else 'first layer'} from {key}")
         subprocess.check_output(args, stderr=subprocess.STDOUT)
         if 'alterations' in inlet_config:
             utils.alter_geojson(outpath, inlet_config['alterations'])

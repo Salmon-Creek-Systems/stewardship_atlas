@@ -337,6 +337,31 @@
         }
     },
     {
+        "name": "lidar_metrics",
+        "geometry_type": "polygon",
+        "color": [100, 180, 100],
+        "fill_opacity": 0.7,
+        "vis": {
+            "layout": {
+                "visibility": "none"
+            }
+        },
+        "paint": {
+            "fill-outline-color": "#333333",
+            "fill-color": ["step", ["get", "zmean"],
+                "#f7fcf5",
+                3.33,  "#e5f5e0",
+                6.67,  "#c7e9c0",
+                10.0,  "#a1d99b",
+                13.33, "#74c476",
+                16.67, "#41ab5d",
+                20.0,  "#238b45",
+                23.33, "#006d2c",
+                26.67, "#00441b"
+            ]
+        }
+    },
+    {
         "name": "photos",
         "conversations_enabled": true,
 	"geometry_type": "point",

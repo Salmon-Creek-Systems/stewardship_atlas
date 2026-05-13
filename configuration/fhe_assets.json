@@ -129,6 +129,13 @@
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/INaturalist_export.geojson"
     },
+    "lidar_metrics": {
+        "type": "inlet",
+        "out_layer": "lidar_metrics",
+        "config_def": "s3_gpkg",
+        "s3_bucket": "scs-internal",
+        "s3_key": "CahtoCreekRanch/metrics_h3_r12.gpkg"
+    },
     "webmap": {
         "type": "outlet",
         "name": "webmap",
@@ -147,7 +154,8 @@
             "processing_sites_index",
             "photos",
             "h3_grid_r9",
-            "flow_accumulation"
+            "flow_accumulation",
+            "lidar_metrics"
         ],
         "config_def": "webmap",
         "access": [
