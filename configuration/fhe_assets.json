@@ -136,6 +136,12 @@
         "s3_bucket": "scs-internal",
         "s3_key": "CahtoCreekRanch/metrics_h3_r12.gpkg"
     },
+    "spreadsheet_export": {
+        "type": "outlet",
+        "name": "spreadsheet_export",
+        "config_def": "gsheet_export",
+        "in_layers": ["lidar_metrics", "regions", "photos"]
+    },
     "photos_h3_merge": {
         "type": "eddy",
         "config_def": "merge_h3",
