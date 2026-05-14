@@ -27,6 +27,15 @@
     ]
   },
   {
+    "name": "landslides",
+    "geometry_type": "polygon",
+    "color": [209, 93, 4],
+    "fill_color": [209, 93, 4],
+    "interaction": "interface",
+    "access": ["public", "internal", "admin"],
+    "fill_opacity": 0.5
+  },
+  {
     "name": "tsunami_fillcolor",
     "geometry_type": "polygon",
     "color": [0, 0, 255],
@@ -197,6 +206,42 @@
     "symbol": {"png": "milemarker.png", "icon": "basic/marker"},
     "icon-size": 3.0,
     "icon-anchor": "bottom"
+  },
+  {
+    "name": "bridges",
+    "geometry_type": "point",
+    "color": [0, 200, 0],
+    "add_labels": true,
+    "max_labels": 100,
+    "vis": {"minzoom": 14, "maxzoom": 22},
+    "symbol": {"png": "bridge.png", "icon": "basic/marker"},
+    "icon-size": 3.0,
+    "icon-anchor": "bottom"
+  },
+  {
+    "name": "private_bridges",
+    "geometry_type": "point",
+    "color": [0, 200, 0],
+    "add_labels": true,
+    "max_labels": 100,
+    "vis": {"minzoom": 14, "maxzoom": 22},
+    "symbol": {"png": "bridge.png", "icon": "basic/marker"},
+    "icon-size": 3.0,
+    "icon-anchor": "bottom"
+  },
+  {
+    "name": "powerlines",
+    "geometry_type": "linestring",
+    "add_labels": true,
+    "constant_width": 5,
+    "color": [250, 250, 0],
+    "interaction": "interface",
+    "vector_width": true,
+    "label_repeat_distance": 1000,
+    "deduplicate_labels": true,
+    "rotate_labels": false,
+    "labels_avoid_features": false,
+    "avoid_label_collisions": true
   },
   {
     "name": "helilandings",
