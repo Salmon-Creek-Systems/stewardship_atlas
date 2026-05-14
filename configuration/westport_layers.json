@@ -181,7 +181,7 @@
     "add_labels": true,
     "symbol": {"png": "tent.png", "icon": "basic/triangle"},
     "vis": {"minzoom": 17, "maxzoom": 22},
-    "icon-size": 3.0,
+    "icon-size": 1.0,
     "interaction": "interface",
     "editable_columns": [
       {"name": "name", "type": "string", "default": "Road"}

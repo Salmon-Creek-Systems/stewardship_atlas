@@ -127,6 +127,8 @@
     "name": "webmap",
     "in_layers": [
       "basemap",
+      "regions",
+      "sites",
       "tsunami",
       "contours",
       "roads_primary",
