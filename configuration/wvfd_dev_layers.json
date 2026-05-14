@@ -54,6 +54,18 @@
     "geometry_type": "raster"
   },
   {
+    "name": "terrain_dem",
+    "geometry_type": "raster"
+  },
+  {
+    "name": "hillshade_tiles",
+    "geometry_type": "raster"
+  },
+  {
+    "name": "terrain_rgb_tiles",
+    "geometry_type": "raster"
+  },
+  {
     "name": "lidar_basemap",
     "geometry_type": "raster"
   },

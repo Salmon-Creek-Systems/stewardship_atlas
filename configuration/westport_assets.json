@@ -10,11 +10,28 @@
     "out_layer": "contours",
     "config_def": "gdal_contours"
   },
+  "terrain_dem": {
+    "type": "inlet",
+    "out_layer": "terrain_dem",
+    "config_def": "terrain_dem"
+  },
   "derived_hillshade": {
     "type": "eddy",
-    "in_layer": "elevation",
+    "in_layer": "terrain_dem",
     "out_layer": "basemap",
     "config_def": "derived_hillshade"
+  },
+  "hillshade_tiles": {
+    "type": "eddy",
+    "in_layer": "basemap",
+    "out_layer": "hillshade_tiles",
+    "config_def": "hillshade_tiles"
+  },
+  "3dview": {
+    "type": "outlet",
+    "name": "3dview",
+    "config_def": "3dview",
+    "access": ["public", "internal", "admin"]
   },
   "public_buildings": {
     "type": "inlet",
@@ -128,7 +145,7 @@
   },
   "webedit": {
     "type": "outlet",
-    "name": "webmap",
+    "name": "webedit",
       "in_layers": [
 	  "basemap",
 	  "contours",
@@ -257,22 +274,6 @@
     "name": "spreadsheet_export",
     "config_def": "gsheet_export",
     "in_layers": ["helilandings", "hydrants", "milemarkers"]
-  },
-  "gazetteer": {
-    "type": "outlet",
-    "name": "gazetteer",
-    "config_def": "gazetteer",
-    "in_layers": [
-      "basemap",
-      "tsunami",
-      "parcels",
-      "contours",
-      "roads_secondary",
-      "milemarkers",
-      "creeks",
-      "buildings",
-      "natural"
-    ]
   },
   "private_runbook": {
     "type": "outlet",
