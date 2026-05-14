@@ -64,6 +64,7 @@ server {
     location / {
         autoindex on;
         try_files $uri $uri/ =404;
+        add_header 'Access-Control-Allow-Origin' '*';
     }
 
     # Per-atlas auth — admin and internal paths.
@@ -132,6 +133,25 @@ server {
 #
 # Requires a wildcard SSL cert for *.fireatlas.org.
 # If not available, use the per-subdomain blocks at the bottom of this file.
+#
+# Per-atlas overrides go BEFORE the wildcard block — nginx uses the first match.
+# Needed when the customer subdomain name doesn't match the atlas name.
+
+server {
+    server_name westportvfd.fireatlas.org;
+    return 301 https://fireatlas.org/westport$request_uri;
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+server {
+    server_name westportvfd.fireatlas.org;
+    listen 80;
+    return 301 https://fireatlas.org/westport$request_uri;
+}
 
 server {
     server_name ~^(?<atlas>[a-zA-Z0-9_-]+)\.fireatlas\.org$;
