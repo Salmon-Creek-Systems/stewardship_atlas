@@ -2999,7 +2999,10 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     for i,f in enumerate(layer['features']):
         #logger.info(f"Adding row for Prop [{type(f['properties'])}]: {f['properties']} and geom [{type(f['properties'])}]:: {f['geometry']}...")
         for ih,h in enumerate(header):    
-            cells.append( gspread.Cell(row=i+2, col=ih+1, value=f['properties'].get(h, '')))
+            val = f['properties'].get(h, '')
+            if isinstance(val, (list, dict)):
+                val = json.dumps(val)
+            cells.append(gspread.Cell(row=i+2, col=ih+1, value=val))
             #for j,p in enumerate(f['properties'].items()):
             # if first row set the headers
             
