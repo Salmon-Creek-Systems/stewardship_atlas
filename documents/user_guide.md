@@ -699,6 +699,8 @@ This is the quickest way to monitor incoming photos day-to-day without running a
 
 Only addresses listed in `admin_emails` in the atlas configuration are accepted. To add a new sender:
 
+> **Note:** `admin_emails` currently serves double duty — it controls both who can submit photos via email *and* who Google Sheets exports are shared with. These are often different people (field crews vs. administrators). See issue #98 for planned split into `email_authorized_senders` and `spreadsheet_share_emails`.
+
 1. Add the email address to `admin_emails` in `configuration/{atlas}.geojson`
 2. Commit and push, then pull on the server and rebuild the atlas config:
    ```bash
