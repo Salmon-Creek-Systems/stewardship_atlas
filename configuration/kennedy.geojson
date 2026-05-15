@@ -53,25 +53,25 @@
                         "layer_def": "regions"
                     },
                     "elevation": {
-                        "layer_def": "elevation"
+                        "layer_def": "raster"
                     },
                     "hillshade_tiles": {
-                        "layer_def": "hillshade_tiles"
+                        "layer_def": "raster"
                     },
                     "terrain_dem": {
-                        "layer_def": "terrain_dem"
+                        "layer_def": "raster"
                     },
                     "terrain_rgb_tiles": {
-                        "layer_def": "terrain_rgb_tiles"
+                        "layer_def": "raster"
                     },
                     "contours": {
                         "layer_def": "contours"
                     },
                     "basemap": {
-                        "layer_def": "basemap"
+                        "layer_def": "raster"
                     },
                     "lidar_basemap": {
-                        "layer_def": "lidar_basemap"
+                        "layer_def": "raster"
                     },
                     "roads": {
                         "layer_def": "roads"
@@ -95,7 +95,7 @@
                         "layer_def": "buildings"
                     },
                     "gazetteer_regions": {
-                        "layer_def": "gazetteer_regions"
+                        "layer_def": "regions"
                     },
                     "addresses": {
                         "layer_def": "addresses"

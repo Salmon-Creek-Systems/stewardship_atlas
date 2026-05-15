@@ -212,7 +212,7 @@ def create_config(config: Dict[str, Any] = None,
     inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
     eddies_config = json.load(open(shared_config_dir / "shared_eddies_config.json"))
     outlets_config = json.load(open(shared_config_dir / "shared_outlets_config.json"))
-    default_layers_config = json.load(open(shared_config_dir / "default_layers.json"))
+    default_layers_config = json.load(open(shared_config_dir / "shared_layers_config.json"))
 
     # Combine all asset configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}
@@ -244,7 +244,7 @@ def create_config(config: Dict[str, Any] = None,
         if 'layer_def' in layer:
             base = default_layers_config.get(layer['layer_def'])
             if base is None:
-                raise KeyError(f"layer_def '{layer['layer_def']}' not found in default_layers.json")
+                raise KeyError(f"layer_def '{layer['layer_def']}' not found in shared_layers_config.json")
             layer_config = copy.deepcopy(base)
         else:
             layer_config = {}
