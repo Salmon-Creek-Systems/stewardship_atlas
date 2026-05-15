@@ -46,7 +46,7 @@ It's easier and more powerful to add data to the map when you email a geotragged
 For example, if we wanted to place a new record in a "watertanks" layer, we might send an email like:
 
 ============================
-TO: scvfd@fireatlas.org
+TO: YOURATLASNAME@fireatlas.org
 SUBJECT:  Ridge Tank
 
 watertanks
