@@ -219,6 +219,10 @@ def create_config(config: Dict[str, Any] = None,
 
     # Process assets with config_def support
     for asset_name, asset in assets.items():
+        # name defaults to dict key; type comes from shared template after merge
+        if 'name' not in asset:
+            asset['name'] = asset_name
+
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
             asset['config'] = copy.deepcopy(all_configs[asset['config_def']])
@@ -227,6 +231,12 @@ def create_config(config: Dict[str, Any] = None,
             for key, value in asset.items():
                 if key != 'config':
                     asset['config'][key] = value
+
+            # Inject type from shared template if not specified in per-atlas asset.
+            # Shared configs use 'asset_type'; some older entries use 'type'.
+            if 'type' not in asset:
+                asset['type'] = (asset['config'].get('asset_type')
+                                 or asset['config'].get('type', ''))
 
     # Process layers: layer_def resolves shared template; overrides applied on top
     processed_layers = []

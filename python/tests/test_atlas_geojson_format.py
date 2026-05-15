@@ -191,6 +191,15 @@ class TestKennedyGeoJSON(unittest.TestCase):
         for prop in REQUIRED_ATLAS_PROPERTIES:
             self.assertIn(prop, props, f"Missing required property: {prop}")
 
+    def test_kennedy_assets_no_redundant_type_or_name(self):
+        """type and name must not appear in per-atlas asset entries."""
+        with open(self.KENNEDY_PATH) as f:
+            data = json.load(f)
+        assets = data["features"][0]["properties"]["assets"]
+        for key, asset in assets.items():
+            self.assertNotIn("type", asset, f"Asset '{key}' has redundant 'type' field")
+            self.assertNotIn("name", asset, f"Asset '{key}' has redundant 'name' field")
+
     def test_kennedy_no_path_properties(self):
         with open(self.KENNEDY_PATH) as f:
             data = json.load(f)
