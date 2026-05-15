@@ -38,6 +38,9 @@ which shares the exact view but without a specific location/pin.
 3D view overlays: The 3D terrain view now shows your map layers — roads,
 creeks, and others — draped over the terrain surface. 
 
+Hideable Nav Box: you can make the navigation menu (top right in webmap) hide 
+by clicking the little triangle just to right of the QR code link.
+
 Email photo info: 
 It's easier and more powerful to add data to the map when you email a geotragged photo.
 * The subject line becomes the new Label on the map.
