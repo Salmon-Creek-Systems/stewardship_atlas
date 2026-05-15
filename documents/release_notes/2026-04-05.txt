@@ -44,6 +44,12 @@ It's easier and more powerful to add data to the map when you email a geotragged
 * Any layer mentioned in the first line will get the photo data added to it.
 * Any further data will be stored - and any key/value pairs for existing layer Properties will be parsed out.
 
+** 
+to: scvfd@fireatlas.org
+Subject:  "comment"
+Body:   "Key:Value"
+"photo" (edited)
+**
 ------------------------------------------------------------------------
 
 As always, reply to this email with any questions or if anything looks off.
