@@ -43,13 +43,18 @@ It's easier and more powerful to add data to the map when you email a geotragged
 * The subject line becomes the new Label on the map.
 * Any layer mentioned in the first line will get the photo data added to it.
 * Any further data will be stored - and any key/value pairs for existing layer Properties will be parsed out.
+For example, if we wanted to place a new record in a "watertanks" layer, we might send an email like:
 
-** 
-to: scvfd@fireatlas.org
-Subject:  "comment"
-Body:   "Key:Value"
-"photo" (edited)
-**
+============================
+TO: scvfd@fireatlas.org
+SUBJECT:  Ridge Tank
+
+watertanks
+capacity: 5000
+accessible: yes
+fitting: 1 1/2" NH Hydrant
+This is the nice new tank we installed on Markov Ridge. It's got the standard adapter and you can drive the truck right up to it.
+============================
 ------------------------------------------------------------------------
 
 As always, reply to this email with any questions or if anything looks off.
