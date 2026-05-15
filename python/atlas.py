@@ -372,7 +372,7 @@ def new_version():
 _BUILD_DEFAULT_ROLES = {"internal": "internal", "admin": "admin"}
 
 REQUIRED_ATLAS_PROPERTIES = [
-    'name', 'assets_path', 'layers_path', 'data_root', 'shared_dir',
+    'name', 'data_root', 'shared_dir',
     'admin_emails', 'base_url', 'port', 'versioned_outlets', 'logo_url',
 ]
 
@@ -423,8 +423,6 @@ def setup_role_htpasswds(data_root: str, atlas_name: str):
 
 def build_atlas(
     name: str,
-    assets_path: str,
-    layers_path: str,
     data_root: str,
     shared_dir: str,
     admin_emails: List[str],
@@ -434,6 +432,10 @@ def build_atlas(
     versioned_outlets: List[str],
     logo_url: str,
     geometry: Dict[str, Any],
+    assets_path: str = None,
+    layers_path: str = None,
+    assets: Dict[str, Any] = None,
+    layers: List[Dict[str, Any]] = None,
     config_only: bool = False,
     extra_props: Dict[str, Any] = None,
 ):
@@ -441,12 +443,15 @@ def build_atlas(
 
     Returns (atlas_config dict, Path to written atlas_config.json).
     Equivalent to running: python scripts/build_atlas.py [config_only] <geojson>
+
+    Accepts either file paths (assets_path/layers_path) or inline dicts
+    (assets/layers). At least one pair must be provided.
     """
     from datetime import datetime as _dt
 
-    if not Path(assets_path).exists():
+    if assets_path is not None and not Path(assets_path).exists():
         raise FileNotFoundError(f"Assets file not found: {assets_path}")
-    if not Path(layers_path).exists():
+    if layers_path is not None and not Path(layers_path).exists():
         raise FileNotFoundError(f"Layers file not found: {layers_path}")
     if not Path(data_root).exists():
         raise FileNotFoundError(f"Data root not found: {data_root}")
@@ -483,7 +488,9 @@ def build_atlas(
 
         config = create_config(
             layers_path=layers_path,
+            layers=layers,
             assets_path=assets_path,
+            assets=assets,
             data_root=data_root,
             feature_collection=feature_collection,
         )
@@ -493,7 +500,9 @@ def build_atlas(
     else:
         config = create(
             layers_path=layers_path,
+            layers=layers,
             assets_path=assets_path,
+            assets=assets,
             data_root=data_root,
             shared_dir=Path(shared_dir),
             feature_collection=feature_collection,
@@ -510,6 +519,12 @@ def build_atlas_from_geojson(geojson_path, config_only: bool = False):
     Equivalent to: python scripts/build_atlas.py [config_only] <geojson_path>
 
     Returns (atlas_config dict, Path to written atlas_config.json).
+
+    Accepts two source formats:
+    - Inline: 'assets' (dict) and 'layers' (dict keyed by name) embedded as
+      GeoJSON feature properties. Single-file format — no external JSON files.
+    - File-path: 'assets_path' and 'layers_path' strings pointing to separate
+      JSON files. Legacy format, still fully supported.
     """
     geojson_path = Path(geojson_path)
     with open(geojson_path) as f:
@@ -531,16 +546,22 @@ def build_atlas_from_geojson(geojson_path, config_only: bool = False):
     if missing:
         raise ValueError(f"Missing required properties: {', '.join(missing)}")
 
-    known = set(REQUIRED_ATLAS_PROPERTIES) | {'app_url', 'config_only'}
+    has_inline = isinstance(props.get('assets'), dict) and isinstance(props.get('layers'), dict)
+    has_paths = 'assets_path' in props and 'layers_path' in props
+    if not has_inline and not has_paths:
+        raise ValueError(
+            "GeoJSON must have either inline 'assets' and 'layers' dicts "
+            "or 'assets_path' and 'layers_path' strings"
+        )
+
+    known = set(REQUIRED_ATLAS_PROPERTIES) | {'app_url', 'config_only', 'assets_path', 'layers_path', 'assets', 'layers'}
     extra_props = {k: v for k, v in props.items() if k not in known}
 
     mode = "config only" if config_only else "full atlas"
     logger.info(f"Building {mode} for '{props['name']}' from {geojson_path.name}")
 
-    return build_atlas(
+    common = dict(
         name=props['name'],
-        assets_path=props['assets_path'],
-        layers_path=props['layers_path'],
         data_root=props['data_root'],
         shared_dir=props['shared_dir'],
         admin_emails=props['admin_emails'],
@@ -553,6 +574,13 @@ def build_atlas_from_geojson(geojson_path, config_only: bool = False):
         config_only=config_only,
         extra_props=extra_props,
     )
+
+    if has_inline:
+        # layers dict is keyed by name; convert to list for downstream compatibility
+        layers_list = list(props['layers'].values())
+        return build_atlas(**common, assets=props['assets'], layers=layers_list)
+    else:
+        return build_atlas(**common, assets_path=props['assets_path'], layers_path=props['layers_path'])
 
 
 def rename_layer(config, old_name, new_name, dry_run=False):
