@@ -2,6 +2,7 @@
     "regions": {
         "geometry_type": "polygon",
         "color": [50, 50, 50],
+        "fill_color": [0, 0, 0, 0],
         "interaction": "interface",
         "access": ["admin"]
     },
@@ -72,10 +73,11 @@
     },
     "hydrants": {
         "geometry_type": "point",
-        "color": [0, 0, 255],
+        "color": [255, 0, 0],
+        "fill_color": [255, 255, 255],
         "add_labels": true,
-        "symbol": {"png": "hydrant.png", "icon": "extra/half-circle"},
-        "icon-size": 1.0,
+        "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"},
+        "icon-size": 1.5,
         "interaction": "interface"
     },
     "watertanks": {
@@ -142,7 +144,10 @@
     },
     "addresses": {
         "geometry_type": "polygon",
-        "color": [255, 0, 0]
+        "color": [255, 0, 0],
+        "fill_color": [255, 0, 0, 0.2],
+        "add_labels": true,
+        "interaction": "interface"
     },
     "parcels": {
         "geometry_type": "polygon",
@@ -183,6 +188,7 @@
         "geometry_type": "point",
         "color": [0, 155, 50],
         "add_labels": true,
+        "interaction": "interface",
         "access": ["admin"]
     },
     "natural": {
@@ -241,6 +247,7 @@
     "gazetteer_regions": {
         "geometry_type": "polygon",
         "color": [50, 50, 50],
+        "fill_color": [0, 0, 0, 0],
         "interaction": "interface",
         "access": ["admin"]
     },

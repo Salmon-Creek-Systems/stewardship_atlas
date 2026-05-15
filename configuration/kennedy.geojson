@@ -52,13 +52,7 @@
                     "gazetteer_regions":{"layer_def": "gazetteer_regions"},
                     "addresses":        {"layer_def": "addresses"},
                     "parcels":          {"layer_def": "parcels"},
-                    "hydrants": {
-                        "layer_def": "hydrants",
-                        "color": [255, 0, 0],
-                        "fill_color": [255, 255, 255],
-                        "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"},
-                        "icon-size": 1.5
-                    },
+                    "hydrants":         {"layer_def": "hydrants"},
                     "notes":            {"layer_def": "notes"}
                 },
                 "assets": {
