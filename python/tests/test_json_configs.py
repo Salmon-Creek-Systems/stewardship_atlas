@@ -35,8 +35,8 @@ class TestJsonConfigs(unittest.TestCase):
     def test_shared_inlets_config(self):
         self._load(CONFIG_DIR / 'shared_inlets_config.json')
 
-    def test_default_layers(self):
-        data = self._load(CONFIG_DIR / 'default_layers.json')
+    def test_shared_layers_config(self):
+        data = self._load(CONFIG_DIR / 'shared_layers_config.json')
         for name, layer in data.items():
             self.assertIn('geometry_type', layer, f"layer '{name}' missing geometry_type")
 
@@ -66,9 +66,9 @@ class TestJsonConfigs(unittest.TestCase):
         layers = self._load(layers_path)
         layer_names = {l['name'] if isinstance(l, dict) else l for l in layers}
         webmap_in_layers = assets['webmap']['in_layers']
-        # We only check that referenced layers are in shared default_layers or atlas layers
-        default_layers = self._load(CONFIG_DIR / 'default_layers.json')
-        all_known = layer_names | set(default_layers.keys())
+        # We only check that referenced layers are in shared_layers_config or atlas layers
+        shared_layers = self._load(CONFIG_DIR / 'shared_layers_config.json')
+        all_known = layer_names | set(shared_layers.keys())
         for lname in webmap_in_layers:
             self.assertIn(lname, all_known,
                 f"MineralKinsey webmap in_layers references '{lname}' not in any layer config")
