@@ -3,25 +3,18 @@
         "geometry_type": "polygon",
         "color": [50, 50, 50],
         "interaction": "interface",
-        "access": ["admin"],
-        "editable_columns": [
-            {
-                "name": "name",
-                "type": "string",
-                "default": "region" 
-            },
-            {
-                "name": "desription",
-                "type": "string",
-                "default": "region"
-            },
-            {
-                "name": "page",
-                "type":     "string",
-                "default": "    region"
-            }]
+        "access": ["admin"]
     },
     "elevation": {
+        "geometry_type": "raster"
+    },
+    "hillshade_tiles": {
+        "geometry_type": "raster"
+    },
+    "terrain_dem": {
+        "geometry_type": "raster"
+    },
+    "terrain_rgb_tiles": {
         "geometry_type": "raster"
     },
     "contours": {
@@ -244,5 +237,32 @@
         "fill_opacity": 0.3,
         "add_labels": false,
         "access": ["internal", "public", "admin"]
+    },
+    "gazetteer_regions": {
+        "geometry_type": "polygon",
+        "color": [50, 50, 50],
+        "interaction": "interface",
+        "access": ["admin"]
+    },
+    "notes": {
+        "geometry_type": "point",
+        "color": [255, 0, 0],
+        "fill_color": [255, 255, 255],
+        "add_labels": true,
+        "label_background": true,
+        "symbol": {
+            "png": "incident.png",
+            "icon": "basic/pushpin"
+        },
+        "icon-size": 2.0,
+        "access": ["admin"],
+        "interaction": "interface",
+        "editable_columns": [
+            {
+                "name": "name",
+                "type": "string",
+                "default": "Notes and Comments go here."
+            }
+        ]
     }
 }

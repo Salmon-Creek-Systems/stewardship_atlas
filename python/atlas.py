@@ -212,37 +212,37 @@ def create_config(config: Dict[str, Any] = None,
     inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
     eddies_config = json.load(open(shared_config_dir / "shared_eddies_config.json"))
     outlets_config = json.load(open(shared_config_dir / "shared_outlets_config.json"))
-    default_layers_config = json.load(open(shared_config_dir / "shared_layers_config.json"))
-    
+    default_layers_config = json.load(open(shared_config_dir / "default_layers.json"))
+
     # Combine all asset configs into one lookup
     all_configs = {**inlets_config, **eddies_config, **outlets_config}
-    
+
     # Process assets with config_def support
     for asset_name, asset in assets.items():
         if 'config_def' in asset:
             # Start with the base config from appropriate config file
             asset['config'] = copy.deepcopy(all_configs[asset['config_def']])
-            
+
             # Apply overrides from asset config (except config_def)
             for key, value in asset.items():
                 if key != 'config':
                     asset['config'][key] = value
-    
-    # Process layers with config_def support
+
+    # Process layers: layer_def resolves shared template; overrides applied on top
     processed_layers = []
     for layer in layers:
-        if 'config_def' in layer:
-            # Start with the base config from default_layers.json
-            layer_config = copy.deepcopy(default_layers_config[layer['config_def']])
+        if 'layer_def' in layer:
+            base = default_layers_config.get(layer['layer_def'])
+            if base is None:
+                raise KeyError(f"layer_def '{layer['layer_def']}' not found in default_layers.json")
+            layer_config = copy.deepcopy(base)
         else:
-            # Backward compatibility: start with empty config
             layer_config = {}
-        
-        # Apply overrides from layer config (except config_def)
+
         for key, value in layer.items():
-            if key != 'config':
+            if key not in ('layer_def', 'config'):
                 layer_config[key] = value
-        
+
         processed_layers.append(layer_config)
     
     # Set processed layers and assets in config
@@ -576,8 +576,8 @@ def build_atlas_from_geojson(geojson_path, config_only: bool = False):
     )
 
     if has_inline:
-        # layers dict is keyed by name; convert to list for downstream compatibility
-        layers_list = list(props['layers'].values())
+        # layers dict is keyed by name; inject name into each layer for downstream compatibility
+        layers_list = [{'name': k, **v} for k, v in props['layers'].items()]
         return build_atlas(**common, assets=props['assets'], layers=layers_list)
     else:
         return build_atlas(**common, assets_path=props['assets_path'], layers_path=props['layers_path'])

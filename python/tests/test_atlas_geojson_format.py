@@ -176,12 +176,13 @@ class TestKennedyGeoJSON(unittest.TestCase):
         self.assertIsInstance(props.get("layers"), dict)
         self.assertIsInstance(props.get("assets"), dict)
 
-    def test_kennedy_layers_have_name_keys(self):
+    def test_kennedy_layers_no_name_in_values(self):
+        """Dict key is the name; values must not redundantly repeat it."""
         with open(self.KENNEDY_PATH) as f:
             data = json.load(f)
         layers = data["features"][0]["properties"]["layers"]
         for key, layer in layers.items():
-            self.assertEqual(key, layer["name"], f"Layer key '{key}' doesn't match name field")
+            self.assertNotIn("name", layer, f"Layer '{key}' has redundant 'name' field in value")
 
     def test_kennedy_has_required_properties(self):
         with open(self.KENNEDY_PATH) as f:

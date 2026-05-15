@@ -34,234 +34,32 @@
                     "private_runbook"
                 ],
                 "layers": {
-                    "regions": {
-                        "name": "regions",
-                        "geometry_type": "polygon",
-                        "color": [50, 50, 50],
-                        "interaction": "interface",
-                        "access": ["admin"]
-                    },
-                    "elevation": {
-                        "name": "elevation",
-                        "geometry_type": "raster"
-                    },
-                    "hillshade_tiles": {
-                        "name": "hillshade_tiles",
-                        "geometry_type": "raster"
-                    },
-                    "terrain_dem": {
-                        "name": "terrain_dem",
-                        "geometry_type": "raster"
-                    },
-                    "terrain_rgb_tiles": {
-                        "name": "terrain_rgb_tiles",
-                        "geometry_type": "raster"
-                    },
-                    "contours": {
-                        "name": "contours",
-                        "geometry_type": "linestring",
-                        "color": [240, 255, 240],
-                        "constant_width": 4,
-                        "vis": {
-                            "minzoom": 14,
-                            "maxzoom": 22
-                        }
-                    },
-                    "basemap": {
-                        "name": "basemap",
-                        "geometry_type": "raster"
-                    },
-                    "lidar_basemap": {
-                        "name": "lidar_basemap",
-                        "geometry_type": "raster"
-                    },
-                    "roads": {
-                        "name": "roads",
-                        "geometry_type": "linestring",
-                        "color": [20, 20, 20],
-                        "add_labels": true,
-                        "interaction": "interface",
-                        "vector_width": true,
-                        "editable_columns": [
-                            {
-                                "name": "name",
-                                "type": "string",
-                                "default": "Road"
-                            },
-                            {
-                                "name": "STREETTYPE",
-                                "type": "radio",
-                                "values": [
-                                    {"STREETTYPE": "RD", "vector_width": 15},
-                                    {"STREETTYPE": "ST", "vector_width": 10},
-                                    {"STREETTYPE": "Other", "vector_width": 5}
-                                ],
-                                "default": {"STREETTYPE": "ST", "vector_width": 10}
-                            }
-                        ]
-                    },
-                    "lpss": {
-                        "name": "lpss",
-                        "geometry_type": "point",
-                        "color": [0, 155, 50],
-                        "add_labels": true,
-                        "access": ["admin"]
-                    },
-                    "poi": {
-                        "name": "poi",
-                        "geometry_type": "point",
-                        "color": [20, 155, 200],
-                        "add_labels": true,
-                        "access": ["admin"],
-                        "editable_columns": [
-                            {
-                                "name": "name",
-                                "type": "string",
-                                "default": ""
-                            }
-                        ],
-                        "interaction": "interface"
-                    },
-                    "creeks": {
-                        "name": "creeks",
-                        "geometry_type": "linestring",
-                        "add_labels": true,
-                        "color": [50, 50, 200],
-                        "interaction": "interface",
-                        "vector_width": true
-                    },
-                    "watertanks": {
-                        "name": "watertanks",
-                        "geometry_type": "point",
-                        "add_labels": true,
-                        "color": [50, 50, 250],
-                        "fill_color": [0, 0, 250],
-                        "symbol": {
-                            "png": "watertank.png",
-                            "icon": "custom/octy"
-                        },
-                        "icon-size": 1.0,
-                        "interaction": "interface",
-                        "editable_columns": [
-                            {
-                                "name": "size",
-                                "type": "radio",
-                                "values": [
-                                    {"size": "< 2.5k gals.", "capacity": 2500},
-                                    {"size": "2.5k-5k gals", "capacity": 5000},
-                                    {"size": "5-10k gals", "capacity": 10000},
-                                    {"size": "> 10k gals", "capacity": 20000}
-                                ],
-                                "default": {"size": "2.5k-5k gals", "capacity": 5000}
-                            }
-                        ]
-                    },
-                    "ponds": {
-                        "name": "ponds",
-                        "geometry_type": "polygon",
-                        "color": [50, 50, 250],
-                        "fill_color": [0, 0, 250],
-                        "add_labels": true,
-                        "icon_if": {
-                            "property": "accessible",
-                            "value": "yes",
-                            "icon": "basic/pushpin"
-                        },
-                        "symbol": {
-                            "png": "waterdrop.png",
-                            "icon": "basic/pushpin"
-                        },
-                        "icon-size": 2.0,
-                        "interaction": "interface",
-                        "editable_columns": [
-                            {
-                                "name": "name",
-                                "type": "string",
-                                "default": ""
-                            },
-                            {
-                                "name": "accessible",
-                                "type": "radio",
-                                "values": [
-                                    {"accessible": "yes"},
-                                    {"accessible": "no"}
-                                ],
-                                "default": {"accessible": "no"}
-                            },
-                            {
-                                "name": "size",
-                                "type": "radio",
-                                "values": [
-                                    {"size": "> 500k gals.", "capacity": 500},
-                                    {"size": "100k-500k gals", "capacity": 100},
-                                    {"size": "10k-100k gals", "capacity": 10},
-                                    {"size": "< 10k gals", "capacity": 0}
-                                ],
-                                "default": {"size": "10k-100k gals", "capacity": 10}
-                            }
-                        ]
-                    },
-                    "buildings": {
-                        "name": "buildings",
-                        "geometry_type": "polygon",
-                        "color": [240, 0, 0],
-                        "fill_color": [250, 0, 0],
-                        "add_labels": true,
-                        "interaction": "interface"
-                    },
-                    "gazetteer_regions": {
-                        "name": "gazetteer_regions",
-                        "geometry_type": "polygon",
-                        "color": [50, 50, 50],
-                        "interaction": "interface",
-                        "access": ["admin"]
-                    },
-                    "addresses": {
-                        "name": "addresses",
-                        "geometry_type": "polygon",
-                        "color": [255, 0, 0]
-                    },
-                    "parcels": {
-                        "name": "parcels",
-                        "geometry_type": "polygon",
-                        "color": [255, 0, 0, 0.3],
-                        "fill_color": [0, 0, 0, 0]
-                    },
+                    "regions":          {"layer_def": "regions"},
+                    "elevation":        {"layer_def": "elevation"},
+                    "hillshade_tiles":  {"layer_def": "hillshade_tiles"},
+                    "terrain_dem":      {"layer_def": "terrain_dem"},
+                    "terrain_rgb_tiles":{"layer_def": "terrain_rgb_tiles"},
+                    "contours":         {"layer_def": "contours"},
+                    "basemap":          {"layer_def": "basemap"},
+                    "lidar_basemap":    {"layer_def": "lidar_basemap"},
+                    "roads":            {"layer_def": "roads"},
+                    "lpss":             {"layer_def": "lpss"},
+                    "poi":              {"layer_def": "poi"},
+                    "creeks":           {"layer_def": "creeks"},
+                    "watertanks":       {"layer_def": "watertanks"},
+                    "ponds":            {"layer_def": "ponds"},
+                    "buildings":        {"layer_def": "buildings"},
+                    "gazetteer_regions":{"layer_def": "gazetteer_regions"},
+                    "addresses":        {"layer_def": "addresses"},
+                    "parcels":          {"layer_def": "parcels"},
                     "hydrants": {
-                        "name": "hydrants",
-                        "geometry_type": "point",
+                        "layer_def": "hydrants",
                         "color": [255, 0, 0],
                         "fill_color": [255, 255, 255],
-                        "add_labels": true,
-                        "interaction": "interface",
-                        "symbol": {
-                            "png": "hydrant.png",
-                            "icon": "basic/pushpin"
-                        },
+                        "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"},
                         "icon-size": 1.5
                     },
-                    "notes": {
-                        "name": "notes",
-                        "geometry_type": "point",
-                        "color": [255, 0, 0],
-                        "fill_color": [255, 255, 255],
-                        "add_labels": true,
-                        "label_background": true,
-                        "editable_columns": [
-                            {
-                                "name": "name",
-                                "type": "string",
-                                "default": "Notes and Comments go here."
-                            }
-                        ],
-                        "symbol": {
-                            "png": "incident.png",
-                            "icon": "basic/pushpin"
-                        },
-                        "icon-size": 2.0,
-                        "access": ["admin"],
-                        "interaction": "interface"
-                    }
+                    "notes":            {"layer_def": "notes"}
                 },
                 "assets": {
                     "dem": {
