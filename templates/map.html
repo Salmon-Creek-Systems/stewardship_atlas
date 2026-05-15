@@ -14,48 +14,49 @@
 
 </head>
 <body>
-    <div id="controls">
+    <div id="controls" class="loading">
         <!-- Title Panel -->
         <div class="control-panel title-panel">
             <h4>{title}</h4>
             {qr_code}
+            <button id="nav-collapse-btn" class="nav-collapse-btn" title="Collapse panel">▾</button>
         </div>
-        
-        <!-- View Panel -->
-        <div class="control-panel view-panel">
-            <label>Basemap:</label>
-            <select id="basemap-select" class="input-field">
-                {lidar_basemap_option}<option value="usgs">USGS Topo</option>
-                <option value="satellite">Satellite (ESRI)</option>
-                <option value="terrain">OpenMapTiles Terrain</option>
-                <option value="shaded-relief">USGS Shaded Relief (WMS)</option>
-            </select>
-        </div>
-        
-        <!-- Sharing Panel -->
-        <div class="control-panel sharing-panel">
-            <button id="share-view-btn" class="button" style="width: 100%; padding: 5px; margin-bottom: 5px;">Share</button>
-            <label>Share format:</label>
-            <select id="coords-format-select" class="input-field">
-                <option value="json">JSON coordinates</option>
-                <option value="google">Google Maps link</option>
-                <option value="internal">Internal map link</option>
-            </select>
-            <input type="text" id="location-input" class="input-field" placeholder="paste location here" style="width: calc(100% - 50px); display: inline-block;">
-            <button id="go-location-btn" class="button" style="width: 40px; margin-left: 5px; padding: 5px;">Go</button>
-        </div>
-        
-        <!-- Navigation Panel -->
-        <div class="control-panel nav-panel">
-            <a href="../html/admin" class="button link-button">Home</a>
-            <a href="../3dview/" class="button link-button">3D</a>
-            <a href="#" class="button link-button" id="help-link">?</a>
-        </div>
-        
-        <!-- Progress Bar -->
-        <div id="loading-progress" class="progress-bar">
-            <div class="progress-fill"></div>
-            <div class="progress-text">Loading layers...</div>
+
+        <!-- Collapsible body -->
+        <div id="nav-body">
+            <!-- Loading overlay (covers nav-body while tiles load; position:absolute so doesn't affect flow) -->
+            <div id="nav-loading-overlay"><span>Loading layers...</span></div>
+
+            <!-- View Panel -->
+            <div class="control-panel view-panel">
+                <label>Basemap:</label>
+                <select id="basemap-select" class="input-field">
+                    {lidar_basemap_option}<option value="usgs">USGS Topo</option>
+                    <option value="satellite">Satellite (ESRI)</option>
+                    <option value="terrain">OpenMapTiles Terrain</option>
+                    <option value="shaded-relief">USGS Shaded Relief (WMS)</option>
+                </select>
+            </div>
+
+            <!-- Sharing Panel -->
+            <div class="control-panel sharing-panel">
+                <button id="share-view-btn" class="button" style="width: 100%; padding: 5px; margin-bottom: 5px;">Share</button>
+                <label>Share format:</label>
+                <select id="coords-format-select" class="input-field">
+                    <option value="json">JSON coordinates</option>
+                    <option value="google">Google Maps link</option>
+                    <option value="internal">Internal map link</option>
+                </select>
+                <input type="text" id="location-input" class="input-field" placeholder="paste location here" style="width: calc(100% - 50px); display: inline-block;">
+                <button id="go-location-btn" class="button" style="width: 40px; margin-left: 5px; padding: 5px;">Go</button>
+            </div>
+
+            <!-- Navigation Panel -->
+            <div class="control-panel nav-panel">
+                <a href="../html/admin" class="button link-button">Home</a>
+                <a href="../3dview/" class="button link-button">3D</a>
+                <a href="#" class="button link-button" id="help-link">?</a>
+            </div>
         </div>
     </div>
     <div id="map"></div>
