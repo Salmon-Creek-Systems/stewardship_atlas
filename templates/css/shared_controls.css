@@ -39,6 +39,67 @@
     font-weight: bold;
 }
 
+/* Collapse toggle button */
+.nav-collapse-btn {
+    position: relative;
+    z-index: 11;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0 2px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: #666;
+    line-height: 1;
+    font-family: inherit;
+}
+
+.nav-collapse-btn:hover {
+    color: #000;
+}
+
+/* Collapsed state */
+#controls.collapsed {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+#controls.collapsed .title-panel {
+    background: rgba(255, 255, 255, 0.4);
+    margin-bottom: 0;
+}
+
+#controls.collapsed #nav-body {
+    display: none;
+}
+
+/* Nav body wrapper — needed for overlay positioning */
+#nav-body {
+    position: relative;
+}
+
+/* Loading overlay — covers nav-body panels while tiles load */
+#nav-loading-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(160, 160, 160, 0.65);
+    border-radius: 6px;
+    z-index: 10;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.85em;
+    color: #222;
+    font-weight: bold;
+    pointer-events: all;
+}
+
+#controls.loading #nav-loading-overlay {
+    display: flex;
+}
+
 .qr-toggle {
     flex-shrink: 0;
     background: none;

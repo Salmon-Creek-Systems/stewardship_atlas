@@ -155,8 +155,10 @@ map.on('load', async () => {
         }
     }
 
-    // Initialize enhanced progress tracking
-    const updateProgress = initializeProgressTracking(map, 5); // basemap + 4 basemaps
+    // Remove loading overlay once all tiles are rendered
+    map.once('idle', () => {
+        document.getElementById('controls').classList.remove('loading');
+    });
 
     map.addSource('satellite', SATELLITE_SOURCE);
     map.addSource('usgs', USGS_SOURCE);
@@ -625,4 +627,15 @@ map.on('load', async () => {
 
     // Initialize help popup
     initializeHelpPopup(document.getElementById('help-popup').querySelector('.help-body').innerHTML);
+
+    // Collapse toggle
+    const collapseBtn = document.getElementById('nav-collapse-btn');
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            const controls = document.getElementById('controls');
+            const collapsed = controls.classList.toggle('collapsed');
+            collapseBtn.textContent = collapsed ? '▸' : '▾';
+            collapseBtn.title = collapsed ? 'Expand panel' : 'Collapse panel';
+        });
+    }
 });
