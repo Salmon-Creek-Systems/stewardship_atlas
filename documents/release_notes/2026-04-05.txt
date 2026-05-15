@@ -1,0 +1,49 @@
+Subject: Stewardship Atlas — April–May 2026 updates
+
+Hi Stewardship Atlas fan and/or user!
+
+Here's a look at what's new in your atlas over the past two months.
+
+------------------------------------------------------------------------
+Comments on Map Features
+------------------------------------------------------------------------
+You can now have conversation threads on any map feature directly from the webmap.
+Specify a layer this makes sense for: field trip photos, roads being worked on,
+ watertank locations under debate, whatever. Just look for the "speech bubble"
+ icon to see where conversations have already started!
+
+------------------------------------------------------------------------
+QR Code
+------------------------------------------------------------------------
+The webmap now includes a QR code you can scan with a phone to pull up
+the atlas on the spot — useful for printing or sharing at a briefing.
+Click the QR button in the map header to show it.
+
+------------------------------------------------------------------------
+Photo Upload in the Edit Interface
+------------------------------------------------------------------------
+The edit map now has a direct photo upload button for point layers. Tap
+or click the button, choose a geotagged photo from your device, and it
+is added to the map at the photo's GPS location — the same result as
+emailing a photo, but without leaving the browser.
+
+------------------------------------------------------------------------
+General Improvements
+------------------------------------------------------------------------
+Share link: Atlas "share" links now include everything about the map you're sharing: 
+zoom level, position, and which layers are visible. This allows much more specific
+communication. There is also a new "Share" button (right above the "share format" dropdown in the nav box)
+which shares the exact view but without a specific location/pin. 
+
+3D view overlays: The 3D terrain view now shows your map layers — roads,
+creeks, and others — draped over the terrain surface. 
+
+Email photo info: 
+It's easier and more powerful to add data to the map when you email a geotragged photo.
+* The subject line becomes the new Label on the map.
+* Any layer mentioned in the first line will get the photo data added to it.
+* Any further data will be stored - and any key/value pairs for existing layer Properties will be parsed out.
+
+------------------------------------------------------------------------
+
+As always, reply to this email with any questions or if anything looks off.
