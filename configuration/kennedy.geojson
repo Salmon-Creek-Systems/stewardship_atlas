@@ -304,9 +304,12 @@
                     "html": {
                         "config_def": "static_html"
                     },
-                    "sqldb": {
+                    "console": {
+			"config_def": "console"
+                    },
+		    "sqldb": {				
                         "config_def": "sqldb",
-                        "layers": [
+                        "layers": [	
                             "basemap",
                             "roads",
                             "creeks"
