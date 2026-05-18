@@ -2149,13 +2149,13 @@ def make_root_html(root_path_str):
 def make_console_html(config,
                       displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
                       admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[],
-                      webmap_available=False):
+                      webmap_available=False, template_name='console.html'):
     """Generate HTML for the console interface."""
     logger.info(f"Making Console for {console_type}...")
 
     # Read the template file
     template_dir = versioning.atlas_path(config, version='app') / 'templates'
-    template_path = Path(template_dir / 'console.html')
+    template_path = Path(template_dir / template_name)
     with open(template_path, 'r') as f:
         template = f.read()
 
@@ -2185,7 +2185,7 @@ def make_console_html(config,
     return html
 
 
-def make_swale_html(config, outlet_config, store_materialized=True):
+def make_swale_html(config, outlet_config, store_materialized=True, template_name='console.html', css_name='console.css'):
     """Generate HTML for the swale interface."""
     # Get version string
     version_string = config.get('version_string', 'staging')
@@ -2200,7 +2200,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     logger.debug(f"Creating CSS dir: {css_dir}")
     css_dir.mkdir(exist_ok=True)
     template_dir = versioning.atlas_path(config, version='app') / 'templates'
-    template_path = Path(template_dir / 'css' /  'console.css')
+    template_path = Path(template_dir / 'css' / css_name)
     subprocess.run(['cp', template_path, str(css_dir)])
     
     # Get interfaces and downloads based on access level
@@ -2476,7 +2476,8 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         spreadsheets=config['spreadsheets'],
         displayed_versions=[str(v) for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=[]
+        use_cases=[],
+        template_name=template_name
     )
 
     tech_path = outpath / "technical"
@@ -2490,14 +2491,15 @@ def make_swale_html(config, outlet_config, store_materialized=True):
     admin_html = make_console_html(
         config,
         console_type='ADMINISTRATION',
-        panel_header = 'Layer operations and Access',        
-        displayed_interfaces=admin_interfaces, 
-        displayed_downloads=admin_downloads, 
+        panel_header = 'Layer operations and Access',
+        displayed_interfaces=admin_interfaces,
+        displayed_downloads=admin_downloads,
         displayed_inlets=admin_layers,
         spreadsheets = config['spreadsheets'],
         displayed_versions=[str(v)for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=[]
+        use_cases=[],
+        template_name=template_name
     )
     
     admin_path = outpath / "admin"
@@ -2511,12 +2513,13 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         config,
         console_type='INTERNAL',
         panel_header = 'Help and How-To',
-        displayed_interfaces=internal_interfaces, 
-        displayed_downloads=internal_downloads, 
-        displayed_inlets=[], 
+        displayed_interfaces=internal_interfaces,
+        displayed_downloads=internal_downloads,
+        displayed_inlets=[],
         displayed_versions=[str(v) for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=user_cases
+        use_cases=user_cases,
+        template_name=template_name
     )
     
     internal_path = outpath / "internal" 
@@ -2540,6 +2543,7 @@ def make_swale_html(config, outlet_config, store_materialized=True):
         use_cases=[],
         admin_controls=[("Internal", "internal.html")],
         webmap_available=webmap_available,
+        template_name=template_name
     )
     
     public_path = outpath / "public"
@@ -2564,9 +2568,12 @@ def make_swale_html(config, outlet_config, store_materialized=True):
 def outlet_html(config, outlet_name):
     """Generate HTML for all outlets."""
     outlet_config = config['assets'][outlet_name]
-    # Create HTML for each swale
-    #for swale in config.get('dataswales', []):
     return make_swale_html(config, outlet_config)
+
+def outlet_console(config, outlet_name):
+    """Generate redesigned console HTML (mobile-first, grouped layer actions)."""
+    outlet_config = config['assets'][outlet_name]
+    return make_swale_html(config, outlet_config, template_name='console_new.html', css_name='console_new.css')
 
 def outlet_sqlquery(config: dict, outlet_name: str):
     """Generate HTML interface for SQL queries."""
@@ -3068,6 +3075,7 @@ asset_methods = {
     #'tiff': outlet_tiff,
     #'pdf': outlet_geopdf,
     'html': outlet_html,
+    'console': outlet_console,
     #'gazetteer': outlet_gazetteer,
     'runbook': outlet_runbook,
     'webmap': outlet_webmap,

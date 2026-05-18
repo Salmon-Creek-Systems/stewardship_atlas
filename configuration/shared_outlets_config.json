@@ -108,6 +108,11 @@
             "citation": "https://portal.opentopography.org/api/terms"
         }
     },
+    "console": {
+        "asset_type": "outlet",
+        "fetch_type": "console",
+        "interaction": "backend"
+    },
     "runbook": {
         "asset_type": "outlet",
         "layers": [
