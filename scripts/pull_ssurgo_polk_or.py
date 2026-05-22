@@ -34,7 +34,8 @@ BBOX = {'west': -123.60, 'south': 44.78, 'east': -123.00, 'north': 45.20}
 def sda_tabular(sql: str, timeout: int = 60) -> list:
     body = {'query': sql, 'format': 'json+columnname'}
     resp = requests.post(SDA_TABULAR_URL, json=body, timeout=timeout)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise Exception(f"SDA tabular {resp.status_code}: {resp.text[:500]}")
     return resp.json().get('Table', [])
 
 
@@ -111,7 +112,7 @@ def fetch_polygons() -> 'gpd.GeoDataFrame':
 def fetch_soil_properties(mukeys: list) -> dict:
     """Batch-fetch dominant topsoil properties for a list of mukeys."""
     props_by_mukey = {}
-    chunk_size = 200
+    chunk_size = 50
     total_chunks = (len(mukeys) + chunk_size - 1) // chunk_size
     for i in range(0, len(mukeys), chunk_size):
         chunk = mukeys[i:i + chunk_size]
