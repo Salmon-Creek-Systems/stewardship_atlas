@@ -122,8 +122,7 @@ def fetch_soil_properties(mukeys: list) -> dict:
         sql = f"""
             SELECT co.mukey, co.compname, co.drainagecl,
                    ch.ph1to1h2o_r, ch.om_r, ch.cec7_r,
-                   ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r,
-                   ch.texture
+                   ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r
             FROM component co
             INNER JOIN chorizon ch ON co.cokey = ch.cokey
             WHERE co.mukey IN ({mukey_list})
@@ -148,6 +147,8 @@ def fetch_soil_properties(mukeys: list) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', default=None)
+    parser.add_argument('--wfs-cache', default='/tmp/ssurgo_polk_or_wfs.gpkg',
+                        help='Path to cache the raw WFS polygons (avoids re-downloading 50MB)')
     args = parser.parse_args()
 
     repo_root = Path(__file__).parent.parent
@@ -156,7 +157,19 @@ def main():
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    gdf = fetch_polygons()
+    cache_path = Path(args.wfs_cache)
+    if cache_path.exists():
+        print(f"Loading WFS polygons from cache: {cache_path}")
+        gdf = gpd.read_file(cache_path)
+        print(f"  {len(gdf)} polygons loaded")
+    else:
+        gdf = fetch_polygons()
+        if gdf.empty:
+            print("ERROR: no polygons returned from WFS")
+            sys.exit(1)
+        print(f"Saving WFS polygons to cache: {cache_path}")
+        gdf.to_file(cache_path, driver='GPKG')
+        print("  Cached.")
     if gdf.empty:
         print("ERROR: no polygons returned from WFS")
         sys.exit(1)
@@ -194,7 +207,6 @@ def main():
             props['soil_sand'] = soil.get('sandtotal_r')
             props['soil_silt'] = soil.get('silttotal_r')
             props['soil_clay'] = soil.get('claytotal_r')
-            props['soil_texture'] = soil.get('texture')
 
         features.append({'type': 'Feature', 'geometry': geom, 'properties': props})
 
