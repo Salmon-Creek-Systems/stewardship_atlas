@@ -39,21 +39,73 @@ def sda_tabular(sql: str, timeout: int = 60) -> list:
 
 
 def fetch_polygons() -> 'gpd.GeoDataFrame':
-    """Fetch MapunitPoly features via SDA WFS for Polk County bbox."""
-    # WFS 1.1.0 with EPSG:4326: axis order is lat,lon (minY,minX,maxY,maxX)
-    bbox_str = f"{BBOX['south']},{BBOX['west']},{BBOX['north']},{BBOX['east']},urn:ogc:def:crs:EPSG::4326"
-    wfs_params = (
-        f"SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature"
-        f"&TYPENAME=MapunitPoly&BBOX={bbox_str}"
+    """Fetch MapunitPoly features via SDA WFS for Polk County bbox.
+
+    Uses direct HTTP rather than GDAL WFS driver to avoid silent failures.
+    Tries lon,lat bbox order (WFS 1.0 convention) first; falls back to
+    lat,lon with explicit CRS (WFS 1.1 EPSG:4326 spec).
+    """
+    import io, tempfile
+
+    attempts = [
+        # lon,lat order — widely accepted despite spec
+        (f"{BBOX['west']},{BBOX['south']},{BBOX['east']},{BBOX['north']}",
+         "1.1.0", "lon,lat order"),
+        # lat,lon with explicit CRS — strict WFS 1.1 EPSG:4326
+        (f"{BBOX['south']},{BBOX['west']},{BBOX['north']},{BBOX['east']},"
+         f"urn:ogc:def:crs:EPSG::4326", "1.1.0", "lat,lon + CRS"),
+        # WFS 1.0.0 lon,lat (older but broadly supported)
+        (f"{BBOX['west']},{BBOX['south']},{BBOX['east']},{BBOX['north']}",
+         "1.0.0", "WFS 1.0 lon,lat"),
+    ]
+
+    for bbox_str, version, label in attempts:
+        url = (
+            f"{SDA_WFS_URL}?SERVICE=WFS&VERSION={version}&REQUEST=GetFeature"
+            f"&TYPENAME=MapunitPoly&BBOX={bbox_str}"
+        )
+        print(f"Trying WFS ({label}): ...BBOX={bbox_str[:40]}")
+        try:
+            resp = requests.get(url, timeout=180)
+            resp.raise_for_status()
+        except Exception as e:
+            print(f"  HTTP error: {e}")
+            continue
+
+        nbytes = len(resp.content)
+        print(f"  Response: {nbytes:,} bytes")
+        if nbytes < 200:
+            print(f"  Response body: {resp.text[:300]}")
+            continue
+
+        try:
+            with tempfile.NamedTemporaryFile(suffix='.gml', delete=False) as tmp:
+                tmp.write(resp.content)
+                tmp_path = tmp.name
+            gdf = gpd.read_file(tmp_path)
+        except Exception as e:
+            print(f"  Parse error: {e}")
+            # Try reading as GeoJSON directly (some WFS endpoints return it)
+            try:
+                gdf = gpd.read_file(io.BytesIO(resp.content))
+            except Exception as e2:
+                print(f"  GeoJSON parse also failed: {e2}")
+                continue
+
+        if gdf.crs and gdf.crs.to_epsg() != 4326:
+            gdf = gdf.to_crs(epsg=4326)
+
+        print(f"  {len(gdf)} polygons parsed")
+        if len(gdf) > 0:
+            return gdf
+        # 0 features — try next bbox ordering
+
+    raise Exception(
+        "All WFS attempts returned 0 features.\n"
+        "Try fetching manually:\n"
+        f"  curl '{SDA_WFS_URL}?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetCapabilities' | head -100\n"
+        "to verify the endpoint and feature type names."
     )
-    url = f"WFS:{SDA_WFS_URL}?{wfs_params}"
-    print(f"Fetching polygons from SDA WFS (Polk County bbox)...")
-    gdf = gpd.read_file(url)
-    # Reproject to WGS84 if needed
-    if gdf.crs and gdf.crs.to_epsg() != 4326:
-        gdf = gdf.to_crs(epsg=4326)
-    print(f"  {len(gdf)} polygons returned")
-    return gdf
 
 
 def fetch_soil_properties(mukeys: list) -> dict:
