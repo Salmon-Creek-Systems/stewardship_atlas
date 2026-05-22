@@ -38,6 +38,7 @@ import deltas_geojson
 import vector_inlets
 import email_inlet
 import atlas_logs
+from biochar_routes import biochar_router
 app = FastAPI()
 logger.logger.setLevel(0)
 
@@ -57,6 +58,7 @@ STORAGE_DIR = "/root/data/uploads/"
 # Serve templates directory for the create-atlas UI
 _templates_dir = versioning.atlas_path(local_path='templates', version='app')
 app.mount("/templates", StaticFiles(directory=str(_templates_dir)), name="templates")
+app.include_router(biochar_router)
 
 
 class JSONPayload(BaseModel):

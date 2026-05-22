@@ -1,0 +1,76 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [-123.60, 44.78],
+                        [-123.60, 45.20],
+                        [-123.00, 45.20],
+                        [-123.00, 44.78],
+                        [-123.60, 44.78]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "abi_demo",
+                "data_root": "/root/swales_dev",
+                "shared_dir": "/root/data/",
+                "admin_emails": ["gateless@gmail.com"],
+                "base_url": "https://fireatlas.org/abi_demo",
+                "app_url": "https://fireatlas.org:9000",
+                "port": 9000,
+                "logo_url": "",
+                "versioned_outlets": ["biochar_webedit"],
+                "layers": {
+                    "regions": {
+                        "layer_def": "regions"
+                    },
+                    "ssurgo_polk_or": {
+                        "geometry_type": "polygon",
+                        "color": [120, 100, 80],
+                        "fill_color": [200, 185, 165],
+                        "fill_opacity": 0.6,
+                        "interaction": "interface",
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {"name": "soil_series", "type": "string", "default": ""},
+                            {"name": "soil_ph", "type": "number", "default": null},
+                            {"name": "soil_om", "type": "number", "default": null},
+                            {"name": "soil_cec", "type": "number", "default": null},
+                            {"name": "drainage_class", "type": "string", "default": ""},
+                            {"name": "soil_texture", "type": "string", "default": ""},
+                            {"name": "mukey", "type": "string", "default": ""}
+                        ]
+                    },
+                    "biochar_properties_pnw": {
+                        "geometry_type": "point",
+                        "vis": {"layout": {"visibility": "none"}}
+                    }
+                },
+                "assets": {
+                    "seed_ssurgo": {
+                        "out_layer": "ssurgo_polk_or",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-data",
+                        "s3_key": "abi_demo/seed/ssurgo_polk_or.geojson"
+                    },
+                    "seed_biochar": {
+                        "out_layer": "biochar_properties_pnw",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-data",
+                        "s3_key": "abi_demo/seed/biochar_properties_pnw.geojson"
+                    },
+                    "biochar_webedit": {
+                        "config_def": "biochar_webedit",
+                        "in_layers": ["ssurgo_polk_or"],
+                        "access": ["public"]
+                    }
+                }
+            }
+        }
+    ]
+}

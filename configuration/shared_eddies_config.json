@@ -178,5 +178,12 @@
         "treatments_file": "configuration/treatments/default_treatments.json",
         "biomass_price": 0.001,
         "biochar_price": 0.01
+    },
+    "dst_match_simplified": {
+        "asset_type": "eddy",
+        "fetch_type": "dst_match_simplified",
+        "in_layer": "ssurgo_polk_or",
+        "biochar_layer": "biochar_properties_pnw",
+        "goal": "raise_ph"
     }
 }
