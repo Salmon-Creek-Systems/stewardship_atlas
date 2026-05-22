@@ -214,7 +214,7 @@ def main():
     with open(out_path, 'w') as f:
         json.dump(fc, f)
 
-    ph_vals = [f['properties']['soil_ph'] for f in features if f['properties'].get('soil_ph') is not None]
+    ph_vals = [float(f['properties']['soil_ph']) for f in features if f['properties'].get('soil_ph') is not None]
     print(f"\nWrote {len(features)} polygons ({matched} with soil data) → {out_path}")
     if ph_vals:
         print(f"pH range: {min(ph_vals):.1f} – {max(ph_vals):.1f} across {len(ph_vals)} polygons")
