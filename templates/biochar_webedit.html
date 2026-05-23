@@ -527,9 +527,9 @@
 
     // ── Panels ──────────────────────────────────────────────────────────────
     function showPanel(which) {{
-        document.getElementById('panel-empty').style.display   = which === 'empty'   ? '' : 'none';
-        document.getElementById('panel-detail').style.display  = which === 'detail'  ? '' : 'none';
-        document.getElementById('panel-results').style.display = which === 'results' ? '' : 'none';
+        document.getElementById('panel-empty').style.display   = which === 'empty'   ? ''      : 'none';
+        document.getElementById('panel-detail').style.display  = which === 'detail'  ? 'block' : 'none';
+        document.getElementById('panel-results').style.display = which === 'results' ? 'block' : 'none';
     }}
 
     // ── Goal selection ──────────────────────────────────────────────────────
