@@ -505,9 +505,9 @@
         document.getElementById('soil-series').textContent = props.soil_series || 'Unknown series';
         document.getElementById('soil-mukey').textContent  = 'MUKEY: ' + (mukey || '—');
 
-        setStatValue('stat-ph',       props.soil_ph,       v => v.toFixed(1));
-        setStatValue('stat-om',       props.soil_om,       v => v.toFixed(1) + '%');
-        setStatValue('stat-cec',      props.soil_cec,      v => v.toFixed(0) + ' meq/100g');
+        setStatValue('stat-ph',       props.soil_ph,       v => Number(v).toFixed(1));
+        setStatValue('stat-om',       props.soil_om,       v => Number(v).toFixed(1) + '%');
+        setStatValue('stat-cec',      props.soil_cec,      v => Number(v).toFixed(0) + ' meq/100g');
         setStatValue('stat-drainage', props.drainage_class, v => v);
         setStatValue('stat-texture',  props.soil_texture,  v => v);
 
@@ -517,7 +517,7 @@
     function setStatValue(id, val, fmt) {{
         const el = document.getElementById(id);
         if (val !== null && val !== undefined && val !== '') {{
-            el.textContent = fmt(typeof val === 'string' ? val : Number(val));
+            el.textContent = fmt(val);
             el.classList.remove('missing');
         }} else {{
             el.textContent = 'n/a';
