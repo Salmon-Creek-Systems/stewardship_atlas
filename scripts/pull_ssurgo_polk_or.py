@@ -16,6 +16,7 @@ import time
 import argparse
 import requests
 from pathlib import Path
+from shapely.ops import transform as shapely_transform
 
 try:
     import geopandas as gpd
@@ -173,6 +174,15 @@ def main():
     if gdf.empty:
         print("ERROR: no polygons returned from WFS")
         sys.exit(1)
+
+    # NRCS WFS returns EPSG:4326 in lat,lon axis order (official spec).
+    # Detect by checking that west Oregon longitude (~-123) is actually stored as x.
+    bounds = gdf.geometry.total_bounds  # [minx, miny, maxx, maxy]
+    if bounds[0] > 0:
+        print(f"Detected lat,lon axis order (minx={bounds[0]:.3f}); swapping to lon,lat...")
+        gdf.geometry = gdf.geometry.apply(
+            lambda geom: shapely_transform(lambda x, y: (y, x), geom)
+        )
 
     # Normalize mukey column name
     mukey_col = next((c for c in gdf.columns if c.lower() == 'mukey'), None)
