@@ -7,6 +7,7 @@
     <title>Biochar Suitability — Polk County, OR</title>
     <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' rel='stylesheet'>
+    <script src='https://unpkg.com/pmtiles@4/dist/pmtiles.js'></script>
     <style>
         *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -463,6 +464,12 @@
     let selectedMukey = null;
     let selectedProps = null;
     let currentGoal   = 'raise_ph';
+
+    // ── PMTiles protocol ────────────────────────────────────────────────────
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+    MAP_STYLE.sources.ssurgo_polk_or.url = 'pmtiles://' +
+        new URL('../../layers/ssurgo_polk_or/ssurgo_polk_or.pmtiles', window.location.href).href;
 
     // ── Map init ────────────────────────────────────────────────────────────
     const map = new maplibregl.Map({{

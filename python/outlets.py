@@ -3099,8 +3099,8 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'attribution': '© OpenStreetMap contributors © CARTO',
             },
             'ssurgo_polk_or': {
-                'type': 'geojson',
-                'data': '../../layers/ssurgo_polk_or/ssurgo_polk_or.geojson',
+                'type': 'vector',
+                'url': 'pmtiles://../../layers/ssurgo_polk_or/ssurgo_polk_or.pmtiles',
             },
         },
         'layers': [
@@ -3114,6 +3114,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'id': 'ssurgo-fill',
                 'type': 'fill',
                 'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
                 'paint': {
                     'fill-color': '#c8b49a',
                     'fill-opacity': 0.55,
@@ -3123,6 +3124,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'id': 'ssurgo-outline',
                 'type': 'line',
                 'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
                 'paint': {
                     'line-color': '#8a7060',
                     'line-width': 0.6,
@@ -3132,6 +3134,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'id': 'ssurgo-selected',
                 'type': 'fill',
                 'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
                 'filter': ['==', ['get', 'mukey'], ''],
                 'paint': {
                     'fill-color': '#173404',
