@@ -187,15 +187,18 @@ def biochar_landscape(req: LandscapeRequest):
             continue
         soil_om_raw = props.get('soil_om') or props.get('SOIL_OM') or props.get('om_r')
         soil_om = float(soil_om_raw) if soil_om_raw is not None else None
+        # Pass all biochars so lp normalization works; find the selected one by id
         ranked = dst_match_point(
             soil_ph=soil_ph,
             soil_om=soil_om,
             goal=req.goal,
-            biochar_records=[biochar_record],
+            biochar_records=biochar_records,
             target_ph=LANDSCAPE_TARGET_PH,
+            top_n=None,
         )
-        if ranked and not ranked[0].get('placeholder'):
-            scores[str(mukey)] = ranked[0]['suitability_score']
+        match = next((r for r in ranked if str(r.get('biochar_id')) == str(req.biochar_id)), None)
+        if match and not match.get('placeholder'):
+            scores[str(mukey)] = match['suitability_score']
 
     logger.info(f"landscape: scored {len(scores)}, skipped no_mukey={skipped_no_mukey} no_ph={skipped_no_ph}")
 

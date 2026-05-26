@@ -1628,7 +1628,7 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
 
 
 def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
-                    target_ph: float = None) -> list:
+                    target_ph: float = None, top_n: int = 5) -> list:
     """Simplified Phillips 2020 pH-matching suitability calculation (point mode).
 
     Implements the pH liming path only. Other goals return a placeholder list.
@@ -1704,7 +1704,7 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
         })
 
     results.sort(key=lambda x: x['suitability_score'], reverse=True)
-    return results[:5]
+    return results[:top_n] if top_n else results
 
 
 def dst_match_simplified(config: Dict[str, Any], asset_name: str):
