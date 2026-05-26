@@ -57,7 +57,7 @@ def _load_biochar_records() -> list:
     """Load biochar properties from the abi_demo staging layer."""
     layer_path = (
         Path(SWALES_ROOT) / BIOCHAR_ATLAS / 'staging' / 'layers'
-        / 'biochar_properties_pnw' / 'biochar_properties_pnw.geojson'
+        / 'seed_biochar' / 'seed_biochar.geojson'
     )
     if not layer_path.exists():
         raise FileNotFoundError(f"Biochar layer not found: {layer_path}")

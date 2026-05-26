@@ -68,7 +68,14 @@
                         "config_def": "biochar_webedit",
                         "in_layers": ["ssurgo_polk_or"],
                         "access": ["public"]
+                    },
+		    "notebook": {
+                        "config_def": "jupyter_notebook",
+                        "access": [
+                            "technical"
+                        ]
                     }
+
                 }
             }
         }
