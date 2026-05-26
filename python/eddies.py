@@ -1693,7 +1693,7 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
 
         results.append({
             'biochar_id': bc.get('biochar_id', i + 1),
-            'name': bc.get('sample_id') or bc.get('name') or f"Biochar-{bc.get('biochar_id', i+1)}",
+            'name': bc.get('sample_id') or bc.get('name') or bc.get('id') or f"Biochar-{bc.get('biochar_id', i+1)}",
             'feedstock': bc.get('feedstock') or bc.get('feedstock_type'),
             'production_temp_c': bc.get('production_temp_c'),
             'biochar_ph': bc.get('biochar_ph'),
