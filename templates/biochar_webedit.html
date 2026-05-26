@@ -116,7 +116,7 @@
         #landscape-btn:disabled {{ background: #aaa; cursor: default; }}
         #landscape-legend {{ display: none; margin-top: 18px; }}
         #landscape-legend .legend-label {{ font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }}
-        #legend-bar {{ height: 14px; border-radius: 4px; background: linear-gradient(to right, #d4e9c4, #173404); margin-bottom: 4px; }}
+        #legend-bar {{ height: 14px; border-radius: 4px; background: linear-gradient(to right, #2c7bb6, #d7191c); margin-bottom: 4px; }}
         .legend-range {{ display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }}
         #landscape-status {{ margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic; }}
 
@@ -725,10 +725,10 @@
     }});
 
     function scoreToHex(score, min, max) {{
-        // Linear interpolation: low=#d4e9c4 (light green) → high=#173404 (dark green)
+        // Linear interpolation: low=#2c7bb6 (blue) → high=#d7191c (red)
         const t = max > min ? (score - min) / (max - min) : 0.5;
-        const lo = [212, 233, 196];  // #d4e9c4
-        const hi = [23,  52,   4];   // #173404
+        const lo = [44,  123, 182];  // #2c7bb6
+        const hi = [215,  25,  28];  // #d7191c
         const r = Math.round(lo[0] + t * (hi[0] - lo[0]));
         const g = Math.round(lo[1] + t * (hi[1] - lo[1]));
         const b = Math.round(lo[2] + t * (hi[2] - lo[2]));
@@ -747,7 +747,7 @@
         expr.push('#cccccc');  // fallback for unscored polygons
 
         map.setPaintProperty('ssurgo-fill', 'fill-color', expr);
-        map.setPaintProperty('ssurgo-fill', 'fill-opacity', 0.7);
+        map.setPaintProperty('ssurgo-fill', 'fill-opacity', 0.5);
     }}
 
     document.getElementById('back-btn').addEventListener('click', () => {{
