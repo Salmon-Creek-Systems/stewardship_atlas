@@ -1638,6 +1638,7 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
     Each dict: biochar_id, name, feedstock, suitability_score (0-1),
                 recommended_rate_t_ac, predicted_dpH.
     """
+    print(f"DST match-  PH:{soil_ph}, OM: {soil_om}, G: {goal}, recs: {biochar_records}")
     if goal != 'raise_ph':
         return [{'placeholder': True, 'message': f"Goal '{goal}' requires full Phillips 2020 — coming in production."}]
 

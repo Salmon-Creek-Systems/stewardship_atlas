@@ -62,6 +62,7 @@ def _load_biochar_records() -> list:
     if not layer_path.exists():
         raise FileNotFoundError(f"Biochar layer not found: {layer_path}")
     fc = json.loads(layer_path.read_text())
+    print(f"Loaded biochar records: {fc}")
     return [f['properties'] for f in fc.get('features', []) if f.get('properties')]
 
 
