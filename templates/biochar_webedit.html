@@ -97,14 +97,34 @@
             padding: 16px;
         }}
 
-        /* ── Empty state ── */
-        #panel-empty {{
-            text-align: center;
-            padding: 40px 16px;
-            color: var(--muted);
+        /* ── Setup panel (landscape mode) ── */
+        #panel-setup {{ padding: 16px 0; }}
+        #panel-setup .setup-intro {{ font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }}
+        .setup-field {{ margin-bottom: 14px; }}
+        .setup-field label {{ display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }}
+        .setup-select {{
+            width: 100%; padding: 7px 10px; border: 1px solid var(--border);
+            border-radius: var(--radius); font-size: 13px; background: white; cursor: pointer;
         }}
-        #panel-empty .hint-icon {{ font-size: 32px; margin-bottom: 12px; }}
-        #panel-empty p {{ font-size: 14px; line-height: 1.5; }}
+        .setup-select:disabled {{ background: #f5f5f5; color: var(--muted); cursor: default; }}
+        #landscape-btn {{
+            width: 100%; padding: 10px; background: var(--green-dark); color: white;
+            border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600;
+            cursor: pointer; margin-top: 4px;
+        }}
+        #landscape-btn:hover {{ background: var(--green-mid); }}
+        #landscape-btn:disabled {{ background: #aaa; cursor: default; }}
+        #landscape-legend {{ display: none; margin-top: 18px; }}
+        #landscape-legend .legend-label {{ font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }}
+        #legend-bar {{ height: 14px; border-radius: 4px; background: linear-gradient(to right, #d4e9c4, #173404); margin-bottom: 4px; }}
+        .legend-range {{ display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }}
+        #landscape-status {{ margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic; }}
+
+        /* ── Back button ── */
+        #back-btn {{
+            font-size: 12px; color: var(--green-mid); background: none; border: none;
+            cursor: pointer; padding: 0; margin-bottom: 10px; text-decoration: underline;
+        }}
 
         /* ── Detail panel ── */
         #panel-detail {{ display: none; }}
@@ -398,12 +418,38 @@
         </div>
 
         <div id="sidebar-body">
-            <div id="panel-empty">
-                <div class="hint-icon">🗺</div>
-                <p>Click a soil polygon on the map to see soil properties and calculate biochar suitability.</p>
+            <div id="panel-setup">
+                <p class="setup-intro">Select a goal and biochar type to see estimated suitability across all soil polygons. Then click any polygon for site-specific results.</p>
+
+                <div class="setup-field">
+                    <label>Amendment Goal</label>
+                    <select id="setup-goal" class="setup-select">
+                        <option value="raise_ph">Raise soil pH</option>
+                        <option value="water_retention" disabled>Improve water retention (v2)</option>
+                        <option value="carbon_sequestration" disabled>Sequester carbon (v2)</option>
+                        <option value="provision_pk" disabled>Provision P or K (v2)</option>
+                    </select>
+                </div>
+
+                <div class="setup-field">
+                    <label>Biochar Type</label>
+                    <select id="setup-biochar" class="setup-select">
+                        <option value="">Loading…</option>
+                    </select>
+                </div>
+
+                <button id="landscape-btn" disabled>Show Landscape Suitability</button>
+                <div id="landscape-status"></div>
+
+                <div id="landscape-legend">
+                    <div class="legend-label">Suitability</div>
+                    <div id="legend-bar"></div>
+                    <div class="legend-range"><span>Lower</span><span>Higher</span></div>
+                </div>
             </div>
 
             <div id="panel-detail">
+                <button id="back-btn">← Back to landscape view</button>
                 <div class="soil-series-name" id="soil-series">—</div>
                 <div class="soil-mukey" id="soil-mukey"></div>
 
@@ -514,10 +560,11 @@
     }};
 
     // ── State ───────────────────────────────────────────────────────────────
-    let selectedMukey  = null;
-    let selectedProps  = null;
-    let currentGoal    = 'raise_ph';
-    let selectedMarker = null;
+    let selectedMukey    = null;
+    let selectedProps    = null;
+    let currentGoal      = 'raise_ph';
+    let selectedMarker   = null;
+    let landscapeActive  = false;
 
     // ── PMTiles protocol ────────────────────────────────────────────────────
     const protocol = new pmtiles.Protocol();
@@ -613,10 +660,92 @@
 
     // ── Panels ──────────────────────────────────────────────────────────────
     function showPanel(which) {{
-        document.getElementById('panel-empty').style.display   = which === 'empty'   ? ''      : 'none';
+        document.getElementById('panel-setup').style.display   = which === 'setup'   ? 'block' : 'none';
         document.getElementById('panel-detail').style.display  = which === 'detail'  ? 'block' : 'none';
         document.getElementById('panel-results').style.display = which === 'results' ? 'block' : 'none';
     }}
+
+    // ── Landscape mode ──────────────────────────────────────────────────────
+
+    // Populate biochar dropdown on load
+    (async () => {{
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/biochar_db');
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            const sel = document.getElementById('setup-biochar');
+            sel.innerHTML = '';
+            data.records.forEach(r => {{
+                const opt = document.createElement('option');
+                opt.value = String(r.biochar_id);
+                opt.textContent = (r.sample_id || r.name || r.id || 'Biochar ' + r.biochar_id)
+                    + (r.feedstock ? ' (' + r.feedstock + ')' : '');
+                sel.appendChild(opt);
+            }});
+            document.getElementById('landscape-btn').disabled = false;
+        }} catch (err) {{
+            document.getElementById('setup-biochar').innerHTML = '<option value="">Failed to load</option>';
+        }}
+    }})();
+
+    document.getElementById('landscape-btn').addEventListener('click', async () => {{
+        const goal      = document.getElementById('setup-goal').value;
+        const biocharId = document.getElementById('setup-biochar').value;
+        if (!biocharId) return;
+
+        const btn    = document.getElementById('landscape-btn');
+        const status = document.getElementById('landscape-status');
+        btn.disabled = true;
+        btn.textContent = 'Calculating…';
+        status.textContent = '';
+
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/landscape', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ goal, biochar_id: biocharId }}),
+            }});
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+
+            applyLandscapeChoropleth(data.scores, data.min_score, data.max_score);
+            landscapeActive = true;
+            document.getElementById('landscape-legend').style.display = 'block';
+            status.textContent = Object.keys(data.scores).length + ' soil polygons scored.';
+        }} catch (err) {{
+            status.textContent = 'Error: ' + err.message;
+        }} finally {{
+            btn.disabled = false;
+            btn.textContent = 'Show Landscape Suitability';
+        }}
+    }});
+
+    function scoreToHex(score, min, max) {{
+        // Linear interpolation: low=#d4e9c4 (light green) → high=#173404 (dark green)
+        const t = max > min ? (score - min) / (max - min) : 0.5;
+        const lo = [212, 233, 196];  // #d4e9c4
+        const hi = [23,  52,   4];   // #173404
+        const r = Math.round(lo[0] + t * (hi[0] - lo[0]));
+        const g = Math.round(lo[1] + t * (hi[1] - lo[1]));
+        const b = Math.round(lo[2] + t * (hi[2] - lo[2]));
+        return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    }}
+
+    function applyLandscapeChoropleth(scores, minScore, maxScore) {{
+        // Build a MapLibre match expression: mukey → hex color
+        const expr = ['match', ['get', 'mukey']];
+        Object.entries(scores).forEach(([mukey, score]) => {{
+            expr.push(mukey, scoreToHex(score, minScore, maxScore));
+        }});
+        expr.push('#cccccc');  // fallback for unscored polygons
+
+        map.setPaintProperty('ssurgo-fill', 'fill-color', expr);
+        map.setPaintProperty('ssurgo-fill', 'fill-opacity', 0.7);
+    }}
+
+    document.getElementById('back-btn').addEventListener('click', () => {{
+        showPanel('setup');
+    }});
 
     // ── Goal selection ──────────────────────────────────────────────────────
     document.querySelectorAll('input[name=goal]').forEach(radio => {{

@@ -66,12 +66,32 @@ def _load_biochar_records() -> list:
     return [f['properties'] for f in fc.get('features', []) if f.get('properties')]
 
 
+LANDSCAPE_TARGET_PH = 6.5  # standard agronomic target for OR
+
+
+def _load_ssurgo_features() -> list:
+    """Load SSURGO polygon features from the abi_demo staging layer."""
+    layer_path = (
+        Path(SWALES_ROOT) / BIOCHAR_ATLAS / 'staging' / 'layers'
+        / 'ssurgo_polk_or' / 'ssurgo_polk_or.geojson'
+    )
+    if not layer_path.exists():
+        raise FileNotFoundError(f"SSURGO layer not found: {layer_path}")
+    fc = json.loads(layer_path.read_text())
+    return [f['properties'] for f in fc.get('features', []) if f.get('properties')]
+
+
 class SuitabilityRequest(BaseModel):
     mukey: Optional[str] = None
     soil_ph: float
     soil_om: Optional[float] = None
     goal: str = 'raise_ph'
     target_ph: Optional[float] = None
+
+
+class LandscapeRequest(BaseModel):
+    goal: str = 'raise_ph'
+    biochar_id: str
 
 
 @biochar_router.post('/suitability')
@@ -107,6 +127,60 @@ def biochar_suitability(req: SuitabilityRequest):
         'goal_implemented': goal_def['implemented'],
         'results': ranked,
     }
+
+
+@biochar_router.post('/landscape')
+def biochar_landscape(req: LandscapeRequest):
+    """Compute suitability for a single biochar across every SSURGO polygon.
+
+    Returns a mukey→score dict for driving a choropleth map. Uses a fixed
+    target_ph of 6.5 so scores vary meaningfully with each polygon's soil_ph.
+    """
+    try:
+        biochar_records = _load_biochar_records()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    try:
+        ssurgo_features = _load_ssurgo_features()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    biochar_record = next(
+        (r for r in biochar_records if str(r.get('biochar_id')) == str(req.biochar_id)),
+        None,
+    )
+    if biochar_record is None:
+        raise HTTPException(status_code=404, detail=f"Biochar id {req.biochar_id!r} not found")
+
+    scores = {}
+    for props in ssurgo_features:
+        mukey = props.get('mukey')
+        soil_ph = props.get('soil_ph')
+        if not mukey or soil_ph is None:
+            continue
+        try:
+            soil_ph = float(soil_ph)
+        except (TypeError, ValueError):
+            continue
+        soil_om = props.get('soil_om')
+        ranked = dst_match_point(
+            soil_ph=soil_ph,
+            soil_om=float(soil_om) if soil_om is not None else None,
+            goal=req.goal,
+            biochar_records=[biochar_record],
+            target_ph=LANDSCAPE_TARGET_PH,
+        )
+        if ranked and not ranked[0].get('placeholder'):
+            scores[mukey] = ranked[0]['suitability_score']
+
+    if scores:
+        min_score = min(scores.values())
+        max_score = max(scores.values())
+    else:
+        min_score = max_score = 0.0
+
+    return {'scores': scores, 'min_score': min_score, 'max_score': max_score}
 
 
 @biochar_router.get('/goals')
