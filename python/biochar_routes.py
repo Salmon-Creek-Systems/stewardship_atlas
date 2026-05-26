@@ -129,6 +129,19 @@ def biochar_suitability(req: SuitabilityRequest):
     }
 
 
+@biochar_router.get('/debug_ssurgo')
+def debug_ssurgo():
+    """Return field names and a sample of the first SSURGO feature for diagnosis."""
+    try:
+        features = _load_ssurgo_features()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    if not features:
+        return {'count': 0, 'fields': [], 'sample': None}
+    sample = features[0]
+    return {'count': len(features), 'fields': sorted(sample.keys()), 'sample': sample}
+
+
 @biochar_router.post('/landscape')
 def biochar_landscape(req: LandscapeRequest):
     """Compute suitability for a single biochar across every SSURGO polygon.
@@ -153,26 +166,38 @@ def biochar_landscape(req: LandscapeRequest):
     if biochar_record is None:
         raise HTTPException(status_code=404, detail=f"Biochar id {req.biochar_id!r} not found")
 
+    if ssurgo_features:
+        logger.info(f"landscape: {len(ssurgo_features)} SSURGO features, sample keys: {sorted(ssurgo_features[0].keys())}")
+
     scores = {}
+    skipped_no_mukey = skipped_no_ph = 0
     for props in ssurgo_features:
-        mukey = props.get('mukey')
-        soil_ph = props.get('soil_ph')
-        if not mukey or soil_ph is None:
+        mukey = props.get('mukey') or props.get('MUKEY')
+        soil_ph = props.get('soil_ph') or props.get('SOIL_PH') or props.get('ph1to1h2o_r')
+        if not mukey:
+            skipped_no_mukey += 1
+            continue
+        if soil_ph is None:
+            skipped_no_ph += 1
             continue
         try:
             soil_ph = float(soil_ph)
         except (TypeError, ValueError):
+            skipped_no_ph += 1
             continue
-        soil_om = props.get('soil_om')
+        soil_om_raw = props.get('soil_om') or props.get('SOIL_OM') or props.get('om_r')
+        soil_om = float(soil_om_raw) if soil_om_raw is not None else None
         ranked = dst_match_point(
             soil_ph=soil_ph,
-            soil_om=float(soil_om) if soil_om is not None else None,
+            soil_om=soil_om,
             goal=req.goal,
             biochar_records=[biochar_record],
             target_ph=LANDSCAPE_TARGET_PH,
         )
         if ranked and not ranked[0].get('placeholder'):
-            scores[mukey] = ranked[0]['suitability_score']
+            scores[str(mukey)] = ranked[0]['suitability_score']
+
+    logger.info(f"landscape: scored {len(scores)}, skipped no_mukey={skipped_no_mukey} no_ph={skipped_no_ph}")
 
     if scores:
         min_score = min(scores.values())
@@ -180,7 +205,9 @@ def biochar_landscape(req: LandscapeRequest):
     else:
         min_score = max_score = 0.0
 
-    return {'scores': scores, 'min_score': min_score, 'max_score': max_score}
+    return {'scores': scores, 'min_score': min_score, 'max_score': max_score,
+            'debug': {'total': len(ssurgo_features), 'scored': len(scores),
+                      'skipped_no_mukey': skipped_no_mukey, 'skipped_no_ph': skipped_no_ph}}
 
 
 @biochar_router.get('/goals')

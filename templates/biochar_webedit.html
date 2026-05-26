@@ -711,7 +711,11 @@
             applyLandscapeChoropleth(data.scores, data.min_score, data.max_score);
             landscapeActive = true;
             document.getElementById('landscape-legend').style.display = 'block';
-            status.textContent = Object.keys(data.scores).length + ' soil polygons scored.';
+            const n = Object.keys(data.scores).length;
+            status.textContent = n + ' soil polygons scored.'
+                + (data.debug && data.debug.skipped_no_ph > 0
+                    ? ` (${data.debug.skipped_no_ph} skipped — no pH data)`
+                    : '');
         }} catch (err) {{
             status.textContent = 'Error: ' + err.message;
         }} finally {{
@@ -732,9 +736,12 @@
     }}
 
     function applyLandscapeChoropleth(scores, minScore, maxScore) {{
+        const entries = Object.entries(scores);
+        if (entries.length === 0) return;  // match expression needs ≥1 case — nothing to show
+
         // Build a MapLibre match expression: mukey → hex color
         const expr = ['match', ['get', 'mukey']];
-        Object.entries(scores).forEach(([mukey, score]) => {{
+        entries.forEach(([mukey, score]) => {{
             expr.push(mukey, scoreToHex(score, minScore, maxScore));
         }});
         expr.push('#cccccc');  // fallback for unscored polygons
