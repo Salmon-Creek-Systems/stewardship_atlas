@@ -333,6 +333,31 @@
         }}
         #toast.show {{ opacity: 1; }}
 
+        /* ── Basemap control ── */
+        #basemap-control {{
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            z-index: 10;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 5px 10px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }}
+        #basemap-control label {{ font-weight: 600; white-space: nowrap; }}
+        #basemap-control select {{
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 12px;
+            background: white;
+            cursor: pointer;
+        }}
+
         @media (max-width: 700px) {{
             #app {{ flex-direction: column; }}
             #sidebar {{ width: 100%; height: 50vh; border-left: none; border-top: 1px solid var(--border); }}
@@ -355,6 +380,15 @@
     <div id="map-container">
         <div id="map"></div>
         <div id="loading-overlay"><div class="spinner"></div></div>
+        <div id="basemap-control">
+            <label for="basemap-select">Basemap</label>
+            <select id="basemap-select">
+                <option value="carto">Carto Light</option>
+                <option value="usgs">USGS Topo</option>
+                <option value="satellite">Satellite (ESRI)</option>
+                <option value="terrain">OpenTopoMap</option>
+            </select>
+        </div>
     </div>
 
     <div id="sidebar">
@@ -460,6 +494,25 @@
     const MAP_STYLE = {style_json};
     const BOUNDS    = {bbox_json};
 
+    const USGS_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{{z}}/{{y}}/{{x}}'],
+        tileSize: 256,
+        attribution: 'Tiles courtesy of the U.S. Geological Survey',
+    }};
+    const SATELLITE_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}'],
+        tileSize: 256,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    }};
+    const TERRAIN_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://tile.opentopomap.org/{{z}}/{{x}}/{{y}}.png'],
+        tileSize: 256,
+        attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)',
+    }};
+
     // ── State ───────────────────────────────────────────────────────────────
     let selectedMukey  = null;
     let selectedProps  = null;
@@ -486,6 +539,24 @@
     // Cursor pointer on hover
     map.on('mouseenter', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = 'pointer'; }});
     map.on('mouseleave', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = ''; }});
+
+    // ── Basemap switcher ────────────────────────────────────────────────────
+    map.on('load', () => {{
+        map.addSource('usgs', USGS_SOURCE);
+        map.addSource('satellite', SATELLITE_SOURCE);
+        map.addSource('terrain', TERRAIN_SOURCE);
+
+        map.addLayer({{ id: 'usgs-layer',       type: 'raster', source: 'usgs',      layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+        map.addLayer({{ id: 'satellite-layer',   type: 'raster', source: 'satellite', layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+        map.addLayer({{ id: 'terrain-layer',     type: 'raster', source: 'terrain',   layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+
+        const basemapLayers = {{ carto: 'basemap', usgs: 'usgs-layer', satellite: 'satellite-layer', terrain: 'terrain-layer' }};
+        document.getElementById('basemap-select').addEventListener('change', (e) => {{
+            Object.values(basemapLayers).forEach(id => {{ if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); }});
+            const target = basemapLayers[e.target.value];
+            if (target && map.getLayer(target)) map.setLayoutProperty(target, 'visibility', 'visible');
+        }});
+    }});
 
     // ── Polygon click ───────────────────────────────────────────────────────
     map.on('click', 'ssurgo-fill', (e) => {{
