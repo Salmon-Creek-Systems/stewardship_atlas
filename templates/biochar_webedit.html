@@ -461,9 +461,10 @@
     const BOUNDS    = {bbox_json};
 
     // ── State ───────────────────────────────────────────────────────────────
-    let selectedMukey = null;
-    let selectedProps = null;
-    let currentGoal   = 'raise_ph';
+    let selectedMukey  = null;
+    let selectedProps  = null;
+    let currentGoal    = 'raise_ph';
+    let selectedMarker = null;
 
     // ── PMTiles protocol ────────────────────────────────────────────────────
     const protocol = new pmtiles.Protocol();
@@ -490,17 +491,24 @@
     map.on('click', 'ssurgo-fill', (e) => {{
         const feat = e.features[0];
         if (!feat) return;
-        const props = feat.properties;
-        selectPolygon(props.mukey, props);
+        selectPolygon(feat.properties.mukey, feat.properties, e.lngLat);
     }});
 
-    function selectPolygon(mukey, props) {{
+    function selectPolygon(mukey, props, lngLat = null) {{
         selectedMukey = mukey;
         selectedProps = props;
         currentGoal   = 'raise_ph';
 
         // Highlight selected polygon
         map.setFilter('ssurgo-selected', ['==', ['get', 'mukey'], mukey]);
+
+        // Place marker at click point (omitted when restoring from URL)
+        if (lngLat) {{
+            if (selectedMarker) selectedMarker.remove();
+            selectedMarker = new maplibregl.Marker({{ color: '#173404' }})
+                .setLngLat(lngLat)
+                .addTo(map);
+        }}
 
         // Update URL state
         const url = new URL(window.location.href);
