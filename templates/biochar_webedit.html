@@ -714,7 +714,7 @@
             const n = Object.keys(data.scores).length;
             status.textContent = n + ' soil polygons scored.'
                 + (data.debug && data.debug.skipped_no_ph > 0
-                    ? ` (${data.debug.skipped_no_ph} skipped — no pH data)`
+                    ? ' (' + data.debug.skipped_no_ph + ' skipped — no pH data)'
                     : '');
         }} catch (err) {{
             status.textContent = 'Error: ' + err.message;
