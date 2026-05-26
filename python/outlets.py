@@ -3070,6 +3070,99 @@ def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
     return cog_path
 
 
+def outlet_biochar_webedit(config: dict, name: str):
+    """Generate the biochar suitability demo interface for abi_demo.
+
+    Produces a single-page MapLibre map with a click-to-calculate sidebar:
+    click a SSURGO polygon → see soil properties + goal selector + ranked biochars.
+    """
+    out_dir = versioning.atlas_path(config, 'outlets') / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    template_path = versioning.atlas_path(version='app') / 'templates'
+    shutil.copytree(template_path / 'css', out_dir / 'css', dirs_exist_ok=True)
+    shutil.copytree(template_path / 'js',  out_dir / 'js',  dirs_exist_ok=True)
+
+    bbox = config['dataswale']['bbox']
+    app_url = config.get('app_url', '')
+    swalename = config['name']
+
+    # MapLibre style — built as dict (avoids f-string / tile URL {z}/{x}/{y} conflicts)
+    style = {
+        'version': 8,
+        'glyphs': 'https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf',
+        'sources': {
+            'carto-light': {
+                'type': 'raster',
+                'tiles': ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+                'tileSize': 256,
+                'attribution': '© OpenStreetMap contributors © CARTO',
+            },
+            'ssurgo_polk_or': {
+                'type': 'vector',
+                'url': 'pmtiles://../../layers/ssurgo_polk_or/ssurgo_polk_or.pmtiles',
+            },
+        },
+        'layers': [
+            {
+                'id': 'basemap',
+                'type': 'raster',
+                'source': 'carto-light',
+                'paint': {'raster-opacity': 0.7},
+            },
+            {
+                'id': 'ssurgo-fill',
+                'type': 'fill',
+                'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
+                'paint': {
+                    'fill-color': '#c8b49a',
+                    'fill-opacity': 0.55,
+                },
+            },
+            {
+                'id': 'ssurgo-outline',
+                'type': 'line',
+                'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
+                'paint': {
+                    'line-color': '#8a7060',
+                    'line-width': 0.6,
+                },
+            },
+            {
+                'id': 'ssurgo-selected',
+                'type': 'fill',
+                'source': 'ssurgo_polk_or',
+                'source-layer': 'ssurgo',
+                'filter': ['==', ['get', 'mukey'], ''],
+                'paint': {
+                    'fill-color': '#173404',
+                    'fill-opacity': 0.35,
+                },
+            },
+        ],
+    }
+
+    context = {
+        'app_url': app_url,
+        'swalename': swalename,
+        'bbox_json': json.dumps([
+            [bbox['west'], bbox['south']],
+            [bbox['east'], bbox['north']],
+        ]),
+        'style_json': json.dumps(style),
+    }
+
+    tpl_path = template_path / 'biochar_webedit.html'
+    tpl = tpl_path.read_text()
+    html = tpl.format(**context)
+    (out_dir / 'index.html').write_text(html)
+
+    logger.info(f"outlet_biochar_webedit: wrote {out_dir / 'index.html'}")
+    return out_dir / 'index.html'
+
+
 asset_methods = {
     #'outlet_gpkg': outlet_gpkg,
     #'tiff': outlet_tiff,
@@ -3087,4 +3180,5 @@ asset_methods = {
     'config_editor': outlet_config_editor,
     '3dview': outlet_3dview,
     's3_upload': s3_upload,
+    'biochar_webedit': outlet_biochar_webedit,
 }

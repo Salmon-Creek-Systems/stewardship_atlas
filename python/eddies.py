@@ -1627,6 +1627,143 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
+                    target_ph: float = None) -> list:
+    """Simplified Phillips 2020 pH-matching suitability calculation (point mode).
+
+    Implements the pH liming path only. Other goals return a placeholder list.
+    Calibration: median biochar at 6 t/ac predicts ΔpH ≈ +0.5 on silt loam.
+
+    Returns top-5 biochars sorted by suitability_score descending.
+    Each dict: biochar_id, name, feedstock, suitability_score (0-1),
+                recommended_rate_t_ac, predicted_dpH.
+    """
+    if goal != 'raise_ph':
+        return [{'placeholder': True, 'message': f"Goal '{goal}' requires full Phillips 2020 — coming in production."}]
+
+    if soil_ph is None:
+        return []
+
+    _target_ph = target_ph if target_ph is not None else soil_ph + 1.0
+    delta_needed = max(0.0, _target_ph - soil_ph)
+
+    # k calibrated so median liming_potential (≈0.5) at 6 t/ac → ΔpH ≈ +0.5
+    K = 0.1667  # 0.5 / (0.5 * 6)
+
+    results = []
+    liming_potentials = []
+    for bc in biochar_records:
+        ph_val = bc.get('biochar_ph')
+        ash_val = bc.get('ash_content_pct')
+        if ph_val is None or ash_val is None:
+            liming_potentials.append(None)
+            continue
+        # Normalize pH to 0-1 (biochar pH typically 4-12)
+        ph_norm = max(0.0, min(1.0, (float(ph_val) - 4.0) / 8.0))
+        ash_norm = max(0.0, min(1.0, float(ash_val) / 60.0))
+        liming_potentials.append(0.7 * ph_norm + 0.3 * ash_norm)
+
+    # Normalize liming_potential across the database (0–1 relative to max)
+    valid = [v for v in liming_potentials if v is not None]
+    lp_max = max(valid) if valid else 1.0
+    lp_min = min(valid) if valid else 0.0
+    lp_range = lp_max - lp_min if lp_max > lp_min else 1.0
+
+    for i, bc in enumerate(biochar_records):
+        lp_raw = liming_potentials[i]
+        if lp_raw is None:
+            continue
+        lp = (lp_raw - lp_min) / lp_range  # normalized 0-1
+
+        if lp < 0.01:
+            continue
+
+        # Solve for rate that achieves target ΔpH; clamp to [3, 12] t/ac
+        if delta_needed > 0 and K * lp > 0:
+            rate = delta_needed / (K * lp)
+        else:
+            rate = 3.0
+        rate = max(3.0, min(12.0, rate))
+
+        predicted_dpH = K * lp * rate
+        # Suitability: high liming potential + low rate (more economical) = better score
+        rate_score = 1.0 - (rate - 3.0) / 9.0  # 1.0 at min rate, 0.0 at max
+        suitability = 0.6 * lp + 0.4 * rate_score
+
+        results.append({
+            'biochar_id': bc.get('biochar_id', i + 1),
+            'name': bc.get('sample_id') or bc.get('name') or f"Biochar-{bc.get('biochar_id', i+1)}",
+            'feedstock': bc.get('feedstock') or bc.get('feedstock_type'),
+            'production_temp_c': bc.get('production_temp_c'),
+            'biochar_ph': bc.get('biochar_ph'),
+            'ash_content_pct': bc.get('ash_content_pct'),
+            'suitability_score': round(suitability, 4),
+            'recommended_rate_t_ac': round(rate, 2),
+            'predicted_dpH': round(predicted_dpH, 3),
+        })
+
+    results.sort(key=lambda x: x['suitability_score'], reverse=True)
+    return results[:5]
+
+
+def dst_match_simplified(config: Dict[str, Any], asset_name: str):
+    """Batch-mode biochar suitability eddy.
+
+    For each polygon in the input soil layer, runs dst_match_point and writes
+    the top biochar's scores as polygon properties. Produces a derived layer
+    suitable for landscape choropleth rendering.
+
+    Config: in_layer (default: ssurgo_polk_or), out_layer, goal (default: raise_ph)
+    """
+    import pandas as pd
+
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config.get('in_layer', 'ssurgo_polk_or')
+    out_layer = asset_config.get('out_layer', f"suitability_{in_layer.replace('ssurgo_', '')}__raise_ph")
+    goal = asset_config.get('goal', 'raise_ph')
+    biochar_layer = asset_config.get('biochar_layer', 'biochar_properties_pnw')
+
+    soil_fc = dataswale.layer_as_featurecollection(config, in_layer)
+    if not soil_fc or not soil_fc.get('features'):
+        raise Exception(f"dst_match_simplified: could not load layer '{in_layer}'")
+
+    biochar_fc = dataswale.layer_as_featurecollection(config, biochar_layer)
+    if not biochar_fc or not biochar_fc.get('features'):
+        raise Exception(f"dst_match_simplified: could not load biochar layer '{biochar_layer}'")
+
+    biochar_records = [f['properties'] for f in biochar_fc['features'] if f.get('properties')]
+    logger.info(f"dst_match_simplified: {len(soil_fc['features'])} soil polygons, {len(biochar_records)} biochars, goal={goal}")
+
+    enriched = []
+    for feature in soil_fc['features']:
+        props = dict(feature.get('properties') or {})
+        soil_ph = props.get('soil_ph')
+        soil_om = props.get('soil_om')
+
+        if soil_ph is not None:
+            try:
+                ranked = dst_match_point(float(soil_ph), soil_om, goal, biochar_records)
+                if ranked and not ranked[0].get('placeholder'):
+                    top = ranked[0]
+                    props['top_biochar_id'] = top['biochar_id']
+                    props['top_biochar_name'] = top['name']
+                    props['suitability_score'] = top['suitability_score']
+                    props['predicted_dpH'] = top['predicted_dpH']
+                    props['recommended_rate'] = top['recommended_rate_t_ac']
+            except Exception as e:
+                logger.warning(f"dst_match_simplified: failed for mukey {props.get('mukey')}: {e}")
+
+        enriched.append({'type': 'Feature', 'geometry': feature.get('geometry'), 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f'{out_layer}.geojson'
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fc = geojson.FeatureCollection(enriched)
+    with open(out_path, 'w') as f:
+        geojson.dump(fc, f)
+    logger.info(f"dst_match_simplified: wrote {len(enriched)} features to {out_path}")
+    return str(out_path)
+
+
 asset_methods = {
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
@@ -1642,4 +1779,5 @@ asset_methods = {
     "road_lrs_markers": road_lrs_markers,
     "ssurgo_enrich": ssurgo_enrich,
     "merge_h3": merge_h3,
+    "dst_match_simplified": dst_match_simplified,
 }

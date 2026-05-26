@@ -1,6 +1,7 @@
 import logging, subprocess, os
 import duckdb
 import geojson
+from shapely.geometry import shape
 
 import versioning
 import utils
@@ -241,7 +242,13 @@ def s3_gpkg(config=None, name=None, delta_queue=DELTA_QUEUE):
 
 def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch a GeoJSON file from a private S3 bucket, filter to atlas bbox, write to delta queue.
-    Copies image_url → URL on each feature to enable webmap click-to-open behavior."""
+    Copies image_url → URL on each feature to enable webmap click-to-open behavior.
+
+    Geometry handling:
+    - null geometry: included unconditionally (tabular layers)
+    - Point: bbox-filter on the coordinate
+    - Polygon / MultiPolygon / other: bbox-filter on the centroid
+    """
     import boto3, json, tempfile
 
     inlet_config = config['assets'][name]['config']
@@ -259,23 +266,39 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
         with open(tmp.name) as f:
             fc = json.load(f)
 
+    def _in_bbox(lon, lat):
+        return bbox['west'] <= lon <= bbox['east'] and bbox['south'] <= lat <= bbox['north']
+
     features = []
     for feature in fc.get('features', []):
-        coords = feature.get('geometry', {}).get('coordinates', [])
-        if coords and len(coords) >= 2:
+        geom = feature.get('geometry')
+        props = feature.get('properties', {}) or {}
+
+        if geom is None:
+            # tabular / no-geometry features: always include
+            features.append(feature)
+            continue
+
+        geom_type = geom.get('type', '')
+        coords = geom.get('coordinates', [])
+
+        if geom_type == 'Point':
             lon, lat = coords[0], coords[1]
-            if bbox['west'] <= lon <= bbox['east'] and bbox['south'] <= lat <= bbox['north']:
-                props = feature.get('properties', {})
-                if props.get('image_url'):
-                    props['URL'] = props['image_url']
-                common = props.get('common_name', '')
-                scientific = props.get('scientific_name', '')
-                user = props.get('user_name', '')
-                date = props.get('observed_on_string', '')
-                species = f"{common} ({scientific})" if common and scientific else common or scientific
-                observer = ' @ '.join(filter(None, [user, date]))
-                props['name'] = props.get('common_name', '')
-                features.append(feature)
+            if not _in_bbox(lon, lat):
+                continue
+        else:
+            # Use shapely centroid for polygon / multipolygon / linestring
+            try:
+                centroid = shape(geom).centroid
+                if not _in_bbox(centroid.x, centroid.y):
+                    continue
+            except Exception:
+                pass  # malformed geometry: include rather than drop
+
+        if props.get('image_url'):
+            props['URL'] = props['image_url']
+        props['name'] = props.get('common_name', props.get('name', ''))
+        features.append(feature)
 
     filtered = geojson.FeatureCollection(features)
     logger.info(f"s3_geojson: {len(features)} features within bbox (of {len(fc.get('features', []))} total)")

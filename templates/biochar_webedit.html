@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Biochar Suitability — Polk County, OR</title>
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' rel='stylesheet'>
+    <script src='https://unpkg.com/pmtiles@4/dist/pmtiles.js'></script>
+    <style>
+        *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+        :root {{
+            --green-dark:  #173404;
+            --green-mid:   #2d5c08;
+            --green-light: #EAF3DE;
+            --green-pale:  #f4f9ee;
+            --border:      #c5d9aa;
+            --text:        #1a1a1a;
+            --muted:       #666;
+            --radius:      6px;
+            --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+
+        html, body {{ height: 100%; font-family: var(--font); color: var(--text); background: #f0f0f0; }}
+
+        /* ── Banner ── */
+        #banner {{
+            background: var(--green-dark);
+            color: #fff;
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }}
+        #banner strong {{ font-weight: 600; }}
+        #banner a {{ color: #a8d87a; text-decoration: none; }}
+        #banner a:hover {{ text-decoration: underline; }}
+        #banner .banner-tag {{
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            padding: 2px 7px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }}
+
+        /* ── Layout ── */
+        #app {{
+            display: flex;
+            height: calc(100vh - 41px);
+            overflow: hidden;
+        }}
+
+        #map-container {{
+            flex: 1 1 0;
+            min-width: 0;
+            position: relative;
+        }}
+        #map {{ width: 100%; height: 100%; }}
+
+        /* ── Sidebar ── */
+        #sidebar {{
+            width: 360px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            border-left: 1px solid var(--border);
+            overflow: hidden;
+        }}
+
+        #sidebar-header {{
+            background: var(--green-light);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 16px 12px;
+        }}
+        #sidebar-header h2 {{
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--green-dark);
+            margin-bottom: 2px;
+        }}
+        #sidebar-header p {{
+            font-size: 12px;
+            color: var(--muted);
+        }}
+
+        #sidebar-body {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }}
+
+        /* ── Empty state ── */
+        #panel-empty {{
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--muted);
+        }}
+        #panel-empty .hint-icon {{ font-size: 32px; margin-bottom: 12px; }}
+        #panel-empty p {{ font-size: 14px; line-height: 1.5; }}
+
+        /* ── Detail panel ── */
+        #panel-detail {{ display: none; }}
+
+        .section-label {{
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }}
+
+        .soil-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }}
+        .soil-stat {{
+            background: var(--green-pale);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px 10px;
+        }}
+        .soil-stat .stat-label {{
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }}
+        .soil-stat .stat-value {{
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--green-dark);
+        }}
+        .soil-stat .stat-value.missing {{ color: #bbb; font-weight: 400; font-style: italic; font-size: 13px; }}
+        .soil-series-name {{
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--green-dark);
+            margin-bottom: 4px;
+        }}
+        .soil-mukey {{
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }}
+
+        /* ── Goal selector ── */
+        .goals-list {{
+            list-style: none;
+            margin-bottom: 16px;
+        }}
+        .goals-list li {{
+            margin-bottom: 6px;
+        }}
+        .goal-radio {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background 0.1s, border-color 0.1s;
+            font-size: 13px;
+        }}
+        .goal-radio:hover:not(.disabled) {{ background: var(--green-light); border-color: var(--green-mid); }}
+        .goal-radio.selected {{ background: var(--green-light); border-color: var(--green-dark); font-weight: 600; }}
+        .goal-radio.disabled {{ opacity: 0.45; cursor: not-allowed; }}
+        .goal-radio input[type=radio] {{ accent-color: var(--green-dark); flex-shrink: 0; }}
+        .goal-coming {{ font-size: 11px; color: var(--muted); margin-left: auto; }}
+
+        /* ── Calculate button ── */
+        #calculate-btn {{
+            width: 100%;
+            padding: 11px;
+            background: var(--green-dark);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-bottom: 20px;
+        }}
+        #calculate-btn:hover {{ background: var(--green-mid); }}
+        #calculate-btn:disabled {{ background: #aaa; cursor: not-allowed; }}
+
+        /* ── Results ── */
+        #panel-results {{ display: none; }}
+
+        .results-header {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }}
+        .results-context {{
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }}
+        #recalculate-btn {{
+            font-size: 12px;
+            color: var(--green-mid);
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+        }}
+
+        .biochar-card {{
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #fff;
+        }}
+        .biochar-card:first-child {{ border-color: var(--green-dark); box-shadow: 0 0 0 1px var(--green-dark); }}
+        .biochar-card-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }}
+        .biochar-rank {{ font-size: 11px; color: var(--muted); font-weight: 600; }}
+        .biochar-name {{ font-size: 13px; font-weight: 700; color: var(--green-dark); }}
+        .biochar-feedstock {{ font-size: 11px; color: var(--muted); margin-top: 1px; }}
+        .suitability-bar-wrap {{ margin-bottom: 10px; }}
+        .suitability-bar-label {{
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 3px;
+        }}
+        .suitability-bar-track {{
+            height: 7px;
+            background: #e8e8e8;
+            border-radius: 4px;
+            overflow: hidden;
+        }}
+        .suitability-bar-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, #5a9e2f, #2d5c08);
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }}
+        .biochar-stats {{
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+        }}
+        .bc-stat {{
+            text-align: center;
+            background: var(--green-pale);
+            border-radius: 4px;
+            padding: 5px 4px;
+        }}
+        .bc-stat-val {{ font-size: 13px; font-weight: 700; color: var(--green-dark); }}
+        .bc-stat-lbl {{ font-size: 10px; color: var(--muted); }}
+
+        .placeholder-msg {{
+            background: #fffbe6;
+            border: 1px solid #f0d060;
+            border-radius: var(--radius);
+            padding: 12px;
+            font-size: 13px;
+            color: #7a6000;
+            line-height: 1.5;
+        }}
+
+        /* ── Loading ── */
+        #loading-overlay {{
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.75);
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }}
+        #loading-overlay.active {{ display: flex; }}
+        .spinner {{
+            width: 32px; height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--green-dark);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }}
+        @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+
+        /* ── Footer ── */
+        #footer {{
+            padding: 8px 16px;
+            font-size: 11px;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            background: var(--green-pale);
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+        }}
+        #footer a {{ color: var(--green-mid); text-decoration: none; }}
+        #footer a:hover {{ text-decoration: underline; }}
+
+        /* ── Copy-link toast ── */
+        #toast {{
+            position: fixed;
+            bottom: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--green-dark);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }}
+        #toast.show {{ opacity: 1; }}
+
+        @media (max-width: 700px) {{
+            #app {{ flex-direction: column; }}
+            #sidebar {{ width: 100%; height: 50vh; border-left: none; border-top: 1px solid var(--border); }}
+            #map-container {{ height: 50vh; }}
+        }}
+    </style>
+</head>
+<body>
+
+<div id="banner">
+    <span class="banner-tag">PROTOTYPE</span>
+    <span>
+        <strong>Biochar Suitability Tool</strong> — working demonstration for ABI/USDA ARS proposal.
+        Algorithms are simplified; full Phillips 2020 method in production.
+        <a href="#methodology" id="methodology-link">Methodology →</a>
+    </span>
+</div>
+
+<div id="app">
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="loading-overlay"><div class="spinner"></div></div>
+    </div>
+
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <h2>Biochar Suitability</h2>
+            <p>Polk County, OR · SSURGO soil polygons</p>
+        </div>
+
+        <div id="sidebar-body">
+            <div id="panel-empty">
+                <div class="hint-icon">🗺</div>
+                <p>Click a soil polygon on the map to see soil properties and calculate biochar suitability.</p>
+            </div>
+
+            <div id="panel-detail">
+                <div class="soil-series-name" id="soil-series">—</div>
+                <div class="soil-mukey" id="soil-mukey"></div>
+
+                <div class="section-label">Soil Properties</div>
+                <div class="soil-grid">
+                    <div class="soil-stat">
+                        <div class="stat-label">pH</div>
+                        <div class="stat-value" id="stat-ph">—</div>
+                    </div>
+                    <div class="soil-stat">
+                        <div class="stat-label">Organic Matter</div>
+                        <div class="stat-value" id="stat-om">—</div>
+                    </div>
+                    <div class="soil-stat">
+                        <div class="stat-label">CEC</div>
+                        <div class="stat-value" id="stat-cec">—</div>
+                    </div>
+                    <div class="soil-stat">
+                        <div class="stat-label">Drainage</div>
+                        <div class="stat-value" id="stat-drainage">—</div>
+                    </div>
+                    <div class="soil-stat" style="grid-column: span 2">
+                        <div class="stat-label">Texture</div>
+                        <div class="stat-value" id="stat-texture">—</div>
+                    </div>
+                </div>
+
+                <div class="section-label">Amendment Goal</div>
+                <ul class="goals-list" id="goals-list">
+                    <li>
+                        <label class="goal-radio selected" id="goal-raise-ph-label">
+                            <input type="radio" name="goal" value="raise_ph" checked> Raise soil pH
+                        </label>
+                    </li>
+                    <li>
+                        <label class="goal-radio disabled">
+                            <input type="radio" name="goal" value="water_retention" disabled>
+                            Improve water retention
+                            <span class="goal-coming">v2</span>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="goal-radio disabled">
+                            <input type="radio" name="goal" value="carbon_sequestration" disabled>
+                            Sequester carbon
+                            <span class="goal-coming">v2</span>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="goal-radio disabled">
+                            <input type="radio" name="goal" value="provision_pk" disabled>
+                            Provision P or K
+                            <span class="goal-coming">v2</span>
+                        </label>
+                    </li>
+                </ul>
+
+                <button id="calculate-btn">Calculate Suitability</button>
+            </div>
+
+            <div id="panel-results">
+                <div class="results-header">
+                    <div class="section-label" style="margin-bottom:0">Top Matches</div>
+                    <button id="recalculate-btn">← Change goal</button>
+                </div>
+                <div class="results-context" id="results-context"></div>
+                <div id="results-cards"></div>
+            </div>
+        </div>
+
+        <div id="footer">
+            <span>Prototype · ABI/ARS proposal review only</span>
+            <span>
+                <a href="#" id="copy-link-btn">Copy link</a>
+                &nbsp;·&nbsp;
+                <a href="#" id="print-btn">Print report</a>
+            </span>
+        </div>
+    </div>
+</div>
+
+<div id="toast">Link copied</div>
+
+<script>
+    // ── Atlas config (substituted by outlet) ───────────────────────────────
+    const APP_URL   = '{app_url}';
+    const SWALENAME = '{swalename}';
+    const MAP_STYLE = {style_json};
+    const BOUNDS    = {bbox_json};
+
+    // ── State ───────────────────────────────────────────────────────────────
+    let selectedMukey = null;
+    let selectedProps = null;
+    let currentGoal   = 'raise_ph';
+
+    // ── PMTiles protocol ────────────────────────────────────────────────────
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+    MAP_STYLE.sources.ssurgo_polk_or.url = 'pmtiles://' +
+        new URL('../../layers/ssurgo_polk_or/ssurgo_polk_or.pmtiles', window.location.href).href;
+
+    // ── Map init ────────────────────────────────────────────────────────────
+    const map = new maplibregl.Map({{
+        container: 'map',
+        style: MAP_STYLE,
+        bounds: BOUNDS,
+        fitBoundsOptions: {{ padding: 20 }},
+    }});
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+    map.addControl(new maplibregl.ScaleControl({{ unit: 'imperial' }}), 'bottom-left');
+
+    // Cursor pointer on hover
+    map.on('mouseenter', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = 'pointer'; }});
+    map.on('mouseleave', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = ''; }});
+
+    // ── Polygon click ───────────────────────────────────────────────────────
+    map.on('click', 'ssurgo-fill', (e) => {{
+        const feat = e.features[0];
+        if (!feat) return;
+        const props = feat.properties;
+        selectPolygon(props.mukey, props);
+    }});
+
+    function selectPolygon(mukey, props) {{
+        selectedMukey = mukey;
+        selectedProps = props;
+        currentGoal   = 'raise_ph';
+
+        // Highlight selected polygon
+        map.setFilter('ssurgo-selected', ['==', ['get', 'mukey'], mukey]);
+
+        // Update URL state
+        const url = new URL(window.location.href);
+        url.searchParams.set('mukey', mukey);
+        url.searchParams.set('goal', currentGoal);
+        history.replaceState(null, '', url.toString());
+
+        // Populate detail panel
+        document.getElementById('soil-series').textContent = props.soil_series || 'Unknown series';
+        document.getElementById('soil-mukey').textContent  = 'MUKEY: ' + (mukey || '—');
+
+        setStatValue('stat-ph',       props.soil_ph,       v => Number(v).toFixed(1));
+        setStatValue('stat-om',       props.soil_om,       v => Number(v).toFixed(1) + '%');
+        setStatValue('stat-cec',      props.soil_cec,      v => Number(v).toFixed(0) + ' meq/100g');
+        setStatValue('stat-drainage', props.drainage_class, v => v);
+        setStatValue('stat-texture',  props.soil_texture,  v => v);
+
+        showPanel('detail');
+    }}
+
+    function setStatValue(id, val, fmt) {{
+        const el = document.getElementById(id);
+        if (val !== null && val !== undefined && val !== '') {{
+            el.textContent = fmt(val);
+            el.classList.remove('missing');
+        }} else {{
+            el.textContent = 'n/a';
+            el.classList.add('missing');
+        }}
+    }}
+
+    // ── Panels ──────────────────────────────────────────────────────────────
+    function showPanel(which) {{
+        document.getElementById('panel-empty').style.display   = which === 'empty'   ? ''      : 'none';
+        document.getElementById('panel-detail').style.display  = which === 'detail'  ? 'block' : 'none';
+        document.getElementById('panel-results').style.display = which === 'results' ? 'block' : 'none';
+    }}
+
+    // ── Goal selection ──────────────────────────────────────────────────────
+    document.querySelectorAll('input[name=goal]').forEach(radio => {{
+        radio.addEventListener('change', () => {{
+            currentGoal = radio.value;
+            document.querySelectorAll('.goal-radio').forEach(l => l.classList.remove('selected'));
+            radio.closest('.goal-radio').classList.add('selected');
+        }});
+    }});
+
+    // ── Calculate ───────────────────────────────────────────────────────────
+    document.getElementById('calculate-btn').addEventListener('click', runCalculation);
+    document.getElementById('recalculate-btn').addEventListener('click', () => {{
+        showPanel('detail');
+    }});
+
+    async function runCalculation() {{
+        if (!selectedProps) return;
+
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.add('active');
+        document.getElementById('calculate-btn').disabled = true;
+
+        const body = {{
+            mukey:    selectedMukey,
+            soil_ph:  selectedProps.soil_ph   !== null ? Number(selectedProps.soil_ph)  : null,
+            soil_om:  selectedProps.soil_om   !== null ? Number(selectedProps.soil_om)  : null,
+            goal:     currentGoal,
+        }};
+
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/suitability', {{
+                method:  'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body:    JSON.stringify(body),
+            }});
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            renderResults(data);
+        }} catch (err) {{
+            alert('Calculation failed: ' + err.message);
+        }} finally {{
+            overlay.classList.remove('active');
+            document.getElementById('calculate-btn').disabled = false;
+        }}
+    }}
+
+    function renderResults(data) {{
+        const ctx = document.getElementById('results-context');
+        const ph  = selectedProps.soil_ph !== null ? Number(selectedProps.soil_ph).toFixed(1) : '—';
+        ctx.innerHTML = `<strong>${{selectedProps.soil_series || 'This soil'}}</strong> &bull;
+            pH ${{ph}} &bull; Goal: <em>${{data.goal_label}}</em>`;
+
+        const cards = document.getElementById('results-cards');
+        cards.innerHTML = '';
+
+        if (!data.goal_implemented) {{
+            cards.innerHTML = `<div class="placeholder-msg">
+                <strong>Coming in production:</strong> the full Phillips 2020 algorithm for
+                &ldquo;${{data.goal_label}}&rdquo; will be implemented collaboratively with ARS.
+                This prototype implements the pH-liming path only.
+            </div>`;
+        }} else if (!data.results || data.results.length === 0) {{
+            cards.innerHTML = `<div class="placeholder-msg">No results — check that soil pH is available for this polygon.</div>`;
+        }} else {{
+            data.results.slice(0, 3).forEach((bc, i) => {{
+                const pct = Math.round((bc.suitability_score || 0) * 100);
+                const dpH = bc.predicted_dpH !== undefined ? '+' + Number(bc.predicted_dpH).toFixed(2) : '—';
+                const rate = bc.recommended_rate_t_ac !== undefined ? Number(bc.recommended_rate_t_ac).toFixed(1) : '—';
+                cards.innerHTML += `
+                <div class="biochar-card">
+                    <div class="biochar-card-header">
+                        <div>
+                            <div class="biochar-rank">#${{i+1}} match</div>
+                            <div class="biochar-name">${{bc.name || 'Biochar ' + bc.biochar_id}}</div>
+                            <div class="biochar-feedstock">${{bc.feedstock || '—'}}</div>
+                        </div>
+                    </div>
+                    <div class="suitability-bar-wrap">
+                        <div class="suitability-bar-label">
+                            <span>Suitability</span><span>${{pct}}%</span>
+                        </div>
+                        <div class="suitability-bar-track">
+                            <div class="suitability-bar-fill" style="width:${{pct}}%"></div>
+                        </div>
+                    </div>
+                    <div class="biochar-stats">
+                        <div class="bc-stat">
+                            <div class="bc-stat-val">${{dpH}}</div>
+                            <div class="bc-stat-lbl">Predicted ΔpH</div>
+                        </div>
+                        <div class="bc-stat">
+                            <div class="bc-stat-val">${{rate}} t/ac</div>
+                            <div class="bc-stat-lbl">Rate</div>
+                        </div>
+                        <div class="bc-stat">
+                            <div class="bc-stat-val">${{bc.biochar_ph !== undefined ? Number(bc.biochar_ph).toFixed(1) : '—'}}</div>
+                            <div class="bc-stat-lbl">Biochar pH</div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+        }}
+
+        // Update URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('goal', currentGoal);
+        history.replaceState(null, '', url.toString());
+
+        showPanel('results');
+    }}
+
+    // ── Copy link ───────────────────────────────────────────────────────────
+    document.getElementById('copy-link-btn').addEventListener('click', (e) => {{
+        e.preventDefault();
+        navigator.clipboard.writeText(window.location.href).then(() => showToast('Link copied'));
+    }});
+
+    function showToast(msg) {{
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }}
+
+    // ── Print ───────────────────────────────────────────────────────────────
+    document.getElementById('print-btn').addEventListener('click', (e) => {{
+        e.preventDefault();
+        window.print();
+    }});
+
+    // ── Methodology modal (placeholder) ─────────────────────────────────────
+    document.getElementById('methodology-link').addEventListener('click', (e) => {{
+        e.preventDefault();
+        alert('Methodology:\n\nSimplified Phillips 2020 pH-liming path.\n' +
+              'liming_potential = 0.7 × norm(biochar_pH) + 0.3 × norm(ash_content)\n' +
+              'predicted_ΔpH = k × liming_potential × rate  (k = 0.1667)\n' +
+              'rate clamped to [3, 12] t/ac per CPS-336.\n\n' +
+              'Cross-checked against PNW Atlas R reference for 3 test cases.\n' +
+              'Full methodology page coming in final demo.');
+    }});
+
+    // ── Restore state from URL ───────────────────────────────────────────────
+    map.on('load', () => {{
+        const params = new URLSearchParams(window.location.search);
+        const urlMukey = params.get('mukey');
+        const urlGoal  = params.get('goal');
+        if (urlGoal) currentGoal = urlGoal;
+        if (urlMukey) {{
+            // Wait for source data to load, then query the feature
+            map.once('idle', () => {{
+                const features = map.querySourceFeatures('ssurgo_polk_or', {{
+                    sourceLayer: '',
+                    filter: ['==', ['get', 'mukey'], urlMukey],
+                }});
+                if (features.length > 0) {{
+                    selectPolygon(urlMukey, features[0].properties);
+                }}
+            }});
+        }}
+    }});
+</script>
+
+</body>
+</html>
