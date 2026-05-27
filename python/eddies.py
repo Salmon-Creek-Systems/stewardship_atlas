@@ -1628,19 +1628,78 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
 
 
 def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
-                    target_ph: float = None, top_n: int = 5) -> list:
-    """Simplified Phillips 2020 pH-matching suitability calculation (point mode).
+                    target_ph: float = None, top_n: int = 5, soil_sand: float = None) -> list:
+    """Simplified Phillips 2020 suitability calculation (point mode).
 
-    Implements the pH liming path only. Other goals return a placeholder list.
-    Calibration: median biochar at 6 t/ac predicts ΔpH ≈ +0.5 on silt loam.
+    Implements raise_ph (pH liming) and water_retention (porosity/texture) paths.
+    Other goals return a placeholder list.
 
     Returns top-5 biochars sorted by suitability_score descending.
-    Each dict: biochar_id, name, feedstock, suitability_score (0-1),
-                recommended_rate_t_ac, predicted_dpH.
     """
     print(f"DST match-  PH:{soil_ph}, OM: {soil_om}, G: {goal}, recs: {biochar_records}")
-    if goal != 'raise_ph':
+    if goal not in ('raise_ph', 'water_retention'):
         return [{'placeholder': True, 'message': f"Goal '{goal}' requires full Phillips 2020 — coming in production."}]
+
+    if goal == 'water_retention':
+        if soil_sand is None:
+            return [{'placeholder': True, 'message': 'Water retention requires soil sand percentage.'}]
+
+        soil_receptivity = float(soil_sand) / 100.0
+
+        # Compute raw water-retention potential per biochar: (1/particle_size) × feedstock_factor
+        raw_potentials = []
+        for bc in biochar_records:
+            ps_raw = bc.get('ps_mean') or bc.get('particle_size_mm') or bc.get('particle_size') or bc.get('ps')
+            feedstock_lc = (bc.get('feedstock') or bc.get('feedstock_type') or '').lower()
+            if any(w in feedstock_lc for w in ('wood', 'oak', 'pine', 'fir', 'cedar', 'hazel', 'juniper', 'conifer', 'douglas')):
+                ff = 1.0
+            elif any(w in feedstock_lc for w in ('straw', 'grass', 'brew', 'yard', 'debris')):
+                ff = 0.8
+            elif any(w in feedstock_lc for w in ('manure', 'litter', 'poultr', 'polutr')):
+                ff = 0.5
+            else:
+                ff = 0.7
+            if ps_raw is None:
+                raw_potentials.append(None)
+            else:
+                try:
+                    ps_f = float(ps_raw)
+                    raw_potentials.append((1.0 / ps_f) * ff if ps_f > 0 else None)
+                except (TypeError, ValueError):
+                    raw_potentials.append(None)
+
+        valid = [v for v in raw_potentials if v is not None]
+        p_max = max(valid) if valid else 1.0
+        p_min = min(valid) if valid else 0.0
+        p_range = p_max - p_min if p_max > p_min else 1.0
+
+        results = []
+        for i, bc in enumerate(biochar_records):
+            p_raw = raw_potentials[i]
+            if p_raw is None:
+                continue
+            biochar_potential = (p_raw - p_min) / p_range
+            suitability = biochar_potential * soil_receptivity
+            if suitability >= 0.5:
+                outcome = 'substantial'
+            elif suitability >= 0.25:
+                outcome = 'moderate'
+            else:
+                outcome = 'small'
+            ps_val = bc.get('ps_mean') or bc.get('particle_size_mm') or bc.get('particle_size')
+            results.append({
+                'biochar_id': bc.get('biochar_id', i + 1),
+                'name': bc.get('sample_id') or bc.get('name') or bc.get('id') or f"Biochar-{bc.get('biochar_id', i+1)}",
+                'feedstock': bc.get('feedstock') or bc.get('feedstock_type'),
+                'production_temp_c': bc.get('production_temp_c'),
+                'ps_mean': ps_val,
+                'suitability_score': round(suitability, 4),
+                'recommended_rate_t_ac': 8.0,
+                'predicted_outcome': outcome,
+            })
+
+        results.sort(key=lambda x: x['suitability_score'], reverse=True)
+        return results[:top_n] if top_n else results
 
     if soil_ph is None:
         return []

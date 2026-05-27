@@ -425,7 +425,7 @@
                     <label>Amendment Goal</label>
                     <select id="setup-goal" class="setup-select">
                         <option value="raise_ph">Raise soil pH</option>
-                        <option value="water_retention" disabled>Improve water retention (v2)</option>
+                        <option value="water_retention">Improve water retention</option>
                         <option value="carbon_sequestration" disabled>Sequester carbon (v2)</option>
                         <option value="provision_pk" disabled>Provision P or K (v2)</option>
                     </select>
@@ -471,7 +471,11 @@
                         <div class="stat-label">Drainage</div>
                         <div class="stat-value" id="stat-drainage">—</div>
                     </div>
-                    <div class="soil-stat" style="grid-column: span 2">
+                    <div class="soil-stat">
+                        <div class="stat-label">Sand %</div>
+                        <div class="stat-value" id="stat-sand">—</div>
+                    </div>
+                    <div class="soil-stat">
                         <div class="stat-label">Texture</div>
                         <div class="stat-value" id="stat-texture">—</div>
                     </div>
@@ -485,10 +489,9 @@
                         </label>
                     </li>
                     <li>
-                        <label class="goal-radio disabled">
-                            <input type="radio" name="goal" value="water_retention" disabled>
+                        <label class="goal-radio" id="goal-water-ret-label">
+                            <input type="radio" name="goal" value="water_retention">
                             Improve water retention
-                            <span class="goal-coming">v2</span>
                         </label>
                     </li>
                     <li>
@@ -642,6 +645,7 @@
         setStatValue('stat-om',       props.soil_om,       v => Number(v).toFixed(1) + '%');
         setStatValue('stat-cec',      props.soil_cec,      v => Number(v).toFixed(0) + ' meq/100g');
         setStatValue('stat-drainage', props.drainage_class, v => v);
+        setStatValue('stat-sand',     props.soil_sand,     v => Number(v).toFixed(0) + '%');
         setStatValue('stat-texture',  props.soil_texture,  v => v);
 
         showPanel('detail');
@@ -712,10 +716,11 @@
             landscapeActive = true;
             document.getElementById('landscape-legend').style.display = 'block';
             const n = Object.keys(data.scores).length;
-            status.textContent = n + ' soil polygons scored.'
-                + (data.debug && data.debug.skipped_no_ph > 0
-                    ? ' (' + data.debug.skipped_no_ph + ' skipped — no pH data)'
-                    : '');
+            const dbg = data.debug || {{}};
+            const skipMsg = dbg.skipped_no_ph > 0 ? ' (' + dbg.skipped_no_ph + ' skipped — no pH data)'
+                          : dbg.skipped_no_sand > 0 ? ' (' + dbg.skipped_no_sand + ' skipped — no sand data)'
+                          : '';
+            status.textContent = n + ' soil polygons scored.' + skipMsg;
         }} catch (err) {{
             status.textContent = 'Error: ' + err.message;
         }} finally {{
@@ -777,10 +782,11 @@
         document.getElementById('calculate-btn').disabled = true;
 
         const body = {{
-            mukey:    selectedMukey,
-            soil_ph:  selectedProps.soil_ph   !== null ? Number(selectedProps.soil_ph)  : null,
-            soil_om:  selectedProps.soil_om   !== null ? Number(selectedProps.soil_om)  : null,
-            goal:     currentGoal,
+            mukey:     selectedMukey,
+            soil_ph:   selectedProps.soil_ph   != null ? Number(selectedProps.soil_ph)  : null,
+            soil_om:   selectedProps.soil_om   != null ? Number(selectedProps.soil_om)  : null,
+            soil_sand: selectedProps.soil_sand != null ? Number(selectedProps.soil_sand) : null,
+            goal:      currentGoal,
         }};
 
         try {{
@@ -816,19 +822,34 @@
                 This prototype implements the pH-liming path only.
             </div>`;
         }} else if (!data.results || data.results.length === 0) {{
-            cards.innerHTML = `<div class="placeholder-msg">No results — check that soil pH is available for this polygon.</div>`;
+            cards.innerHTML = '<div class="placeholder-msg">No results — check that required soil data is available for this polygon.</div>';
         }} else {{
+            const isWR = data.goal === 'water_retention';
             data.results.slice(0, 3).forEach((bc, i) => {{
-                const pct = Math.round((bc.suitability_score || 0) * 100);
-                const dpH = bc.predicted_dpH !== undefined ? '+' + Number(bc.predicted_dpH).toFixed(2) : '—';
+                const pct  = Math.round((bc.suitability_score || 0) * 100);
                 const rate = bc.recommended_rate_t_ac !== undefined ? Number(bc.recommended_rate_t_ac).toFixed(1) : '—';
+                const name = bc.name || 'Biochar ' + bc.biochar_id;
+                const feed = bc.feedstock || '—';
+                const rank = '#' + (i + 1) + ' match';
+                let stat1Val, stat1Lbl, stat3Val, stat3Lbl;
+                if (isWR) {{
+                    stat1Val = bc.predicted_outcome || '—';
+                    stat1Lbl = 'Predicted Effect';
+                    stat3Val = bc.ps_mean != null ? Number(bc.ps_mean).toFixed(1) + ' mm' : '—';
+                    stat3Lbl = 'Particle Size';
+                }} else {{
+                    stat1Val = bc.predicted_dpH !== undefined ? '+' + Number(bc.predicted_dpH).toFixed(2) : '—';
+                    stat1Lbl = 'Predicted ΔpH';
+                    stat3Val = bc.biochar_ph !== undefined ? Number(bc.biochar_ph).toFixed(1) : '—';
+                    stat3Lbl = 'Biochar pH';
+                }}
                 cards.innerHTML += `
                 <div class="biochar-card">
                     <div class="biochar-card-header">
                         <div>
-                            <div class="biochar-rank">#${{i+1}} match</div>
-                            <div class="biochar-name">${{bc.name || 'Biochar ' + bc.biochar_id}}</div>
-                            <div class="biochar-feedstock">${{bc.feedstock || '—'}}</div>
+                            <div class="biochar-rank">${{rank}}</div>
+                            <div class="biochar-name">${{name}}</div>
+                            <div class="biochar-feedstock">${{feed}}</div>
                         </div>
                     </div>
                     <div class="suitability-bar-wrap">
@@ -841,16 +862,16 @@
                     </div>
                     <div class="biochar-stats">
                         <div class="bc-stat">
-                            <div class="bc-stat-val">${{dpH}}</div>
-                            <div class="bc-stat-lbl">Predicted ΔpH</div>
+                            <div class="bc-stat-val">${{stat1Val}}</div>
+                            <div class="bc-stat-lbl">${{stat1Lbl}}</div>
                         </div>
                         <div class="bc-stat">
                             <div class="bc-stat-val">${{rate}} t/ac</div>
                             <div class="bc-stat-lbl">Rate</div>
                         </div>
                         <div class="bc-stat">
-                            <div class="bc-stat-val">${{bc.biochar_ph !== undefined ? Number(bc.biochar_ph).toFixed(1) : '—'}}</div>
-                            <div class="bc-stat-lbl">Biochar pH</div>
+                            <div class="bc-stat-val">${{stat3Val}}</div>
+                            <div class="bc-stat-lbl">${{stat3Lbl}}</div>
                         </div>
                     </div>
                 </div>`;

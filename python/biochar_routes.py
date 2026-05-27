@@ -36,7 +36,7 @@ GOALS = [
         'id': 'water_retention',
         'label': 'Improve water retention',
         'description': 'Increase soil water holding capacity.',
-        'implemented': False,
+        'implemented': True,
     },
     {
         'id': 'carbon_sequestration',
@@ -83,8 +83,9 @@ def _load_ssurgo_features() -> list:
 
 class SuitabilityRequest(BaseModel):
     mukey: Optional[str] = None
-    soil_ph: float
+    soil_ph: Optional[float] = None
     soil_om: Optional[float] = None
+    soil_sand: Optional[float] = None
     goal: str = 'raise_ph'
     target_ph: Optional[float] = None
 
@@ -113,6 +114,7 @@ def biochar_suitability(req: SuitabilityRequest):
     ranked = dst_match_point(
         soil_ph=req.soil_ph,
         soil_om=req.soil_om,
+        soil_sand=req.soil_sand,
         goal=req.goal,
         biochar_records=biochar_records,
         target_ph=req.target_ph,
@@ -122,6 +124,7 @@ def biochar_suitability(req: SuitabilityRequest):
         'mukey': req.mukey,
         'soil_ph': req.soil_ph,
         'soil_om': req.soil_om,
+        'soil_sand': req.soil_sand,
         'goal': req.goal,
         'goal_label': goal_def['label'],
         'goal_implemented': goal_def['implemented'],
@@ -170,27 +173,44 @@ def biochar_landscape(req: LandscapeRequest):
         logger.info(f"landscape: {len(ssurgo_features)} SSURGO features, sample keys: {sorted(ssurgo_features[0].keys())}")
 
     scores = {}
-    skipped_no_mukey = skipped_no_ph = 0
+    skipped_no_mukey = skipped_no_ph = skipped_no_sand = 0
     for props in ssurgo_features:
         mukey = props.get('mukey') or props.get('MUKEY')
-        soil_ph = props.get('soil_ph') or props.get('SOIL_PH') or props.get('ph1to1h2o_r')
         if not mukey:
             skipped_no_mukey += 1
             continue
-        if soil_ph is None:
+
+        soil_ph_raw = props.get('soil_ph') or props.get('SOIL_PH') or props.get('ph1to1h2o_r')
+        soil_ph = None
+        if soil_ph_raw is not None:
+            try:
+                soil_ph = float(soil_ph_raw)
+            except (TypeError, ValueError):
+                pass
+
+        soil_sand_raw = props.get('soil_sand') or props.get('SOIL_SAND') or props.get('sandtotal_r')
+        soil_sand = None
+        if soil_sand_raw is not None:
+            try:
+                soil_sand = float(soil_sand_raw)
+            except (TypeError, ValueError):
+                pass
+
+        if req.goal == 'raise_ph' and soil_ph is None:
             skipped_no_ph += 1
             continue
-        try:
-            soil_ph = float(soil_ph)
-        except (TypeError, ValueError):
-            skipped_no_ph += 1
+        if req.goal == 'water_retention' and soil_sand is None:
+            skipped_no_sand += 1
             continue
+
         soil_om_raw = props.get('soil_om') or props.get('SOIL_OM') or props.get('om_r')
         soil_om = float(soil_om_raw) if soil_om_raw is not None else None
-        # Pass all biochars so lp normalization works; find the selected one by id
+
+        # Pass all biochars so normalization works; find the selected one by id
         ranked = dst_match_point(
             soil_ph=soil_ph,
             soil_om=soil_om,
+            soil_sand=soil_sand,
             goal=req.goal,
             biochar_records=biochar_records,
             target_ph=LANDSCAPE_TARGET_PH,
@@ -200,7 +220,10 @@ def biochar_landscape(req: LandscapeRequest):
         if match and not match.get('placeholder'):
             scores[str(mukey)] = match['suitability_score']
 
-    logger.info(f"landscape: scored {len(scores)}, skipped no_mukey={skipped_no_mukey} no_ph={skipped_no_ph}")
+    logger.info(
+        f"landscape: scored {len(scores)}, skipped no_mukey={skipped_no_mukey} "
+        f"no_ph={skipped_no_ph} no_sand={skipped_no_sand}"
+    )
 
     if scores:
         min_score = min(scores.values())
@@ -210,7 +233,8 @@ def biochar_landscape(req: LandscapeRequest):
 
     return {'scores': scores, 'min_score': min_score, 'max_score': max_score,
             'debug': {'total': len(ssurgo_features), 'scored': len(scores),
-                      'skipped_no_mukey': skipped_no_mukey, 'skipped_no_ph': skipped_no_ph}}
+                      'skipped_no_mukey': skipped_no_mukey, 'skipped_no_ph': skipped_no_ph,
+                      'skipped_no_sand': skipped_no_sand}}
 
 
 @biochar_router.get('/goals')
