@@ -48,6 +48,10 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
+    # ABI demo shortcut
+    location = /biochar_atlas_poc {
+      return 302 https://fireatlas.org/abi_demo/staging/outlets/biochar_webedit/;
+    }
 
     # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/html/public
     location ~ ^/([a-zA-Z0-9_-]+)/?$ {
@@ -136,6 +140,8 @@ server {
 #
 # Per-atlas overrides go BEFORE the wildcard block — nginx uses the first match.
 # Needed when the customer subdomain name doesn't match the atlas name.
+
+
 
 server {
     server_name westportvfd.fireatlas.org;
