@@ -1546,6 +1546,69 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def sda_lookup_point(lat: float, lon: float) -> dict:
+    """Single-point SSURGO lookup via SDA REST API.
+
+    Returns a dict with PMTiles-schema field names (mukey, soil_series,
+    drainage_class, soil_ph, soil_om, soil_sand) so the biochar demo
+    treats SDA-sourced clicks identically to PMTiles-sourced clicks.
+    Returns {'error': str} on lookup failure.
+    """
+    SDA_URL = 'https://sdmdataaccess.nrcs.usda.gov/tabular/post.rest'
+
+    def _post(sql, timeout=15):
+        body = {'query': sql, 'format': 'json+columnname'}
+        resp = requests.post(SDA_URL, json=body, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json().get('Table', [])
+
+    # Phase 1: lat/lon → mukey
+    try:
+        sql = f"SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT({float(lon):.8f} {float(lat):.8f})')"
+        rows = _post(sql)
+        mukey = rows[1][0] if len(rows) > 1 else None
+    except Exception as e:
+        logger.warning(f"sda_lookup_point: mukey lookup failed ({lat},{lon}): {e}")
+        return {'error': 'SDA lookup failed'}
+
+    if not mukey:
+        return {'error': 'no SSURGO data at this location'}
+
+    # Phase 2: mukey → soil properties (topmost horizon, dominant component)
+    try:
+        sql = f"""
+            SELECT co.mukey, co.compname, co.drainagecl,
+                   ch.ph1to1h2o_r, ch.om_r, ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r
+            FROM component co
+            INNER JOIN chorizon ch ON co.cokey = ch.cokey
+            WHERE co.mukey = '{mukey}'
+            AND co.majcompflag = 'Yes'
+            AND ch.hzdept_r = (SELECT MIN(h2.hzdept_r) FROM chorizon h2 WHERE h2.cokey = co.cokey)
+            ORDER BY co.comppct_r DESC
+        """
+        rows = _post(sql, timeout=20)
+        if len(rows) < 2:
+            return {'error': 'no component data for mukey', 'mukey': mukey}
+        headers = rows[0]
+        soil = dict(zip(headers, rows[1]))
+    except Exception as e:
+        logger.warning(f"sda_lookup_point: properties query failed for mukey {mukey}: {e}")
+        return {'error': 'SDA properties query failed', 'mukey': mukey}
+
+    return {
+        'mukey':         mukey,
+        'soil_series':   soil.get('compname'),
+        'drainage_class': soil.get('drainagecl'),
+        'soil_ph':       soil.get('ph1to1h2o_r'),
+        'soil_om':       soil.get('om_r'),
+        'soil_sand':     soil.get('sandtotal_r'),
+        'soil_silt':     soil.get('silttotal_r'),
+        'soil_clay':     soil.get('claytotal_r'),
+        'soil_cec':      None,
+        'soil_texture':  None,
+    }
+
+
 def merge_h3(config: Dict[str, Any], asset_name: str):
     """
     Enrich a vector layer's features with properties from one or more H3 polygon layers.

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
-from eddies import dst_match_point
+from eddies import dst_match_point, sda_lookup_point
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,19 @@ def debug_ssurgo():
         return {'count': 0, 'fields': [], 'sample': None}
     sample = features[0]
     return {'count': len(features), 'fields': sorted(sample.keys()), 'sample': sample}
+
+
+@biochar_router.get('/ssurgo_point')
+def ssurgo_point(lat: float, lng: float):
+    """SSURGO point lookup via SDA API — fallback for clicks outside PMTiles coverage.
+
+    Returns soil properties in the same schema as the PMTiles layer so the
+    frontend can use both paths identically.
+    """
+    props = sda_lookup_point(lat, lng)
+    if 'error' in props:
+        raise HTTPException(status_code=404, detail=props['error'])
+    return props
 
 
 @biochar_router.post('/landscape')

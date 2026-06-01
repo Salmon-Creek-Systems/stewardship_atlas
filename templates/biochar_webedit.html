@@ -613,12 +613,34 @@
         document.getElementById('basemap-select').dispatchEvent(new Event('change'));
     }});
 
-    // ── Polygon click ───────────────────────────────────────────────────────
-    map.on('click', 'ssurgo-fill', (e) => {{
-        const feat = e.features[0];
-        if (!feat) return;
-        selectPolygon(feat.properties.mukey, feat.properties, e.lngLat);
+    // ── Polygon click (hybrid: PMTiles fast path, SDA API fallback) ────────────
+    map.on('click', (e) => {{
+        const features = map.queryRenderedFeatures(e.point, {{ layers: ['ssurgo-fill'] }});
+        if (features.length > 0) {{
+            selectPolygon(features[0].properties.mukey, features[0].properties, e.lngLat);
+        }} else {{
+            fetchSDAPoint(e.lngLat.lat, e.lngLat.lng);
+        }}
     }});
+
+    async function fetchSDAPoint(lat, lng) {{
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.add('active');
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/ssurgo_point?lat=' + lat + '&lng=' + lng);
+            if (resp.status === 404) {{
+                showToast('No soil data at this location');
+                return;
+            }}
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            selectPolygon(data.mukey, data, {{ lat, lng }});
+        }} catch (err) {{
+            showToast('Soil lookup failed: ' + err.message);
+        }} finally {{
+            overlay.classList.remove('active');
+        }}
+    }}
 
     function selectPolygon(mukey, props, lngLat = null) {{
         selectedMukey = mukey;
