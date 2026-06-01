@@ -1770,6 +1770,9 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
     _target_ph = target_ph if target_ph is not None else soil_ph + 1.0
     delta_needed = max(0.0, _target_ph - soil_ph)
 
+    if delta_needed <= 0:
+        return []  # soil already at/above target pH — no amendment benefit
+
     # k calibrated so median liming_potential (≈0.5) at 6 t/ac → ΔpH ≈ +0.5
     K = 0.1667  # 0.5 / (0.5 * 6)
 
