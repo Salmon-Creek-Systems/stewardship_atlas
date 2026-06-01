@@ -610,6 +610,7 @@
             const target = basemapLayers[e.target.value];
             if (target && map.getLayer(target)) map.setLayoutProperty(target, 'visibility', 'visible');
         }});
+        document.getElementById('basemap-select').dispatchEvent(new Event('change'));
     }});
 
     // ── Polygon click ───────────────────────────────────────────────────────
