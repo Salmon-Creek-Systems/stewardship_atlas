@@ -3108,7 +3108,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'id': 'basemap',
                 'type': 'raster',
                 'source': 'carto-light',
-                'paint': {'raster-opacity': 0.7},
+                'paint': {'raster-opacity': 0.9},
             },
             {
                 'id': 'ssurgo-fill',
@@ -3117,7 +3117,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'source-layer': 'ssurgo',
                 'paint': {
                     'fill-color': '#c8b49a',
-                    'fill-opacity': 0.55,
+                    'fill-opacity': 0,
                 },
             },
             {
@@ -3127,7 +3127,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'source-layer': 'ssurgo',
                 'paint': {
                     'line-color': '#8a7060',
-                    'line-width': 0.6,
+                    'line-width': 1.0,
                 },
             },
             {
@@ -3138,7 +3138,7 @@ def outlet_biochar_webedit(config: dict, name: str):
                 'filter': ['==', ['get', 'mukey'], ''],
                 'paint': {
                     'fill-color': '#173404',
-                    'fill-opacity': 0.35,
+                    'fill-opacity': 0.5,
                 },
             },
         ],

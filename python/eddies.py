@@ -1546,6 +1546,69 @@ def ssurgo_enrich(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def sda_lookup_point(lat: float, lon: float) -> dict:
+    """Single-point SSURGO lookup via SDA REST API.
+
+    Returns a dict with PMTiles-schema field names (mukey, soil_series,
+    drainage_class, soil_ph, soil_om, soil_sand) so the biochar demo
+    treats SDA-sourced clicks identically to PMTiles-sourced clicks.
+    Returns {'error': str} on lookup failure.
+    """
+    SDA_URL = 'https://sdmdataaccess.nrcs.usda.gov/tabular/post.rest'
+
+    def _post(sql, timeout=15):
+        body = {'query': sql, 'format': 'json+columnname'}
+        resp = requests.post(SDA_URL, json=body, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json().get('Table', [])
+
+    # Phase 1: lat/lon → mukey
+    try:
+        sql = f"SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT({float(lon):.8f} {float(lat):.8f})')"
+        rows = _post(sql)
+        mukey = rows[1][0] if len(rows) > 1 else None
+    except Exception as e:
+        logger.warning(f"sda_lookup_point: mukey lookup failed ({lat},{lon}): {e}")
+        return {'error': 'SDA lookup failed'}
+
+    if not mukey:
+        return {'error': 'no SSURGO data at this location'}
+
+    # Phase 2: mukey → soil properties (topmost horizon, dominant component)
+    try:
+        sql = f"""
+            SELECT co.mukey, co.compname, co.drainagecl,
+                   ch.ph1to1h2o_r, ch.om_r, ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r
+            FROM component co
+            INNER JOIN chorizon ch ON co.cokey = ch.cokey
+            WHERE co.mukey = '{mukey}'
+            AND co.majcompflag = 'Yes'
+            AND ch.hzdept_r = (SELECT MIN(h2.hzdept_r) FROM chorizon h2 WHERE h2.cokey = co.cokey)
+            ORDER BY co.comppct_r DESC
+        """
+        rows = _post(sql, timeout=20)
+        if len(rows) < 2:
+            return {'error': 'no component data for mukey', 'mukey': mukey}
+        headers = rows[0]
+        soil = dict(zip(headers, rows[1]))
+    except Exception as e:
+        logger.warning(f"sda_lookup_point: properties query failed for mukey {mukey}: {e}")
+        return {'error': 'SDA properties query failed', 'mukey': mukey}
+
+    return {
+        'mukey':         mukey,
+        'soil_series':   soil.get('compname'),
+        'drainage_class': soil.get('drainagecl'),
+        'soil_ph':       soil.get('ph1to1h2o_r'),
+        'soil_om':       soil.get('om_r'),
+        'soil_sand':     soil.get('sandtotal_r'),
+        'soil_silt':     soil.get('silttotal_r'),
+        'soil_clay':     soil.get('claytotal_r'),
+        'soil_cec':      None,
+        'soil_texture':  None,
+    }
+
+
 def merge_h3(config: Dict[str, Any], asset_name: str):
     """
     Enrich a vector layer's features with properties from one or more H3 polygon layers.
@@ -1628,25 +1691,87 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
 
 
 def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
-                    target_ph: float = None) -> list:
-    """Simplified Phillips 2020 pH-matching suitability calculation (point mode).
+                    target_ph: float = None, top_n: int = 5, soil_sand: float = None) -> list:
+    """Simplified Phillips 2020 suitability calculation (point mode).
 
-    Implements the pH liming path only. Other goals return a placeholder list.
-    Calibration: median biochar at 6 t/ac predicts ΔpH ≈ +0.5 on silt loam.
+    Implements raise_ph (pH liming) and water_retention (porosity/texture) paths.
+    Other goals return a placeholder list.
 
     Returns top-5 biochars sorted by suitability_score descending.
-    Each dict: biochar_id, name, feedstock, suitability_score (0-1),
-                recommended_rate_t_ac, predicted_dpH.
     """
     print(f"DST match-  PH:{soil_ph}, OM: {soil_om}, G: {goal}, recs: {biochar_records}")
-    if goal != 'raise_ph':
+    if goal not in ('raise_ph', 'water_retention'):
         return [{'placeholder': True, 'message': f"Goal '{goal}' requires full Phillips 2020 — coming in production."}]
+
+    if goal == 'water_retention':
+        if soil_sand is None:
+            return [{'placeholder': True, 'message': 'Water retention requires soil sand percentage.'}]
+
+        soil_receptivity = float(soil_sand) / 100.0
+
+        # Compute raw water-retention potential per biochar: (1/particle_size) × feedstock_factor
+        raw_potentials = []
+        for bc in biochar_records:
+            ps_raw = bc.get('ps_mean') or bc.get('particle_size_mm') or bc.get('particle_size') or bc.get('ps')
+            feedstock_lc = (bc.get('feedstock') or bc.get('feedstock_type') or '').lower()
+            if any(w in feedstock_lc for w in ('wood', 'oak', 'pine', 'fir', 'cedar', 'hazel', 'juniper', 'conifer', 'douglas')):
+                ff = 1.0
+            elif any(w in feedstock_lc for w in ('straw', 'grass', 'brew', 'yard', 'debris')):
+                ff = 0.8
+            elif any(w in feedstock_lc for w in ('manure', 'litter', 'poultr', 'polutr')):
+                ff = 0.5
+            else:
+                ff = 0.7
+            if ps_raw is None:
+                raw_potentials.append(None)
+            else:
+                try:
+                    ps_f = float(ps_raw)
+                    raw_potentials.append((1.0 / ps_f) * ff if ps_f > 0 else None)
+                except (TypeError, ValueError):
+                    raw_potentials.append(None)
+
+        valid = [v for v in raw_potentials if v is not None]
+        p_max = max(valid) if valid else 1.0
+        p_min = min(valid) if valid else 0.0
+        p_range = p_max - p_min if p_max > p_min else 1.0
+
+        results = []
+        for i, bc in enumerate(biochar_records):
+            p_raw = raw_potentials[i]
+            if p_raw is None:
+                continue
+            biochar_potential = (p_raw - p_min) / p_range
+            suitability = biochar_potential * soil_receptivity
+            if suitability >= 0.5:
+                outcome = 'substantial'
+            elif suitability >= 0.25:
+                outcome = 'moderate'
+            else:
+                outcome = 'small'
+            ps_val = bc.get('ps_mean') or bc.get('particle_size_mm') or bc.get('particle_size')
+            results.append({
+                'biochar_id': bc.get('biochar_id', i + 1),
+                'name': bc.get('sample_id') or bc.get('name') or bc.get('id') or f"Biochar-{bc.get('biochar_id', i+1)}",
+                'feedstock': bc.get('feedstock') or bc.get('feedstock_type'),
+                'production_temp_c': bc.get('production_temp_c'),
+                'ps_mean': ps_val,
+                'suitability_score': round(suitability, 4),
+                'recommended_rate_t_ac': 8.0,
+                'predicted_outcome': outcome,
+            })
+
+        results.sort(key=lambda x: x['suitability_score'], reverse=True)
+        return results[:top_n] if top_n else results
 
     if soil_ph is None:
         return []
 
     _target_ph = target_ph if target_ph is not None else soil_ph + 1.0
     delta_needed = max(0.0, _target_ph - soil_ph)
+
+    if delta_needed <= 0:
+        return []  # soil already at/above target pH — no amendment benefit
 
     # k calibrated so median liming_potential (≈0.5) at 6 t/ac → ΔpH ≈ +0.5
     K = 0.1667  # 0.5 / (0.5 * 6)
@@ -1693,7 +1818,7 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
 
         results.append({
             'biochar_id': bc.get('biochar_id', i + 1),
-            'name': bc.get('sample_id') or bc.get('name') or f"Biochar-{bc.get('biochar_id', i+1)}",
+            'name': bc.get('sample_id') or bc.get('name') or bc.get('id') or f"Biochar-{bc.get('biochar_id', i+1)}",
             'feedstock': bc.get('feedstock') or bc.get('feedstock_type'),
             'production_temp_c': bc.get('production_temp_c'),
             'biochar_ph': bc.get('biochar_ph'),
@@ -1704,7 +1829,7 @@ def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: 
         })
 
     results.sort(key=lambda x: x['suitability_score'], reverse=True)
-    return results[:5]
+    return results[:top_n] if top_n else results
 
 
 def dst_match_simplified(config: Dict[str, Any], asset_name: str):

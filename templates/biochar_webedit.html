@@ -97,14 +97,34 @@
             padding: 16px;
         }}
 
-        /* ── Empty state ── */
-        #panel-empty {{
-            text-align: center;
-            padding: 40px 16px;
-            color: var(--muted);
+        /* ── Setup panel (landscape mode) ── */
+        #panel-setup {{ padding: 16px 0; }}
+        #panel-setup .setup-intro {{ font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }}
+        .setup-field {{ margin-bottom: 14px; }}
+        .setup-field label {{ display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }}
+        .setup-select {{
+            width: 100%; padding: 7px 10px; border: 1px solid var(--border);
+            border-radius: var(--radius); font-size: 13px; background: white; cursor: pointer;
         }}
-        #panel-empty .hint-icon {{ font-size: 32px; margin-bottom: 12px; }}
-        #panel-empty p {{ font-size: 14px; line-height: 1.5; }}
+        .setup-select:disabled {{ background: #f5f5f5; color: var(--muted); cursor: default; }}
+        #landscape-btn {{
+            width: 100%; padding: 10px; background: var(--green-dark); color: white;
+            border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600;
+            cursor: pointer; margin-top: 4px;
+        }}
+        #landscape-btn:hover {{ background: var(--green-mid); }}
+        #landscape-btn:disabled {{ background: #aaa; cursor: default; }}
+        #landscape-legend {{ display: none; margin-top: 18px; }}
+        #landscape-legend .legend-label {{ font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }}
+        #legend-bar {{ height: 14px; border-radius: 4px; background: linear-gradient(to right, #2c7bb6, #d7191c); margin-bottom: 4px; }}
+        .legend-range {{ display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }}
+        #landscape-status {{ margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic; }}
+
+        /* ── Back button ── */
+        #back-btn {{
+            font-size: 12px; color: var(--green-mid); background: none; border: none;
+            cursor: pointer; padding: 0; margin-bottom: 10px; text-decoration: underline;
+        }}
 
         /* ── Detail panel ── */
         #panel-detail {{ display: none; }}
@@ -333,6 +353,31 @@
         }}
         #toast.show {{ opacity: 1; }}
 
+        /* ── Basemap control ── */
+        #basemap-control {{
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            z-index: 10;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 5px 10px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }}
+        #basemap-control label {{ font-weight: 600; white-space: nowrap; }}
+        #basemap-control select {{
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 12px;
+            background: white;
+            cursor: pointer;
+        }}
+
         @media (max-width: 700px) {{
             #app {{ flex-direction: column; }}
             #sidebar {{ width: 100%; height: 50vh; border-left: none; border-top: 1px solid var(--border); }}
@@ -345,7 +390,7 @@
 <div id="banner">
     <span class="banner-tag">PROTOTYPE</span>
     <span>
-        <strong>Biochar Suitability Tool</strong> — working demonstration for ABI/USDA ARS proposal.
+        <strong>Biochar Suitability Tool</strong> — working but partial Proof-of-Concept for ABI/USDA ARS proposal.
         Algorithms are simplified; full Phillips 2020 method in production.
         <a href="#methodology" id="methodology-link">Methodology →</a>
     </span>
@@ -355,6 +400,15 @@
     <div id="map-container">
         <div id="map"></div>
         <div id="loading-overlay"><div class="spinner"></div></div>
+        <div id="basemap-control">
+            <label for="basemap-select">Basemap</label>
+            <select id="basemap-select">
+                <option value="usgs">USGS Topo</option>
+                <option value="carto">Carto Light</option>
+                <option value="satellite">Satellite (ESRI)</option>
+                <option value="terrain">OpenTopoMap</option>
+            </select>
+        </div>
     </div>
 
     <div id="sidebar">
@@ -364,12 +418,42 @@
         </div>
 
         <div id="sidebar-body">
-            <div id="panel-empty">
-                <div class="hint-icon">🗺</div>
-                <p>Click a soil polygon on the map to see soil properties and calculate biochar suitability.</p>
+            <div id="panel-setup">
+                <p class="setup-intro">
+                    <b>Explore Locations:</b> click map then choose Goal for site-specific recommendations. 
+                    <br>
+                    <b>Explore Landscape:</b>> Select a goal and biochar type to see all location suitabilities. 
+                    </p>
+
+                <div class="setup-field">
+                    <label>Amendment Goal</label>
+                    <select id="setup-goal" class="setup-select">
+                        <option value="raise_ph">Raise soil pH</option>
+                        <option value="water_retention">Improve water retention</option>
+                        <option value="carbon_sequestration" disabled>Sequester carbon (v2)</option>
+                        <option value="provision_pk" disabled>Provision P or K (v2)</option>
+                    </select>
+                </div>
+
+                <div class="setup-field">
+                    <label>Biochar Type</label>
+                    <select id="setup-biochar" class="setup-select">
+                        <option value="">Loading…</option>
+                    </select>
+                </div>
+
+                <button id="landscape-btn" disabled>Show Landscape Suitability</button>
+                <div id="landscape-status"></div>
+
+                <div id="landscape-legend">
+                    <div class="legend-label">Suitability</div>
+                    <div id="legend-bar"></div>
+                    <div class="legend-range"><span>Lower</span><span>Higher</span></div>
+                </div>
             </div>
 
             <div id="panel-detail">
+                <button id="back-btn">← Back to landscape view</button>
                 <div class="soil-series-name" id="soil-series">—</div>
                 <div class="soil-mukey" id="soil-mukey"></div>
 
@@ -391,7 +475,11 @@
                         <div class="stat-label">Drainage</div>
                         <div class="stat-value" id="stat-drainage">—</div>
                     </div>
-                    <div class="soil-stat" style="grid-column: span 2">
+                    <div class="soil-stat">
+                        <div class="stat-label">Sand %</div>
+                        <div class="stat-value" id="stat-sand">—</div>
+                    </div>
+                    <div class="soil-stat">
                         <div class="stat-label">Texture</div>
                         <div class="stat-value" id="stat-texture">—</div>
                     </div>
@@ -405,10 +493,9 @@
                         </label>
                     </li>
                     <li>
-                        <label class="goal-radio disabled">
-                            <input type="radio" name="goal" value="water_retention" disabled>
+                        <label class="goal-radio" id="goal-water-ret-label">
+                            <input type="radio" name="goal" value="water_retention">
                             Improve water retention
-                            <span class="goal-coming">v2</span>
                         </label>
                     </li>
                     <li>
@@ -460,10 +547,31 @@
     const MAP_STYLE = {style_json};
     const BOUNDS    = {bbox_json};
 
+    const USGS_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{{z}}/{{y}}/{{x}}'],
+        tileSize: 256,
+        attribution: 'Tiles courtesy of the U.S. Geological Survey',
+    }};
+    const SATELLITE_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}'],
+        tileSize: 256,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    }};
+    const TERRAIN_SOURCE = {{
+        type: 'raster',
+        tiles: ['https://tile.opentopomap.org/{{z}}/{{x}}/{{y}}.png'],
+        tileSize: 256,
+        attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)',
+    }};
+
     // ── State ───────────────────────────────────────────────────────────────
-    let selectedMukey = null;
-    let selectedProps = null;
-    let currentGoal   = 'raise_ph';
+    let selectedMukey    = null;
+    let selectedProps    = null;
+    let currentGoal      = 'raise_ph';
+    let selectedMarker   = null;
+    let landscapeActive  = false;
 
     // ── PMTiles protocol ────────────────────────────────────────────────────
     const protocol = new pmtiles.Protocol();
@@ -486,21 +594,69 @@
     map.on('mouseenter', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = 'pointer'; }});
     map.on('mouseleave', 'ssurgo-fill', () => {{ map.getCanvas().style.cursor = ''; }});
 
-    // ── Polygon click ───────────────────────────────────────────────────────
-    map.on('click', 'ssurgo-fill', (e) => {{
-        const feat = e.features[0];
-        if (!feat) return;
-        const props = feat.properties;
-        selectPolygon(props.mukey, props);
+    // ── Basemap switcher ────────────────────────────────────────────────────
+    map.on('load', () => {{
+        map.addSource('usgs', USGS_SOURCE);
+        map.addSource('satellite', SATELLITE_SOURCE);
+        map.addSource('terrain', TERRAIN_SOURCE);
+
+        map.addLayer({{ id: 'usgs-layer',       type: 'raster', source: 'usgs',      layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+        map.addLayer({{ id: 'satellite-layer',   type: 'raster', source: 'satellite', layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+        map.addLayer({{ id: 'terrain-layer',     type: 'raster', source: 'terrain',   layout: {{ visibility: 'none' }} }}, 'ssurgo-fill');
+
+        const basemapLayers = {{ carto: 'basemap', usgs: 'usgs-layer', satellite: 'satellite-layer', terrain: 'terrain-layer' }};
+        document.getElementById('basemap-select').addEventListener('change', (e) => {{
+            Object.values(basemapLayers).forEach(id => {{ if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); }});
+            const target = basemapLayers[e.target.value];
+            if (target && map.getLayer(target)) map.setLayoutProperty(target, 'visibility', 'visible');
+        }});
+        document.getElementById('basemap-select').dispatchEvent(new Event('change'));
     }});
 
-    function selectPolygon(mukey, props) {{
+    // ── Polygon click (hybrid: PMTiles fast path, SDA API fallback) ────────────
+    map.on('click', (e) => {{
+        const features = map.queryRenderedFeatures(e.point, {{ layers: ['ssurgo-fill'] }});
+        if (features.length > 0) {{
+            selectPolygon(features[0].properties.mukey, features[0].properties, e.lngLat);
+        }} else {{
+            fetchSDAPoint(e.lngLat.lat, e.lngLat.lng);
+        }}
+    }});
+
+    async function fetchSDAPoint(lat, lng) {{
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.add('active');
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/ssurgo_point?lat=' + lat + '&lng=' + lng);
+            if (resp.status === 404) {{
+                showToast('No soil data at this location');
+                return;
+            }}
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            selectPolygon(data.mukey, data, {{ lat, lng }});
+        }} catch (err) {{
+            showToast('Soil lookup failed: ' + err.message);
+        }} finally {{
+            overlay.classList.remove('active');
+        }}
+    }}
+
+    function selectPolygon(mukey, props, lngLat = null) {{
         selectedMukey = mukey;
         selectedProps = props;
         currentGoal   = 'raise_ph';
 
         // Highlight selected polygon
         map.setFilter('ssurgo-selected', ['==', ['get', 'mukey'], mukey]);
+
+        // Place marker at click point (omitted when restoring from URL)
+        if (lngLat) {{
+            if (selectedMarker) selectedMarker.remove();
+            selectedMarker = new maplibregl.Marker({{ color: '#173404' }})
+                .setLngLat(lngLat)
+                .addTo(map);
+        }}
 
         // Update URL state
         const url = new URL(window.location.href);
@@ -516,6 +672,7 @@
         setStatValue('stat-om',       props.soil_om,       v => Number(v).toFixed(1) + '%');
         setStatValue('stat-cec',      props.soil_cec,      v => Number(v).toFixed(0) + ' meq/100g');
         setStatValue('stat-drainage', props.drainage_class, v => v);
+        setStatValue('stat-sand',     props.soil_sand,     v => Number(v).toFixed(0) + '%');
         setStatValue('stat-texture',  props.soil_texture,  v => v);
 
         showPanel('detail');
@@ -534,10 +691,100 @@
 
     // ── Panels ──────────────────────────────────────────────────────────────
     function showPanel(which) {{
-        document.getElementById('panel-empty').style.display   = which === 'empty'   ? ''      : 'none';
+        document.getElementById('panel-setup').style.display   = which === 'setup'   ? 'block' : 'none';
         document.getElementById('panel-detail').style.display  = which === 'detail'  ? 'block' : 'none';
         document.getElementById('panel-results').style.display = which === 'results' ? 'block' : 'none';
     }}
+
+    // ── Landscape mode ──────────────────────────────────────────────────────
+
+    // Populate biochar dropdown on load
+    (async () => {{
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/biochar_db');
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            const sel = document.getElementById('setup-biochar');
+            sel.innerHTML = '';
+            data.records.forEach(r => {{
+                const opt = document.createElement('option');
+                opt.value = String(r.biochar_id);
+                opt.textContent = (r.sample_id || r.name || r.id || 'Biochar ' + r.biochar_id)
+                    + (r.feedstock ? ' (' + r.feedstock + ')' : '');
+                sel.appendChild(opt);
+            }});
+            document.getElementById('landscape-btn').disabled = false;
+        }} catch (err) {{
+            document.getElementById('setup-biochar').innerHTML = '<option value="">Failed to load</option>';
+        }}
+    }})();
+
+    document.getElementById('landscape-btn').addEventListener('click', async () => {{
+        const goal      = document.getElementById('setup-goal').value;
+        const biocharId = document.getElementById('setup-biochar').value;
+        if (!biocharId) return;
+
+        const btn    = document.getElementById('landscape-btn');
+        const status = document.getElementById('landscape-status');
+        btn.disabled = true;
+        btn.textContent = 'Calculating…';
+        status.textContent = '';
+
+        try {{
+            const resp = await fetch(APP_URL + '/api/biochar/landscape', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ goal, biochar_id: biocharId }}),
+            }});
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+
+            applyLandscapeChoropleth(data.scores, data.min_score, data.max_score);
+            landscapeActive = true;
+            document.getElementById('landscape-legend').style.display = 'block';
+            const n = Object.keys(data.scores).length;
+            const dbg = data.debug || {{}};
+            const skipMsg = dbg.skipped_no_ph > 0 ? ' (' + dbg.skipped_no_ph + ' skipped — no pH data)'
+                          : dbg.skipped_no_sand > 0 ? ' (' + dbg.skipped_no_sand + ' skipped — no sand data)'
+                          : '';
+            status.textContent = n + ' soil polygons scored.' + skipMsg;
+        }} catch (err) {{
+            status.textContent = 'Error: ' + err.message;
+        }} finally {{
+            btn.disabled = false;
+            btn.textContent = 'Show Landscape Suitability';
+        }}
+    }});
+
+    function scoreToHex(score, min, max) {{
+        // Linear interpolation: low=#2c7bb6 (blue) → high=#d7191c (red)
+        const t = max > min ? (score - min) / (max - min) : 0.5;
+        const lo = [44,  123, 182];  // #2c7bb6
+        const hi = [215,  25,  28];  // #d7191c
+        const r = Math.round(lo[0] + t * (hi[0] - lo[0]));
+        const g = Math.round(lo[1] + t * (hi[1] - lo[1]));
+        const b = Math.round(lo[2] + t * (hi[2] - lo[2]));
+        return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    }}
+
+    function applyLandscapeChoropleth(scores, minScore, maxScore) {{
+        const entries = Object.entries(scores);
+        if (entries.length === 0) return;  // match expression needs ≥1 case — nothing to show
+
+        // Build a MapLibre match expression: mukey → hex color
+        const expr = ['match', ['get', 'mukey']];
+        entries.forEach(([mukey, score]) => {{
+            expr.push(mukey, scoreToHex(score, minScore, maxScore));
+        }});
+        expr.push('#cccccc');  // fallback for unscored polygons
+
+        map.setPaintProperty('ssurgo-fill', 'fill-color', expr);
+        map.setPaintProperty('ssurgo-fill', 'fill-opacity', 0.5);
+    }}
+
+    document.getElementById('back-btn').addEventListener('click', () => {{
+        showPanel('setup');
+    }});
 
     // ── Goal selection ──────────────────────────────────────────────────────
     document.querySelectorAll('input[name=goal]').forEach(radio => {{
@@ -562,10 +809,11 @@
         document.getElementById('calculate-btn').disabled = true;
 
         const body = {{
-            mukey:    selectedMukey,
-            soil_ph:  selectedProps.soil_ph   !== null ? Number(selectedProps.soil_ph)  : null,
-            soil_om:  selectedProps.soil_om   !== null ? Number(selectedProps.soil_om)  : null,
-            goal:     currentGoal,
+            mukey:     selectedMukey,
+            soil_ph:   selectedProps.soil_ph   != null ? Number(selectedProps.soil_ph)  : null,
+            soil_om:   selectedProps.soil_om   != null ? Number(selectedProps.soil_om)  : null,
+            soil_sand: selectedProps.soil_sand != null ? Number(selectedProps.soil_sand) : null,
+            goal:      currentGoal,
         }};
 
         try {{
@@ -601,19 +849,34 @@
                 This prototype implements the pH-liming path only.
             </div>`;
         }} else if (!data.results || data.results.length === 0) {{
-            cards.innerHTML = `<div class="placeholder-msg">No results — check that soil pH is available for this polygon.</div>`;
+            cards.innerHTML = '<div class="placeholder-msg">No results — check that required soil data is available for this polygon.</div>';
         }} else {{
+            const isWR = data.goal === 'water_retention';
             data.results.slice(0, 3).forEach((bc, i) => {{
-                const pct = Math.round((bc.suitability_score || 0) * 100);
-                const dpH = bc.predicted_dpH !== undefined ? '+' + Number(bc.predicted_dpH).toFixed(2) : '—';
+                const pct  = Math.round((bc.suitability_score || 0) * 100);
                 const rate = bc.recommended_rate_t_ac !== undefined ? Number(bc.recommended_rate_t_ac).toFixed(1) : '—';
+                const name = bc.name || 'Biochar ' + bc.biochar_id;
+                const feed = bc.feedstock || '—';
+                const rank = '#' + (i + 1) + ' match';
+                let stat1Val, stat1Lbl, stat3Val, stat3Lbl;
+                if (isWR) {{
+                    stat1Val = bc.predicted_outcome || '—';
+                    stat1Lbl = 'Predicted Effect';
+                    stat3Val = bc.ps_mean != null ? Number(bc.ps_mean).toFixed(1) + ' mm' : '—';
+                    stat3Lbl = 'Particle Size';
+                }} else {{
+                    stat1Val = bc.predicted_dpH !== undefined ? '+' + Number(bc.predicted_dpH).toFixed(2) : '—';
+                    stat1Lbl = 'Predicted ΔpH';
+                    stat3Val = bc.biochar_ph !== undefined ? Number(bc.biochar_ph).toFixed(1) : '—';
+                    stat3Lbl = 'Biochar pH';
+                }}
                 cards.innerHTML += `
                 <div class="biochar-card">
                     <div class="biochar-card-header">
                         <div>
-                            <div class="biochar-rank">#${{i+1}} match</div>
-                            <div class="biochar-name">${{bc.name || 'Biochar ' + bc.biochar_id}}</div>
-                            <div class="biochar-feedstock">${{bc.feedstock || '—'}}</div>
+                            <div class="biochar-rank">${{rank}}</div>
+                            <div class="biochar-name">${{name}}</div>
+                            <div class="biochar-feedstock">${{feed}}</div>
                         </div>
                     </div>
                     <div class="suitability-bar-wrap">
@@ -626,16 +889,16 @@
                     </div>
                     <div class="biochar-stats">
                         <div class="bc-stat">
-                            <div class="bc-stat-val">${{dpH}}</div>
-                            <div class="bc-stat-lbl">Predicted ΔpH</div>
+                            <div class="bc-stat-val">${{stat1Val}}</div>
+                            <div class="bc-stat-lbl">${{stat1Lbl}}</div>
                         </div>
                         <div class="bc-stat">
                             <div class="bc-stat-val">${{rate}} t/ac</div>
                             <div class="bc-stat-lbl">Rate</div>
                         </div>
                         <div class="bc-stat">
-                            <div class="bc-stat-val">${{bc.biochar_ph !== undefined ? Number(bc.biochar_ph).toFixed(1) : '—'}}</div>
-                            <div class="bc-stat-lbl">Biochar pH</div>
+                            <div class="bc-stat-val">${{stat3Val}}</div>
+                            <div class="bc-stat-lbl">${{stat3Lbl}}</div>
                         </div>
                     </div>
                 </div>`;

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
-from eddies import dst_match_point
+from eddies import dst_match_point, sda_lookup_point
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ GOALS = [
         'id': 'water_retention',
         'label': 'Improve water retention',
         'description': 'Increase soil water holding capacity.',
-        'implemented': False,
+        'implemented': True,
     },
     {
         'id': 'carbon_sequestration',
@@ -66,12 +66,33 @@ def _load_biochar_records() -> list:
     return [f['properties'] for f in fc.get('features', []) if f.get('properties')]
 
 
+LANDSCAPE_TARGET_PH = 6.5  # standard agronomic target for OR
+
+
+def _load_ssurgo_features() -> list:
+    """Load SSURGO polygon features from the abi_demo staging layer."""
+    layer_path = (
+        Path(SWALES_ROOT) / BIOCHAR_ATLAS / 'staging' / 'layers'
+        / 'ssurgo_polk_or' / 'ssurgo_polk_or.geojson'
+    )
+    if not layer_path.exists():
+        raise FileNotFoundError(f"SSURGO layer not found: {layer_path}")
+    fc = json.loads(layer_path.read_text())
+    return [f['properties'] for f in fc.get('features', []) if f.get('properties')]
+
+
 class SuitabilityRequest(BaseModel):
     mukey: Optional[str] = None
-    soil_ph: float
+    soil_ph: Optional[float] = None
     soil_om: Optional[float] = None
+    soil_sand: Optional[float] = None
     goal: str = 'raise_ph'
     target_ph: Optional[float] = None
+
+
+class LandscapeRequest(BaseModel):
+    goal: str = 'raise_ph'
+    biochar_id: str
 
 
 @biochar_router.post('/suitability')
@@ -93,6 +114,7 @@ def biochar_suitability(req: SuitabilityRequest):
     ranked = dst_match_point(
         soil_ph=req.soil_ph,
         soil_om=req.soil_om,
+        soil_sand=req.soil_sand,
         goal=req.goal,
         biochar_records=biochar_records,
         target_ph=req.target_ph,
@@ -102,11 +124,130 @@ def biochar_suitability(req: SuitabilityRequest):
         'mukey': req.mukey,
         'soil_ph': req.soil_ph,
         'soil_om': req.soil_om,
+        'soil_sand': req.soil_sand,
         'goal': req.goal,
         'goal_label': goal_def['label'],
         'goal_implemented': goal_def['implemented'],
         'results': ranked,
     }
+
+
+@biochar_router.get('/debug_ssurgo')
+def debug_ssurgo():
+    """Return field names and a sample of the first SSURGO feature for diagnosis."""
+    try:
+        features = _load_ssurgo_features()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    if not features:
+        return {'count': 0, 'fields': [], 'sample': None}
+    sample = features[0]
+    return {'count': len(features), 'fields': sorted(sample.keys()), 'sample': sample}
+
+
+@biochar_router.get('/ssurgo_point')
+def ssurgo_point(lat: float, lng: float):
+    """SSURGO point lookup via SDA API — fallback for clicks outside PMTiles coverage.
+
+    Returns soil properties in the same schema as the PMTiles layer so the
+    frontend can use both paths identically.
+    """
+    props = sda_lookup_point(lat, lng)
+    if 'error' in props:
+        raise HTTPException(status_code=404, detail=props['error'])
+    return props
+
+
+@biochar_router.post('/landscape')
+def biochar_landscape(req: LandscapeRequest):
+    """Compute suitability for a single biochar across every SSURGO polygon.
+
+    Returns a mukey→score dict for driving a choropleth map. Uses a fixed
+    target_ph of 6.5 so scores vary meaningfully with each polygon's soil_ph.
+    """
+    try:
+        biochar_records = _load_biochar_records()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    try:
+        ssurgo_features = _load_ssurgo_features()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    biochar_record = next(
+        (r for r in biochar_records if str(r.get('biochar_id')) == str(req.biochar_id)),
+        None,
+    )
+    if biochar_record is None:
+        raise HTTPException(status_code=404, detail=f"Biochar id {req.biochar_id!r} not found")
+
+    if ssurgo_features:
+        logger.info(f"landscape: {len(ssurgo_features)} SSURGO features, sample keys: {sorted(ssurgo_features[0].keys())}")
+
+    scores = {}
+    skipped_no_mukey = skipped_no_ph = skipped_no_sand = 0
+    for props in ssurgo_features:
+        mukey = props.get('mukey') or props.get('MUKEY')
+        if not mukey:
+            skipped_no_mukey += 1
+            continue
+
+        soil_ph_raw = props.get('soil_ph') or props.get('SOIL_PH') or props.get('ph1to1h2o_r')
+        soil_ph = None
+        if soil_ph_raw is not None:
+            try:
+                soil_ph = float(soil_ph_raw)
+            except (TypeError, ValueError):
+                pass
+
+        soil_sand_raw = props.get('soil_sand') or props.get('SOIL_SAND') or props.get('sandtotal_r')
+        soil_sand = None
+        if soil_sand_raw is not None:
+            try:
+                soil_sand = float(soil_sand_raw)
+            except (TypeError, ValueError):
+                pass
+
+        if req.goal == 'raise_ph' and soil_ph is None:
+            skipped_no_ph += 1
+            continue
+        if req.goal == 'water_retention' and soil_sand is None:
+            skipped_no_sand += 1
+            continue
+
+        soil_om_raw = props.get('soil_om') or props.get('SOIL_OM') or props.get('om_r')
+        soil_om = float(soil_om_raw) if soil_om_raw is not None else None
+
+        # Pass all biochars so normalization works; find the selected one by id
+        ranked = dst_match_point(
+            soil_ph=soil_ph,
+            soil_om=soil_om,
+            soil_sand=soil_sand,
+            goal=req.goal,
+            biochar_records=biochar_records,
+            target_ph=LANDSCAPE_TARGET_PH,
+            top_n=None,
+        )
+        match = next((r for r in ranked if str(r.get('biochar_id')) == str(req.biochar_id)), None)
+        if match and not match.get('placeholder'):
+            scores[str(mukey)] = match['suitability_score']
+
+    logger.info(
+        f"landscape: scored {len(scores)}, skipped no_mukey={skipped_no_mukey} "
+        f"no_ph={skipped_no_ph} no_sand={skipped_no_sand}"
+    )
+
+    if scores:
+        min_score = min(scores.values())
+        max_score = max(scores.values())
+    else:
+        min_score = max_score = 0.0
+
+    return {'scores': scores, 'min_score': min_score, 'max_score': max_score,
+            'debug': {'total': len(ssurgo_features), 'scored': len(scores),
+                      'skipped_no_mukey': skipped_no_mukey, 'skipped_no_ph': skipped_no_ph,
+                      'skipped_no_sand': skipped_no_sand}}
 
 
 @biochar_router.get('/goals')
