@@ -43,7 +43,7 @@ def main():
     sql = f"""
         SELECT co.mukey, co.cokey, co.compname, co.comppct_r, co.majcompflag,
                ch.hzdept_r, ch.hzdepb_r, ch.ph1to1h2o_r, ch.om_r,
-               ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r
+               ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r, ch.hzname, ch.desgnmaster
         FROM component co
         LEFT JOIN chorizon ch ON co.cokey = ch.cokey
         WHERE co.mukey IN ({mukey_list})
