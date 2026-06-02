@@ -666,7 +666,7 @@
 
         // Populate detail panel
         document.getElementById('soil-series').textContent = props.soil_series || 'Unknown series';
-        document.getElementById('soil-mukey').textContent  = 'MUKEY: ' + (mukey || '—');
+        document.getElementById('soil-mukey').textContent  = 'MUKEY: ' + (mukey || '—') + '(simple upmost horizon)';
 
         setStatValue('stat-ph',       props.soil_ph,       v => Number(v).toFixed(1));
         setStatValue('stat-om',       props.soil_om,       v => Number(v).toFixed(1) + '%');
