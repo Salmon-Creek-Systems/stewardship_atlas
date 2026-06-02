@@ -10,6 +10,7 @@ Usage:
     echo -e '2711143\n2609528' | python scripts/query_sda.py
     cat mukeys.txt | python scripts/query_sda.py | column -t
     echo '2711143' | python scripts/query_sda.py --json
+    echo '2711143' | python scripts/query_sda.py --valu1 --json
 """
 
 import sys
@@ -33,6 +34,8 @@ def main():
         description='Diagnostic SDA component/horizon query. Reads mukeys from stdin.'
     )
     parser.add_argument('--json', action='store_true', help='Output as JSON instead of TSV')
+    parser.add_argument('--valu1', action='store_true',
+                        help='Query the valu1 pre-aggregated mapunit table instead of component/horizon')
     args = parser.parse_args()
 
     mukeys = [line.strip() for line in sys.stdin if line.strip()]
@@ -40,15 +43,19 @@ def main():
         raise SystemExit("No mukeys on stdin.")
 
     mukey_list = ', '.join(f"'{m}'" for m in mukeys)
-    sql = f"""
-        SELECT co.mukey, co.cokey, co.compname, co.comppct_r, co.majcompflag,
-               ch.hzdept_r, ch.hzdepb_r, ch.ph1to1h2o_r, ch.om_r,
-               ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r, ch.hzname, ch.desgnmaster
-        FROM component co
-        LEFT JOIN chorizon ch ON co.cokey = ch.cokey
-        WHERE co.mukey IN ({mukey_list})
-        ORDER BY co.mukey, co.comppct_r DESC, ch.hzdept_r
-    """
+
+    if args.valu1:
+        sql = f"SELECT * FROM valu1 WHERE mukey IN ({mukey_list})"
+    else:
+        sql = f"""
+            SELECT co.mukey, co.cokey, co.compname, co.comppct_r, co.majcompflag,
+                   ch.hzdept_r, ch.hzdepb_r, ch.ph1to1h2o_r, ch.om_r,
+                   ch.sandtotal_r, ch.silttotal_r, ch.claytotal_r, ch.hzname, ch.desgnmaster
+            FROM component co
+            LEFT JOIN chorizon ch ON co.cokey = ch.cokey
+            WHERE co.mukey IN ({mukey_list})
+            ORDER BY co.mukey, co.comppct_r DESC, ch.hzdept_r
+        """
 
     rows = sda_post(sql)
 
