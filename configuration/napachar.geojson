@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.937590646,
+              38.254052074
+            ],
+            [
+              -121.607426054,
+              38.254052074
+            ],
+            [
+              -121.607426054,
+              38.73544431
+            ],
+            [
+              -122.937590646,
+              38.73544431
+            ],
+            [
+              -122.937590646,
+              38.254052074
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "napachar",
+        "description": "napachar",
+        "app_url": "https://fireatlas.org:9000",
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "default_h3_resolution": 8,
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "layers_path": "/root/swales_dev/app/configuration/biochar_layers.json",
+        "assets_path": "/root/swales_dev/app/configuration/biochar_assets.json",
+        "base_url": "https://fireatlas.org/napachar",
+        "port": 9000,
+        "admin_emails": [],
+        "logo_url": ""
+      }
+    }
+  ]
+}
