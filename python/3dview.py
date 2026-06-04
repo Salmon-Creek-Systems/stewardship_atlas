@@ -357,7 +357,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
         {toggle_panel_html}
 
-        <a href="../../html/admin" class="back-link">&larr; Back</a>
+        <a href="#" onclick="history.back(); return false;" class="back-link">&larr; Back</a>
     </div>
 
     <script>
