@@ -1,1 +1,912 @@
-{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "scvfd", "app_url": "https://fireatlas.org:9000", "data_root": "/root/swales_dev", "shared_dir": "/root/data/", "versioned_outlets": ["html", "webmap", "private_webmap", "webedit", "gazetteer"], "admin_emails": ["gateless@gmail.com", "planephun@gmail.com"], "email_photo_default_layer": "photos", "base_url": "https://fireatlas.org/scvfd", "port": 9000, "logo_url": "https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png", "config_only": false, "layers": {"regions": {"geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]}, "elevation": {"geometry_type": "raster"}, "terrain_dem": {"geometry_type": "raster"}, "hillshade_tiles": {"geometry_type": "raster"}, "terrain_rgb_tiles": {"geometry_type": "raster"}, "contours": {"geometry_type": "linestring", "color": [240, 255, 240], "constant_width": 4, "vis": {"minzoom": 14, "maxzoom": 22}, "paint": {"line-opacity": 0.5}}, "basemap": {"geometry_type": "raster"}, "lidar_basemap": {"geometry_type": "raster", "opacity": 0.0, "qgis_opacity": 1.0}, "usgs_hillshade": {"geometry_type": "wms", "wms_url": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer", "wms_layer": "3DEPElevation:Hillshade Gray", "wms_format": "image/png", "opacity": 0.5}, "roads": {"geometry_type": "linestring", "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0], "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)", "qgis_width_scale": 4.0, "interaction": "interface", "vector_width": true, "editable_columns": [{"name": "name", "type": "string", "default": "Road"}, {"name": "STREETTYPE", "type": "radio", "values": [{"STREETTYPE": "RD", "vector_width": 15}, {"STREETTYPE": "ST", "vector_width": 10}, {"STREETTYPE": "Other", "vector_width": 8}], "default": {"STREETTYPE": "ST", "vector_width": 10}}]}, "roads_lrs": {"geometry_type": "linestring", "color": [255, 140, 0], "interaction": "interface", "show_attributes": true, "editable_columns": [{"name": "m_start", "type": "string", "default": ""}, {"name": "m_end", "type": "string", "default": ""}], "paint": {"line-color": ["interpolate", ["linear"], ["min", ["coalesce", ["get", "m_start"], 14000], ["coalesce", ["get", "m_end"], 14000]], 0, "#00c800", 5000, "#ffff00", 9000, "#ffa500", 13000, "#c80000", 14000, "#888888"], "line-width": 5, "line-opacity": 0.85}}, "lrs_markers": {"geometry_type": "point", "color": [255, 255, 255], "fill_color": [50, 50, 50], "add_labels": true, "symbol": {"png": "map_marker.png"}, "icon-size": 1.5, "icon-anchor": "bottom", "interaction": "interface", "show_attributes": true, "editable_columns": [{"name": "name", "type": "string", "default": ""}, {"name": "d_m", "type": "string", "default": ""}, {"name": "d_km", "type": "string", "default": ""}]}, "lpss": {"geometry_type": "point", "color": [0, 155, 50], "add_labels": true, "access": ["admin"]}, "poi": {"geometry_type": "point", "color": [20, 155, 200], "add_labels": true, "access": ["admin"], "editable_columns": [{"name": "name", "type": "string", "default": ""}], "interaction": "interface"}, "creeks": {"geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200], "qgis_width_scale": 4.0, "interaction": "interface", "vector_width": true}, "watertanks": {"geometry_type": "point", "add_labels": true, "color": [50, 50, 250], "fill_color": [0, 0, 250], "symbol": {"png": "watertank.png", "icon": "custom/octy"}, "icon-size": 1.0, "show_attributes": true, "interaction": "interface", "editable_columns": [{"name": "capacity", "type": "string", "default": ""}, {"name": "access", "type": "string", "default": "no"}, {"name": "fitting", "type": "string", "default": "no"}]}, "ponds": {"geometry_type": "polygon", "color": [50, 50, 250], "fill_color": [0, 0, 250], "add_labels": true, "icon_if": {"property": "accessible", "value": "yes", "icon": "basic/pushpin"}, "symbol": {"png": "waterdrop.png", "icon": "basic/pushpin"}, "icon-size": 2.0, "interaction": "interface", "editable_columns": [{"name": "name", "type": "string", "default": ""}, {"name": "accessible", "type": "radio", "values": [{"accessible": "yes"}, {"accessible": "no"}], "default": {"accessible": "no"}}, {"name": "size", "type": "radio", "values": [{"size": "> 500k gals.", "capacity": 500}, {"size": "100k-500k gals", "capacity": 100}, {"size": "10k-100k gals", "capacity": 10}, {"size": "< 10k gals", "capacity": 0}], "default": {"size": "10k-100k gals", "capacity": 10}}]}, "buildings": {"geometry_type": "polygon", "color": [240, 0, 0], "fill_color": [250, 0, 0], "add_labels": true, "label_deduplicate": true, "interaction": "interface"}, "gazetteer_regions": {"geometry_type": "polygon", "color": [50, 50, 50], "interaction": "interface", "access": ["admin"]}, "addresses": {"geometry_type": "polygon", "color": [255, 0, 0]}, "parcels": {"geometry_type": "polygon", "color": [255, 0, 0, 0.3], "fill_color": [0, 0, 0, 0]}, "hydrants": {"geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255], "add_labels": true, "interaction": "interface", "symbol": {"png": "hydrant.png", "icon": "basic/pushpin"}, "icon-size": 1.5}, "photos": {"geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255], "add_labels": true, "label_background": true, "editable_columns": [{"name": "name", "type": "string", "default": "Notes and Comments go here."}], "symbol": {"png": "camera.png", "icon": "camera"}, "icon-size": 1.0, "access": ["admin"], "interaction": "interface"}, "private_notes": {"geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255], "add_labels": true, "label_background": true, "editable_columns": [{"name": "name", "type": "string", "default": "Notes and Comments go here."}], "symbol": {"png": "eye.png", "icon": "eye"}, "icon-size": 1.0, "access": ["admin"], "interaction": "interface"}, "hazards": {"geometry_type": "point", "color": [255, 0, 0], "fill_color": [255, 255, 255], "add_labels": true, "label_background": true, "editable_columns": [{"name": "name", "type": "string", "default": "Notes and Comments go here."}], "symbol": {"png": "incident.png", "icon": "basic/pushpin"}, "icon-size": 1.0, "access": ["public", "internal", "admin"], "interaction": "interface"}}, "assets": {"dem": {"type": "inlet", "out_layer": "elevation", "config_def": "opentopo_dem"}, "gdal_contours": {"type": "eddy", "in_layer": "elevation", "out_layer": "contours", "config_def": "gdal_contours"}, "derived_hillshade": {"type": "eddy", "in_layer": "elevation", "out_layer": "basemap", "config_def": "derived_hillshade"}, "local_hillshade": {"type": "inlet", "out_layer": "lidar_basemap", "config_def": "local_hillshade"}, "hillshade_tiles": {"type": "eddy", "in_layer": "lidar_basemap", "out_layer": "hillshade_tiles", "config_def": "hillshade_tiles"}, "3dview": {"type": "outlet", "name": "3dview", "config_def": "3dview", "access": ["public", "internal", "admin"]}, "public_poi": {"type": "inlet", "out_layer": "poi", "config_def": "osm_poi"}, "public_buildings": {"type": "inlet", "out_layer": "buildings", "config_def": "overture_buildings"}, "public_addresses": {"type": "inlet", "out_layer": "parcels", "config_def": "overture_addresses"}, "oa_parcels": {"type": "inlet", "out_layer": "parcels", "config_def": "local_humboldt_parcels"}, "public_roads": {"type": "inlet", "out_layer": "roads", "config_def": "overture_roads"}, "humtrans_roads": {"type": "inlet", "out_layer": "roads", "config_def": "humtrans_roads"}, "public_creeks": {"type": "inlet", "out_layer": "creeks", "config_def": "nhd_creeks"}, "local_watertanks": {"type": "inlet", "out_layer": "watertanks", "config_def": "local_watertanks"}, "local_ponds": {"type": "inlet", "out_layer": "ponds", "config_def": "local_ponds"}, "local_lpss": {"type": "inlet", "out_layer": "lpss", "config_def": "local_lpss"}, "local_turnouts": {"type": "inlet", "out_layer": "turnouts", "config_def": "local_turnouts"}, "webmap": {"type": "outlet", "name": "webmap", "in_layers": ["basemap", "ponds", "contours", "roads", "roads_lrs", "lrs_markers", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "hazards"], "hidden_layers": ["lpss", "roads_lrs", "lrs_markers"], "config_def": "webmap", "access": ["public", "internal", "admin"]}, "private_webmap": {"type": "outlet", "name": "private_webmap", "in_layers": ["basemap", "ponds", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "photos", "private_notes", "hazards"], "hidden_layers": ["lpss"], "config_def": "webmap", "access": ["admin", "technical"]}, "spreadsheet_export": {"type": "outlet", "name": "spreadsheet_export", "config_def": "gsheet_export", "in_layers": ["ponds", "poi"]}, "webedit": {"type": "outlet", "name": "webedit", "in_layers": ["basemap", "lidar_basemap", "roads", "creeks", "buildings", "hydrants", "poi", "ponds", "watertanks", "photos", "private_notes", "hazards", "lrs_markers"], "config_def": "webedit"}, "runbook": {"type": "outlet", "name": "runbook", "config_def": "qgis_runbook", "base_url": "individual_pages", "regions_layer": "regions", "feature_scale": 0.5, "blend_percent": 50, "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds"], "access": ["technical"], "regions": []}, "private_runbook": {"type": "outlet", "name": "private_runbook", "config_def": "qgis_runbook", "base_url": "individual_pages", "regions_layer": "regions", "feature_scale": 0.5, "blend_percent": 50, "in_layers": ["lidar_basemap", "basemap", "contours", "roads", "creeks", "buildings", "hydrants", "watertanks", "poi", "lpss", "ponds", "photos"], "access": ["technical"]}, "html": {"type": "outlet", "name": "html", "config_def": "static_html"}, "sqldb": {"type": "outlet", "config_def": "sqldb", "layers": ["basemap", "roads", "creeks"]}, "sqlquery": {"type": "outlet", "name": "sqlquery", "config_def": "sqlquery", "access": ["technical"]}, "gazetteer_grid": {"type": "inlet", "out_layer": "gazetteer_regions", "config_def": "gazetteer_grid", "num_cols": 6}, "gazetteer": {"type": "outlet", "name": "gazetteer", "config_def": "qgis_gazetteer", "base_url": "individual_pages", "regions_layer": "gazetteer_regions", "feature_scale": 0.5, "blend_percent": 40, "in_layers": ["lidar_basemap", "contours", "roads", "creeks", "ponds", "buildings", "lpss", "poi", "hydrants", "hazards", "watertanks"], "access": ["public", "internal", "admin"], "multipage_pdf": false, "grid_layers": ["lidar_basemap", "roads", "creeks", "ponds"], "grid_feature_scale": 5.0}, "notebook": {"type": "outlet", "name": "notebook", "config_def": "jupyter_notebook", "access": ["technical"]}, "road_lrs": {"type": "eddy", "config_def": "road_lrs", "lrs_anchor_coordinates": [40.205889035286134, -123.89681666989158]}, "road_lrs_markers": {"type": "eddy", "config_def": "road_lrs_markers", "road_names": ["Thomas", "Upper Samuels Ranch", "Lower Samuels Ranch", "Flicker", "Early Ranch", "Upper Thomas", "Lower Thomas", "Serendipity"]}}}, "geometry": {"coordinates": [[[-123.99695934595182, 40.16], [-123.83251148547124, 40.16], [-123.83251148547124, 40.26], [-123.99695934595182, 40.26], [-123.99695934595182, 40.16]]], "type": "Polygon"}}]}
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "scvfd",
+        "app_url": "https://fireatlas.org:9000",
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data/",
+        "versioned_outlets": [
+          "html",
+          "webmap",
+          "private_webmap",
+          "webedit",
+          "gazetteer"
+        ],
+        "admin_emails": [
+          "gateless@gmail.com",
+          "planephun@gmail.com"
+        ],
+        "email_photo_default_layer": "photos",
+        "base_url": "https://fireatlas.org/scvfd",
+        "port": 9000,
+        "logo_url": "https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png",
+        "config_only": false,
+        "layers": {
+          "regions": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              50,
+              50
+            ],
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ]
+          },
+          "elevation": {
+            "geometry_type": "raster"
+          },
+          "terrain_dem": {
+            "geometry_type": "raster"
+          },
+          "hillshade_tiles": {
+            "geometry_type": "raster"
+          },
+          "terrain_rgb_tiles": {
+            "geometry_type": "raster"
+          },
+          "contours": {
+            "geometry_type": "linestring",
+            "color": [
+              240,
+              255,
+              240
+            ],
+            "constant_width": 4,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "paint": {
+              "line-opacity": 0.5
+            }
+          },
+          "basemap": {
+            "geometry_type": "raster"
+          },
+          "lidar_basemap": {
+            "geometry_type": "raster",
+            "opacity": 0.0,
+            "qgis_opacity": 1.0
+          },
+          "usgs_hillshade": {
+            "geometry_type": "wms",
+            "wms_url": "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer",
+            "wms_layer": "3DEPElevation:Hillshade Gray",
+            "wms_format": "image/png",
+            "opacity": 0.5
+          },
+          "roads": {
+            "geometry_type": "linestring",
+            "color": [
+              20,
+              20,
+              20
+            ],
+            "add_labels": true,
+            "label_color": [
+              220,
+              0,
+              0
+            ],
+            "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+            "qgis_width_scale": 4.0,
+            "interaction": "interface",
+            "vector_width": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 15
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 10
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 8
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "ST",
+                  "vector_width": 10
+                }
+              }
+            ]
+          },
+          "roads_lrs": {
+            "geometry_type": "linestring",
+            "color": [
+              255,
+              140,
+              0
+            ],
+            "interaction": "interface",
+            "show_attributes": true,
+            "editable_columns": [
+              {
+                "name": "m_start",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "m_end",
+                "type": "string",
+                "default": ""
+              }
+            ],
+            "paint": {
+              "line-color": [
+                "interpolate",
+                [
+                  "linear"
+                ],
+                [
+                  "min",
+                  [
+                    "coalesce",
+                    [
+                      "get",
+                      "m_start"
+                    ],
+                    14000
+                  ],
+                  [
+                    "coalesce",
+                    [
+                      "get",
+                      "m_end"
+                    ],
+                    14000
+                  ]
+                ],
+                0,
+                "#00c800",
+                5000,
+                "#ffff00",
+                9000,
+                "#ffa500",
+                13000,
+                "#c80000",
+                14000,
+                "#888888"
+              ],
+              "line-width": 5,
+              "line-opacity": 0.85
+            }
+          },
+          "lrs_markers": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              255,
+              255
+            ],
+            "fill_color": [
+              50,
+              50,
+              50
+            ],
+            "add_labels": true,
+            "symbol": {
+              "png": "map_marker.png"
+            },
+            "icon-size": 1.5,
+            "icon-anchor": "bottom",
+            "interaction": "interface",
+            "show_attributes": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "d_m",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "d_km",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "lpss": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              155,
+              50
+            ],
+            "add_labels": true,
+            "access": [
+              "admin"
+            ]
+          },
+          "poi": {
+            "geometry_type": "point",
+            "color": [
+              20,
+              155,
+              200
+            ],
+            "add_labels": true,
+            "access": [
+              "admin"
+            ],
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              }
+            ],
+            "interaction": "interface"
+          },
+          "creeks": {
+            "geometry_type": "linestring",
+            "add_labels": true,
+            "color": [
+              50,
+              50,
+              200
+            ],
+            "qgis_width_scale": 4.0,
+            "interaction": "interface",
+            "vector_width": true
+          },
+          "watertanks": {
+            "geometry_type": "point",
+            "add_labels": true,
+            "color": [
+              50,
+              50,
+              250
+            ],
+            "fill_color": [
+              0,
+              0,
+              250
+            ],
+            "symbol": {
+              "png": "watertank.png",
+              "icon": "custom/octy"
+            },
+            "icon-size": 1.0,
+            "show_attributes": true,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "capacity",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "access",
+                "type": "string",
+                "default": "no"
+              },
+              {
+                "name": "fitting",
+                "type": "string",
+                "default": "no"
+              }
+            ]
+          },
+          "ponds": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              50,
+              250
+            ],
+            "fill_color": [
+              0,
+              0,
+              250
+            ],
+            "add_labels": true,
+            "icon_if": {
+              "property": "accessible",
+              "value": "yes",
+              "icon": "basic/pushpin"
+            },
+            "symbol": {
+              "png": "waterdrop.png",
+              "icon": "basic/pushpin"
+            },
+            "icon-size": 2.0,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "accessible",
+                "type": "radio",
+                "values": [
+                  {
+                    "accessible": "yes"
+                  },
+                  {
+                    "accessible": "no"
+                  }
+                ],
+                "default": {
+                  "accessible": "no"
+                }
+              },
+              {
+                "name": "size",
+                "type": "radio",
+                "values": [
+                  {
+                    "size": "> 500k gals.",
+                    "capacity": 500
+                  },
+                  {
+                    "size": "100k-500k gals",
+                    "capacity": 100
+                  },
+                  {
+                    "size": "10k-100k gals",
+                    "capacity": 10
+                  },
+                  {
+                    "size": "< 10k gals",
+                    "capacity": 0
+                  }
+                ],
+                "default": {
+                  "size": "10k-100k gals",
+                  "capacity": 10
+                }
+              }
+            ]
+          },
+          "buildings": {
+            "geometry_type": "polygon",
+            "color": [
+              240,
+              0,
+              0
+            ],
+            "fill_color": [
+              250,
+              0,
+              0
+            ],
+            "add_labels": true,
+            "label_deduplicate": true,
+            "interaction": "interface"
+          },
+          "gazetteer_regions": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              50,
+              50
+            ],
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ]
+          },
+          "addresses": {
+            "geometry_type": "polygon",
+            "color": [
+              255,
+              0,
+              0
+            ]
+          },
+          "parcels": {
+            "geometry_type": "polygon",
+            "color": [
+              255,
+              0,
+              0,
+              0.3
+            ],
+            "fill_color": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "hydrants": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "symbol": {
+              "png": "hydrant.png",
+              "icon": "basic/pushpin"
+            },
+            "icon-size": 1.5
+          },
+          "photos": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "label_background": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Notes and Comments go here."
+              }
+            ],
+            "symbol": {
+              "png": "camera.png",
+              "icon": "camera"
+            },
+            "icon-size": 1.0,
+            "access": [
+              "admin"
+            ],
+            "interaction": "interface"
+          },
+          "private_notes": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "label_background": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Notes and Comments go here."
+              }
+            ],
+            "symbol": {
+              "png": "eye.png",
+              "icon": "eye"
+            },
+            "icon-size": 1.0,
+            "access": [
+              "admin"
+            ],
+            "interaction": "interface"
+          },
+          "hazards": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "label_background": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Notes and Comments go here."
+              }
+            ],
+            "symbol": {
+              "png": "incident.png",
+              "icon": "basic/pushpin"
+            },
+            "icon-size": 1.0,
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "interaction": "interface"
+          }
+        },
+        "assets": {
+          "dem": {
+            "type": "inlet",
+            "out_layer": "elevation",
+            "config_def": "opentopo_dem"
+          },
+          "gdal_contours": {
+            "type": "eddy",
+            "in_layer": "elevation",
+            "out_layer": "contours",
+            "config_def": "gdal_contours"
+          },
+          "derived_hillshade": {
+            "type": "eddy",
+            "in_layer": "elevation",
+            "out_layer": "basemap",
+            "config_def": "derived_hillshade"
+          },
+          "local_hillshade": {
+            "type": "inlet",
+            "out_layer": "lidar_basemap",
+            "config_def": "local_hillshade"
+          },
+          "hillshade_tiles": {
+            "type": "eddy",
+            "in_layer": "lidar_basemap",
+            "out_layer": "hillshade_tiles",
+            "config_def": "hillshade_tiles"
+          },
+          "3dview": {
+            "type": "outlet",
+            "name": "3dview",
+            "config_def": "3dview",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ]
+          },
+          "public_poi": {
+            "type": "inlet",
+            "out_layer": "poi",
+            "config_def": "osm_poi"
+          },
+          "public_buildings": {
+            "type": "inlet",
+            "out_layer": "buildings",
+            "config_def": "overture_buildings"
+          },
+          "public_addresses": {
+            "type": "inlet",
+            "out_layer": "parcels",
+            "config_def": "overture_addresses"
+          },
+          "oa_parcels": {
+            "type": "inlet",
+            "out_layer": "parcels",
+            "config_def": "local_humboldt_parcels"
+          },
+          "public_roads": {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "overture_roads"
+          },
+          "humtrans_roads": {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "humtrans_roads"
+          },
+          "public_creeks": {
+            "type": "inlet",
+            "out_layer": "creeks",
+            "config_def": "nhd_creeks"
+          },
+          "local_watertanks": {
+            "type": "inlet",
+            "out_layer": "watertanks",
+            "config_def": "local_watertanks"
+          },
+          "local_ponds": {
+            "type": "inlet",
+            "out_layer": "ponds",
+            "config_def": "local_ponds"
+          },
+          "local_lpss": {
+            "type": "inlet",
+            "out_layer": "lpss",
+            "config_def": "local_lpss"
+          },
+          "local_turnouts": {
+            "type": "inlet",
+            "out_layer": "turnouts",
+            "config_def": "local_turnouts"
+          },
+          "webmap": {
+            "type": "outlet",
+            "name": "webmap",
+            "in_layers": [
+              "basemap",
+              "ponds",
+              "contours",
+              "roads",
+              "roads_lrs",
+              "lrs_markers",
+              "creeks",
+              "buildings",
+              "hydrants",
+              "watertanks",
+              "poi",
+              "lpss",
+              "hazards"
+            ],
+            "hidden_layers": [
+              "lpss",
+              "roads_lrs",
+              "lrs_markers"
+            ],
+            "config_def": "webmap",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ]
+          },
+          "private_webmap": {
+            "type": "outlet",
+            "name": "private_webmap",
+            "in_layers": [
+              "basemap",
+              "ponds",
+              "contours",
+              "roads",
+              "creeks",
+              "buildings",
+              "hydrants",
+              "watertanks",
+              "poi",
+              "lpss",
+              "photos",
+              "private_notes",
+              "hazards"
+            ],
+            "hidden_layers": [
+              "lpss"
+            ],
+            "config_def": "webmap",
+            "access": [
+              "admin",
+              "technical"
+            ]
+          },
+          "spreadsheet_export": {
+            "type": "outlet",
+            "name": "spreadsheet_export",
+            "config_def": "gsheet_export",
+            "in_layers": [
+              "ponds",
+              "poi"
+            ]
+          },
+          "webedit": {
+            "type": "outlet",
+            "name": "webedit",
+            "in_layers": [
+              "basemap",
+              "lidar_basemap",
+              "roads",
+              "creeks",
+              "buildings",
+              "hydrants",
+              "poi",
+              "ponds",
+              "watertanks",
+              "photos",
+              "private_notes",
+              "hazards",
+              "lrs_markers"
+            ],
+            "config_def": "webedit"
+          },
+          "runbook": {
+            "type": "outlet",
+            "name": "runbook",
+            "config_def": "qgis_runbook",
+            "base_url": "individual_pages",
+            "regions_layer": "regions",
+            "feature_scale": 0.5,
+            "blend_percent": 50,
+            "in_layers": [
+              "lidar_basemap",
+              "basemap",
+              "contours",
+              "roads",
+              "creeks",
+              "buildings",
+              "hydrants",
+              "watertanks",
+              "poi",
+              "lpss",
+              "ponds"
+            ],
+            "access": [
+              "technical"
+            ],
+            "regions": []
+          },
+          "private_runbook": {
+            "type": "outlet",
+            "name": "private_runbook",
+            "config_def": "qgis_runbook",
+            "base_url": "individual_pages",
+            "regions_layer": "regions",
+            "feature_scale": 0.5,
+            "blend_percent": 50,
+            "in_layers": [
+              "lidar_basemap",
+              "basemap",
+              "contours",
+              "roads",
+              "creeks",
+              "buildings",
+              "hydrants",
+              "watertanks",
+              "poi",
+              "lpss",
+              "ponds",
+              "photos"
+            ],
+            "access": [
+              "technical"
+            ]
+          },
+          "html": {
+            "type": "outlet",
+            "name": "html",
+            "config_def": "static_html"
+          },
+          "sqldb": {
+            "type": "outlet",
+            "config_def": "sqldb",
+            "layers": [
+              "basemap",
+              "roads",
+              "creeks"
+            ]
+          },
+          "sqlquery": {
+            "type": "outlet",
+            "name": "sqlquery",
+            "config_def": "sqlquery",
+            "access": [
+              "technical"
+            ]
+          },
+          "gazetteer_grid": {
+            "type": "inlet",
+            "out_layer": "gazetteer_regions",
+            "config_def": "gazetteer_grid",
+            "num_cols": 6
+          },
+          "gazetteer": {
+            "type": "outlet",
+            "name": "gazetteer",
+            "config_def": "qgis_gazetteer",
+            "base_url": "individual_pages",
+            "regions_layer": "gazetteer_regions",
+            "feature_scale": 0.5,
+            "blend_percent": 40,
+            "in_layers": [
+              "lidar_basemap",
+              "contours",
+              "roads",
+              "creeks",
+              "ponds",
+              "buildings",
+              "lpss",
+              "poi",
+              "hydrants",
+              "hazards",
+              "watertanks"
+            ],
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "multipage_pdf": false,
+            "grid_layers": [
+              "lidar_basemap",
+              "roads",
+              "creeks",
+              "ponds"
+            ],
+            "grid_feature_scale": 5.0
+          },
+          "notebook": {
+            "type": "outlet",
+            "name": "notebook",
+            "config_def": "jupyter_notebook",
+            "access": [
+              "technical"
+            ]
+          },
+          "road_lrs": {
+            "type": "eddy",
+            "config_def": "road_lrs",
+            "lrs_anchor_coordinates": [
+              40.205889035286134,
+              -123.89681666989158
+            ]
+          },
+          "road_lrs_markers": {
+            "type": "eddy",
+            "config_def": "road_lrs_markers",
+            "road_names": [
+              "Thomas",
+              "Upper Samuels Ranch",
+              "Lower Samuels Ranch",
+              "Flicker",
+              "Early Ranch",
+              "Upper Thomas",
+              "Lower Thomas",
+              "Serendipity"
+            ]
+          },
+          "console": {
+            "type": "outlet",
+            "name": "console",
+            "config_def": "console"
+          }
+        }
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              -123.99695934595182,
+              40.16
+            ],
+            [
+              -123.83251148547124,
+              40.16
+            ],
+            [
+              -123.83251148547124,
+              40.26
+            ],
+            [
+              -123.99695934595182,
+              40.26
+            ],
+            [
+              -123.99695934595182,
+              40.16
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    }
+  ]
+}

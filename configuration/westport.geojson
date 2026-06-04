@@ -1,1 +1,1070 @@
-{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"westport","app_url":"https://fireatlas.org:9000","data_root":"/root/swales_dev","shared_dir":"/root/data/","versioned_outlets":["html","webmap"],"admin_emails":["westportfire1@gmail.com","tim@caflc.dev","gateless@gmail.com"],"email_photo_default_layer":"private_notes","base_url":"https://fireatlas.org/westport","port":9000,"logo_url":"https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png","layers":{"regions":{"geometry_type":"polygon","color":[50,50,50],"interaction":"interface","access":["admin"],"fill_opacity":0.2,"editable_columns":[{"name":"name","type":"string","default":"unique name"},{"name":"description","type":"string","default":"Text describing the region"},{"name":"caption","type":"string","default":"Displayed Title"}]},"sites":{"geometry_type":"polygon","color":[0,150,255],"interaction":"interface","access":["admin"],"fill_opacity":0.4,"editable_columns":[{"name":"name","type":"string","default":"unique name"},{"name":"description","type":"string","default":"Text describing the region"},{"name":"caption","type":"string","default":"Displayed Title"},{"name":"URL","type":"string","default":""}]},"landslides":{"geometry_type":"polygon","color":[209,93,4],"fill_color":[209,93,4],"interaction":"interface","access":["public","internal","admin"],"fill_opacity":0.5},"tsunami_fillcolor":{"geometry_type":"polygon","color":[0,0,255],"fill_color":"none","fill_opacity":0.15},"tsunami":{"geometry_type":"polygon","fill_color":[0,0,250],"fill_opacity":0.2},"elevation":{"geometry_type":"raster"},"contours":{"geometry_type":"linestring","color":[50,200,50],"vis":{"minzoom":14,"maxzoom":22}},"basemap":{"geometry_type":"raster"},"terrain_dem":{"geometry_type":"raster"},"hillshade_tiles":{"geometry_type":"raster"},"terrain_rgb_tiles":{"geometry_type":"raster"},"lidar_basemap":{"geometry_type":"raster"},"roads_primary":{"geometry_type":"linestring","color":[219,0,0],"add_labels":true,"interaction":"interface","vector_width":true,"vis":{"minzoom":10,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"},{"name":"STREETTYPE","type":"radio","values":[{"STREETTYPE":"RD","vector_width":10},{"STREETTYPE":"ST","vector_width":10},{"STREETTYPE":"Other","vector_width":10}],"default":{"STREETTYPE":"RD","vector_width":8}}]},"roads_secondary":{"geometry_type":"linestring","color":[224,54,2],"add_labels":true,"interaction":"interface","vector_width":true,"vis":{"minzoom":13,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"},{"name":"STREETTYPE","type":"radio","values":[{"STREETTYPE":"RD","vector_width":7},{"STREETTYPE":"ST","vector_width":7},{"STREETTYPE":"Other","vector_width":7}],"default":{"STREETTYPE":"RD","vector_width":7}}]},"roads_tertiary":{"geometry_type":"linestring","color":[196,107,12],"add_labels":true,"interaction":"interface","vector_width":true,"vis":{"minzoom":16,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"},{"name":"STREETTYPE","type":"radio","values":[{"STREETTYPE":"RD","vector_width":5},{"STREETTYPE":"ST","vector_width":5},{"STREETTYPE":"Other","vector_width":5}],"default":{"STREETTYPE":"RD","vector_width":5}}]},"roads_candidates":{"geometry_type":"linestring","color":[196,107,72],"add_labels":true,"interaction":"interface","vector_width":true,"vis":{"minzoom":13,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"},{"name":"STREETTYPE","type":"radio","values":[{"STREETTYPE":"RD","vector_width":5},{"STREETTYPE":"ST","vector_width":5},{"STREETTYPE":"Other","vector_width":5}],"default":{"STREETTYPE":"RD","vector_width":5}}]},"creeks":{"geometry_type":"linestring","add_labels":true,"color":[50,50,200],"interaction":"interface","vector_width":true,"label_repeat_distance":1000,"deduplicate_labels":true,"rotate_labels":false,"labels_avoid_features":false,"avoid_label_collisions":true,"editable_columns":[{"name":"name","type":"string","default":"Road"}]},"campgrounds":{"geometry_type":"point","color":[0,0,255],"add_labels":true,"symbol":{"png":"tent.png","icon":"basic/triangle"},"vis":{"minzoom":17,"maxzoom":22},"icon-size":1.0,"interaction":"interface","editable_columns":[{"name":"name","type":"string","default":"Road"}]},"milemarkers":{"geometry_type":"point","color":[0,200,0],"add_labels":true,"max_labels":100,"vis":{"minzoom":14,"maxzoom":22},"symbol":{"png":"milemarker.png","icon":"basic/marker"},"icon-size":3.0,"icon-anchor":"bottom"},"bridges":{"geometry_type":"point","color":[0,200,0],"add_labels":true,"max_labels":100,"vis":{"minzoom":14,"maxzoom":22},"symbol":{"png":"bridge.png","icon":"basic/marker"},"icon-size":3.0,"icon-anchor":"bottom"},"private_bridges":{"geometry_type":"point","color":[0,200,0],"add_labels":true,"max_labels":100,"vis":{"minzoom":14,"maxzoom":22},"symbol":{"png":"bridge.png","icon":"basic/marker"},"icon-size":3.0,"icon-anchor":"bottom"},"powerlines":{"geometry_type":"linestring","add_labels":true,"constant_width":5,"color":[250,250,0],"interaction":"interface","vector_width":true,"label_repeat_distance":1000,"deduplicate_labels":true,"rotate_labels":false,"labels_avoid_features":false,"avoid_label_collisions":true},"helilandings":{"geometry_type":"point","color":[0,255,0],"add_labels":true,"vis":{"minzoom":14,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"}],"symbol":{"png":"helipad.png","icon":"custom/helipad"},"icon-size":3.0,"access":["internal","admin"],"interaction":"interface"},"incidents":{"geometry_type":"point","color":[255,100,0],"add_labels":true,"editable_columns":[{"name":"name","type":"string","default":"Incident"}],"symbol":{"png":"incident.png","icon":"basic/pushpin"},"icon-size":3.0,"access":["internal","admin"],"interaction":"interface"},"hydrants":{"geometry_type":"point","color":[0,0,255],"vis":{"minzoom":15,"maxzoom":22},"add_labels":true,"symbol":{"png":"hydrant.png","icon":"custom/hydrant"},"icon-size":3.0,"interaction":"interface","editable_columns":[{"name":"name","type":"string","default":"Road"}]},"natural":{"geometry_type":"point","color":[0,200,55],"add_labels":true,"icon-size":0.05,"interaction":"interface"},"buildings":{"geometry_type":"polygon","color":[0,0,0],"fill_color":[255,0,0],"add_labels":true,"interaction":"interface","deduplicate_labels":true,"vis":{"minzoom":14,"maxzoom":22},"editable_columns":[{"name":"name","type":"string","default":"Road"}]},"addresses":{"geometry_type":"polygon","color":[255,0,0]},"parcels":{"geometry_type":"polygon","color":[255,0,0,0.3],"fill_color":[255,0,0,0.3]},"private_notes":{"geometry_type":"point","color":[255,0,0],"fill_color":[255,255,255],"add_labels":true,"label_background":true,"editable_columns":[{"name":"name","type":"string","default":"Notes and Comments go here."}],"symbol":{"png":"incident.png","icon":"basic/pushpin"},"icon-size":2.0,"access":["admin"],"interaction":"interface"}},"assets":{"dem":{"type":"inlet","out_layer":"elevation","config_def":"opentopo_dem"},"gdal_contours":{"type":"eddy","in_layer":"elevation","out_layer":"contours","config_def":"gdal_contours"},"terrain_dem":{"type":"inlet","out_layer":"terrain_dem","config_def":"terrain_dem"},"derived_hillshade":{"type":"eddy","in_layer":"terrain_dem","out_layer":"basemap","config_def":"derived_hillshade"},"hillshade_tiles":{"type":"eddy","in_layer":"basemap","out_layer":"hillshade_tiles","config_def":"hillshade_tiles"},"3dview":{"type":"outlet","name":"3dview","config_def":"3dview","access":["public","internal","admin"],"in_layers":["regions","sites","landslides","tsunami","contours","roads_primary","roads_secondary","roads_tertiary","creeks","milemarkers","bridges","powerlines","helilandings","incidents","hydrants","natural","buildings","addresses","parcels","private_notes"]},"public_buildings":{"type":"inlet","out_layer":"buildings","config_def":"overture_buildings"},"public_addresses":{"type":"inlet","out_layer":"parcels","config_def":"overture_addresses"},"oa_parcels":{"type":"inlet","out_layer":"parcels","config_def":"local_parcels"},"local_tsunami":{"type":"inlet","out_layer":"tsunami","config_def":"local_tsunami"},"public_roads":{"type":"inlet","out_layer":"roads_secondary","config_def":"overture_roads"},"internal_roads_primary":{"type":"inlet","inpath_template":"westport_primary_roads.geojson","out_layer":"roads_primary","config_def":"internal_roads"},"internal_roads_secondary":{"type":"inlet","out_layer":"roads_secondary","config_def":"internal_roads"},"internal_roads_tertiary":{"type":"inlet","out_layer":"roads_tertiary","config_def":"internal_roads"},"public_creeks":{"type":"inlet","out_layer":"creeks","config_def":"nhd_creeks","filter":[["require","fcode_description",["Stream/River: Hydrographic Category = Perennial"]]]},"local_hillshade":{"type":"inlet","out_layer":"lidar_basemap","config_def":"local_hillshade"},"opentopo_dem":{"type":"inlet","out_layer":"basemap","config_def":"opentopo_dem"},"local_helilandings":{"type":"inlet","out_layer":"helilandings","config_def":"local_helilandings"},"local_incidents":{"type":"inlet","out_layer":"incidents","config_def":"local_incidents"},"local_hydrants":{"type":"inlet","out_layer":"hydrants","config_def":"local_hydrants"},"local_campgrounds":{"type":"inlet","out_layer":"campgrounds","config_def":"local_campgrounds"},"local_turnouts":{"type":"inlet","out_layer":"turnouts","config_def":"local_turnouts"},"local_milemarkers":{"type":"inlet","out_layer":"milemarkers","config_def":"local_milemarkers"},"webmap":{"type":"outlet","name":"webmap","in_layers":["basemap","regions","sites","tsunami","landslides","contours","roads_primary","roads_secondary","roads_tertiary","powerlines","bridges","private_bridges","milemarkers","creeks","buildings","natural","helilandings","hydrants","campgrounds"],"config_def":"webmap","access":["public","internal","admin"]},"webedit":{"type":"outlet","name":"webedit","in_layers":["basemap","contours","roads_primary","roads_secondary","roads_tertiary","milemarkers","creeks","buildings","natural","helilandings","hydrants","campgrounds","private_notes"],"config_def":"webedit"},"config_edit":{"type":"outlet","name":"config_edit","access":["technical"],"interaction":"interface","config_def":"config_editor"},"private_webmap":{"type":"outlet","name":"private_webmap","in_layers":["basemap","sites","tsunami","contours","roads_primary","roads_secondary","roads_tertiary","roads_candidates","milemarkers","creeks","buildings","natural","helilandings","hydrants","campgrounds","private_notes"],"config_def":"webmap","access":["admin","technical"]},"notebook":{"type":"outlet","name":"notebook","config_def":"jupyter_notebook","access":["technical"]},"runbook":{"type":"outlet","name":"runbook","config_def":"qgis_runbook","base_url":"individual_pages","regions_layer":"regions","in_layers":["lidar_basemap","contours","roads_primary","creeks","buildings","helilandings","milemarkers","hydrants","campgrounds","roads_secondary","roads_tertiary","private_notes"],"access":["public","internal","admin"],"feature_scale":0.5,"blend_percent":50,"regions":[{"bbox":{"east":-121.19978063408502,"west":-121.20391109005016,"south":39.23863749098538,"north":39.24416744687048},"name":"RockLoop","caption":"Double loop with Ginger and big rocks.","vectors":[],"raster":"","text":"Hwy20 to the County Lnie"},{"bbox":{"east":-121.19978063408502,"west":-121.20391109005016,"south":39.23863749098538,"north":39.24416744687048},"name":"GolfCourses","caption":"Golf Courses","vectors":[],"raster":"","text":"Golf Courses"}]},"html":{"type":"outlet","name":"html","config_def":"static_html"},"sqldb":{"type":"outlet","config_def":"sqldb","layers":["basemap","roads_secondary","creeks"]},"sqlquery":{"type":"outlet","name":"sqlquery","config_def":"sqlquery","access":["technical"]},"spreadsheet_export":{"type":"outlet","name":"spreadsheet_export","config_def":"gsheet_export","in_layers":["helilandings","hydrants","milemarkers"]},"private_runbook":{"type":"outlet","name":"private_runbook","access":["admin","technical"],"config_def":"qgis_runbook","base_url":"individual_pages","regions_layer":"regions","feature_scale":0.5,"in_layers":["lidar_basemap","tsunami","contours","roads_primary","roads_secondary","roads_tertiary","roads_candidates","milemarkers","creeks","buildings","campgrounds","natural","hydrants","helilandings","private_notes"]},"sitesbook":{"type":"outlet","name":"sitesbook","generate_pdf":false,"access":["internal","admin"],"config_def":"qgis_runbook","base_url":"https://scs-internal.s3.us-west-1.amazonaws.com/Sites/current_sites","regions_layer":"sites","label_property":"SCS_NAME","index_property":"scs_sites_index","in_layers":["lidar_basemap","tsunami","contours","roads_primary","roads_secondary","roads_tertiary","milemarkers","creeks","buildings","campgrounds","natural","hydrants","helilandings","private_notes"]}}},"geometry":{"coordinates":[[[-123.85333388805361,39.53857292439969],[-123.67763908625702,39.53857292439969],[-123.67763908625702,39.89595306214338],[-123.85333388805361,39.89595306214338],[-123.85333388805361,39.53857292439969]]],"type":"Polygon"}}]}
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "westport",
+        "app_url": "https://fireatlas.org:9000",
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data/",
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "admin_emails": [
+          "westportfire1@gmail.com",
+          "tim@caflc.dev",
+          "gateless@gmail.com"
+        ],
+        "email_photo_default_layer": "private_notes",
+        "base_url": "https://fireatlas.org/westport",
+        "port": 9000,
+        "logo_url": "https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png",
+        "layers": {
+          "regions": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              50,
+              50
+            ],
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "fill_opacity": 0.2,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "unique name"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "default": "Text describing the region"
+              },
+              {
+                "name": "caption",
+                "type": "string",
+                "default": "Displayed Title"
+              }
+            ]
+          },
+          "sites": {
+            "geometry_type": "polygon",
+            "color": [
+              0,
+              150,
+              255
+            ],
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "fill_opacity": 0.4,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "unique name"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "default": "Text describing the region"
+              },
+              {
+                "name": "caption",
+                "type": "string",
+                "default": "Displayed Title"
+              },
+              {
+                "name": "URL",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "landslides": {
+            "geometry_type": "polygon",
+            "color": [
+              209,
+              93,
+              4
+            ],
+            "fill_color": [
+              209,
+              93,
+              4
+            ],
+            "interaction": "interface",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "fill_opacity": 0.5
+          },
+          "tsunami_fillcolor": {
+            "geometry_type": "polygon",
+            "color": [
+              0,
+              0,
+              255
+            ],
+            "fill_color": "none",
+            "fill_opacity": 0.15
+          },
+          "tsunami": {
+            "geometry_type": "polygon",
+            "fill_color": [
+              0,
+              0,
+              250
+            ],
+            "fill_opacity": 0.2
+          },
+          "elevation": {
+            "geometry_type": "raster"
+          },
+          "contours": {
+            "geometry_type": "linestring",
+            "color": [
+              50,
+              200,
+              50
+            ],
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            }
+          },
+          "basemap": {
+            "geometry_type": "raster"
+          },
+          "terrain_dem": {
+            "geometry_type": "raster"
+          },
+          "hillshade_tiles": {
+            "geometry_type": "raster"
+          },
+          "terrain_rgb_tiles": {
+            "geometry_type": "raster"
+          },
+          "lidar_basemap": {
+            "geometry_type": "raster"
+          },
+          "roads_primary": {
+            "geometry_type": "linestring",
+            "color": [
+              219,
+              0,
+              0
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "vector_width": true,
+            "vis": {
+              "minzoom": 10,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 10
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 10
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 10
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "RD",
+                  "vector_width": 8
+                }
+              }
+            ]
+          },
+          "roads_secondary": {
+            "geometry_type": "linestring",
+            "color": [
+              224,
+              54,
+              2
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "vector_width": true,
+            "vis": {
+              "minzoom": 13,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 7
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 7
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 7
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "RD",
+                  "vector_width": 7
+                }
+              }
+            ]
+          },
+          "roads_tertiary": {
+            "geometry_type": "linestring",
+            "color": [
+              196,
+              107,
+              12
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "vector_width": true,
+            "vis": {
+              "minzoom": 16,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 5
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 5
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 5
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "RD",
+                  "vector_width": 5
+                }
+              }
+            ]
+          },
+          "roads_candidates": {
+            "geometry_type": "linestring",
+            "color": [
+              196,
+              107,
+              72
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "vector_width": true,
+            "vis": {
+              "minzoom": 13,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 5
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 5
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 5
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "RD",
+                  "vector_width": 5
+                }
+              }
+            ]
+          },
+          "creeks": {
+            "geometry_type": "linestring",
+            "add_labels": true,
+            "color": [
+              50,
+              50,
+              200
+            ],
+            "interaction": "interface",
+            "vector_width": true,
+            "label_repeat_distance": 1000,
+            "deduplicate_labels": true,
+            "rotate_labels": false,
+            "labels_avoid_features": false,
+            "avoid_label_collisions": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              }
+            ]
+          },
+          "campgrounds": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              0,
+              255
+            ],
+            "add_labels": true,
+            "symbol": {
+              "png": "tent.png",
+              "icon": "basic/triangle"
+            },
+            "vis": {
+              "minzoom": 17,
+              "maxzoom": 22
+            },
+            "icon-size": 1.0,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              }
+            ]
+          },
+          "milemarkers": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              200,
+              0
+            ],
+            "add_labels": true,
+            "max_labels": 100,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "symbol": {
+              "png": "milemarker.png",
+              "icon": "basic/marker"
+            },
+            "icon-size": 3.0,
+            "icon-anchor": "bottom"
+          },
+          "bridges": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              200,
+              0
+            ],
+            "add_labels": true,
+            "max_labels": 100,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "symbol": {
+              "png": "bridge.png",
+              "icon": "basic/marker"
+            },
+            "icon-size": 3.0,
+            "icon-anchor": "bottom"
+          },
+          "private_bridges": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              200,
+              0
+            ],
+            "add_labels": true,
+            "max_labels": 100,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "symbol": {
+              "png": "bridge.png",
+              "icon": "basic/marker"
+            },
+            "icon-size": 3.0,
+            "icon-anchor": "bottom"
+          },
+          "powerlines": {
+            "geometry_type": "linestring",
+            "add_labels": true,
+            "constant_width": 5,
+            "color": [
+              250,
+              250,
+              0
+            ],
+            "interaction": "interface",
+            "vector_width": true,
+            "label_repeat_distance": 1000,
+            "deduplicate_labels": true,
+            "rotate_labels": false,
+            "labels_avoid_features": false,
+            "avoid_label_collisions": true
+          },
+          "helilandings": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              255,
+              0
+            ],
+            "add_labels": true,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              }
+            ],
+            "symbol": {
+              "png": "helipad.png",
+              "icon": "custom/helipad"
+            },
+            "icon-size": 3.0,
+            "access": [
+              "internal",
+              "admin"
+            ],
+            "interaction": "interface"
+          },
+          "incidents": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              100,
+              0
+            ],
+            "add_labels": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Incident"
+              }
+            ],
+            "symbol": {
+              "png": "incident.png",
+              "icon": "basic/pushpin"
+            },
+            "icon-size": 3.0,
+            "access": [
+              "internal",
+              "admin"
+            ],
+            "interaction": "interface"
+          },
+          "hydrants": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              0,
+              255
+            ],
+            "vis": {
+              "minzoom": 15,
+              "maxzoom": 22
+            },
+            "add_labels": true,
+            "symbol": {
+              "png": "hydrant.png",
+              "icon": "custom/hydrant"
+            },
+            "icon-size": 3.0,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              }
+            ]
+          },
+          "natural": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              200,
+              55
+            ],
+            "add_labels": true,
+            "icon-size": 0.05,
+            "interaction": "interface"
+          },
+          "buildings": {
+            "geometry_type": "polygon",
+            "color": [
+              0,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              0,
+              0
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "deduplicate_labels": true,
+            "vis": {
+              "minzoom": 14,
+              "maxzoom": 22
+            },
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              }
+            ]
+          },
+          "addresses": {
+            "geometry_type": "polygon",
+            "color": [
+              255,
+              0,
+              0
+            ]
+          },
+          "parcels": {
+            "geometry_type": "polygon",
+            "color": [
+              255,
+              0,
+              0,
+              0.3
+            ],
+            "fill_color": [
+              255,
+              0,
+              0,
+              0.3
+            ]
+          },
+          "private_notes": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              0,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "label_background": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Notes and Comments go here."
+              }
+            ],
+            "symbol": {
+              "png": "incident.png",
+              "icon": "basic/pushpin"
+            },
+            "icon-size": 2.0,
+            "access": [
+              "admin"
+            ],
+            "interaction": "interface"
+          }
+        },
+        "assets": {
+          "dem": {
+            "type": "inlet",
+            "out_layer": "elevation",
+            "config_def": "opentopo_dem"
+          },
+          "gdal_contours": {
+            "type": "eddy",
+            "in_layer": "elevation",
+            "out_layer": "contours",
+            "config_def": "gdal_contours"
+          },
+          "terrain_dem": {
+            "type": "inlet",
+            "out_layer": "terrain_dem",
+            "config_def": "terrain_dem"
+          },
+          "derived_hillshade": {
+            "type": "eddy",
+            "in_layer": "terrain_dem",
+            "out_layer": "basemap",
+            "config_def": "derived_hillshade"
+          },
+          "hillshade_tiles": {
+            "type": "eddy",
+            "in_layer": "basemap",
+            "out_layer": "hillshade_tiles",
+            "config_def": "hillshade_tiles"
+          },
+          "3dview": {
+            "type": "outlet",
+            "name": "3dview",
+            "config_def": "3dview",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "in_layers": [
+              "regions",
+              "sites",
+              "landslides",
+              "tsunami",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "creeks",
+              "milemarkers",
+              "bridges",
+              "powerlines",
+              "helilandings",
+              "incidents",
+              "hydrants",
+              "natural",
+              "buildings",
+              "addresses",
+              "parcels",
+              "private_notes"
+            ]
+          },
+          "public_buildings": {
+            "type": "inlet",
+            "out_layer": "buildings",
+            "config_def": "overture_buildings"
+          },
+          "public_addresses": {
+            "type": "inlet",
+            "out_layer": "parcels",
+            "config_def": "overture_addresses"
+          },
+          "oa_parcels": {
+            "type": "inlet",
+            "out_layer": "parcels",
+            "config_def": "local_parcels"
+          },
+          "local_tsunami": {
+            "type": "inlet",
+            "out_layer": "tsunami",
+            "config_def": "local_tsunami"
+          },
+          "public_roads": {
+            "type": "inlet",
+            "out_layer": "roads_secondary",
+            "config_def": "overture_roads"
+          },
+          "internal_roads_primary": {
+            "type": "inlet",
+            "inpath_template": "westport_primary_roads.geojson",
+            "out_layer": "roads_primary",
+            "config_def": "internal_roads"
+          },
+          "internal_roads_secondary": {
+            "type": "inlet",
+            "out_layer": "roads_secondary",
+            "config_def": "internal_roads"
+          },
+          "internal_roads_tertiary": {
+            "type": "inlet",
+            "out_layer": "roads_tertiary",
+            "config_def": "internal_roads"
+          },
+          "public_creeks": {
+            "type": "inlet",
+            "out_layer": "creeks",
+            "config_def": "nhd_creeks",
+            "filter": [
+              [
+                "require",
+                "fcode_description",
+                [
+                  "Stream/River: Hydrographic Category = Perennial"
+                ]
+              ]
+            ]
+          },
+          "local_hillshade": {
+            "type": "inlet",
+            "out_layer": "lidar_basemap",
+            "config_def": "local_hillshade"
+          },
+          "opentopo_dem": {
+            "type": "inlet",
+            "out_layer": "basemap",
+            "config_def": "opentopo_dem"
+          },
+          "local_helilandings": {
+            "type": "inlet",
+            "out_layer": "helilandings",
+            "config_def": "local_helilandings"
+          },
+          "local_incidents": {
+            "type": "inlet",
+            "out_layer": "incidents",
+            "config_def": "local_incidents"
+          },
+          "local_hydrants": {
+            "type": "inlet",
+            "out_layer": "hydrants",
+            "config_def": "local_hydrants"
+          },
+          "local_campgrounds": {
+            "type": "inlet",
+            "out_layer": "campgrounds",
+            "config_def": "local_campgrounds"
+          },
+          "local_turnouts": {
+            "type": "inlet",
+            "out_layer": "turnouts",
+            "config_def": "local_turnouts"
+          },
+          "local_milemarkers": {
+            "type": "inlet",
+            "out_layer": "milemarkers",
+            "config_def": "local_milemarkers"
+          },
+          "webmap": {
+            "type": "outlet",
+            "name": "webmap",
+            "in_layers": [
+              "basemap",
+              "regions",
+              "sites",
+              "tsunami",
+              "landslides",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "powerlines",
+              "bridges",
+              "private_bridges",
+              "milemarkers",
+              "creeks",
+              "buildings",
+              "natural",
+              "helilandings",
+              "hydrants",
+              "campgrounds"
+            ],
+            "config_def": "webmap",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ]
+          },
+          "webedit": {
+            "type": "outlet",
+            "name": "webedit",
+            "in_layers": [
+              "basemap",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "milemarkers",
+              "creeks",
+              "buildings",
+              "natural",
+              "helilandings",
+              "hydrants",
+              "campgrounds",
+              "private_notes"
+            ],
+            "config_def": "webedit"
+          },
+          "config_edit": {
+            "type": "outlet",
+            "name": "config_edit",
+            "access": [
+              "technical"
+            ],
+            "interaction": "interface",
+            "config_def": "config_editor"
+          },
+          "private_webmap": {
+            "type": "outlet",
+            "name": "private_webmap",
+            "in_layers": [
+              "basemap",
+              "sites",
+              "tsunami",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "roads_candidates",
+              "milemarkers",
+              "creeks",
+              "buildings",
+              "natural",
+              "helilandings",
+              "hydrants",
+              "campgrounds",
+              "private_notes"
+            ],
+            "config_def": "webmap",
+            "access": [
+              "admin",
+              "technical"
+            ]
+          },
+          "notebook": {
+            "type": "outlet",
+            "name": "notebook",
+            "config_def": "jupyter_notebook",
+            "access": [
+              "technical"
+            ]
+          },
+          "runbook": {
+            "type": "outlet",
+            "name": "runbook",
+            "config_def": "qgis_runbook",
+            "base_url": "individual_pages",
+            "regions_layer": "regions",
+            "in_layers": [
+              "lidar_basemap",
+              "contours",
+              "roads_primary",
+              "creeks",
+              "buildings",
+              "helilandings",
+              "milemarkers",
+              "hydrants",
+              "campgrounds",
+              "roads_secondary",
+              "roads_tertiary",
+              "private_notes"
+            ],
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "feature_scale": 0.5,
+            "blend_percent": 50,
+            "regions": [
+              {
+                "bbox": {
+                  "east": -121.19978063408502,
+                  "west": -121.20391109005016,
+                  "south": 39.23863749098538,
+                  "north": 39.24416744687048
+                },
+                "name": "RockLoop",
+                "caption": "Double loop with Ginger and big rocks.",
+                "vectors": [],
+                "raster": "",
+                "text": "Hwy20 to the County Lnie"
+              },
+              {
+                "bbox": {
+                  "east": -121.19978063408502,
+                  "west": -121.20391109005016,
+                  "south": 39.23863749098538,
+                  "north": 39.24416744687048
+                },
+                "name": "GolfCourses",
+                "caption": "Golf Courses",
+                "vectors": [],
+                "raster": "",
+                "text": "Golf Courses"
+              }
+            ]
+          },
+          "html": {
+            "type": "outlet",
+            "name": "html",
+            "config_def": "static_html"
+          },
+          "sqldb": {
+            "type": "outlet",
+            "config_def": "sqldb",
+            "layers": [
+              "basemap",
+              "roads_secondary",
+              "creeks"
+            ]
+          },
+          "sqlquery": {
+            "type": "outlet",
+            "name": "sqlquery",
+            "config_def": "sqlquery",
+            "access": [
+              "technical"
+            ]
+          },
+          "spreadsheet_export": {
+            "type": "outlet",
+            "name": "spreadsheet_export",
+            "config_def": "gsheet_export",
+            "in_layers": [
+              "helilandings",
+              "hydrants",
+              "milemarkers"
+            ]
+          },
+          "private_runbook": {
+            "type": "outlet",
+            "name": "private_runbook",
+            "access": [
+              "admin",
+              "technical"
+            ],
+            "config_def": "qgis_runbook",
+            "base_url": "individual_pages",
+            "regions_layer": "regions",
+            "feature_scale": 0.5,
+            "in_layers": [
+              "lidar_basemap",
+              "tsunami",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "roads_candidates",
+              "milemarkers",
+              "creeks",
+              "buildings",
+              "campgrounds",
+              "natural",
+              "hydrants",
+              "helilandings",
+              "private_notes"
+            ]
+          },
+          "sitesbook": {
+            "type": "outlet",
+            "name": "sitesbook",
+            "generate_pdf": false,
+            "access": [
+              "internal",
+              "admin"
+            ],
+            "config_def": "qgis_runbook",
+            "base_url": "https://scs-internal.s3.us-west-1.amazonaws.com/Sites/current_sites",
+            "regions_layer": "sites",
+            "label_property": "SCS_NAME",
+            "index_property": "scs_sites_index",
+            "in_layers": [
+              "lidar_basemap",
+              "tsunami",
+              "contours",
+              "roads_primary",
+              "roads_secondary",
+              "roads_tertiary",
+              "milemarkers",
+              "creeks",
+              "buildings",
+              "campgrounds",
+              "natural",
+              "hydrants",
+              "helilandings",
+              "private_notes"
+            ]
+          },
+          "console": {
+            "type": "outlet",
+            "name": "console",
+            "config_def": "console"
+          }
+        }
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              -123.85333388805361,
+              39.53857292439969
+            ],
+            [
+              -123.67763908625702,
+              39.53857292439969
+            ],
+            [
+              -123.67763908625702,
+              39.89595306214338
+            ],
+            [
+              -123.85333388805361,
+              39.89595306214338
+            ],
+            [
+              -123.85333388805361,
+              39.53857292439969
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    }
+  ]
+}
