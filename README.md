@@ -1,6 +1,8 @@
 # Stewardship Atlas
 
-Stewardship Atlas is an open platform for building and maintaining place-based geospatial atlases — combining public, community, and private datasets into a managed, shareable resource. It is cloud-native and requires no installation, works with other tools and platforms via open standards, and can generate offline-usable artifacts.
+The Stewardship Atlas is an open-source, cloud-native platform for turning geospatial analysis into tools that practitioners can act on. The gap between a dataset and a decision is rarely technical — it's the absence of a delivery layer: something that exposes analytical results as decision-ready maps and exports, supports further query and refinement, and produces durable artifacts — web maps, PDF runbooks, GeoPackages, a documented API — without requiring a GIS environment or specialist knowledge. Its modular architecture means adding a new dataset, processing step, or output format is self-contained work rather than a systems integration project.
+
+Atlas is built around the idea that useful data is living data. Ingestion pipelines refresh layers as source assets are revised or new data arrives — from remote-sensing products to field-verified fire and land management observations — so the atlas tracks the current state of a landscape rather than a frozen snapshot. The versioned datastore records every change with full provenance, and community contributions (field photos, ground-truth corrections, incident notes) enter the same refresh cycle. This makes Atlas a natural medium for data-driven conversation: local knowledge and analytical products reconciled in one place, kept current, and accessible to everyone who needs to act on them.
 
 [![Screenshot 1](documents/images/screenshot1_thumb.png)](documents/images/screenshot1.png)
 
@@ -17,6 +19,25 @@ Stewardship Atlas is an open platform for building and maintaining place-based g
 **Emergency response and incident coordination** — During an active incident, a current atlas provides the situational awareness layer: up-to-date infrastructure, access routes, hazard data, and resource locations — the payoff for keeping data current day-to-day.
 
 **Regional aggregation and planning** — A county agency, regional planning body, or multi-org network can pull together data from multiple contributing organizations into a unified, current picture that no single contributor maintains alone.
+
+## Capabilities
+
+| Capability | Description |
+|---|---|
+| Interactive web map | MapLibre map with layers, popups, legend, and layer visibility controls |
+| 3D terrain view | Vector layers draped on elevation using cloud terrain data |
+| Web editing | In-browser feature editing, attribute forms, and photo upload |
+| Email photo ingest | Geotagged photos submitted via email become geolocated features |
+| PDF runbooks | Print-quality runbooks and atlases via QGIS |
+| Road LRS | Linear reference system with mileage markers and segment attributes |
+| Conversations | Field comments and observations attached to map features |
+| SQL query interface | DuckDB spatial queries across layers from the browser |
+| Spreadsheet sync | Google Sheets import/export for tabular layer data |
+| COG raster layers | Cloud-optimized GeoTIFFs for custom raster data (canopy density, fuel loads, flow accumulation) |
+| Static tile basemaps | PMTiles hillshade for offline-capable deployment |
+| Soil and agriculture enrichment | Enrich layers with national soil and agricultural datasets (SSURGO/NRCS) |
+| Versioning and audit | Timestamped deltas with full provenance; immutable published snapshots |
+| Multi-atlas | Single deployment hosts multiple atlases with shared infrastructure |
 
 ## Requirements and Optional Dependencies
 
@@ -36,6 +57,8 @@ Install only what your use case needs.
 | GeoDataFrame operations | `geopandas` |
 | OpenStreetMap inlets | `overpass` |
 | Raster processing and tile generation | GDAL (`gdal_translate`, `gdalwarp`, `gdal2tiles`) |
+| PMTiles basemap generation | `pmtiles` |
+| Cloud-optimized GeoTIFF (COG) serving | GDAL + S3 bucket with public read policy |
 | Cloud raster sources (STAC / Planetary Computer) | `pystac-client`, `planetary-computer`, `mercantile` |
 | Print atlas and PDF generation | QGIS with PyQGIS |
 | Advanced spatial analysis | GRASS GIS |
