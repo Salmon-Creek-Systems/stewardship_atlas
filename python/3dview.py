@@ -25,12 +25,13 @@ def _is_default_visible(name: str) -> bool:
     return any(p in name_lower for p in _DEFAULT_VISIBLE_PATTERNS)
 
 
-def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
+def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -> Tuple[dict, list, list]:
     """
     Build MapLibre sources, layers, and toggle info for non-index vector layers.
     Returns (sources_dict, layers_list, toggle_list).
     Layer order: polygons first, then lines, then points.
     Each toggle_list item: {ids, label, visible} where ids covers geometry + label layers.
+    If in_layers is provided, only those layers are included (order preserved from config).
     """
     sources = {}
     polygon_layers: List[dict] = []
@@ -44,6 +45,8 @@ def _build_vector_overlay(config: Dict[str, Any]) -> Tuple[dict, list, list]:
         if geom_type not in _VECTOR_INCLUDE_TYPES:
             continue
         if any(name.endswith(s) for s in _INDEX_SUFFIXES):
+            continue
+        if in_layers is not None and name not in in_layers:
             continue
 
         visible = _is_default_visible(name)
@@ -162,7 +165,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     center_lng = (bbox['west'] + bbox['east']) / 2
     center_lat = (bbox['south'] + bbox['north']) / 2
 
-    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config)
+    in_layers = config.get('assets', {}).get('3dview', {}).get('in_layers')
+    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers)
     toggle_panel_html = _build_toggle_panel_html(toggle_list)
 
     style = {
