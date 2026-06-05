@@ -39,7 +39,7 @@
             <ul class="sb-list" id="sb-downloads-list"></ul>
         </div>
 
-        <div class="sb-section">
+        <div class="sb-section" id="sb-help-section">
             <button class="sb-toggle" aria-expanded="true">
                 <span>Help</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -306,6 +306,44 @@ function startResetStaging() {
         });
 }
 
+// ── Dropdown builder for layer rows ─────────────────────
+function makeLayerDropdown(label, items) {
+    var ddWrap = document.createElement('div');
+    ddWrap.className = 'dd-wrap';
+    var trigger = document.createElement('button');
+    trigger.className = 'btn btn-sm btn-action dd-trigger';
+    trigger.setAttribute('aria-haspopup', 'true');
+    trigger.innerHTML = label + '<svg width="9" height="9" viewBox="0 0 9 9" style="margin-left:3px;vertical-align:middle;flex-shrink:0"><path d="M1.5 3l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    trigger.onclick = function(e) { e.stopPropagation(); toggleDropdown(this); };
+    var menu = document.createElement('div');
+    menu.className = 'dd-menu';
+    menu.setAttribute('role', 'menu');
+    items.forEach(function(item) {
+        var el;
+        if (item.type === 'link') {
+            el = document.createElement('a');
+            el.href = item.href;
+            el.className = 'dd-item';
+        } else {
+            el = document.createElement('button');
+            el.className = 'dd-item' + (item.danger ? ' dd-item-danger' : '');
+            (function(el, fn, m, t) {
+                el.onclick = function() {
+                    m.classList.remove('open');
+                    t.classList.remove('open');
+                    fn(el);
+                };
+            })(el, item.onclick, menu, trigger);
+        }
+        el.textContent = item.text;
+        el.setAttribute('role', 'menuitem');
+        menu.appendChild(el);
+    });
+    ddWrap.appendChild(trigger);
+    ddWrap.appendChild(menu);
+    return ddWrap;
+}
+
 // ── Layer operations ─────────────────────────────────────
 function toggleDropdown(triggerBtn) {
     const menu = triggerBtn.nextElementSibling;
@@ -532,111 +570,49 @@ function initializePage(data) {
             var li = document.createElement('li');
             li.className = 'layer-row';
 
-            // Name
-            var nameLink = document.createElement('a');
-            nameLink.href = '../../../layers/' + item.name + '/';
-            nameLink.className = 'layer-name';
-            nameLink.textContent = item.name;
-            li.appendChild(nameLink);
+            // Name — bold span, not a link
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'layer-name';
+            nameSpan.textContent = item.name;
+            li.appendChild(nameSpan);
 
             // Actions container
             var actions = document.createElement('div');
             actions.className = 'layer-actions';
 
-            // Draw / Edit button group
-            var group = document.createElement('div');
-            group.className = 'btn-group';
-
-            var drawBtn = document.createElement('a');
-            drawBtn.href = '../../webedit/' + item.name + '_create.html';
-            drawBtn.className = 'btn btn-sm btn-action';
-            drawBtn.textContent = 'Draw';
-
-            var editBtn = document.createElement('a');
-            editBtn.href = '../../webedit/' + item.name + '_annotate.html';
-            editBtn.className = 'btn btn-sm btn-action';
-            editBtn.textContent = 'Edit';
-
-            group.appendChild(drawBtn);
-            group.appendChild(editBtn);
-            actions.appendChild(group);
-
-            // Data dropdown
-            var ddWrap = document.createElement('div');
-            ddWrap.className = 'dd-wrap';
-
-            var ddTrigger = document.createElement('button');
-            ddTrigger.className = 'btn btn-sm btn-action dd-trigger';
-            ddTrigger.setAttribute('aria-haspopup', 'true');
-            // Build trigger content without template literals containing braces
-            ddTrigger.innerHTML = 'Data <svg width="9" height="9" viewBox="0 0 9 9" style="margin-left:2px;vertical-align:middle;flex-shrink:0"><path d="M1.5 3l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            ddTrigger.onclick = function(e) { e.stopPropagation(); toggleDropdown(this); };
-
-            var ddMenu = document.createElement('div');
-            ddMenu.className = 'dd-menu';
-            ddMenu.setAttribute('role', 'menu');
-
-            // Upload
-            var uploadBtn = document.createElement('button');
-            uploadBtn.className = 'dd-item';
-            uploadBtn.textContent = 'Upload GeoJSON';
-            uploadBtn.setAttribute('role', 'menuitem');
+            // Alter: Draw, Edit
             (function(name) {
-                uploadBtn.onclick = function() {
-                    ddMenu.classList.remove('open');
-                    ddTrigger.classList.remove('open');
-                    uploadGeoJSON(name);
-                };
+                actions.appendChild(makeLayerDropdown('Alter', [
+                    { type: 'link', href: '../../webedit/' + name + '_create.html', text: 'Draw' },
+                    { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' }
+                ]));
             })(item.name);
-            ddMenu.appendChild(uploadBtn);
 
-            // Export
-            var exportBtn = document.createElement('button');
-            exportBtn.className = 'dd-item';
-            exportBtn.textContent = 'Export to Sheet';
-            exportBtn.setAttribute('role', 'menuitem');
+            // Spreadsheets: Import, Export
             (function(name) {
-                exportBtn.onclick = function() { exportToSheet(name, this); };
+                actions.appendChild(makeLayerDropdown('Spreadsheets', [
+                    { type: 'button', text: 'Import from Sheet', onclick: function(btn) { importFromSheet(name, btn); } },
+                    { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } }
+                ]));
             })(item.name);
-            ddMenu.appendChild(exportBtn);
 
-            // Import
-            var importBtn = document.createElement('button');
-            importBtn.className = 'dd-item';
-            importBtn.textContent = 'Import from Sheet';
-            importBtn.setAttribute('role', 'menuitem');
+            // Dataset: Upload, Clear, Directory
             (function(name) {
-                importBtn.onclick = function() { importFromSheet(name, this); };
+                actions.appendChild(makeLayerDropdown('Dataset', [
+                    { type: 'button', text: 'Upload File', onclick: function() { uploadGeoJSON(name); } },
+                    { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
+                    { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
+                ]));
             })(item.name);
-            ddMenu.appendChild(importBtn);
 
-            // Attribution separator
-            var sep = document.createElement('div');
-            sep.className = 'dd-sep';
-            ddMenu.appendChild(sep);
-
-            // Source
-            var sourceLink = document.createElement('a');
-            sourceLink.className = 'dd-item';
-            sourceLink.href = '../' + item.name + '/attribution.html';
-            sourceLink.textContent = 'Source / Attribution';
-            sourceLink.setAttribute('role', 'menuitem');
-            ddMenu.appendChild(sourceLink);
-
-            ddWrap.appendChild(ddTrigger);
-            ddWrap.appendChild(ddMenu);
-            actions.appendChild(ddWrap);
-
-            // Clear (destructive)
-            var clearBtn = document.createElement('button');
-            clearBtn.className = 'btn btn-sm btn-clear';
-            clearBtn.setAttribute('title', 'Clear layer data');
-            clearBtn.setAttribute('aria-label', 'Clear ' + item.name);
-            clearBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 3h10M4.5 3V2a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 5.5v4M7.5 5.5v4M2.5 3l.6 7a.5.5 0 00.5.5h5.8a.5.5 0 00.5-.5l.6-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            // About: Attribution, Description, Metadata
             (function(name) {
-                clearBtn.onclick = function() { clearLayer(name); };
+                actions.appendChild(makeLayerDropdown('About', [
+                    { type: 'link', href: '../' + name + '/attribution.html', text: 'Source / Attribution' },
+                    { type: 'link', href: '../' + name + '/attribution.html', text: 'Description' },
+                    { type: 'link', href: '../' + name + '/attribution.html', text: 'Metadata' }
+                ]));
             })(item.name);
-            actions.appendChild(clearBtn);
 
             li.appendChild(actions);
             layerList.appendChild(li);

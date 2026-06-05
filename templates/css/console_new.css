@@ -161,6 +161,28 @@ a:hover { text-decoration: underline; }
   padding: 8px 13px 12px;
 }
 
+/* Maps section — blue tint */
+#sb-maps-section {
+  background: #f0f4fd;
+}
+#sb-maps-section .sb-toggle {
+  background: #dce7f9;
+  color: #1e3a7a;
+  border-bottom: 1px solid #c5d5ef;
+}
+#sb-maps-section .sb-toggle:hover { background: #cfdaf5; }
+
+/* Help section — green tint */
+#sb-help-section {
+  background: #f1faf4;
+}
+#sb-help-section .sb-toggle {
+  background: #d8f0e3;
+  color: #1a5c37;
+  border-bottom: 1px solid #bce0cc;
+}
+#sb-help-section .sb-toggle:hover { background: #c9ebd8; }
+
 /* ── Publish / versions ──────────────────────────────── */
 
 .version-badge {
@@ -236,7 +258,7 @@ a:hover { text-decoration: underline; }
 .btn-danger:hover { background: #fee2e2; }
 
 /* Size variants */
-.btn-sm { font-size: 12px; padding: 4px 9px; min-height: 28px; }
+.btn-sm { font-size: 13px; padding: 4px 9px; min-height: 28px; }
 .btn-full { width: 100%; justify-content: center; }
 
 /* Action buttons in layer rows */
@@ -300,17 +322,15 @@ a:hover { text-decoration: underline; }
 
 .layer-name {
   font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text);
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 0.1s;
 }
-.layer-name:hover { color: var(--blue); text-decoration: none; }
 
 .layer-actions {
   display: flex;
@@ -372,6 +392,9 @@ a:hover { text-decoration: underline; }
   background: var(--border);
   margin: 2px 0;
 }
+
+.dd-item-danger { color: var(--red); }
+.dd-item-danger:hover { background: var(--red-bg); color: var(--red); }
 
 /* ── Use cases / help / log ──────────────────────────── */
 
@@ -464,7 +487,7 @@ a:hover { text-decoration: underline; }
 
   .layer-name {
     flex-basis: 100%;
-    font-size: 14px;
+    font-size: 15px;
   }
 
   /* Bigger tap targets on mobile */
