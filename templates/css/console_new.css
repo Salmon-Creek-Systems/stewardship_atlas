@@ -84,6 +84,31 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
 }
 
+/* ── A/B view toggle ────────────────────────────────── */
+
+.ab-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.ab-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+}
+
 /* ── Main layout ─────────────────────────────────────── */
 
 .layout {
@@ -297,12 +322,15 @@ a:hover { text-decoration: underline; }
 }
 
 .panel-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  /* stretch edge-to-edge across .main and add a tinted band */
+  margin: -20px -24px 20px;
+  padding: 16px 24px;
+  background: #f5f7fc;
+  border-bottom: 1px solid var(--border-light);
 }
 
 /* ── Layer list ──────────────────────────────────────── */

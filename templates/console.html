@@ -12,6 +12,7 @@
             <span class="atlas-name" id="swale-name"></span>
             <span class="console-type" id="console-type"></span>
         </div>
+        <a id="ab-toggle" class="ab-toggle" href="#" title="Switch between console and HTML view">A/B</a>
     </header>
 
     <div class="console-layout">
@@ -426,6 +427,20 @@
                     linkElement.style.pointerEvents = 'auto';
                 });
         }
+    </script>
+    <script>
+        // A/B toggle: swap /outlets/html/ ↔ /outlets/console/
+        document.addEventListener('DOMContentLoaded', function() {
+            var p = window.location.pathname;
+            var altPath = null;
+            if (p.indexOf('/outlets/html/') !== -1) {
+                altPath = p.replace('/outlets/html/', '/outlets/console/');
+            } else if (p.indexOf('/outlets/console/') !== -1) {
+                altPath = p.replace('/outlets/console/', '/outlets/html/');
+            }
+            var t = document.getElementById('ab-toggle');
+            if (t && altPath) { t.href = altPath; } else if (t) { t.style.display = 'none'; }
+        });
     </script>
 </body>
 </html>

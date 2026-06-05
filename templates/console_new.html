@@ -17,6 +17,7 @@
         <span class="topbar-name" id="swale-name"></span>
         <span class="topbar-type" id="console-type"></span>
     </div>
+    <a id="ab-toggle" class="ab-toggle" href="#" title="Switch between console and HTML view">A/B</a>
 </header>
 
 <div class="layout">
@@ -181,6 +182,23 @@ function switchTab(tab) {
     });
     main.style.display = (tab === 'layers') ? '' : 'none';
 }
+
+// ── A/B toggle ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    var p = window.location.pathname;
+    var altPath = null;
+    if (p.indexOf('/outlets/console/') !== -1) {
+        altPath = p.replace('/outlets/console/', '/outlets/html/');
+    } else if (p.indexOf('/outlets/html/') !== -1) {
+        altPath = p.replace('/outlets/html/', '/outlets/console/');
+    }
+    var abToggle = document.getElementById('ab-toggle');
+    if (abToggle && altPath) {
+        abToggle.href = altPath;
+    } else if (abToggle) {
+        abToggle.style.display = 'none';
+    }
+});
 
 // ── Sidebar collapse ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
@@ -560,7 +578,6 @@ function initializePage(data) {
         iframe.className = 'webmap-iframe';
         iframe.title = 'Atlas Webmap';
         main.appendChild(iframe);
-        document.getElementById('sidebar').style.display = 'none';
     }
 
     // Layers (ADMINISTRATION only)
@@ -599,7 +616,7 @@ function initializePage(data) {
             // Dataset: Upload, Clear, Directory
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Dataset', [
-                    { type: 'button', text: 'Upload File', onclick: function() { uploadGeoJSON(name); } },
+                    { type: 'button', text: 'Replace with File', onclick: function() { uploadGeoJSON(name); } },
                     { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
                     { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
                 ]));

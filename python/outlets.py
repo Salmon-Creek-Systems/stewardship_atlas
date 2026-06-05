@@ -2491,7 +2491,7 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
     admin_html = make_console_html(
         config,
         console_type='ADMINISTRATION',
-        panel_header = 'Layer operations and Access',
+        panel_header = 'Layers',
         displayed_interfaces=admin_interfaces,
         displayed_downloads=admin_downloads,
         displayed_inlets=admin_layers,
