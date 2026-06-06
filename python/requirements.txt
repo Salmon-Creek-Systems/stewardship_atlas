@@ -25,3 +25,7 @@ anthropic>=0.25.0
 # Road LRS eddy
 networkx>=3.0
 pyproj>=3.0
+
+# Dagster asset orchestration (optional — only needed to run the Dagster UI/scheduler)
+dagster>=1.6
+dagster-webserver>=1.6
