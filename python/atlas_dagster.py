@@ -136,7 +136,8 @@ def build_atlas_assets(config: Dict) -> List:
             else:
                 # Raster or eddy-produced layer: depend directly on the producing asset.
                 producer = _find_layer_producer(config, layer)
-                if producer:
+                # Skip self-deps: in-place eddies (e.g. ssurgo_enrich) have in_layer == out_layer.
+                if producer and producer != asset_name:
                     ins[_sanitize(producer)] = AssetIn(key=AssetKey([atlas_slug, producer]))
 
         result.append(_make_materializer_asset(atlas_slug, asset_name, config, ins))
