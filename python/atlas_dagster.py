@@ -123,23 +123,56 @@ def build_atlas_assets(config: Dict) -> List:
         result.append(_make_layer_refresh_asset(atlas_slug, layer_name, config, ins))
 
     # Eddy and outlet assets.
+    # Build deps incrementally and guard against cycles with a reachability check.
+    # Cycles arise from write-back eddies (e.g. biochar_simulation writes to 'photos',
+    # which processing_sites_h3 also reads as its primary source from the delta system).
+    upstream: Dict[str, set] = {}  # asset_name -> set of direct upstream asset names
+
+    def _reachable(start: str, target: str) -> bool:
+        """True if target is reachable from start through current upstream edges."""
+        visited: set = set()
+        stack = list(upstream.get(start, set()))
+        while stack:
+            node = stack.pop()
+            if node == target:
+                return True
+            if node not in visited:
+                visited.add(node)
+                stack.extend(upstream.get(node, set()))
+        return False
+
     for asset_name, entry in assets_cfg.items():
         if entry.get('type') == 'inlet':
+            upstream[asset_name] = set()
             continue
 
         ins = {}
+        asset_upstream: set = set()
         for layer in _get_in_layers(entry):
             if layer in by_layer:
                 # Vector layer: depend on the synthesized layer_ asset.
                 key = f"layer_{layer}"
                 ins[_sanitize(key)] = AssetIn(key=AssetKey([atlas_slug, key]))
+                asset_upstream.add(key)
             else:
                 # Raster or eddy-produced layer: depend directly on the producing asset.
                 producer = _find_layer_producer(config, layer)
                 # Skip self-deps: in-place eddies (e.g. ssurgo_enrich) have in_layer == out_layer.
-                if producer and producer != asset_name:
-                    ins[_sanitize(producer)] = AssetIn(key=AssetKey([atlas_slug, producer]))
+                if not producer or producer == asset_name:
+                    continue
+                # Skip if this edge would create a cycle (write-back pattern, e.g.
+                # biochar_simulation writes to 'photos' which processing_sites_h3 reads).
+                if _reachable(producer, asset_name):
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"{atlas_slug}/{asset_name}: skipping dep on {producer} "
+                        f"(would create cycle via layer '{layer}')"
+                    )
+                    continue
+                ins[_sanitize(producer)] = AssetIn(key=AssetKey([atlas_slug, producer]))
+                asset_upstream.add(producer)
 
+        upstream[asset_name] = asset_upstream
         result.append(_make_materializer_asset(atlas_slug, asset_name, config, ins))
 
     return result
