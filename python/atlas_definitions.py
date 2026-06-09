@@ -20,7 +20,11 @@ Set it to a path under SWALES_ROOT to keep everything co-located:
 """
 import json
 import os
+import sys
 from pathlib import Path
+
+# Ensure the python/ directory is on sys.path regardless of Dagster's working directory.
+sys.path.insert(0, str(Path(__file__).parent))
 
 from atlas_dagster import build_definitions
 
