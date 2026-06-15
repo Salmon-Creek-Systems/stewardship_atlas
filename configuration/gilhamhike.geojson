@@ -51,6 +51,8 @@
             "color": [60, 160, 60],
             "add_labels": true,
             "show_attributes": true,
+            "symbol": { "png": "flower.png", "icon": "flower" },
+            "icon-size": 1.5,
             "interaction": "interface",
             "editable_columns": [
               { "name": "taxon_name", "type": "string", "default": "" },
