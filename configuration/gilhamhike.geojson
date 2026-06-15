@@ -115,6 +115,12 @@
             "in_layers": ["regions", "roads", "creeks", "landmarks", "photos"],
             "config_def": "webedit"
           },
+          "3dview": {
+            "type": "outlet",
+            "name": "3dview",
+            "config_def": "3dview",
+            "access": ["public", "internal", "admin"]
+          },
           "html": {
             "type": "outlet",
             "name": "html",
