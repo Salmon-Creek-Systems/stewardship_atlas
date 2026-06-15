@@ -48,9 +48,14 @@
             "geometry_type": "point",
             "color": [60, 160, 60],
             "add_labels": true,
+            "show_attributes": true,
             "interaction": "interface",
             "editable_columns": [
-              { "name": "taxon_name", "type": "string", "default": "" }
+              { "name": "taxon_name", "type": "string", "default": "" },
+              { "name": "iconic_taxon", "type": "string", "default": "" },
+              { "name": "observed_on", "type": "string", "default": "" },
+              { "name": "username", "type": "string", "default": "" },
+              { "name": "quality_grade", "type": "string", "default": "" }
             ]
           }
         },

@@ -396,6 +396,7 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
                 features.append(geojson.Feature(
                     geometry=geom,
                     properties={
+                        'name': taxon.get('name'),
                         'observation_id': obs['id'],
                         'username': (obs.get('user') or {}).get('login'),
                         'observed_on': obs.get('observed_on'),
