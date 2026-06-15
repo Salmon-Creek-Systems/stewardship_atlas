@@ -55,6 +55,7 @@
             "icon-size": 1.5,
             "interaction": "interface",
             "editable_columns": [
+              { "name": "common_name", "type": "string", "default": "" },
               { "name": "taxon_name", "type": "string", "default": "" },
               { "name": "iconic_taxon", "type": "string", "default": "" },
               { "name": "observed_on", "type": "string", "default": "" },

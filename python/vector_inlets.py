@@ -397,6 +397,7 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
                     geometry=geom,
                     properties={
                         'name': taxon.get('preferred_common_name') or taxon.get('name'),
+                        'common_name': taxon.get('preferred_common_name'),
                         'observation_id': obs['id'],
                         'username': (obs.get('user') or {}).get('login'),
                         'observed_on': obs.get('observed_on'),
