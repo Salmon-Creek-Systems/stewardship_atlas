@@ -1,0 +1,99 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-124.067953091, 40.182643101],
+            [-123.92727787,  40.182643101],
+            [-123.92727787,  40.315303868],
+            [-124.067953091, 40.315303868],
+            [-124.067953091, 40.182643101]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "gilhamhike",
+        "description": "FOLC Gilham Butte Hike",
+        "app_url": "https://fireatlas.org:9000",
+        "base_url": "https://fireatlas.org/gilhamhike",
+        "port": 9000,
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "admin_emails": [],
+        "logo_url": "",
+        "email_photo_default_layer": "photos",
+        "versioned_outlets": ["html", "webmap"],
+        "layers": {
+          "regions": { "layer_def": "regions" },
+          "roads":   { "layer_def": "roads" },
+          "creeks":  { "layer_def": "creeks" },
+          "landmarks": { "layer_def": "poi" },
+          "photos": {
+            "geometry_type": "point",
+            "color": [255, 100, 0],
+            "fill_color": [255, 255, 255],
+            "add_labels": true,
+            "label_background": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "name", "type": "string", "default": "Photo" }
+            ]
+          },
+          "inaturalist": {
+            "geometry_type": "point",
+            "color": [60, 160, 60],
+            "add_labels": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "taxon_name", "type": "string", "default": "" }
+            ]
+          }
+        },
+        "assets": {
+          "public_roads": {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "overture_roads"
+          },
+          "public_creeks": {
+            "type": "inlet",
+            "out_layer": "creeks",
+            "config_def": "nhd_creeks"
+          },
+          "public_landmarks": {
+            "type": "inlet",
+            "out_layer": "landmarks",
+            "config_def": "osm_poi"
+          },
+          "inat_obs": {
+            "type": "inlet",
+            "out_layer": "inaturalist",
+            "config_def": "inaturalist"
+          },
+          "webmap": {
+            "type": "outlet",
+            "name": "webmap",
+            "in_layers": ["regions", "roads", "creeks", "landmarks", "photos", "inaturalist"],
+            "config_def": "webmap",
+            "access": ["public", "internal", "admin"]
+          },
+          "webedit": {
+            "type": "outlet",
+            "name": "webedit",
+            "in_layers": ["regions", "roads", "creeks", "landmarks", "photos"],
+            "config_def": "webedit"
+          },
+          "html": {
+            "type": "outlet",
+            "name": "html",
+            "config_def": "static_html"
+          }
+        }
+      }
+    }
+  ]
+}
