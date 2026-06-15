@@ -34,6 +34,7 @@
           "landmarks": { "layer_def": "poi" },
           "photos": {
             "geometry_type": "point",
+            "conversations_enabled": true,
             "color": [255, 100, 0],
             "fill_color": [255, 255, 255],
             "add_labels": true,
