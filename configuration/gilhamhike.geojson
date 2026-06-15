@@ -39,6 +39,8 @@
             "fill_color": [255, 255, 255],
             "add_labels": true,
             "label_background": true,
+            "symbol": { "png": "camera.png", "icon": "camera" },
+            "icon-size": 1.0,
             "interaction": "interface",
             "editable_columns": [
               { "name": "name", "type": "string", "default": "Photo" }
