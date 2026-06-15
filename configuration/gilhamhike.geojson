@@ -83,7 +83,7 @@
             "type": "inlet",
             "out_layer": "inaturalist",
             "config_def": "inaturalist",
-            "time_range": ["2026-06-14", null]
+            "time_range": ["2026-06-14", "2026-06-14"]
           },
           "webmap": {
             "type": "outlet",
