@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -124.067953091,
+              40.182643101
+            ],
+            [
+              -123.92727787,
+              40.182643101
+            ],
+            [
+              -123.92727787,
+              40.315303868
+            ],
+            [
+              -124.067953091,
+              40.315303868
+            ],
+            [
+              -124.067953091,
+              40.182643101
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "gilhamhike",
+        "description": "FOLC Gilham Butte Hike",
+        "app_url": "https://fireatlas.org:9000",
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "default_h3_resolution": 9,
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "layers_path": "/root/swales_dev/app/configuration/starter_layers.json",
+        "assets_path": "/root/swales_dev/app/configuration/starter_assets.json",
+        "base_url": "https://fireatlas.org/gilhamhike",
+        "port": 9000,
+        "admin_emails": [],
+        "logo_url": ""
+      }
+    }
+  ]
+}
