@@ -82,7 +82,8 @@
           "inat_obs": {
             "type": "inlet",
             "out_layer": "inaturalist",
-            "config_def": "inaturalist"
+            "config_def": "inaturalist",
+            "time_range": ["2026-06-14", null]
           },
           "webmap": {
             "type": "outlet",
