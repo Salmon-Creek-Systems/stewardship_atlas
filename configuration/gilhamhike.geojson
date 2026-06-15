@@ -5,15 +5,30 @@
       "type": "Feature",
       "geometry": {
         "type": "Polygon",
-        "coordinates": [
-          [
-            [-124.00045216690609, 40.22724720584617],
-            [-123.9399403484496,  40.22724720584617],
-            [-123.9399403484496,  40.21375232089423],
-            [-124.00045216690609, 40.21375232089423],
-            [-124.00045216690609, 40.22724720584617]
-          ]
+"coordinates": [
+      [
+        [
+          -123.9577003,
+          40.2163138
+        ],
+        [
+          -124.00058521952303,
+          40.2163138
+        ],
+        [
+          -124.00058521952303,
+          40.2243937361381
+        ],
+        [
+          -123.9577003,
+          40.2243937361381
+        ],
+        [
+          -123.9577003,
+          40.2163138
         ]
+      ]
+      ]
       },
       "properties": {
         "name": "gilhamhike",
@@ -53,8 +68,9 @@
             "show_attributes": true,
             "symbol": { "png": "flower.png", "icon": "flower" },
             "icon-size": 1.5,
-            "interaction": "interface",
-            "editable_columns": [
+            "interaction": "interface",	
+	    "vis": {"layout": {"visibility": "none"}},
+	    "editable_columns": [
               { "name": "common_name", "type": "string", "default": "" },
               { "name": "taxon_name", "type": "string", "default": "" },
               { "name": "iconic_taxon", "type": "string", "default": "" },
