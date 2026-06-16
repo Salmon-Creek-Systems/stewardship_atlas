@@ -335,6 +335,93 @@ def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     logger.info(f"h3_grid_inlet: generated {len(features)} cells at resolution {resolution}")
 
 
+def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Fetch iNaturalist observations for configured bbox regions into a point layer."""
+    import requests, time
+
+    inlet_config = config['assets'][name]['config']
+    atlas_bbox = config['dataswale']['bbox']
+
+    regions = inlet_config.get('regions') or [{'bbox': [
+        atlas_bbox['west'], atlas_bbox['south'], atlas_bbox['east'], atlas_bbox['north']
+    ]}]
+    users = inlet_config.get('users') or []
+    time_range = inlet_config.get('time_range')
+    quality_grade = inlet_config.get('quality_grade')
+    out_layer = inlet_config.get('out_layer', 'inaturalist')
+
+    features = []
+    for region in regions:
+        swlng, swlat, nelng, nelat = region['bbox']
+        base_params = {
+            'swlng': swlng, 'swlat': swlat,
+            'nelng': nelng, 'nelat': nelat,
+            'per_page': 200,
+            'order': 'asc',
+            'order_by': 'id',
+        }
+        if users:
+            base_params['user_login'] = ','.join(users)
+        if time_range:
+            base_params['d1'], base_params['d2'] = time_range[0], time_range[1]
+        if quality_grade:
+            base_params['quality_grade'] = quality_grade
+
+        id_above = None
+        while True:
+            params = dict(base_params)
+            if id_above is not None:
+                params['id_above'] = id_above
+
+            resp = requests.get(
+                'https://api.inaturalist.org/v1/observations',
+                params=params, timeout=30
+            )
+            resp.raise_for_status()
+            results = resp.json().get('results', [])
+            if not results:
+                break
+
+            for obs in results:
+                geom = obs.get('geojson')
+                if not geom:
+                    continue  # obscured/private observations have no coordinates
+
+                taxon = obs.get('taxon') or {}
+                photos = obs.get('photos') or []
+                image_url = None
+                if photos:
+                    image_url = photos[0].get('url', '').replace('/square.', '/medium.')
+
+                features.append(geojson.Feature(
+                    geometry=geom,
+                    properties={
+                        'name': taxon.get('preferred_common_name') or taxon.get('name'),
+                        'common_name': taxon.get('preferred_common_name'),
+                        'observation_id': obs['id'],
+                        'username': (obs.get('user') or {}).get('login'),
+                        'observed_on': obs.get('observed_on'),
+                        'quality_grade': obs.get('quality_grade'),
+                        'taxon_name': taxon.get('name'),
+                        'taxon_id': taxon.get('id'),
+                        'iconic_taxon': taxon.get('iconic_taxon_name'),
+                        'image_url': image_url,
+                        'inat_url': obs.get('uri'),
+                        'updated_at': obs.get('updated_at'),
+                    }
+                ))
+
+            id_above = results[-1]['id']
+            if len(results) < 200:
+                break
+            time.sleep(0.5)  # iNat rate limit: 100 req/min
+
+    fc = geojson.FeatureCollection(features)
+    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+    logger.info(f"inaturalist_inlet: {len(features)} observations across {len(regions)} region(s)")
+    # TODO: delta refresh — pass updated_since=<last_run> to the API to skip unchanged observations
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
@@ -343,4 +430,5 @@ asset_methods = {
     "s3_geojson": s3_geojson,
     "s3_gpkg": s3_gpkg,
     "h3_grid": h3_grid_inlet,
+    "inaturalist": inaturalist_inlet,
     }

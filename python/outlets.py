@@ -183,6 +183,8 @@ def webmap_json(config, name, sprite_json=None):
 
         if vis := layer.get('vis'):
             map_layer |= vis
+            if 'layout' in map_layer:
+                map_layer['layout'] = dict(map_layer['layout'])  # break shared ref with label_layer
         if paint := layer.get('paint'):
             if not 'paint' in map_layer:
                 map_layer['paint'] = {}

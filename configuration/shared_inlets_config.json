@@ -665,5 +665,21 @@
             "license": "Apache 2.0",
             "citation": "Uber H3"
         }
+    },
+    "inaturalist": {
+        "name": "inaturalist",
+        "asset_type": "inlet",
+        "fetch_type": "inaturalist",
+        "data_type": "geojson",
+        "feature_type": "point",
+        "regions": [],
+        "users": [],
+        "time_range": null,
+        "quality_grade": null,
+        "attribution": {
+            "url": "https://www.inaturalist.org",
+            "description": "iNaturalist observations",
+            "license": "CC BY-NC"
+        }
     }
 }
