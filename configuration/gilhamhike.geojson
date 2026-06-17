@@ -46,6 +46,16 @@
           "regions": { "layer_def": "regions" },
           "roads":   { "layer_def": "roads" },
           "creeks":  { "layer_def": "creeks" },
+          "trails": {
+            "geometry_type": "linestring",
+            "color": [165, 90, 20],
+            "add_labels": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "name", "type": "string", "default": "Trail" }
+            ],
+            "paint": { "line-width": 3, "line-dasharray": [2, 2] }
+          },
           "landmarks": { "layer_def": "poi" },
           "photos": {
             "geometry_type": "point",
@@ -105,14 +115,14 @@
           "webmap": {
             "type": "outlet",
             "name": "webmap",
-            "in_layers": ["regions", "roads", "creeks", "landmarks", "photos", "inaturalist"],
+            "in_layers": ["regions", "roads", "creeks", "trails", "landmarks", "photos", "inaturalist"],
             "config_def": "webmap",
             "access": ["public", "internal", "admin"]
           },
           "webedit": {
             "type": "outlet",
             "name": "webedit",
-            "in_layers": ["regions", "roads", "creeks", "landmarks", "photos"],
+            "in_layers": ["regions", "roads", "creeks", "trails", "landmarks", "photos"],
             "config_def": "webedit"
           },
           "3dview": {
