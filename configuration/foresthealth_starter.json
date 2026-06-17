@@ -1,0 +1,120 @@
+{
+  "label": "Forest Health",
+  "description": "Canopy and ladder-fuel raster layers, iNaturalist observations, and LANDFIRE context for forest condition assessment.",
+  "layers": {
+    "regions": {
+      "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3,
+      "interaction": "interface", "access": ["admin"],
+      "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
+    },
+    "roads": {
+      "geometry_type": "linestring",
+      "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
+      "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+      "interaction": "interface", "vector_width": true,
+      "editable_columns": [
+        { "name": "name", "type": "string", "default": "Road" },
+        {
+          "name": "STREETTYPE", "type": "radio",
+          "values": [
+            { "STREETTYPE": "RD", "vector_width": 15 },
+            { "STREETTYPE": "ST", "vector_width": 10 },
+            { "STREETTYPE": "Other", "vector_width": 8 }
+          ],
+          "default": { "STREETTYPE": "RD", "vector_width": 15 }
+        }
+      ]
+    },
+    "creeks": {
+      "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
+      "interaction": "interface", "vector_width": true,
+      "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
+    },
+    "landmarks": {
+      "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
+      "interaction": "interface",
+      "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
+    },
+    "inaturalist": {
+      "geometry_type": "point", "color": [0, 180, 100], "add_labels": true,
+      "interaction": "interface", "show_attributes": true,
+      "symbol": { "png": "flower.png", "icon": "flower" }, "icon-size": 1.5,
+      "vis": { "minzoom": 10 }, "label_minzoom": 16,
+      "editable_columns": [
+        { "name": "common_name", "type": "string", "default": "" },
+        { "name": "taxon_name", "type": "string", "default": "" },
+        { "name": "iconic_taxon", "type": "string", "default": "" },
+        { "name": "observed_on", "type": "string", "default": "" },
+        { "name": "username", "type": "string", "default": "" },
+        { "name": "quality_grade", "type": "string", "default": "" }
+      ]
+    },
+    "canopy_density": { "geometry_type": "raster", "cog": true, "cog_color": "BrewerBuGn9,0,50,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
+    "ladder_fuel_density": { "geometry_type": "raster", "cog": true, "cog_color": "BrewerOrRd9,0,20,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
+    "landfire_evc": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
+    "landfire_evt": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
+    "terrain_dem": { "geometry_type": "raster" },
+    "basemap": { "geometry_type": "raster" },
+    "hillshade_tiles": { "geometry_type": "raster" },
+    "roads_index": { "geometry_type": "polygon", "color": [100, 55, 50], "fill_color": [100, 55, 50], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "creeks_index": { "geometry_type": "polygon", "color": [50, 55, 255], "fill_color": [50, 55, 255], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "burns_index": { "geometry_type": "polygon", "color": [200, 55, 55], "fill_color": [200, 55, 55], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "processing_sites_index": { "geometry_type": "polygon", "color": [128, 0, 128], "fill_color": [128, 0, 128], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "burns": {
+      "geometry_type": "polygon", "color": [155, 5, 5], "fill_color": [255, 50, 50],
+      "add_labels": true, "interaction": "interface", "access": ["admin"], "fill_opacity": 0.4,
+      "editable_columns": [{ "name": "name", "type": "string", "default": "Treatment Area" }]
+    },
+    "processing_sites": {
+      "geometry_type": "point", "color": [128, 0, 128],
+      "add_labels": true, "interaction": "interface", "access": ["admin"], "label_minzoom": 16,
+      "editable_columns": [{ "name": "name", "type": "string", "default": "Processing Site" }]
+    }
+  },
+  "assets": {
+    "public_roads": { "type": "inlet", "out_layer": "roads", "config_def": "overture_roads" },
+    "public_creeks": { "type": "inlet", "out_layer": "creeks", "config_def": "nhd_creeks" },
+    "public_landmarks": { "type": "inlet", "out_layer": "landmarks", "config_def": "osm_poi" },
+    "inat_obs": { "type": "inlet", "out_layer": "inaturalist", "config_def": "inaturalist", "time_range": null },
+    "canopy_density": { "type": "inlet", "out_layer": "canopy_density", "config_def": "s3_geotiff", "s3_bucket": "scs-internal", "s3_key": "starters/foresthealth/canopy_density_2m.tif" },
+    "canopy_density_cog": { "type": "eddy", "config_def": "tiff_to_cog", "in_layer": "canopy_density", "out_layer": "canopy_density" },
+    "canopy_density_s3": { "type": "outlet", "config_def": "s3_upload", "in_layer": "canopy_density" },
+    "ladder_fuel_density": { "type": "inlet", "out_layer": "ladder_fuel_density", "config_def": "s3_geotiff", "s3_bucket": "scs-internal", "s3_key": "starters/foresthealth/ladder_fuel_density_2m.tif" },
+    "ladder_fuel_density_cog": { "type": "eddy", "config_def": "tiff_to_cog", "in_layer": "ladder_fuel_density", "out_layer": "ladder_fuel_density" },
+    "ladder_fuel_density_s3": { "type": "outlet", "config_def": "s3_upload", "in_layer": "ladder_fuel_density" },
+    "landfire_evc": { "type": "inlet", "out_layer": "landfire_evc", "config_def": "landfire_evc" },
+    "landfire_evt": { "type": "inlet", "out_layer": "landfire_evt", "config_def": "landfire_evt" },
+    "terrain_dem": { "type": "inlet", "out_layer": "terrain_dem", "config_def": "terrain_dem" },
+    "roads_h3": { "type": "eddy", "config_def": "h3_cells", "in_layer": "roads", "out_layer": "roads_index", "starting_resolution": 11 },
+    "creeks_h3": { "type": "eddy", "config_def": "h3_cells", "in_layer": "creeks", "out_layer": "creeks_index", "starting_resolution": 11, "max_cells": 100 },
+    "derived_hillshade": { "type": "eddy", "in_layer": "terrain_dem", "out_layer": "basemap", "config_def": "derived_hillshade" },
+    "hillshade_tiles": { "type": "eddy", "in_layer": "basemap", "out_layer": "hillshade_tiles", "config_def": "hillshade_tiles" },
+    "3dview": {
+      "type": "outlet", "name": "3dview", "config_def": "3dview",
+      "access": ["public", "internal", "admin"]
+    },
+    "webmap": {
+      "type": "outlet", "name": "webmap", "config_def": "webmap",
+      "in_layers": ["regions", "roads", "creeks", "landmarks", "inaturalist", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "processing_sites_index", "processing_sites"],
+      "access": ["public", "internal", "admin"]
+    },
+    "webedit": {
+      "type": "outlet", "name": "webedit", "config_def": "webedit",
+      "in_layers": ["regions", "roads", "creeks", "landmarks", "processing_sites"]
+    },
+    "html": { "type": "outlet", "name": "html", "config_def": "static_html" },
+    "notebook": {
+      "type": "outlet", "name": "notebook", "config_def": "jupyter_notebook",
+      "access": ["technical"]
+    },
+    "sqldb": { "type": "outlet", "config_def": "sqldb", "layers": ["roads", "creeks", "burns", "processing_sites"] },
+    "sqlquery": {
+      "type": "outlet", "name": "sqlquery", "config_def": "sqlquery",
+      "access": ["admin"]
+    },
+    "config_edit": {
+      "type": "outlet", "name": "config_edit", "config_def": "config_editor",
+      "interaction": "interface", "access": ["technical"]
+    }
+  }
+}
