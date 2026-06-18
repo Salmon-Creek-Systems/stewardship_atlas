@@ -1,0 +1,116 @@
+{
+  "label": "Volunteer Fire Department",
+  "description": "Response-focused atlas: roads, hydrants, water tanks, buildings, hazards, and photo/notes layers, with LANDFIRE fuel rasters.",
+  "properties": {
+    "email_photo_default_layer": "photos"
+  },
+  "layers": {
+    "regions": { "layer_def": "regions" },
+    "roads": { "layer_def": "roads" },
+    "creeks": { "layer_def": "creeks" },
+    "landmarks": { "layer_def": "poi" },
+    "buildings": {
+      "geometry_type": "polygon",
+      "color": [240, 0, 0],
+      "fill_color": [250, 0, 0],
+      "add_labels": true,
+      "label_deduplicate": true,
+      "interaction": "interface"
+    },
+    "hydrants": {
+      "geometry_type": "point",
+      "color": [255, 0, 0],
+      "fill_color": [255, 255, 255],
+      "add_labels": true,
+      "interaction": "interface",
+      "symbol": { "png": "hydrant.png", "icon": "basic/pushpin" },
+      "icon-size": 1.5
+    },
+    "watertanks": {
+      "geometry_type": "point",
+      "add_labels": true,
+      "color": [50, 50, 250],
+      "fill_color": [0, 0, 250],
+      "symbol": { "png": "watertank.png", "icon": "custom/octy" },
+      "icon-size": 1.0,
+      "show_attributes": true,
+      "interaction": "interface",
+      "editable_columns": [
+        { "name": "capacity", "type": "string", "default": "" },
+        { "name": "access", "type": "string", "default": "no" },
+        { "name": "fitting", "type": "string", "default": "no" }
+      ]
+    },
+    "photos": {
+      "geometry_type": "point",
+      "color": [255, 0, 0],
+      "fill_color": [255, 255, 255],
+      "add_labels": true,
+      "label_background": true,
+      "editable_columns": [
+        { "name": "name", "type": "string", "default": "Notes and Comments go here." }
+      ],
+      "symbol": { "png": "camera.png", "icon": "camera" },
+      "icon-size": 1.0,
+      "access": ["admin"],
+      "interaction": "interface"
+    },
+    "private_notes": {
+      "geometry_type": "point",
+      "color": [255, 0, 0],
+      "fill_color": [255, 255, 255],
+      "add_labels": true,
+      "label_background": true,
+      "editable_columns": [
+        { "name": "name", "type": "string", "default": "Notes and Comments go here." }
+      ],
+      "symbol": { "png": "eye.png", "icon": "eye" },
+      "icon-size": 1.0,
+      "access": ["admin"],
+      "interaction": "interface"
+    },
+    "hazards": {
+      "geometry_type": "point",
+      "color": [255, 0, 0],
+      "fill_color": [255, 255, 255],
+      "add_labels": true,
+      "label_background": true,
+      "editable_columns": [
+        { "name": "name", "type": "string", "default": "Notes and Comments go here." }
+      ],
+      "symbol": { "png": "incident.png", "icon": "basic/pushpin" },
+      "icon-size": 1.0,
+      "access": ["public", "internal", "admin"],
+      "interaction": "interface"
+    },
+    "landfire_evc": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
+    "landfire_evt": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } }
+  },
+  "assets": {
+    "public_roads": { "type": "inlet", "out_layer": "roads", "config_def": "overture_roads" },
+    "public_creeks": { "type": "inlet", "out_layer": "creeks", "config_def": "nhd_creeks" },
+    "public_landmarks": { "type": "inlet", "out_layer": "landmarks", "config_def": "osm_poi" },
+    "public_buildings": { "type": "inlet", "out_layer": "buildings", "config_def": "overture_buildings" },
+    "landfire_evc": { "type": "inlet", "out_layer": "landfire_evc", "config_def": "landfire_evc" },
+    "landfire_evt": { "type": "inlet", "out_layer": "landfire_evt", "config_def": "landfire_evt" },
+    "webmap": {
+      "type": "outlet", "name": "webmap", "config_def": "webmap",
+      "in_layers": ["regions", "roads", "creeks", "landmarks", "buildings", "hydrants", "watertanks", "hazards", "landfire_evc", "landfire_evt"],
+      "hidden_layers": ["landfire_evc", "landfire_evt"],
+      "access": ["public", "internal", "admin"]
+    },
+    "webedit": {
+      "type": "outlet", "name": "webedit", "config_def": "webedit",
+      "in_layers": ["regions", "roads", "creeks", "landmarks", "buildings", "hydrants", "watertanks", "photos", "private_notes", "hazards"]
+    },
+    "3dview": {
+      "type": "outlet", "name": "3dview", "config_def": "3dview",
+      "access": ["public", "internal", "admin"]
+    },
+    "html": { "type": "outlet", "name": "html", "config_def": "static_html" },
+    "notebook": {
+      "type": "outlet", "name": "notebook", "config_def": "jupyter_notebook",
+      "access": ["technical"]
+    }
+  }
+}

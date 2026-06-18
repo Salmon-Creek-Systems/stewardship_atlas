@@ -24,6 +24,12 @@
             <div id="slug-error" style="color:#c00; font-size:12px; margin-top:4px; display:none;"></div>
         </div>
 
+        <div class="control-panel">
+            <label>Starter:</label>
+            <select id="starter-select" class="input-field"></select>
+            <div id="starter-description" style="font-size:12px; color:#666; margin-top:4px;"></div>
+        </div>
+
         <div class="control-panel view-panel">
             <label>Basemap:</label>
             <select id="basemap-select" class="input-field">
@@ -107,6 +113,28 @@
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+    // Populate the starter dropdown from the server.
+    let starters = [];
+    const starterSelect = document.getElementById('starter-select');
+    const starterDesc = document.getElementById('starter-description');
+
+    function updateStarterDescription() {
+        const s = starters.find(s => s.key === starterSelect.value);
+        starterDesc.textContent = s ? s.description : '';
+    }
+    starterSelect.addEventListener('change', updateStarterDescription);
+
+    fetch('/create-starters')
+        .then(r => r.json())
+        .then(data => {
+            starters = data.starters || [];
+            starterSelect.innerHTML = starters
+                .map(s => `<option value="${s.key}">${s.label}</option>`)
+                .join('');
+            updateStarterDescription();
+        })
+        .catch(e => { starterDesc.textContent = 'Could not load starters: ' + e.message; });
 
     document.getElementById('basemap-select').addEventListener('change', function() {
         map.getSource('basemap').setTiles(BASEMAP_SOURCES[this.value].tiles);
@@ -242,7 +270,7 @@
             resp = await fetch('/create_atlas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, slug, bbox: bbox })
+                body: JSON.stringify({ name, slug, bbox: bbox, starter: starterSelect.value || 'simple' })
             });
         } catch(e) {
             appendLog('ERROR: ' + e.message);

@@ -86,6 +86,7 @@ class CreateAtlasRequest(BaseModel):
     name: str   # display name (e.g. "Salmon Creek VFD")
     slug: str   # atlas ID / directory name (e.g. "scvfd")
     bbox: BBox
+    starter: str = "simple"   # starter bundle key (configuration/{starter}_starter.json)
 
 class MovePayload(BaseModel):
     source_layer: str
@@ -636,6 +637,49 @@ async def create_page():
     return FileResponse(str(create_html))
 
 
+def _starter_dir() -> Path:
+    """Directory holding {key}_starter.json files in the app checkout."""
+    return Path(versioning.atlas_path(local_path='configuration', version='app'))
+
+
+def _load_starter(key: str) -> dict:
+    """Load a single starter bundle; raises 400 if missing/invalid."""
+    path = _starter_dir() / f"{key}_starter.json"
+    if not path.exists():
+        raise HTTPException(status_code=400, detail=f"Unknown starter '{key}'")
+    with open(path) as f:
+        return json.load(f)
+
+
+@app.get("/create-starters")
+async def list_starters():
+    """List available starter bundles for the /create dropdown.
+
+    Routed under the /create prefix so the existing nginx location block
+    (^/(create|create_atlas|create-status|templates/)) proxies it to the
+    webapp; a bare /starters path would fall through to the atlas-slug
+    redirect and 302 instead.
+
+    Returns [{key, label, description}], with 'simple' first when present.
+    """
+    starters = []
+    for path in sorted(_starter_dir().glob("*_starter.json")):
+        key = path.name[:-len("_starter.json")]
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logging.warning(f"Skipping unreadable starter {path.name}: {e}")
+            continue
+        starters.append({
+            "key": key,
+            "label": data.get("label", key),
+            "description": data.get("description", ""),
+        })
+    starters.sort(key=lambda s: (s["key"] != "simple", s["label"]))
+    return {"status": "success", "starters": starters}
+
+
 @app.post("/create_atlas")
 async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: BackgroundTasks):
     slug = payload.slug.strip()
@@ -643,6 +687,13 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
         raise HTTPException(status_code=400, detail="slug must start with a letter and contain only letters, numbers, and underscores")
     if (Path(SWALES_ROOT) / slug).exists():
         raise HTTPException(status_code=409, detail=f"Atlas '{slug}' already exists")
+
+    starter = _load_starter(payload.starter)
+    starter_props = starter.get("properties", {})
+    starter_layers = starter["layers"]   # dict keyed by name
+    starter_assets = starter["assets"]
+    # create_config/create expect layers as a list with 'name' injected
+    starter_layers_list = [{"name": k, **v} for k, v in starter_layers.items()]
 
     create_statuses[slug] = {
         "creating": True,
@@ -687,20 +738,18 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 "description": payload.name,
                 "app_url": "https://fireatlas.org:9000",
                 "versioned_outlets": ["html", "webmap"],
-                "default_h3_resolution": _default_h3_resolution
+                "default_h3_resolution": _default_h3_resolution,
+                **starter_props,
             }
         }]
     }
 
-    layers_path = str(versioning.atlas_path(local_path='configuration/starter_layers.json', version='app'))
-    assets_path = str(versioning.atlas_path(local_path='configuration/starter_assets.json', version='app'))
-
     async def finish_creating():
         try:
-            create_statuses[slug]["log"].append(["Creating atlas structure", datetime.now().isoformat()])
+            create_statuses[slug]["log"].append([f"Creating atlas structure (starter: {payload.starter})", datetime.now().isoformat()])
             await asyncio.to_thread(atlas.create,
-                layers_path=layers_path,
-                assets_path=assets_path,
+                layers=starter_layers_list,
+                assets=starter_assets,
                 data_root=SWALES_ROOT,
                 shared_dir=Path(ATLAS_SHARED_DIR),
                 feature_collection=feature_collection
@@ -724,35 +773,53 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 logging.warning(f"Could not configure SES for {slug}: {ses_err}")
                 create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
 
+            # Write a self-contained single-file atlas.geojson: the starter's
+            # layers/assets are embedded inline so future config rebuilds
+            # (build_atlas_from_geojson) don't depend on the starter file.
             atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
             atlas_geojson = json.loads(json.dumps(feature_collection))
             atlas_geojson['features'][0]['properties'].update({
                 "data_root": SWALES_ROOT,
                 "shared_dir": ATLAS_SHARED_DIR,
-                "layers_path": layers_path,
-                "assets_path": assets_path,
                 "base_url": f"https://fireatlas.org/{slug}",
                 "port": 9000,
                 "admin_emails": [],
                 "logo_url": "",
+                "layers": starter_layers,
+                "assets": starter_assets,
             })
             with open(atlas_geojson_path, 'w') as f:
                 json.dump(atlas_geojson, f, indent=2)
 
             ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
-            raster_inlets = {"landfire_evc", "landfire_evt"}
-            for inlet_name in ["public_roads", "public_creeks", "public_landmarks", "landfire_evc", "landfire_evt"]:
+            assets = ac['assets']
+            raster_layers = {l['name'] for l in ac['dataswale']['layers']
+                             if l.get('geometry_type') == 'raster'}
+
+            # Materialize the starter's inlets to populate base layers. Eddies
+            # are intentionally skipped at create time (DEM/hillshade/H3/sim can
+            # be slow and run on layers that start empty) — run them later.
+            inlet_names = [n for n, a in assets.items() if a.get('type') == 'inlet']
+            for inlet_name in inlet_names:
                 create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
                 try:
                     await asyncio.to_thread(atlas.materialize, ac, inlet_name)
-                    if inlet_name in raster_inlets:
-                        layer_name = ac['assets'][inlet_name]['out_layer']
-                        await asyncio.to_thread(dataswale_geojson.refresh_raster_layer, ac, layer_name)
+                    out_layer = assets[inlet_name].get('out_layer')
+                    if out_layer in raster_layers:
+                        await asyncio.to_thread(dataswale_geojson.refresh_raster_layer, ac, out_layer)
                     create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
                 except Exception as inlet_err:
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
                     create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
-            for outlet_name in ["notebook", "webmap", "webedit", "html"]:
+
+            # Outlets: webmap must precede html (console HTML checks for the
+            # webmap output); notebook first, html last.
+            _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
+            outlet_names = sorted(
+                (n for n, a in assets.items() if a.get('type') == 'outlet'),
+                key=lambda n: _outlet_order.get(n, 5)
+            )
+            for outlet_name in outlet_names:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                 try:
                     await asyncio.to_thread(atlas.materialize, ac, outlet_name)

@@ -1,0 +1,33 @@
+{
+  "label": "Simple",
+  "description": "A minimal atlas: roads, creeks, and landmarks over terrain. A clean starting point for any region.",
+  "layers": {
+    "regions": { "layer_def": "regions" },
+    "roads": { "layer_def": "roads" },
+    "creeks": { "layer_def": "creeks" },
+    "landmarks": { "layer_def": "poi" }
+  },
+  "assets": {
+    "public_roads": { "type": "inlet", "out_layer": "roads", "config_def": "overture_roads" },
+    "public_creeks": { "type": "inlet", "out_layer": "creeks", "config_def": "nhd_creeks" },
+    "public_landmarks": { "type": "inlet", "out_layer": "landmarks", "config_def": "osm_poi" },
+    "webmap": {
+      "type": "outlet", "name": "webmap", "config_def": "webmap",
+      "in_layers": ["regions", "roads", "creeks", "landmarks"],
+      "access": ["public", "internal", "admin"]
+    },
+    "webedit": {
+      "type": "outlet", "name": "webedit", "config_def": "webedit",
+      "in_layers": ["regions", "roads", "creeks", "landmarks"]
+    },
+    "3dview": {
+      "type": "outlet", "name": "3dview", "config_def": "3dview",
+      "access": ["public", "internal", "admin"]
+    },
+    "html": { "type": "outlet", "name": "html", "config_def": "static_html" },
+    "notebook": {
+      "type": "outlet", "name": "notebook", "config_def": "jupyter_notebook",
+      "access": ["technical"]
+    }
+  }
+}
