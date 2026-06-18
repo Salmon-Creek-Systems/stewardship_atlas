@@ -88,6 +88,16 @@
                     "watertanks": {
                         "layer_def": "watertanks"
                     },
+                    "watertanks__shared": {
+                        "layer_def": "watertanks",
+                        "hidden": true,
+                        "shareable": {
+                            "enabled": true,
+                            "title": "Water tanks",
+                            "description": "Static water sources for suppression planning, federated from the Kennedy atlas.",
+                            "license": "CC-BY-4.0"
+                        }
+                    },
                     "ponds": {
                         "layer_def": "ponds"
                     },
@@ -173,6 +183,17 @@
                     "local_watertanks": {
                         "out_layer": "watertanks",
                         "config_def": "local_watertanks"
+                    },
+                    "watertanks_shared": {
+                        "type": "eddy",
+                        "config_def": "mask_properties",
+                        "in_layer": "watertanks",
+                        "out_layer": "watertanks__shared",
+                        "block": ["webmap_url"]
+                    },
+                    "stac": {
+                        "type": "outlet",
+                        "config_def": "stac_catalog"
                     },
                     "local_ponds": {
                         "out_layer": "ponds",

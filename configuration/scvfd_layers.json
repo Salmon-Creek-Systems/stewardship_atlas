@@ -241,6 +241,51 @@
         ]
     },
     {
+        "name": "kennedy_watertanks",
+        "geometry_type": "point",
+        "add_labels": true,
+        "color": [
+            120,
+            50,
+            200
+        ],
+        "fill_color": [
+            150,
+            80,
+            230
+        ],
+        "symbol": {
+            "png": "watertank.png",
+            "icon": "custom/octy"
+        },
+        "icon-size": 1.0,
+        "show_attributes": true,
+        "interaction": "interface",
+        "attribution": {
+            "title": "Kennedy water tanks (federated)",
+            "description": "Water tanks federated from the Kennedy atlas.",
+            "url": "https://fireatlas.org/kennedy",
+            "license": "CC-BY-4.0"
+        },
+        "editable_columns": [
+            {
+                "name": "name",
+                "type": "string",
+                "default": ""
+            },
+            {
+                "name": "size",
+                "type": "string",
+                "default": ""
+            },
+            {
+                "name": "capacity",
+                "type": "string",
+                "default": ""
+            }
+        ]
+    },
+    {
         "name": "ponds",
         "geometry_type": "polygon",
         "color": [

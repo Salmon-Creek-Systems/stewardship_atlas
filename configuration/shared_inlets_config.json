@@ -1,4 +1,11 @@
 {
+    "federation": {
+        "asset_type": "inlet",
+        "fetch_type": "federation",
+        "interaction": "import",
+        "data_type": "geojson",
+        "bbox": null
+    },
     "overture_addresses": {
         "name": "addresses",
         "asset_type": "inlet",

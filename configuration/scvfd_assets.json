@@ -77,6 +77,13 @@
         "out_layer": "watertanks",
         "config_def": "local_watertanks"
     },
+    "kennedy_watertanks": {
+        "type": "inlet",
+        "out_layer": "kennedy_watertanks",
+        "config_def": "federation",
+        "source_catalog": "https://fireatlas.org/kennedy/CURRENT/outlets/stac/catalog.json",
+        "collection_id": "watertanks__shared"
+    },
     "local_ponds": {
         "type": "inlet",
         "out_layer": "ponds",
@@ -106,6 +113,7 @@
             "buildings",
             "hydrants",
             "watertanks",
+            "kennedy_watertanks",
             "poi",
             "lpss",
             "hazards"

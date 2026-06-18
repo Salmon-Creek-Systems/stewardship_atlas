@@ -1,4 +1,11 @@
 {
+    "mask_properties": {
+        "name": "mask_properties",
+        "asset_type": "eddy",
+        "fetch_type": "mask_properties",
+        "interaction": "backend",
+        "data_type": "geojson"
+    },
     "derived_hillshade": {
         "name": "hillshade",
         "asset_type": "eddy",

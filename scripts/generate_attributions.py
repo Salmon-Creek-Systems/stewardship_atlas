@@ -25,6 +25,18 @@ python_dir = script_dir.parent / 'python'
 sys.path.insert(0, str(python_dir))
 
 import utils
+import federation
+
+
+def _load_provenance(staging_dir: Path, layer_name: str) -> Dict[str, Any]:
+    """Return the federation provenance record for a layer, or {} if none.
+
+    Written by the federation inlet at layers/{layer}/provenance.json."""
+    prov_path = staging_dir / 'layers' / layer_name / 'provenance.json'
+    if prov_path.exists():
+        with open(prov_path) as f:
+            return json.load(f)
+    return {}
 
 
 def bbox_to_polygon_coords(bbox: Dict[str, float]) -> List[List[List[float]]]:
@@ -80,6 +92,9 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
     
     polygon_coords = bbox_to_polygon_coords(bbox)
     
+    # Staging dir holds layers/ (and per-layer provenance.json for federated layers)
+    staging_dir = config_path.parent
+
     # Get layers
     layers = config.get('dataswale', {}).get('layers', [])
     if not layers:
@@ -97,11 +112,12 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
     for layer in layers:
         layer_name = layer.get('name', 'unknown')
         attr = layer.get('attribution', {})
-        
+        prov = _load_provenance(staging_dir, layer_name)
+
         # Check if layer has any real attribution data
-        has_attribution = any([attr.get('title'), attr.get('description'), attr.get('url'), 
+        has_attribution = any([attr.get('title'), attr.get('description'), attr.get('url'),
                                attr.get('license'), attr.get('citation')])
-        
+
         if has_attribution:
             # Build attribution dict from existing data with reasonable defaults
             attribution = {
@@ -112,6 +128,18 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
                 'citation': attr.get('citation', 'Not Specified'),
                 'logo_url': attr.get('logo_url', atlas_logo),
                 'metadata': attr.get('metadata', '')
+            }
+        elif prov:
+            # Federated layer with no static attribution — title from provenance,
+            # the rest filled in by fold_provenance_into_attribution below.
+            attribution = {
+                'title': f'Federated source: {layer_name}',
+                'description': '',
+                'url': '',
+                'license': attr.get('license', 'Not Specified'),
+                'citation': attr.get('citation', 'Not Specified'),
+                'logo_url': atlas_logo,
+                'metadata': ''
             }
         else:
             # No attribution data - create placeholder with helpful defaults
@@ -124,7 +152,12 @@ def generate_attributions(config_path: str, output_path: str = None) -> Path:
                 'logo_url': atlas_logo,
                 'metadata': ''
             }
-        
+
+        # Fold federation provenance (source catalog, version, fetch time) into
+        # the attribution so the console '(source)' link reflects the pull.
+        if prov:
+            attribution = federation.fold_provenance_into_attribution(attribution, prov)
+
         key = attribution_key(attribution)
         attribution_groups[key].append(layer_name)
     

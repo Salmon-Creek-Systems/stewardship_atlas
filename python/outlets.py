@@ -17,6 +17,7 @@ import geojson
 import gspread
 
 import dataswale_geojson
+import federation
 import utils
 # from outlets_mapnik import build_region_map_mapnik
 
@@ -3035,6 +3036,60 @@ def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
                   
     return statefile_path
 
+def outlet_stac_catalog(config: dict, outlet_name: str) -> Path:
+    """Publish shareable layers as a static STAC catalog (federation source side).
+
+    Pure serializer: discovers layers whose `shareable.enabled` is set, then
+    writes one catalog.json plus one collection.json per shareable layer into the
+    outlet dir. Each collection's `data` asset points at that layer's
+    already-published (already-masked) GeoJSON. No property logic lives here —
+    masking is done upstream by the mask_properties eddy, so the outlet cannot
+    leak withheld data. See python/federation.py and federation-overview.md.
+
+    Config keys (all optional):
+        description:  catalog description text
+        version_path: published version dir referenced by hrefs (default 'CURRENT')
+    """
+    outlet_config = config['assets'][outlet_name]['config']
+    out_dir = versioning.atlas_path(config, "outlets") / outlet_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    shareable = federation.iter_shareable_layers(config['dataswale']['layers'])
+    bbox = config['dataswale']['bbox']
+
+    # FUTURE: hrefs target the published CURRENT snapshot so consumers pull a
+    # stable version, not churning staging. A read-endpoint variant (overview §7)
+    # would swap this base for a dynamic URL without touching the builder.
+    base_url = config['base_url']
+    version_path = outlet_config.get('version_path', 'CURRENT')
+    catalog_base_url = f"{base_url}/{version_path}/outlets/{outlet_name}/"
+    data_base_url = f"{base_url}/{version_path}/layers/"
+
+    catalog, collections = federation.build_stac_catalog(
+        atlas_id=config['name'],
+        atlas_description=outlet_config.get(
+            'description', f"Shareable layers published by the {config['name']} atlas."),
+        shareable_layers=shareable,
+        bbox=bbox,
+        catalog_base_url=catalog_base_url,
+        data_base_url=data_base_url,
+    )
+
+    catalog_path = out_dir / 'catalog.json'
+    with open(catalog_path, 'w') as f:
+        json.dump(catalog, f, indent=2)
+
+    for layer_name, collection in collections.items():
+        coll_dir = out_dir / layer_name
+        coll_dir.mkdir(parents=True, exist_ok=True)
+        with open(coll_dir / 'collection.json', 'w') as f:
+            json.dump(collection, f, indent=2)
+
+    logger.info(f"stac_catalog: wrote catalog + {len(collections)} collection(s) to "
+                f"{out_dir} ({[s['name'] for s in shareable]})")
+    return catalog_path
+
+
 def s3_upload(config: dict[str, any], outlet_name: str) -> Path:
     """Upload a layer's COG to S3 for public delivery.
 
@@ -3182,5 +3237,6 @@ asset_methods = {
     'config_editor': outlet_config_editor,
     '3dview': outlet_3dview,
     's3_upload': s3_upload,
+    'stac_catalog': outlet_stac_catalog,
     'biochar_webedit': outlet_biochar_webedit,
 }
