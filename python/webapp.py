@@ -651,9 +651,14 @@ def _load_starter(key: str) -> dict:
         return json.load(f)
 
 
-@app.get("/starters")
+@app.get("/create-starters")
 async def list_starters():
     """List available starter bundles for the /create dropdown.
+
+    Routed under the /create prefix so the existing nginx location block
+    (^/(create|create_atlas|create-status|templates/)) proxies it to the
+    webapp; a bare /starters path would fall through to the atlas-slug
+    redirect and 302 instead.
 
     Returns [{key, label, description}], with 'simple' first when present.
     """

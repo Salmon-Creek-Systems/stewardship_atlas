@@ -125,7 +125,7 @@
     }
     starterSelect.addEventListener('change', updateStarterDescription);
 
-    fetch('/starters')
+    fetch('/create-starters')
         .then(r => r.json())
         .then(data => {
             starters = data.starters || [];
