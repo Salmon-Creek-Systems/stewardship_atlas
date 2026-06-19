@@ -354,6 +354,8 @@
                             "basemap",
                             "lidar_basemap",
                             "ponds",
+                            "burn_areas",
+                            "processing_sites",
                             "contours",
                             "roads",
                             "creeks",
