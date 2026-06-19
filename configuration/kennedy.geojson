@@ -212,6 +212,28 @@
                                 "visibility": "visible"
                             }
                         }
+                    },
+                    "landfire_evc": {
+                        "geometry_type": "raster",
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "paint": {
+                            "raster-opacity": 0.5
+                        }
+                    },
+                    "landfire_evt": {
+                        "geometry_type": "raster",
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "paint": {
+                            "raster-opacity": 0.5
+                        }
                     }
                 },
                 "assets": {
@@ -354,6 +376,8 @@
                             "basemap",
                             "lidar_basemap",
                             "ponds",
+                            "landfire_evt",
+                            "landfire_evc",
                             "burn_areas",
                             "processing_sites",
                             "contours",
