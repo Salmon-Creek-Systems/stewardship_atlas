@@ -118,9 +118,149 @@
                     },
                     "notes": {
                         "layer_def": "notes"
+                    },
+                    "roads_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            100,
+                            55,
+                            50
+                        ],
+                        "fill_color": [
+                            100,
+                            55,
+                            50
+                        ],
+                        "fill_opacity": 0.3,
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        }
+                    },
+                    "creeks_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_opacity": 0.3,
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        }
+                    },
+                    "burn_areas": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            155,
+                            5,
+                            5
+                        ],
+                        "fill_color": [
+                            255,
+                            50,
+                            50
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "fill_opacity": 0.4,
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Treatment Area"
+                            }
+                        ],
+                        "vis": {
+                            "layout": {
+                                "visibility": "visible"
+                            }
+                        }
+                    },
+                    "processing_sites": {
+                        "geometry_type": "point",
+                        "color": [
+                            128,
+                            0,
+                            128
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Processing Site"
+                            }
+                        ],
+                        "vis": {
+                            "layout": {
+                                "visibility": "visible"
+                            }
+                        }
                     }
                 },
                 "assets": {
+                    "landfire_evc": {
+                        "type": "inlet",
+                        "out_layer": "landfire_evc",
+                        "config_def": "landfire_evc"
+                    },
+                    "landfire_evt": {
+                        "type": "inlet",
+                        "out_layer": "landfire_evt",
+                        "config_def": "landfire_evt"
+                    },
+                    "roads_h3": {
+                        "type": "eddy",
+                        "config_def": "h3_cells",
+                        "in_layer": "roads",
+                        "out_layer": "roads_index",
+                        "starting_resolution": 11
+                    },
+                    "creeks_h3": {
+                        "type": "eddy",
+                        "config_def": "h3_cells",
+                        "in_layer": "creeks",
+                        "out_layer": "creeks_index",
+                        "starting_resolution": 11,
+                        "max_cells": 100
+                    },
+                    "burns_h3": {
+                        "type": "eddy",
+                        "config_def": "h3_cells",
+                        "in_layer": "burns",
+                        "out_layer": "burns_index",
+                        "starting_resolution": 11,
+                        "max_cells": 100
+                    },
+                    "processing_sites_h3": {
+                        "type": "eddy",
+                        "config_def": "processing_sites_h3",
+                        "starting_resolution": 11
+                    },
+                    "fuel_mass_landfire": {
+                        "type": "eddy",
+                        "config_def": "fuel_mass_landfire"
+                    },
+                    "biochar_simulation": {
+                        "type": "eddy",
+                        "config_def": "biochar_simulation"
+                    },
                     "dem": {
                         "out_layer": "elevation",
                         "config_def": "opentopo_dem"
@@ -189,7 +329,9 @@
                         "config_def": "mask_properties",
                         "in_layer": "watertanks",
                         "out_layer": "watertanks__shared",
-                        "block": ["webmap_url"]
+                        "block": [
+                            "webmap_url"
+                        ]
                     },
                     "stac": {
                         "type": "outlet",
@@ -326,11 +468,11 @@
                         "config_def": "static_html"
                     },
                     "console": {
-			"config_def": "console"
+                        "config_def": "console"
                     },
-		    "sqldb": {				
+                    "sqldb": {
                         "config_def": "sqldb",
-                        "layers": [	
+                        "layers": [
                             "basemap",
                             "roads",
                             "creeks"
