@@ -272,6 +272,7 @@
                     },
                     "processing_sites_h3": {
                         "type": "eddy",
+                        "in_layer": "processing_sites",
                         "config_def": "processing_sites_h3",
                         "starting_resolution": 11
                     },
