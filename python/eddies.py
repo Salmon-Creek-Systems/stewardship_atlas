@@ -482,10 +482,15 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
         # Try to find a resolution that gives us <= max_num_cells
         while res >= 0:
             try:
-                # Create H3 polygon and get cells
+                # Create H3 polygon and get cells.
+                # Use 'overlap' containment (h3 >= 4.1): include any cell that
+                # overlaps the polygon, not only cells whose center falls inside.
+                # Center-containment returns 0 cells for polygons smaller than ~1
+                # cell at this resolution (e.g. a small burn/treatment area at
+                # res 11), which silently produced empty index layers.
                 h3_poly = h3.LatLngPoly(polygon_coords)
-                h3_cells = h3.h3shape_to_cells(h3_poly, res)
-                
+                h3_cells = h3.h3shape_to_cells_experimental(h3_poly, res, 'overlap')
+
                 # Convert to list and check count
                 cell_list = list(h3_cells)
                 cell_count = len(cell_list)
