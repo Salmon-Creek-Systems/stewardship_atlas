@@ -420,7 +420,7 @@
                             "burn_areas",
                             "processing_sites",
                             "contours",
-                            "roads_index","creeks_index","burns_index","processing_sites_index","fuel_mass_landfire",
+                            "roads_index","creeks_index","burns_index","processing_sites_index",
                             "roads",
                             "creeks",
                             "buildings",
