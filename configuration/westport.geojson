@@ -814,6 +814,7 @@
               "campgrounds"
             ],
             "config_def": "webmap",
+            "default_view": "eyJhIjozOS42NDI2OTg5MzEyMzQ2MzQsIm8iOi0xMjMuNzcxOTE4MjA2NDE4NjYsInoiOjE0LjcyNjI3NDUyMzU5OTQ1OSwiYiI6ImJhc2VtYXAiLCJsIjpbImJhc2VtYXAiLCJyb2Fkc19wcmltYXJ5Iiwicm9hZHNfc2Vjb25kYXJ5Iiwicm9hZHNfdGVydGlhcnkiLCJwb3dlcmxpbmVzIiwiYnVpbGRpbmdzIiwiaGVsaWxhbmRpbmdzIiwiaHlkcmFudHMiXX0=",
             "access": [
               "public",
               "internal",
