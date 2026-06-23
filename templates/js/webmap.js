@@ -235,10 +235,25 @@ map.on('load', async () => {
     // Restore layer visibility from ?s= state before legend initializes (so checkboxes render correctly)
     if (urlState && urlState.l) {
         const visibleSet = new Set(urlState.l);
+        // Build group -> layer ids from the current style. Each legend entry points at
+        // a single layer (the label layer for labeled features), but a layer's geometry
+        // and label are separate map layers sharing a metadata.group. Relying on the
+        // lazy window.LAYER_GROUPS / setLayoutProperty override is racy at load time, so
+        // resolve the full group here and set visibility on every member directly.
+        const groupMembers = {};
+        map.getStyle().layers.forEach(l => {
+            const g = l.metadata && l.metadata.group;
+            if (g) (groupMembers[g] = groupMembers[g] || []).push(l.id);
+        });
         for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
-            if (map.getLayer(layerId)) {
-                map.setLayoutProperty(layerId, 'visibility', visibleSet.has(layerName) ? 'visible' : 'none');
-            }
+            const vis = visibleSet.has(layerName) ? 'visible' : 'none';
+            // Fall back to the legend target layer itself for ungrouped layers (e.g. COG).
+            const ids = groupMembers[layerName] || [layerId];
+            ids.forEach(id => {
+                if (map.getLayer(id)) {
+                    originalSetLayoutProperty.call(map, id, 'visibility', vis);
+                }
+            });
         }
     }
 
@@ -547,7 +562,10 @@ map.on('load', async () => {
             const basemap = document.getElementById('basemap-select').value;
             const visibleLayers = [];
             for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
-                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') === 'visible') {
+                // MapLibre returns undefined for layers whose visibility was never
+                // explicitly set; those are visible-by-default. Treat anything that
+                // isn't explicitly 'none' as visible so default-on layers are captured.
+                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') !== 'none') {
                     visibleLayers.push(layerName);
                 }
             }
