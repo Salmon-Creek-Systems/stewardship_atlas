@@ -1,4 +1,10 @@
 {
+    "stac_catalog": {
+        "name": "stac",
+        "asset_type": "outlet",
+        "fetch_type": "stac_catalog",
+        "interaction": "backend"
+    },
     "s3_upload": {
         "asset_type": "outlet",
         "fetch_type": "s3_upload",

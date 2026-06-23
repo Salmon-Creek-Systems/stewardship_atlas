@@ -13,6 +13,7 @@ import subprocess
 import versioning
 import utils
 import outlets
+import federation
 import h3
 from datetime import datetime
 
@@ -481,10 +482,15 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
         # Try to find a resolution that gives us <= max_num_cells
         while res >= 0:
             try:
-                # Create H3 polygon and get cells
+                # Create H3 polygon and get cells.
+                # Use 'overlap' containment (h3 >= 4.1): include any cell that
+                # overlaps the polygon, not only cells whose center falls inside.
+                # Center-containment returns 0 cells for polygons smaller than ~1
+                # cell at this resolution (e.g. a small burn/treatment area at
+                # res 11), which silently produced empty index layers.
                 h3_poly = h3.LatLngPoly(polygon_coords)
-                h3_cells = h3.h3shape_to_cells(h3_poly, res)
-                
+                h3_cells = h3.h3shape_to_cells_experimental(h3_poly, res, 'overlap')
+
                 # Convert to list and check count
                 cell_list = list(h3_cells)
                 cell_count = len(cell_list)
@@ -517,9 +523,46 @@ def h3_for_polygon(geometry, starting_res=11, swap_coordinates=True, max_num_cel
         raise Exception(f"Failed to generate H3 indices for polygon: {str(e)}")
 
 
+def mask_properties(config, asset_name):
+    """
+    Eddy: project a layer's feature properties, writing a masked copy to out_layer.
+
+    A generic, reusable property filter. The source `in_layer` is never modified —
+    masking is applied to a copy written to `out_layer`. Used by federation to
+    produce a shareable layer with sensitive properties withheld, but useful
+    anywhere a redacted/projected variant of a layer is needed.
+
+    Config (resolved 'config' subdict):
+        in_layer  — source layer to read
+        out_layer — layer to write the masked features to
+        allow / block — exactly one (or neither); passed to utils.mask_features
+                        (allow: keep only these keys; block: drop these keys)
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config['in_layer']
+    out_layer = asset_config['out_layer']
+    allow = asset_config.get('allow')
+    block = asset_config.get('block')
+
+    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not layer_data or 'features' not in layer_data:
+        raise Exception(f"mask_properties: could not load layer '{in_layer}' or it has no features")
+
+    masked = federation.mask_features(layer_data, allow=allow, block=block)
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(masked, f, default=utils.json_serial)
+
+    logger.info(f"mask_properties: wrote {len(masked['features'])} features from '{in_layer}' "
+                f"to '{out_layer}' (allow={allow}, block={block})")
+    return out_path
+
+
 def h3_cells(config, asset_name):
     """
-    Eddy function to generate hexagonal H3 cell features from input layer geometries. 
+    Eddy function to generate hexagonal H3 cell features from input layer geometries.
     
     Args:
         config: Configuration dictionary containing assets
@@ -1895,6 +1938,7 @@ asset_methods = {
     "gdal_contours": contours_gdal,
     "contours": contours_gdal,  # legacy name, kept for config compatibility
     "h3_cells": h3_cells,
+    "mask_properties": mask_properties,
     "hillshade_tiles": hillshade_to_pmtiles,
     "terrain_rgb_tiles": terrain_rgb_to_pmtiles,
     "fuel_mass_landfire": fuel_mass_from_landfire,

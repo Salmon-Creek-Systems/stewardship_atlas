@@ -634,6 +634,46 @@ Contact your atlas administrator for:
 - Downloaded data should be handled according to your organization's policies
 - Consider data licensing and attribution requirements when sharing
 
+### TLS Certificate Expired / `certbot renew` Fails
+
+**Symptoms:** Browsers warn the certificate has expired and API calls (port `:9000`) stop working entirely — `curl` reports `SSL certificate problem: certificate has expired` with `http_code=000` (the TLS handshake never completes, so nothing the API does matters). Running `sudo certbot renew` fails with:
+
+```
+Failed to renew certificate fireatlas.org-0001 with error: The manual plugin is not
+working ... An authentication script must be provided with --manual-auth-hook when
+using the manual plugin non-interactively.
+```
+
+**Cause:** The cert is (or was) a **wildcard** `*.fireatlas.org`. Wildcards can only be validated by **DNS-01**, and this lineage was issued with certbot's **manual** plugin (`authenticator = manual` in `/etc/letsencrypt/renewal/fireatlas.org-0001.conf`). `certbot renew` *always* runs non-interactively (it's built for cron), so it refuses to prompt for the manual DNS step regardless of you sitting at a terminal — it needs a `--manual-auth-hook`. There isn't one, so auto-renewal has silently failed every cycle since the switch to a wildcard. It only surfaces when the 90-day cert actually expires. This is **not** a terminal/`TERM` problem, and not caused by nginx config edits.
+
+**Confirm it:**
+```bash
+echo | openssl s_client -servername fireatlas.org -connect fireatlas.org:443 2>/dev/null \
+  | openssl x509 -noout -subject -dates          # look for CN=*.fireatlas.org and a past notAfter
+sudo cat /etc/letsencrypt/renewal/fireatlas.org-0001.conf   # authenticator = manual
+```
+
+**Cure (drop the wildcard → explicit SANs over HTTP-01, which auto-renews):** We only use the apex plus the `scvfd` and `westportvfd` subdomains, and they all point at this host, so HTTP-01 works. Reuse `--cert-name` so the files stay at `/etc/letsencrypt/live/fireatlas.org-0001/` — **nginx and the `:9000` launch flags don't change**, only the cert contents and authenticator:
+
+```bash
+sudo certbot certonly --nginx \
+  --cert-name fireatlas.org-0001 \
+  -d fireatlas.org -d scvfd.fireatlas.org -d westportvfd.fireatlas.org
+# confirm 'yes' when it warns the domain set changed (dropping *.fireatlas.org)
+```
+
+Then reload/restart both services that serve the cert:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+# HARD restart the :9000 uvicorn screen session — it loads --ssl-certfile at launch,
+# so --reload will NOT pick up the new cert. Kill the screen session and relaunch it.
+```
+
+This restores service **and** brings back unattended renewal (`authenticator` becomes `nginx`, which `certbot renew` can run on its own). Caveat: `--nginx` needs a `server_name` matching each `-d` name; if certbot can't find one for a subdomain, add it to the server block and rerun.
+
+**Alternative — keep the wildcard:** if you need arbitrary `*.fireatlas.org` subdomains, install the `dns-route53` plugin (our DNS is in Route 53, personal AWS account) and reissue with `--dns-route53`. Also fully automated, but requires the plugin plus AWS credentials with `route53:ChangeResourceRecordSets` available on the box.
+
 ### Diagnosing Email Photo Submissions
 
 If a photo email doesn't appear in the atlas within a few minutes, use the `trace_email.py` script to follow it through the pipeline and find where it stopped.

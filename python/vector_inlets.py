@@ -5,6 +5,7 @@ from shapely.geometry import shape
 
 import versioning
 import utils
+import federation
 import deltas_geojson as deltas
 
 import overpass
@@ -422,6 +423,77 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     # TODO: delta refresh — pass updated_since=<last_run> to the API to skip unchanged observations
 
 
+def federation_inlet(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
+    """Pull a published layer from another atlas's static STAC catalog.
+
+    Federation consumer side: reads the source catalog.json, resolves the target
+    collection by id, follows its `data` asset to the (already-masked) GeoJSON,
+    optionally filters to a bbox, writes the features into out_layer, and records
+    provenance for the attribution system. Build-time only — no runtime
+    dependency on the source after ingest. Consumes exactly what's published;
+    never attempts to unmask or re-derive. See python/federation.py.
+
+    Config keys:
+        source_catalog: URL of the source atlas catalog.json (required)
+        collection_id:  collection (layer) id to pull (required)
+        out_layer:      consumer layer to write into (required)
+        bbox:           [w, s, e, n] to filter to an explicit box, or truthy to
+                        filter to the atlas bbox; falsy/absent ⇒ no spatial filter
+    """
+    import json
+    import requests
+    # FUTURE: transport is plain HTTP over a static catalog; a STAC-API / read-
+    # endpoint variant (overview §7) would slot in here without changing callers.
+    from urllib.parse import urljoin
+
+    inlet_config = config['assets'][name]['config']
+    source_catalog = inlet_config['source_catalog']
+    collection_id = inlet_config['collection_id']
+    out_layer = inlet_config.get('out_layer') or config['assets'][name].get('out_layer')
+    use_bbox = inlet_config.get('bbox')
+
+    def _get_json(url, step):
+        try:
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            raise RuntimeError(f"federation_inlet: failed to {step} from {url}: {e}")
+
+    catalog = _get_json(source_catalog, "fetch catalog")
+    child_href = federation.resolve_collection_href(catalog, collection_id)
+    collection_url = urljoin(source_catalog, child_href)
+    collection = _get_json(collection_url, "fetch collection")
+    data_url = urljoin(collection_url, federation.data_href_from_collection(collection))
+    fc = _get_json(data_url, "fetch layer geojson")
+
+    if use_bbox:
+        if isinstance(use_bbox, (list, tuple)) and len(use_bbox) == 4:
+            w, s, e, n = use_bbox
+            filter_bbox = {'west': w, 'south': s, 'east': e, 'north': n}
+        else:
+            filter_bbox = config['dataswale']['bbox']
+        fc = federation.filter_features_to_bbox(fc, filter_bbox)
+
+    fc = geojson.FeatureCollection(fc.get('features', []))
+    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+
+    # Provenance → folded into attribution by generate_attributions.py
+    provenance = federation.build_provenance(
+        source_catalog=source_catalog,
+        collection_id=collection_id,
+        source_version=federation.source_version_from_collection(collection),
+        consumer_version=config.get('version'),
+    )
+    prov_path = versioning.atlas_path(config, 'layers') / out_layer / 'provenance.json'
+    prov_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(prov_path, 'w') as f:
+        json.dump(provenance, f, indent=2)
+
+    logger.info(f"federation_inlet: pulled {len(fc['features'])} features for collection "
+                f"'{collection_id}' from {source_catalog} into '{out_layer}'")
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
@@ -429,6 +501,7 @@ asset_methods = {
     "fetch_osm": fetch_osm,
     "s3_geojson": s3_geojson,
     "s3_gpkg": s3_gpkg,
+    "federation": federation_inlet,
     "h3_grid": h3_grid_inlet,
     "inaturalist": inaturalist_inlet,
     }
