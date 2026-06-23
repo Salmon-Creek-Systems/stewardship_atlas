@@ -232,6 +232,25 @@
                             }
                         }
                     },
+                    "processing_sites_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_opacity": 0.3,
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        }
+                    },
                     "landfire_evc": {
                         "geometry_type": "raster",
                         "vis": {
