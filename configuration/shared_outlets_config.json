@@ -69,7 +69,8 @@
             "description": "Open Topography's Global DEM",
             "license": "https://portal.opentopography.org/api/terms",
             "citation": "https://portal.opentopography.org/api/terms"
-        }
+        },
+        "default_view": ""
     },
     "webedit": {
         "asset_type": "outlet",

@@ -500,7 +500,7 @@ def webmap_json(config, name, sprite_json=None):
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
             "cog_sources": cog_sources, "cog_layers": cog_layers}
 
-def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None):
+def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view=''):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     source_root = versioning.atlas_path(config, version='app') 
@@ -607,6 +607,7 @@ void await map.loadImage('{im_uri}',
             app_url=app_url,
             swalename=config.get('name', ''),
             lidar_basemap_option=lidar_basemap_option,
+            default_view=json.dumps(default_view or ""),
             qr_code=qr_code_html)
 
     with open(output_path, 'w') as f_out:
@@ -806,7 +807,10 @@ def outlet_webmap(config, name):
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
     page_url = f"{config['base_url']}/staging/outlets/{name}/"
-    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json, page_url=page_url)
+    # Optional default view: a bare share-state blob applied when the map loads with no ?s= param.
+    default_view = config['assets'][name].get('default_view', '')
+    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json,
+                                  page_url=page_url, default_view=default_view)
   
     return output_path
 

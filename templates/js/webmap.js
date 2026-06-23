@@ -125,7 +125,14 @@ map.on('load', async () => {
     // Handle URL parameters after map is loaded.
     // ?s= param: base64-encoded JSON state (preferred, set by internal share link).
     // ?lat=&lng=&zoom= params: legacy fallback so old links continue to work.
-    const urlState = decodeMapState(getUrlParameter('s'));
+    let urlState = decodeMapState(getUrlParameter('s'));
+    // Fall back to the outlet's configured default view (a bare share-state blob) when the
+    // map is opened with no ?s= parameter. Strip the point marker so a default view never
+    // drops a pin. An explicit ?s= link always takes precedence.
+    if (!urlState && typeof DEFAULT_VIEW !== 'undefined' && DEFAULT_VIEW) {
+        urlState = decodeMapState(DEFAULT_VIEW);
+        if (urlState) delete urlState.p;
+    }
     let targetLat, targetLng, targetZoom;
     if (urlState) {
         targetLat = urlState.a;
