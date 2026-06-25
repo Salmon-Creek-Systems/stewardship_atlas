@@ -125,6 +125,7 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
             toggle_ids.append(label_id)
 
         toggle_list.append({
+            'name': name,
             'ids': toggle_ids,
             'label': name.replace('_', ' ').title(),
             'visible': visible,
@@ -134,24 +135,30 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
 
 
 def _build_toggle_panel_html(toggle_list: list) -> str:
-    if not toggle_list:
-        return ''
+    # The panel always renders so the Share view button is available, even for
+    # atlases with no overlay layers. The Layers header/list only appears when
+    # there are toggleable layers.
     lines = [
         '<div class="layer-panel">',
-        '    <div class="layer-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">',
-        '        Layers <span class="layer-panel-arrow">&#x25be;</span>',
-        '    </div>',
-        '    <div class="layer-panel-list">',
+        '    <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
     ]
-    for t in toggle_list:
-        ids_attr = ','.join(t['ids'])
-        checked = ' checked' if t['visible'] else ''
-        lines.append(
-            f'        <label>'
-            f'<input type="checkbox" data-layers="{ids_attr}"{checked}> '
-            f'{t["label"]}</label>'
-        )
-    lines += ['    </div>', '</div>']
+    if toggle_list:
+        lines += [
+            '    <div class="layer-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">',
+            '        Layers <span class="layer-panel-arrow">&#x25be;</span>',
+            '    </div>',
+            '    <div class="layer-panel-list">',
+        ]
+        for t in toggle_list:
+            ids_attr = ','.join(t['ids'])
+            checked = ' checked' if t['visible'] else ''
+            lines.append(
+                f'        <label>'
+                f'<input type="checkbox" data-layers="{ids_attr}" data-name="{t["name"]}"{checked}> '
+                f'{t["label"]}</label>'
+            )
+        lines += ['    </div>']
+    lines += ['</div>']
     return '\n'.join(lines)
 
 
@@ -199,10 +206,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     }
     style_json = json.dumps(style, indent=4)
 
-    layer_toggle_js = ""
+    # Checkbox change listeners only matter when there are toggleable layers.
+    checkbox_listener_js = ""
     if toggle_list:
-        layer_toggle_js = """
-        map.on('load', () => {
+        checkbox_listener_js = """
             document.querySelectorAll('.layer-panel-list input[type=checkbox]').forEach(cb => {
                 cb.addEventListener('change', e => {
                     const vis = e.target.checked ? 'visible' : 'none';
@@ -210,8 +217,87 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                         map.setLayoutProperty(id, 'visibility', vis);
                     });
                 });
+            });"""
+
+    # Share view + restore-from-URL. Always emitted so the Share button works
+    # even when the atlas has no overlay layers.
+    # Share state is a base64-encoded JSON blob in the ?s= param. This codec is
+    # intentionally independent of the webmap's share state (different camera
+    # fields), so the two are not coupled.
+    # Keys: a=lat, o=lng, z=zoom, t=pitch, r=bearing, e=exaggeration, l=visible layer names.
+    interaction_js = """
+        function encode3DState(s) { return btoa(JSON.stringify(s)); }
+        function decode3DState(s) { try { return JSON.parse(atob(s)); } catch (e) { return null; } }
+
+        function showSuccessNotification(message, duration = 2000) {
+            const n = document.createElement('div');
+            n.className = 'success-notification';
+            n.textContent = message;
+            document.body.appendChild(n);
+            setTimeout(() => n.remove(), duration);
+        }
+
+        function buildShareUrl() {
+            const c = map.getCenter();
+            const exEl = document.getElementById('exaggeration');
+            const layers = [];
+            document.querySelectorAll('.layer-panel-list input[type=checkbox]').forEach(cb => {
+                if (cb.checked) layers.push(cb.dataset.name);
             });
-        });"""
+            const state = {
+                a: +c.lat.toFixed(6),
+                o: +c.lng.toFixed(6),
+                z: +map.getZoom().toFixed(2),
+                t: Math.round(map.getPitch()),
+                r: Math.round(map.getBearing()),
+                e: exEl ? parseFloat(exEl.value) : 1.5,
+                l: layers,
+            };
+            return `https://${window.location.hostname}${window.location.pathname}?s=${encode3DState(state)}`;
+        }
+
+        const shareBtn = document.getElementById('share-view-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                const url = buildShareUrl();
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url)
+                        .then(() => showSuccessNotification('View link copied to clipboard!'))
+                        .catch(() => prompt('Copy this link:', url));
+                } else {
+                    prompt('Copy this link:', url);
+                }
+            });
+        }
+
+        map.on('load', () => {
+            CHECKBOX_LISTENERS
+
+            const st = decode3DState(new URLSearchParams(window.location.search).get('s'));
+            if (!st) return;
+            if (typeof st.a === 'number' && typeof st.o === 'number') map.setCenter([st.o, st.a]);
+            if (typeof st.z === 'number') map.setZoom(st.z);
+            if (typeof st.t === 'number') map.setPitch(st.t);
+            if (typeof st.r === 'number') map.setBearing(st.r);
+            if (typeof st.e === 'number') {
+                const exEl = document.getElementById('exaggeration');
+                const exVal = document.getElementById('exaggeration-value');
+                if (exEl) exEl.value = st.e;
+                if (exVal) exVal.textContent = st.e + 'x';
+                map.setTerrain({source: 'terrain', exaggeration: st.e});
+            }
+            if (Array.isArray(st.l)) {
+                const want = new Set(st.l);
+                document.querySelectorAll('.layer-panel-list input[type=checkbox]').forEach(cb => {
+                    const on = want.has(cb.dataset.name);
+                    cb.checked = on;
+                    const vis = on ? 'visible' : 'none';
+                    cb.dataset.layers.split(',').forEach(id => {
+                        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis);
+                    });
+                });
+            }
+        });""".replace('CHECKBOX_LISTENERS', checkbox_listener_js)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -315,6 +401,34 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             margin-right: 5px;
             cursor: pointer;
         }}
+        .share-view-btn {{
+            display: block;
+            width: 100%;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+        }}
+        .share-view-btn:hover {{
+            background: #e0e0e0;
+        }}
+        .success-notification {{
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }}
         .back-link {{
             position: absolute;
             bottom: 10px;
@@ -408,7 +522,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             pitchSlider.value = pitch;
             pitchValue.textContent = Math.round(pitch) + '°';
         }});
-        {layer_toggle_js}
+        {interaction_js}
         map.on('load', () => {{
             console.log('3D Terrain map loaded — atlas: {atlas_name}');
         }});
