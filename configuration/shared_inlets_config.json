@@ -662,6 +662,40 @@
         "interaction": "import",
         "data_type": "gpkg"
     },
+    "geology_units": {
+        "asset_type": "inlet",
+        "fetch_type": "local_ogr",
+        "interaction": "import",
+        "data_type": "geojson",
+        "name": "geology_units",
+        "description": "Geologic map units (polygons) from a local OGR source",
+        "feature_type": "polygon",
+        "source_sublayer": "geology",
+        "geometry": "dataswale",
+        "attribution": {
+            "url": "https://doi.org/10.3133/mf2336",
+            "description": "USGS geologic map (e.g. MF-2336, McLaughlin et al., 2000)",
+            "license": "Public domain (USGS)",
+            "citation": "U.S. Geological Survey"
+        }
+    },
+    "geology_faults": {
+        "asset_type": "inlet",
+        "fetch_type": "local_ogr",
+        "interaction": "import",
+        "data_type": "geojson",
+        "name": "geology_faults",
+        "description": "Geologic fault lines from a local OGR source",
+        "feature_type": "linestring",
+        "source_sublayer": "faults",
+        "geometry": "dataswale",
+        "attribution": {
+            "url": "https://doi.org/10.3133/mf2336",
+            "description": "USGS geologic map (e.g. MF-2336, McLaughlin et al., 2000)",
+            "license": "Public domain (USGS)",
+            "citation": "U.S. Geological Survey"
+        }
+    },
     "h3_grid": {
         "name": "h3_grid",
         "asset_type": "inlet",

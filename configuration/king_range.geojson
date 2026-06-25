@@ -140,6 +140,37 @@
                 "default": ""
               }
             ]
+          },
+          "geology": {
+            "geometry_type": "polygon",
+            "color": [90, 70, 50],
+            "fill_color": [200, 190, 170],
+            "fill_opacity": 0.45,
+            "show_attributes": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "PTYPE", "type": "string", "default": "" }
+            ],
+            "paint": {
+              "fill-color": ["match", ["slice", ["to-string", ["get", "PTYPE"]], 0, 1],
+                "Q", "#fef9b8",
+                "T", "#fcc370",
+                "K", "#a6d96a",
+                "J", "#7eb6d9",
+                "#cbb9a6"]
+            }
+          },
+          "faults": {
+            "geometry_type": "linestring",
+            "color": [200, 30, 30],
+            "show_attributes": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "LTYPE", "type": "string", "default": "" }
+            ],
+            "paint": {
+              "line-width": 1.5
+            }
           }
         },
         "assets": {
@@ -298,11 +329,25 @@
               "config_def": "inaturalist"
             }
           },
+          "public_geology": {
+            "type": "inlet",
+            "out_layer": "geology",
+            "config_def": "geology_units",
+            "inpath_template": "mf2336_king_range.gpkg"
+          },
+          "public_faults": {
+            "type": "inlet",
+            "out_layer": "faults",
+            "config_def": "geology_faults",
+            "inpath_template": "mf2336_king_range.gpkg"
+          },
           "webmap": {
             "type": "outlet",
             "name": "webmap",
             "config_def": "webmap",
             "in_layers": [
+              "geology",
+              "faults",
               "regions",
               "roads",
               "creeks",
@@ -330,6 +375,8 @@
               "type": "outlet",
               "config_def": "webmap",
               "in_layers": [
+                "geology",
+                "faults",
                 "regions",
                 "roads",
                 "creeks",
