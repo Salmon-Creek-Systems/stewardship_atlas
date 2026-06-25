@@ -100,6 +100,25 @@ map.on('load', () => {
     // Initialize basemap switching
     initializeBasemapSwitching(map);
 
+    // Show the basemap matching the dropdown's initial selection on load.
+    // Without this, all basemaps start hidden and only switch on a dropdown
+    // 'change' event, leaving the edit map blank until the user interacts
+    // (mirrors webmap.js behavior; see issue #134).
+    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer',
+                                'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
+    allBasemapLayerIds.forEach(id => {
+        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch (e) {}
+    });
+    const basemapValueToLayer = {
+        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
+        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
+        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
+    };
+    const initialBasemap = document.getElementById('basemap-select').value;
+    if (basemapValueToLayer[initialBasemap] && map.getLayer(basemapValueToLayer[initialBasemap])) {
+        map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
+    }
+
     // Initialize help popup
     const helpContent = `
         <h3>Edit Layer Help</h3>
