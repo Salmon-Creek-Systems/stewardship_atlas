@@ -169,8 +169,27 @@
               { "name": "LTYPE", "type": "string", "default": "" }
             ],
             "paint": {
-              "line-width": 1.5
+              "line-color": ["case",
+                [">=", ["index-of", "thrust", ["get", "LTYPE"]], 0], "#8c2d04",
+                [">=", ["index-of", "reverse", ["get", "LTYPE"]], 0], "#e6550d",
+                [">=", ["index-of", "normal", ["get", "LTYPE"]], 0], "#3182bd",
+                [">=", ["index-of", "s.s.", ["get", "LTYPE"]], 0], "#31a354",
+                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], "#e7298a",
+                "#d62728"],
+              "line-width": ["case",
+                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], 2.5,
+                1.5]
             }
+          },
+          "trails": {
+            "geometry_type": "linestring",
+            "color": [165, 90, 20],
+            "add_labels": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "name", "type": "string", "default": "Trail" }
+            ],
+            "paint": { "line-width": 3, "line-dasharray": [2, 2] }
           }
         },
         "assets": {
@@ -351,6 +370,7 @@
               "regions",
               "roads",
               "creeks",
+              "trails",
               "landmarks",
               "photos",
               "inaturalist"
@@ -380,6 +400,7 @@
                 "regions",
                 "roads",
                 "creeks",
+                "trails",
                 "landmarks",
                 "photos",
                 "inaturalist"
@@ -399,6 +420,7 @@
               "regions",
               "roads",
               "creeks",
+              "trails",
               "landmarks",
               "photos"
             ],
@@ -422,6 +444,7 @@
                 "regions",
                 "roads",
                 "creeks",
+                "trails",
                 "landmarks",
                 "photos"
               ]
