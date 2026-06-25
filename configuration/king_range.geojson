@@ -1,0 +1,457 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -124.208973666,
+              40.099869743
+            ],
+            [
+              -124.062314021,
+              40.099869743
+            ],
+            [
+              -124.062314021,
+              40.196835009
+            ],
+            [
+              -124.208973666,
+              40.196835009
+            ],
+            [
+              -124.208973666,
+              40.099869743
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "king_range",
+        "description": "King Range",
+        "app_url": "https://fireatlas.org:9000",
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "default_h3_resolution": 10,
+        "email_photo_default_layer": "photos",
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "base_url": "https://fireatlas.org/king_range",
+        "port": 9000,
+        "admin_emails": [],
+        "logo_url": "",
+        "layers": {
+          "regions": {
+            "layer_def": "regions"
+          },
+          "roads": {
+            "layer_def": "roads"
+          },
+          "creeks": {
+            "layer_def": "creeks"
+          },
+          "landmarks": {
+            "layer_def": "poi"
+          },
+          "photos": {
+            "geometry_type": "point",
+            "conversations_enabled": true,
+            "color": [
+              255,
+              100,
+              0
+            ],
+            "fill_color": [
+              255,
+              255,
+              255
+            ],
+            "add_labels": true,
+            "label_background": true,
+            "symbol": {
+              "png": "camera.png",
+              "icon": "camera"
+            },
+            "icon-size": 1.0,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Photo"
+              }
+            ]
+          },
+          "inaturalist": {
+            "geometry_type": "point",
+            "color": [
+              60,
+              160,
+              60
+            ],
+            "add_labels": true,
+            "show_attributes": true,
+            "symbol": {
+              "png": "flower.png",
+              "icon": "flower"
+            },
+            "icon-size": 1.5,
+            "interaction": "interface",
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            },
+            "editable_columns": [
+              {
+                "name": "common_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "taxon_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "iconic_taxon",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "observed_on",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "username",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "quality_grade",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          }
+        },
+        "assets": {
+          "public_roads": {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "overture_roads",
+            "name": "public_roads",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "overture_duckdb",
+              "interaction": "import",
+              "data_type": "geojson",
+              "out_layer": "roads",
+              "color": [
+                110,
+                110,
+                255
+              ],
+              "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-06-17.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+              "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-06-17.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+              "outpath_template": "overture_roads.geojson",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "alterations": {
+                "canonicalize": [
+                  {
+                    "to": "name",
+                    "from": [
+                      "primary_name",
+                      "FULLRDNAME"
+                    ],
+                    "remove_prefix": []
+                  }
+                ],
+                "vector_width": {
+                  "attribute": "class",
+                  "map": {
+                    "primary": 15,
+                    "secondary": 11,
+                    "tertiary": 9
+                  },
+                  "default": 7
+                }
+              },
+              "type": "inlet",
+              "config_def": "overture_roads",
+              "name": "public_roads"
+            }
+          },
+          "public_creeks": {
+            "type": "inlet",
+            "out_layer": "creeks",
+            "config_def": "nhd_creeks",
+            "name": "public_creeks",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "local_ogr",
+              "interaction": "import",
+              "data_type": "geojson",
+              "name": "public_creeks",
+              "description": "External creek vector source",
+              "feature_type": "linestring",
+              "color": [
+                110,
+                110,
+                255
+              ],
+              "source_sublayer": "NHDFlowline",
+              "inpath_template": "NHD_H_California_State_GPKG.gpkg",
+              "geometry": "dataswale",
+              "alterations": {
+                "canonicalize": [
+                  {
+                    "to": "name",
+                    "from": [
+                      "gnis_name"
+                    ],
+                    "remove_prefix": []
+                  }
+                ],
+                "vector_width": {
+                  "attribute": "fcode_description",
+                  "map": {
+                    "Stream/River: Hydrographic Category = Ephemeral": 2,
+                    "Stream/River: Hydrographic Category = Perennial": 3,
+                    "Stream/River: Hydrographic Category = Intermittent": 1,
+                    "Artificial Path": 1
+                  },
+                  "default": 1
+                },
+                "filter": [
+                  [
+                    "remove",
+                    "fcode_description",
+                    []
+                  ]
+                ]
+              },
+              "attribution": {
+                "url": "https://www.usgs.gov/nhd",
+                "description": "USGS National Hydrography Dataset",
+                "license": "https://www.usgs.gov/nhd/license",
+                "citation": "USGS NHD"
+              },
+              "type": "inlet",
+              "out_layer": "creeks",
+              "config_def": "nhd_creeks"
+            }
+          },
+          "public_landmarks": {
+            "type": "inlet",
+            "out_layer": "landmarks",
+            "config_def": "osm_poi",
+            "name": "public_landmarks",
+            "config": {
+              "name": "public_landmarks",
+              "asset_type": "inlet",
+              "data_type": "geojson",
+              "feature_type": "point",
+              "add_labels": true,
+              "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
+              "fetch_type": "fetch_osm",
+              "type": "inlet",
+              "out_layer": "landmarks",
+              "config_def": "osm_poi"
+            }
+          },
+          "inat_obs": {
+            "type": "inlet",
+            "out_layer": "inaturalist",
+            "config_def": "inaturalist",
+            "time_range": null,
+            "name": "inat_obs",
+            "config": {
+              "name": "inat_obs",
+              "asset_type": "inlet",
+              "fetch_type": "inaturalist",
+              "data_type": "geojson",
+              "feature_type": "point",
+              "regions": [],
+              "users": [],
+              "time_range": null,
+              "quality_grade": null,
+              "attribution": {
+                "url": "https://www.inaturalist.org",
+                "description": "iNaturalist observations",
+                "license": "CC BY-NC"
+              },
+              "type": "inlet",
+              "out_layer": "inaturalist",
+              "config_def": "inaturalist"
+            }
+          },
+          "webmap": {
+            "type": "outlet",
+            "name": "webmap",
+            "config_def": "webmap",
+            "in_layers": [
+              "regions",
+              "roads",
+              "creeks",
+              "landmarks",
+              "photos",
+              "inaturalist"
+            ],
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "webmap",
+              "fetch_type": "webmap",
+              "interaction": "interface",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "default_view": "",
+              "type": "outlet",
+              "config_def": "webmap",
+              "in_layers": [
+                "regions",
+                "roads",
+                "creeks",
+                "landmarks",
+                "photos",
+                "inaturalist"
+              ],
+              "access": [
+                "public",
+                "internal",
+                "admin"
+              ]
+            }
+          },
+          "webedit": {
+            "type": "outlet",
+            "name": "webedit",
+            "config_def": "webedit",
+            "in_layers": [
+              "regions",
+              "roads",
+              "creeks",
+              "landmarks",
+              "photos"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "webedit",
+              "fetch_type": "webedit",
+              "access": [
+                "admin"
+              ],
+              "interaction": "backend",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "type": "outlet",
+              "config_def": "webedit",
+              "in_layers": [
+                "regions",
+                "roads",
+                "creeks",
+                "landmarks",
+                "photos"
+              ]
+            }
+          },
+          "3dview": {
+            "type": "outlet",
+            "name": "3dview",
+            "config_def": "3dview",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "3dview",
+              "fetch_type": "3dview",
+              "interaction": "interface",
+              "attribution": {
+                "description": "3D terrain view using MapLibre GL JS and terrain-RGB PMTiles"
+              },
+              "type": "outlet",
+              "config_def": "3dview",
+              "access": [
+                "public",
+                "internal",
+                "admin"
+              ]
+            }
+          },
+          "html": {
+            "type": "outlet",
+            "name": "html",
+            "config_def": "static_html",
+            "config": {
+              "asset_type": "outlet",
+              "fetch_type": "html",
+              "interaction": "backend",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "type": "outlet",
+              "name": "html",
+              "config_def": "static_html"
+            }
+          },
+          "notebook": {
+            "type": "outlet",
+            "name": "notebook",
+            "config_def": "jupyter_notebook",
+            "access": [
+              "technical"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "notebook",
+              "fetch_type": "jupyter_notebook",
+              "interaction": "interface",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "type": "outlet",
+              "config_def": "jupyter_notebook",
+              "access": [
+                "technical"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
