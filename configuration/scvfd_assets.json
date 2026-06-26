@@ -107,8 +107,9 @@
             "ponds",
             "contours",
             "roads",
-            "roads_lrs",
-            "lrs_markers",
+            "mileage_zones",
+            "road_mileage",
+            "mileage_markers",
             "creeks",
             "buildings",
             "hydrants",
@@ -118,7 +119,7 @@
             "lpss",
             "hazards"
         ],
-        "hidden_layers": ["lpss", "roads_lrs", "lrs_markers"],
+        "hidden_layers": ["lpss", "mileage_zones", "road_mileage", "mileage_markers"],
         "config_def": "webmap",
         "access": [
             "public",
@@ -176,7 +177,8 @@
             "photos",
             "private_notes",
             "hazards",
-            "lrs_markers"
+            "mileage_zones",
+            "mileage_markers"
         ],
         "config_def": "webedit"
     },
@@ -301,20 +303,12 @@
     "road_lrs": {
         "type": "eddy",
         "config_def": "road_lrs",
-        "lrs_anchor_coordinates": [40.205889035286134, -123.89681666989158]
+        "lrs_zones_layer": "mileage_zones"
     },
     "road_lrs_markers": {
         "type": "eddy",
         "config_def": "road_lrs_markers",
-        "road_names": [
-            "Thomas",
-            "Upper Samuels Ranch",
-            "Lower Samuels Ranch",
-            "Flicker",
-            "Early Ranch",
-            "Upper Thomas",
-	    "Lower Thomas",
-	    "Serendipity"
-        ]
+        "marker_interval_mi": 1,
+        "label_template": "{route_name} {d_mi:.1f} mi"
     }
 }
