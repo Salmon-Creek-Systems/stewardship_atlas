@@ -707,35 +707,17 @@ def h3_cells(config, asset_name):
         raise Exception(f"H3 cells eddy failed: {str(e)}")
 
 
-def road_lrs(config, asset_name):
+def _build_road_graph(features, resolution):
+    """Build an H3-cell topology graph from road LineString features.
+
+    H3 cell IDs are used purely as an in-memory snapping trick: two segments that
+    share an endpoint hash to the same cell and become the same graph node. Returns
+    (graph, segment_nodes) where segment_nodes[i] = (start_cell, end_cell) for
+    features[i] (or (None, None) for non-LineString features).
     """
-    Eddy: annotate road segments with cumulative network distance from an anchor point.
-
-    Uses H3 cell IDs as topology nodes — each segment's start and end coordinates are
-    snapped to H3 cells at `h3_resolution`. Dijkstra from the anchor cell assigns
-    m_start/m_end (meters) to every reachable segment.
-
-    Required config: lrs_anchor_coordinates [lat, lng]
-    """
-    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
-    in_layer = asset_config.get('in_layer', 'roads')
-    out_layer = asset_config.get('out_layer', 'roads_lrs')
-    anchor_coords = asset_config.get('lrs_anchor_coordinates')
-    resolution = asset_config.get('h3_resolution', 12)
-
-    if not anchor_coords:
-        raise ValueError(f"road_lrs: lrs_anchor_coordinates [lat, lng] is required in asset config for '{asset_name}'")
-
-    anchor_lat, anchor_lng = anchor_coords
-
-    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
-    if not layer_data or 'features' not in layer_data:
-        raise Exception(f"road_lrs: could not load layer '{in_layer}'")
-
-    features = layer_data['features']
     geod = Geod(ellps='WGS84')
     G = nx.Graph()
-    segment_nodes = []  # (start_cell, end_cell) per feature index
+    segment_nodes = []
 
     for feature in features:
         geom = feature.get('geometry')
@@ -759,24 +741,33 @@ def road_lrs(config, asset_name):
 
         segment_nodes.append((start_cell, end_cell))
 
-    # Find the graph node nearest to the anchor
+    return G, segment_nodes
+
+
+def _snap_anchor(G, anchor_lat, anchor_lng, resolution):
+    """Return the graph node nearest to the anchor coordinates, searching outward
+    in H3 rings if the anchor's own cell isn't a node."""
     anchor_cell = h3.latlng_to_cell(anchor_lat, anchor_lng, resolution)
-    if anchor_cell not in G:
-        found = False
-        for ring in range(1, 30):
-            for candidate in h3.grid_disk(anchor_cell, ring):
-                if candidate in G:
-                    anchor_cell = candidate
-                    found = True
-                    break
-            if found:
-                break
-        if not found:
-            raise Exception("road_lrs: no graph node found within 30 rings of anchor — check lrs_anchor_coordinates and road data")
+    if anchor_cell in G:
+        return anchor_cell
+    for ring in range(1, 30):
+        for candidate in h3.grid_disk(anchor_cell, ring):
+            if candidate in G:
+                return candidate
+    raise Exception("road_lrs: no graph node found within 30 rings of anchor — check anchor coordinates and road data")
 
-    logger.info(f"road_lrs: anchor={anchor_cell} resolution={resolution} nodes={G.number_of_nodes()} edges={G.number_of_edges()}")
 
+def _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None):
+    """Annotate a set of road features with cumulative distance (m_start/m_end)
+    from the given anchor. Distances reset to 0 at the anchor. If route_name is
+    given, it is written onto each feature."""
+    G, segment_nodes = _build_road_graph(features, resolution)
+    if G.number_of_nodes() == 0:
+        return []
+
+    anchor_cell = _snap_anchor(G, anchor_lat, anchor_lng, resolution)
     distances = nx.single_source_dijkstra_path_length(G, anchor_cell, weight='weight')
+    logger.info(f"road_lrs: route={route_name!r} anchor={anchor_cell} nodes={G.number_of_nodes()} edges={G.number_of_edges()}")
 
     annotated = []
     for feature, (start_cell, end_cell) in zip(features, segment_nodes):
@@ -784,11 +775,119 @@ def road_lrs(config, asset_name):
         props['m_start'] = distances.get(start_cell)
         props['m_end'] = distances.get(end_cell)
         props['lrs_anchor'] = anchor_cell
+        if route_name is not None:
+            props['route_name'] = route_name
         annotated.append({
             'type': 'Feature',
             'geometry': feature['geometry'],
             'properties': props
         })
+    return annotated
+
+
+def _load_lrs_zones(config, zones_layer):
+    """Load LRS zones from an editable polygon control layer. Each feature needs a
+    `name` and an `anchor` property (a JSON string `{"latitude":.., "longitude":..}`
+    as produced by the webmap Share button). Returns a list of
+    {name, anchor_lat, anchor_lng, polygon (shapely geometry)}."""
+    data = dataswale.layer_as_featurecollection(config, zones_layer)
+    if not data or 'features' not in data:
+        raise Exception(f"road_lrs: could not load zones layer '{zones_layer}'")
+
+    zones = []
+    for f in data['features']:
+        props = f.get('properties') or {}
+        name = props.get('name')
+        anchor_raw = props.get('anchor')
+        geom = f.get('geometry')
+        if not (name and anchor_raw and geom):
+            logger.warning(f"road_lrs: skipping zone with missing name/anchor/geometry: {props}")
+            continue
+        try:
+            anchor = json.loads(anchor_raw) if isinstance(anchor_raw, str) else anchor_raw
+            anchor_lat = float(anchor['latitude'])
+            anchor_lng = float(anchor['longitude'])
+        except (ValueError, KeyError, TypeError) as e:
+            logger.warning(f"road_lrs: zone '{name}' has unparseable anchor {anchor_raw!r}: {e}")
+            continue
+        zones.append({
+            'name': name,
+            'anchor_lat': anchor_lat,
+            'anchor_lng': anchor_lng,
+            'polygon': shape(geom),
+        })
+    return zones
+
+
+def _assign_features_to_zones(features, zones):
+    """Assign each road segment to the zone whose polygon contains the segment's
+    midpoint. Zones are assumed non-overlapping, so each segment lands in at most
+    one zone (first match wins). Segments in no zone are dropped. Returns a dict
+    keyed by zone name -> list of features."""
+    buckets = {z['name']: [] for z in zones}
+    for feature in features:
+        geom = feature.get('geometry')
+        if not geom or geom.get('type') != 'LineString':
+            continue
+        midpoint = shape(geom).interpolate(0.5, normalized=True)
+        for z in zones:
+            if z['polygon'].contains(midpoint):
+                buckets[z['name']].append(feature)
+                break
+    return buckets
+
+
+def road_lrs(config, asset_name):
+    """
+    Eddy: annotate road segments with cumulative network distance from an anchor.
+
+    Uses H3 cell IDs as topology nodes — each segment's start and end coordinates are
+    snapped to H3 cells at `h3_resolution`. Dijkstra from the anchor cell assigns
+    m_start/m_end (meters) to every reachable segment.
+
+    Two modes:
+      - Zoned (preferred): `lrs_zones_layer` names an editable polygon layer of LRS
+        zones, each with a `name` and an `anchor` (JSON string). Each segment is
+        assigned to the zone containing its midpoint, and distance resets to 0 at
+        each zone's anchor. Segments outside every zone are dropped. The zone name is
+        written to `route_name` on each segment.
+      - Single-anchor (legacy): `lrs_anchor_coordinates` [lat, lng] measures all
+        reachable segments from one anchor.
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config.get('in_layer', 'roads')
+    out_layer = asset_config.get('out_layer', 'road_mileage')
+    resolution = asset_config.get('h3_resolution', 12)
+    zones_layer = asset_config.get('lrs_zones_layer')
+    anchor_coords = asset_config.get('lrs_anchor_coordinates')
+
+    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
+    if not layer_data or 'features' not in layer_data:
+        raise Exception(f"road_lrs: could not load layer '{in_layer}'")
+    features = layer_data['features']
+
+    if zones_layer:
+        zones = _load_lrs_zones(config, zones_layer)
+        if not zones:
+            raise Exception(f"road_lrs: zones layer '{zones_layer}' yielded no usable zones")
+        buckets = _assign_features_to_zones(features, zones)
+        annotated = []
+        for z in zones:
+            zone_features = buckets[z['name']]
+            if not zone_features:
+                logger.warning(f"road_lrs: zone '{z['name']}' contains no road segments")
+                continue
+            annotated.extend(
+                _lrs_annotate(zone_features, z['anchor_lat'], z['anchor_lng'], resolution, route_name=z['name'])
+            )
+        logger.info(f"road_lrs: {len(zones)} zones, {len(annotated)} segments annotated")
+    elif anchor_coords:
+        anchor_lat, anchor_lng = anchor_coords
+        annotated = _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None)
+    else:
+        raise ValueError(
+            f"road_lrs: either lrs_zones_layer or lrs_anchor_coordinates is required in asset config for '{asset_name}'"
+        )
 
     out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -804,14 +903,24 @@ def road_lrs_markers(config, asset_name):
     """
     Eddy: generate a point layer of distance markers at regular intervals along a road LRS layer.
 
-    Reads an roads_lrs-style layer (with m_start/m_end per segment), then for each marker
+    Reads a road_mileage-style layer (with m_start/m_end per segment), then for each marker
     distance d uses shapely interpolation to place a point at the exact position on each
     segment that spans that distance.
+
+    When the input layer carries `route_name` (zoned LRS), markers are generated per route
+    with distance resetting to 0 in each — so two routes both get a "1 mi" marker measured
+    from their own anchor. The route name is available as `{route_name}` in `label_template`.
+
+    Interval: `marker_interval_mi` (miles) takes precedence over `marker_interval_m` (meters).
     """
     asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
-    in_layer = asset_config.get('in_layer', 'roads_lrs')
-    out_layer = asset_config.get('out_layer', 'lrs_markers')
-    interval = asset_config.get('marker_interval_m', 1000)
+    in_layer = asset_config.get('in_layer', 'road_mileage')
+    out_layer = asset_config.get('out_layer', 'mileage_markers')
+    interval_mi = asset_config.get('marker_interval_mi')
+    if interval_mi is not None:
+        interval = int(round(interval_mi * 1609.34))
+    else:
+        interval = int(asset_config.get('marker_interval_m', 1000))
     label_template = asset_config.get('label_template', '{d_km:.0f} km')
     marker_bbox = asset_config.get('marker_bbox')  # [west, south, east, north] or None
     road_names = asset_config.get('road_names')    # list of road names to include, or null for all
@@ -841,63 +950,74 @@ def road_lrs_markers(config, asset_name):
             )
         logger.info(f"road_lrs_markers: road_names filter active, {len(features)} segments match {road_names}")
 
-    # Determine maximum reachable distance
-    max_d = 0.0
+    # Group by route_name (None = a single un-zoned group) so distances reset per route.
+    route_groups = {}
     for feature in features:
-        props = feature.get('properties') or {}
-        m_start = props.get('m_start')
-        m_end = props.get('m_end')
-        if m_start is not None:
-            max_d = max(max_d, m_start)
-        if m_end is not None:
-            max_d = max(max_d, m_end)
-
-    if max_d == 0:
-        raise Exception(f"road_lrs_markers: no reachable distances found in '{in_layer}' — run road_lrs first")
-
-    marker_distances = range(0, int(max_d) + interval, interval)
-    logger.info(f"road_lrs_markers: {len(features)} segments, max_d={max_d:.0f}m, {len(marker_distances)} marker distances")
+        route_name = (feature.get('properties') or {}).get('route_name')
+        route_groups.setdefault(route_name, []).append(feature)
 
     points = []
-    for d in marker_distances:
-        for feature in features:
+    for route_name, group_features in route_groups.items():
+        # Determine maximum reachable distance within this route
+        max_d = 0.0
+        for feature in group_features:
             props = feature.get('properties') or {}
-            m_start = props.get('m_start')
-            m_end = props.get('m_end')
-            geom = feature.get('geometry')
+            for key in ('m_start', 'm_end'):
+                v = props.get(key)
+                if v is not None:
+                    max_d = max(max_d, v)
 
-            if m_start is None or m_end is None or not geom:
-                continue
-            if m_start == m_end:
-                continue
+        if max_d == 0:
+            logger.warning(f"road_lrs_markers: route {route_name!r} has no reachable distances — skipping")
+            continue
 
-            lo, hi = min(m_start, m_end), max(m_start, m_end)
-            if not (lo <= d <= hi):
-                continue
+        marker_distances = range(0, int(max_d) + interval, interval)
+        logger.info(f"road_lrs_markers: route={route_name!r} {len(group_features)} segments, max_d={max_d:.0f}m, {len(marker_distances)} markers")
 
-            if m_start <= m_end:
-                frac = (d - m_start) / (m_end - m_start)
-            else:
-                frac = 1.0 - (d - m_end) / (m_start - m_end)
+        for d in marker_distances:
+            for feature in group_features:
+                props = feature.get('properties') or {}
+                m_start = props.get('m_start')
+                m_end = props.get('m_end')
+                geom = feature.get('geometry')
 
-            pt = shape(geom).interpolate(frac, normalized=True)
-
-            if marker_bbox:
-                west, south, east, north = marker_bbox
-                lng, lat = pt.x, pt.y
-                if not (west <= lng <= east and south <= lat <= north):
+                if m_start is None or m_end is None or not geom:
+                    continue
+                if m_start == m_end:
                     continue
 
-            label = label_template.format(d_m=int(d), d_km=d / 1000, d_mi=d / 1609.34)
-            points.append({
-                'type': 'Feature',
-                'geometry': {'type': 'Point', 'coordinates': [pt.x, pt.y]},
-                'properties': {
-                    'name': label,
-                    'd_m': int(d),
-                    'd_km': round(d / 1000, 3),
-                }
-            })
+                lo, hi = min(m_start, m_end), max(m_start, m_end)
+                if not (lo <= d <= hi):
+                    continue
+
+                if m_start <= m_end:
+                    frac = (d - m_start) / (m_end - m_start)
+                else:
+                    frac = 1.0 - (d - m_end) / (m_start - m_end)
+
+                pt = shape(geom).interpolate(frac, normalized=True)
+
+                if marker_bbox:
+                    west, south, east, north = marker_bbox
+                    lng, lat = pt.x, pt.y
+                    if not (west <= lng <= east and south <= lat <= north):
+                        continue
+
+                label = label_template.format(
+                    d_m=int(d), d_km=d / 1000, d_mi=d / 1609.34,
+                    route_name=route_name or ''
+                ).strip()
+                points.append({
+                    'type': 'Feature',
+                    'geometry': {'type': 'Point', 'coordinates': [pt.x, pt.y]},
+                    'properties': {
+                        'name': label,
+                        'route_name': route_name,
+                        'd_m': int(d),
+                        'd_km': round(d / 1000, 3),
+                        'd_mi': round(d / 1609.34, 3),
+                    }
+                })
 
     out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
     out_path.parent.mkdir(parents=True, exist_ok=True)
