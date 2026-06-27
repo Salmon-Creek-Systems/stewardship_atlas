@@ -340,7 +340,9 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
         # Check if layer has custom PNG icon
         symbol_config = layer_config.get('symbol', {})
         png_icon = symbol_config.get('png')
-        
+        # QGIS-only icon size multiplier (no effect on webmap), mirrors qgis_width_scale.
+        qgis_icon_scale = layer_config.get('qgis_icon_scale', 1.0)
+
         if png_icon and config:
             # Try to load custom PNG icon
             try:
@@ -366,7 +368,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
                     
                     icon_size = layer_config.get('icon-size', 1.0)
                     print_icon_mm = (config or {}).get('print_icon_mm', 15)
-                    size_mm = icon_size * print_icon_mm * feature_scale
+                    size_mm = icon_size * print_icon_mm * feature_scale * qgis_icon_scale
                     raster_marker.setSize(size_mm)
                     raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
                     
@@ -384,12 +386,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
                 logger.warning(f"Failed to load PNG icon {png_icon}: {e}, using default circle")
                 symbol = QgsSymbol.defaultSymbol(layer.geometryType())
                 symbol.setColor(qcolor)
-                symbol.setSize(3 * feature_scale)
+                symbol.setSize(3 * feature_scale * qgis_icon_scale)
         else:
             # No custom icon, use default
             symbol = QgsSymbol.defaultSymbol(layer.geometryType())
             symbol.setColor(qcolor)
-            symbol.setSize(3 * feature_scale)  # Basic point size scaled by feature_scale
+            symbol.setSize(3 * feature_scale * qgis_icon_scale)  # Basic point size scaled by feature_scale
         
     elif geometry_type == 'linestring':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())

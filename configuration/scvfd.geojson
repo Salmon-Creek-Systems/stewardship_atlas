@@ -289,59 +289,63 @@
                   "linear"
                 ],
                 [
-                  "min",
+                  "/",
                   [
-                    "coalesce",
+                    "min",
                     [
-                      "get",
-                      "m_start"
+                      "coalesce",
+                      [
+                        "get",
+                        "m_start"
+                      ],
+                      1000000
                     ],
-                    14000
+                    [
+                      "coalesce",
+                      [
+                        "get",
+                        "m_end"
+                      ],
+                      1000000
+                    ]
                   ],
-                  [
-                    "coalesce",
-                    [
-                      "get",
-                      "m_end"
-                    ],
-                    14000
-                  ]
+                  1609.34
                 ],
                 0,
                 "#00c800",
-                5000,
+                1.667,
                 "#ffff00",
-                9000,
+                3.333,
                 "#ffa500",
-                13000,
+                5,
                 "#c80000",
-                14000,
+                100,
                 "#888888"
               ],
               "line-width": 5,
               "line-opacity": 0.85
             },
             "qgis_color_stops": {
-              "expression": "min(coalesce(\"m_start\", 14000), coalesce(\"m_end\", 14000))",
+              "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
               "stops": [
                 [
                   0,
                   "#00c800"
                 ],
                 [
-                  5000,
+                  1.667,
                   "#ffff00"
                 ],
                 [
-                  9000,
+                  3.333,
                   "#ffa500"
                 ],
                 [
-                  13000,
+                  5,
                   "#c80000"
                 ],
                 [
-                  14000,
+                  100,
                   "#888888"
                 ]
               ]
@@ -480,7 +484,8 @@
                 "type": "string",
                 "default": "no"
               }
-            ]
+            ],
+            "qgis_icon_scale": 2.0
           },
           "ponds": {
             "geometry_type": "polygon",
