@@ -471,3 +471,52 @@ def extract_field_across_layers(field_spec_original):
         except Exception as e:
             print(f"Cannot read layer {layer_name}")
             #traceback.print_exc()
+
+
+def hex_to_rgb(h):
+    """'#rrggbb' (or 'rrggbb') -> (r, g, b) ints."""
+    h = h.lstrip('#')
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def build_qgis_color_expression(value_expression, stops):
+    """Build a QGIS expression that linearly interpolates a color across stops.
+
+    Mirrors a MapLibre `["interpolate", ["linear"], <value>, v0, c0, v1, c1, ...]`
+    paint so QGIS output (PDFs) can match the webmap gradient. Per-channel linear
+    interpolation via scale_linear, bucketed by a CASE so each segment stays in its
+    own domain; below the first stop and above the last clamp to the end colors.
+
+    Args:
+        value_expression: a QGIS expression string yielding the numeric value to map
+            (e.g. 'min(coalesce("m_start", 14000), coalesce("m_end", 14000))').
+        stops: list of [value, '#rrggbb'] pairs (any order; sorted here ascending).
+
+    Returns:
+        A QGIS expression string returning a color (usable as a data-defined
+        stroke/fill color property).
+    """
+    stops = sorted(stops, key=lambda s: s[0])
+    if not stops:
+        raise ValueError("build_qgis_color_expression: stops is empty")
+
+    v = f"({value_expression})"
+    first_r, first_g, first_b = hex_to_rgb(stops[0][1])
+    last_r, last_g, last_b = hex_to_rgb(stops[-1][1])
+
+    clauses = [f"WHEN {v} <= {stops[0][0]} THEN color_rgb({first_r}, {first_g}, {first_b})"]
+    for (v0, h0), (v1, h1) in zip(stops, stops[1:]):
+        r0, g0, b0 = hex_to_rgb(h0)
+        r1, g1, b1 = hex_to_rgb(h1)
+        clauses.append(
+            f"WHEN {v} <= {v1} THEN color_rgb("
+            f"to_int(scale_linear({v}, {v0}, {v1}, {r0}, {r1})), "
+            f"to_int(scale_linear({v}, {v0}, {v1}, {g0}, {g1})), "
+            f"to_int(scale_linear({v}, {v0}, {v1}, {b0}, {b1})))"
+        )
+
+    body = "\n  ".join(clauses)
+    return (
+        f"CASE\n  {body}\n"
+        f"  ELSE color_rgb({last_r}, {last_g}, {last_b})\nEND"
+    )

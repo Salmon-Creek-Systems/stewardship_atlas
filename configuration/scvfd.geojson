@@ -320,6 +320,31 @@
               ],
               "line-width": 5,
               "line-opacity": 0.85
+            },
+            "qgis_color_stops": {
+              "expression": "min(coalesce(\"m_start\", 14000), coalesce(\"m_end\", 14000))",
+              "stops": [
+                [
+                  0,
+                  "#00c800"
+                ],
+                [
+                  5000,
+                  "#ffff00"
+                ],
+                [
+                  9000,
+                  "#ffa500"
+                ],
+                [
+                  13000,
+                  "#c80000"
+                ],
+                [
+                  14000,
+                  "#888888"
+                ]
+              ]
             }
           },
           "mileage_markers": {
@@ -368,6 +393,11 @@
                 "type": "string",
                 "default": ""
               }
+            ],
+            "label_color": [
+              0,
+              0,
+              0
             ]
           },
           "lpss": {

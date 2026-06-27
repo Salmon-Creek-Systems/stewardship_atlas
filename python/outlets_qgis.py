@@ -347,7 +347,16 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
                 from qgis.core import QgsRasterMarkerSymbolLayer
                 local_path = versioning.atlas_path(config, "local")
                 icon_path = local_path / png_icon
-                
+
+                # Fall back to repo-bundled icons (templates/icons/) when the icon
+                # isn't in the atlas's local/ data dir. version='app' resolves to the
+                # live codebase, so bundled icons work without a manual server copy.
+                if not icon_path.exists():
+                    bundled = versioning.atlas_path(config, f"templates/icons/{png_icon}", version='app')
+                    if bundled.exists():
+                        icon_path = bundled
+                        logger.info(f"Using bundled icon for {png_icon}: {icon_path}")
+
                 if icon_path.exists():
                     # Create symbol with raster marker
                     symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -422,6 +431,21 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             width = layer_config.get('constant_width', 2)
             symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
             logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale * line_scale})")
+
+        # Opt-in data-defined stroke color (mirrors a webmap interpolate paint).
+        # Only applied when 'qgis_color_stops' is present; flat color otherwise.
+        color_stops = layer_config.get('qgis_color_stops')
+        if color_stops:
+            color_expr = utils.build_qgis_color_expression(
+                color_stops['expression'], color_stops['stops']
+            )
+            symbol_layer = symbol.symbolLayer(0)
+            if symbol_layer:
+                symbol_layer.setDataDefinedProperty(
+                    QgsSymbolLayer.PropertyStrokeColor,
+                    QgsProperty.fromExpression(color_expr)
+                )
+                logger.info(f"Applied qgis_color_stops data-defined color to {layer.name()}")
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
