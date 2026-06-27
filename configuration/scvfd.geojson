@@ -1011,7 +1011,7 @@
               "internal",
               "admin"
             ],
-            "multipage_pdf": false,
+            "multipage_pdf": true,
             "grid_layers": [
               "lidar_basemap",
               "roads",
