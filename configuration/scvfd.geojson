@@ -965,16 +965,16 @@
             "blend_percent": 40,
             "in_layers": [
               "lidar_basemap",
-              "contours",
               "roads",
               "creeks",
               "ponds",
               "buildings",
-              "lpss",
               "poi",
               "hydrants",
               "hazards",
-              "watertanks"
+              "watertanks",
+              "road_mileage",
+              "mileage_markers"
             ],
             "access": [
               "public",

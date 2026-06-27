@@ -690,6 +690,18 @@ python scripts/trace_email.py --n 0 --profile atlas
 python scripts/trace_email.py incoming/mvjamh5c7rtsvpb3qejlkaa0mhavb8uaj76luo81 --profile atlas
 ```
 
+**Quick check — which atlas addresses are active:** Stage 1 of the trace lists the
+recipients SES will accept. To query SES directly without running the full trace:
+
+```bash
+aws ses describe-receipt-rule-set --rule-set-name atlas-email-inlet \
+  --profile atlas --region us-east-1 \
+  --query 'Rules[].{rule:Name,enabled:Enabled,recipients:Recipients}'
+```
+
+Each `{slug}@fireatlas.org` is appended to this rule automatically when an atlas
+is created, so this is the authoritative list of live ingest addresses.
+
 The script checks each stage in order:
 
 1. **SES receipt rule** — confirms the rule set is active and configured for the right recipient address
