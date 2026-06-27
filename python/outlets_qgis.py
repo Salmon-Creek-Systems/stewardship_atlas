@@ -466,6 +466,13 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             symbol_layer.setStrokeColor(qcolor)
             symbol_layer.setStrokeWidth(0.3 * feature_scale)  # Stroke width scaled by feature_scale
     
+    # QGIS-only symbol opacity — lighten a vector layer in PDF/gazetteer output
+    # without touching the webmap (which uses paint/opacity). Applied to the symbol,
+    # not the layer, so labels stay fully opaque. Opt-in via 'qgis_opacity'.
+    qgis_opacity = layer_config.get('qgis_opacity')
+    if qgis_opacity is not None:
+        symbol.setOpacity(qgis_opacity)
+
     # Apply symbol renderer
     renderer = QgsSingleSymbolRenderer(symbol)
     layer.setRenderer(renderer)

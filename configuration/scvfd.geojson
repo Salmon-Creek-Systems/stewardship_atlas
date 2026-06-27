@@ -446,7 +446,8 @@
             ],
             "qgis_width_scale": 4.0,
             "interaction": "interface",
-            "vector_width": true
+            "vector_width": true,
+            "qgis_opacity": 0.5
           },
           "watertanks": {
             "geometry_type": "point",
