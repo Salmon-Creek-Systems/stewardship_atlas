@@ -349,7 +349,9 @@
                   "#888888"
                 ]
               ]
-            }
+            },
+            "vector_width": true,
+            "qgis_width_scale": 4.0
           },
           "mileage_markers": {
             "geometry_type": "point",
@@ -402,7 +404,8 @@
               0,
               0,
               0
-            ]
+            ],
+            "qgis_label_scale": 2.0
           },
           "lpss": {
             "geometry_type": "point",
