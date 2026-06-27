@@ -71,7 +71,7 @@
           "lidar_basemap": {
             "geometry_type": "raster",
             "opacity": 0.0,
-            "qgis_opacity": 1.0
+            "qgis_opacity": 0.5
           },
           "usgs_hillshade": {
             "geometry_type": "wms",
