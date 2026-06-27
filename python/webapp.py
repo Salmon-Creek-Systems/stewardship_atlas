@@ -35,6 +35,7 @@ import dataswale_geojson
 import outlets
 import versioning
 import deltas_geojson
+import utils
 import vector_inlets
 import email_inlet
 import atlas_logs
@@ -361,7 +362,7 @@ async def move_features(payload: MovePayload, swalename: str):
             create_fc = {"type": "FeatureCollection", "layer": payload.target_layer, "action": "create", "features": [dict(f) for f in moved]}
             target_delta = deltas_geojson.delta_path_from_layer(ac, payload.target_layer, "create")
             with open(target_delta, "w") as f:
-                json.dump(create_fc, f)
+                json.dump(create_fc, f, default=utils.json_serial)
             delta_files_written.append(Path(target_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.target_layer)
 
@@ -370,7 +371,7 @@ async def move_features(payload: MovePayload, swalename: str):
             delete_fc["action"] = "delete"
             source_delta = deltas_geojson.delta_path_from_layer(ac, payload.source_layer, "delete")
             with open(source_delta, "w") as f:
-                json.dump(delete_fc, f)
+                json.dump(delete_fc, f, default=utils.json_serial)
             delta_files_written.append(Path(source_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.source_layer)
 
