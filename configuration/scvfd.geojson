@@ -330,28 +330,28 @@
               "stops": [
                 [
                   0,
-                  "#00c800"
+                  "#00a000"
                 ],
                 [
                   1.667,
-                  "#ffff00"
+                  "#cccc00"
                 ],
                 [
                   3.333,
-                  "#ffa500"
+                  "#cc8400"
                 ],
                 [
                   5,
-                  "#c80000"
+                  "#a00000"
                 ],
                 [
                   100,
-                  "#888888"
+                  "#6c6c6c"
                 ]
               ]
             },
             "vector_width": true,
-            "qgis_width_scale": 4.0
+            "qgis_width_scale": 12.0
           },
           "mileage_markers": {
             "geometry_type": "point",
