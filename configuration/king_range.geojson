@@ -189,8 +189,7 @@
             "editable_columns": [
               { "name": "name", "type": "string", "default": "Trail" }
             ],
-            "vis": { "layout": { "line-cap": "round", "visibility": "visible" } },
-            "paint": { "line-color": "#995b28", "line-width": 2, "line-dasharray": [0, 2] }
+            "paint": { "line-color": "#995b28", "line-width": 1.5, "line-dasharray": [1, 2] }
           },
           "hike": {
             "geometry_type": "linestring",
