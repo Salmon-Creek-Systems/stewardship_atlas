@@ -153,11 +153,11 @@
             ],
             "paint": {
               "fill-color": ["match", ["slice", ["to-string", ["get", "PTYPE"]], 0, 1],
-                "Q", "#fef9b8",
-                "T", "#fcc370",
-                "K", "#a6d96a",
-                "J", "#7eb6d9",
-                "#cbb9a6"]
+                "Q", "#e15ad0",
+                "T", "#9b5de5",
+                "K", "#5a7be8",
+                "J", "#2b2f9e",
+                "#00b4c4"]
             }
           },
           "faults": {
@@ -177,8 +177,8 @@
                 [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], "#e7298a",
                 "#d62728"],
               "line-width": ["case",
-                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], 2.5,
-                1.5]
+                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], 7.5,
+                4.5]
             }
           },
           "trails": {
