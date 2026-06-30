@@ -135,20 +135,22 @@
         "fetch_type": "road_lrs",
         "interaction": "backend",
         "in_layer": "roads",
-        "out_layer": "roads_lrs",
+        "out_layer": "road_mileage",
         "h3_resolution": 12,
+        "lrs_zones_layer": null,
         "lrs_anchor_coordinates": null,
         "attribution": {
-            "description": "Road LRS — cumulative network distance from anchor via H3 graph"
+            "description": "Road LRS — cumulative network distance from per-zone anchors via H3 graph"
         }
     },
     "road_lrs_markers": {
         "type": "eddy",
         "fetch_type": "road_lrs_markers",
         "interaction": "backend",
-        "in_layer": "roads_lrs",
-        "out_layer": "lrs_markers",
+        "in_layer": "road_mileage",
+        "out_layer": "mileage_markers",
         "marker_interval_m": 1000,
+        "marker_interval_mi": null,
         "label_template": "{d_km:.0f} km",
         "marker_bbox": null,
         "road_names": null,

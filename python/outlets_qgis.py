@@ -340,14 +340,25 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
         # Check if layer has custom PNG icon
         symbol_config = layer_config.get('symbol', {})
         png_icon = symbol_config.get('png')
-        
+        # QGIS-only icon size multiplier (no effect on webmap), mirrors qgis_width_scale.
+        qgis_icon_scale = layer_config.get('qgis_icon_scale', 1.0)
+
         if png_icon and config:
             # Try to load custom PNG icon
             try:
                 from qgis.core import QgsRasterMarkerSymbolLayer
                 local_path = versioning.atlas_path(config, "local")
                 icon_path = local_path / png_icon
-                
+
+                # Fall back to repo-bundled icons (templates/icons/) when the icon
+                # isn't in the atlas's local/ data dir. version='app' resolves to the
+                # live codebase, so bundled icons work without a manual server copy.
+                if not icon_path.exists():
+                    bundled = versioning.atlas_path(config, f"templates/icons/{png_icon}", version='app')
+                    if bundled.exists():
+                        icon_path = bundled
+                        logger.info(f"Using bundled icon for {png_icon}: {icon_path}")
+
                 if icon_path.exists():
                     # Create symbol with raster marker
                     symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -357,7 +368,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
                     
                     icon_size = layer_config.get('icon-size', 1.0)
                     print_icon_mm = (config or {}).get('print_icon_mm', 15)
-                    size_mm = icon_size * print_icon_mm * feature_scale
+                    size_mm = icon_size * print_icon_mm * feature_scale * qgis_icon_scale
                     raster_marker.setSize(size_mm)
                     raster_marker.setSizeUnit(QgsUnitTypes.RenderMillimeters)
                     
@@ -375,12 +386,12 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
                 logger.warning(f"Failed to load PNG icon {png_icon}: {e}, using default circle")
                 symbol = QgsSymbol.defaultSymbol(layer.geometryType())
                 symbol.setColor(qcolor)
-                symbol.setSize(3 * feature_scale)
+                symbol.setSize(3 * feature_scale * qgis_icon_scale)
         else:
             # No custom icon, use default
             symbol = QgsSymbol.defaultSymbol(layer.geometryType())
             symbol.setColor(qcolor)
-            symbol.setSize(3 * feature_scale)  # Basic point size scaled by feature_scale
+            symbol.setSize(3 * feature_scale * qgis_icon_scale)  # Basic point size scaled by feature_scale
         
     elif geometry_type == 'linestring':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
@@ -422,6 +433,21 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             width = layer_config.get('constant_width', 2)
             symbol.setWidth(width * 0.1 * qgis_width_scale * line_scale)
             logger.info(f"DEFAULT constant width: {width} (scale={qgis_width_scale * line_scale})")
+
+        # Opt-in data-defined stroke color (mirrors a webmap interpolate paint).
+        # Only applied when 'qgis_color_stops' is present; flat color otherwise.
+        color_stops = layer_config.get('qgis_color_stops')
+        if color_stops:
+            color_expr = utils.build_qgis_color_expression(
+                color_stops['expression'], color_stops['stops']
+            )
+            symbol_layer = symbol.symbolLayer(0)
+            if symbol_layer:
+                symbol_layer.setDataDefinedProperty(
+                    QgsSymbolLayer.PropertyStrokeColor,
+                    QgsProperty.fromExpression(color_expr)
+                )
+                logger.info(f"Applied qgis_color_stops data-defined color to {layer.name()}")
     elif geometry_type == 'polygon':
         symbol = QgsSymbol.defaultSymbol(layer.geometryType())
         symbol.setColor(qcolor)
@@ -440,6 +466,13 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             symbol_layer.setStrokeColor(qcolor)
             symbol_layer.setStrokeWidth(0.3 * feature_scale)  # Stroke width scaled by feature_scale
     
+    # QGIS-only symbol opacity — lighten a vector layer in PDF/gazetteer output
+    # without touching the webmap (which uses paint/opacity). Applied to the symbol,
+    # not the layer, so labels stay fully opaque. Opt-in via 'qgis_opacity'.
+    qgis_opacity = layer_config.get('qgis_opacity')
+    if qgis_opacity is not None:
+        symbol.setOpacity(qgis_opacity)
+
     # Apply symbol renderer
     renderer = QgsSingleSymbolRenderer(symbol)
     layer.setRenderer(renderer)
@@ -498,17 +531,20 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             lc = layer_config.get('label_color')
             label_qcolor = QColor(lc[0], lc[1], lc[2]) if lc else None
 
+            # Per-layer label size multiplier (QGIS-only). e.g. 2.0 = twice as big.
+            label_scale = layer_config.get('qgis_label_scale', 1.0)
+
             if geometry_type == 'linestring':
-                text_format.setSize(14 * feature_scale)
+                text_format.setSize(14 * feature_scale * label_scale)
                 text_format.setColor(label_qcolor if label_qcolor else QColor(255, 255, 255))
                 font = QFont()
-                font.setPointSize(int(14 * feature_scale))
+                font.setPointSize(int(14 * feature_scale * label_scale))
                 font.setBold(True)
             else:
-                text_format.setSize(10 * feature_scale)
+                text_format.setSize(10 * feature_scale * label_scale)
                 text_format.setColor(label_qcolor if label_qcolor else qcolor)
                 font = QFont()
-                font.setPointSize(int(10 * feature_scale))
+                font.setPointSize(int(10 * feature_scale * label_scale))
             
             text_format.setFont(font)
             

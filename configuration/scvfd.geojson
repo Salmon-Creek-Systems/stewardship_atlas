@@ -71,7 +71,7 @@
           "lidar_basemap": {
             "geometry_type": "raster",
             "opacity": 0.0,
-            "qgis_opacity": 1.0
+            "qgis_opacity": 0.5
           },
           "usgs_hillshade": {
             "geometry_type": "wms",
@@ -226,6 +226,187 @@
               }
             ]
           },
+          "mileage_zones": {
+            "geometry_type": "polygon",
+            "color": [
+              255,
+              140,
+              0
+            ],
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "show_attributes": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "anchor",
+                "type": "string",
+                "default": ""
+              }
+            ],
+            "paint": {
+              "fill-color": "#ff8c00",
+              "fill-opacity": 0.15,
+              "fill-outline-color": "#ff8c00"
+            }
+          },
+          "road_mileage": {
+            "geometry_type": "linestring",
+            "color": [
+              255,
+              140,
+              0
+            ],
+            "interaction": "interface",
+            "show_attributes": true,
+            "editable_columns": [
+              {
+                "name": "route_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "m_start",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "m_end",
+                "type": "string",
+                "default": ""
+              }
+            ],
+            "paint": {
+              "line-color": [
+                "interpolate",
+                [
+                  "linear"
+                ],
+                [
+                  "/",
+                  [
+                    "min",
+                    [
+                      "coalesce",
+                      [
+                        "get",
+                        "m_start"
+                      ],
+                      1000000
+                    ],
+                    [
+                      "coalesce",
+                      [
+                        "get",
+                        "m_end"
+                      ],
+                      1000000
+                    ]
+                  ],
+                  1609.34
+                ],
+                0,
+                "#00c800",
+                1.667,
+                "#ffff00",
+                3.333,
+                "#ffa500",
+                5,
+                "#c80000",
+                100,
+                "#888888"
+              ],
+              "line-width": 5,
+              "line-opacity": 0.85
+            },
+            "qgis_color_stops": {
+              "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
+              "stops": [
+                [
+                  0,
+                  "#00a000"
+                ],
+                [
+                  1.667,
+                  "#999900"
+                ],
+                [
+                  3.333,
+                  "#cc8400"
+                ],
+                [
+                  5,
+                  "#a00000"
+                ],
+                [
+                  100,
+                  "#6c6c6c"
+                ]
+              ]
+            },
+            "vector_width": true,
+            "qgis_width_scale": 12.0
+          },
+          "mileage_markers": {
+            "geometry_type": "point",
+            "color": [
+              255,
+              255,
+              255
+            ],
+            "fill_color": [
+              50,
+              50,
+              50
+            ],
+            "add_labels": true,
+            "symbol": {
+              "png": "map_marker.png"
+            },
+            "icon-size": 1.5,
+            "icon-anchor": "bottom",
+            "interaction": "interface",
+            "show_attributes": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "route_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "d_mi",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "d_m",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "d_km",
+                "type": "string",
+                "default": ""
+              }
+            ],
+            "label_color": [
+              0,
+              0,
+              0
+            ],
+            "qgis_label_scale": 2.0
+          },
           "lpss": {
             "geometry_type": "point",
             "color": [
@@ -268,7 +449,8 @@
             ],
             "qgis_width_scale": 4.0,
             "interaction": "interface",
-            "vector_width": true
+            "vector_width": true,
+            "qgis_opacity": 0.25
           },
           "watertanks": {
             "geometry_type": "point",
@@ -306,7 +488,8 @@
                 "type": "string",
                 "default": "no"
               }
-            ]
+            ],
+            "qgis_icon_scale": 2.0
           },
           "ponds": {
             "geometry_type": "polygon",
@@ -650,8 +833,9 @@
               "ponds",
               "contours",
               "roads",
-              "roads_lrs",
-              "lrs_markers",
+              "mileage_zones",
+              "road_mileage",
+              "mileage_markers",
               "creeks",
               "buildings",
               "hydrants",
@@ -662,8 +846,9 @@
             ],
             "hidden_layers": [
               "lpss",
-              "roads_lrs",
-              "lrs_markers"
+              "mileage_zones",
+              "road_mileage",
+              "mileage_markers"
             ],
             "config_def": "webmap",
             "access": [
@@ -724,7 +909,8 @@
               "photos",
               "private_notes",
               "hazards",
-              "lrs_markers"
+              "mileage_markers",
+              "mileage_zones"
             ],
             "config_def": "webedit"
           },
@@ -818,23 +1004,23 @@
             "blend_percent": 40,
             "in_layers": [
               "lidar_basemap",
-              "contours",
               "roads",
               "creeks",
               "ponds",
               "buildings",
-              "lpss",
               "poi",
               "hydrants",
               "hazards",
-              "watertanks"
+              "watertanks",
+              "road_mileage",
+              "mileage_markers"
             ],
             "access": [
               "public",
               "internal",
               "admin"
             ],
-            "multipage_pdf": false,
+            "multipage_pdf": true,
             "grid_layers": [
               "lidar_basemap",
               "roads",
@@ -854,24 +1040,13 @@
           "road_lrs": {
             "type": "eddy",
             "config_def": "road_lrs",
-            "lrs_anchor_coordinates": [
-              40.205889035286134,
-              -123.89681666989158
-            ]
+            "lrs_zones_layer": "mileage_zones"
           },
           "road_lrs_markers": {
             "type": "eddy",
             "config_def": "road_lrs_markers",
-            "road_names": [
-              "Thomas",
-              "Upper Samuels Ranch",
-              "Lower Samuels Ranch",
-              "Flicker",
-              "Early Ranch",
-              "Upper Thomas",
-              "Lower Thomas",
-              "Serendipity"
-            ]
+            "marker_interval_mi": 1,
+            "label_template": "{route_name} {d_mi:.1f} mi"
           },
           "console": {
             "type": "outlet",
