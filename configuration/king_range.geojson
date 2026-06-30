@@ -183,6 +183,17 @@
           },
           "trails": {
             "geometry_type": "linestring",
+            "color": [153, 91, 40],
+            "add_labels": true,
+            "interaction": "interface",
+            "editable_columns": [
+              { "name": "name", "type": "string", "default": "Trail" }
+            ],
+            "vis": { "layout": { "line-cap": "round", "visibility": "visible" } },
+            "paint": { "line-color": "#995b28", "line-width": 2, "line-dasharray": [0, 2] }
+          },
+          "hike": {
+            "geometry_type": "linestring",
             "color": [165, 90, 20],
             "add_labels": true,
             "interaction": "interface",
@@ -196,7 +207,7 @@
           "public_roads": {
             "type": "inlet",
             "out_layer": "roads",
-            "config_def": "overture_roads",
+            "config_def": "roads_overture",
             "name": "public_roads",
             "config": {
               "asset_type": "inlet",
@@ -243,6 +254,12 @@
               "config_def": "overture_roads",
               "name": "public_roads"
             }
+          },
+          "public_trails": {
+            "type": "inlet",
+            "out_layer": "trails",
+            "config_def": "trails_overture",
+            "name": "public_trails"
           },
           "public_creeks": {
             "type": "inlet",
@@ -371,6 +388,7 @@
               "roads",
               "creeks",
               "trails",
+              "hike",
               "landmarks",
               "photos",
               "inaturalist"
@@ -401,6 +419,7 @@
                 "roads",
                 "creeks",
                 "trails",
+                "hike",
                 "landmarks",
                 "photos",
                 "inaturalist"
@@ -421,6 +440,7 @@
               "roads",
               "creeks",
               "trails",
+              "hike",
               "landmarks",
               "photos"
             ],
@@ -445,6 +465,7 @@
                 "roads",
                 "creeks",
                 "trails",
+                "hike",
                 "landmarks",
                 "photos"
               ]

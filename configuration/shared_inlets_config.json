@@ -555,6 +555,65 @@
 	    }
 	}
     },			
+    "roads_overture": {
+        "asset_type": "inlet",
+        "fetch_type": "overture_duckdb",
+        "interaction": "import",
+        "data_type": "geojson",
+        "out_layer": "roads",
+        "color": [110, 110, 255],
+        "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-06-17.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin < {east}\n  AND bbox.xmax > {west}\n  AND bbox.ymin < {north}\n  AND bbox.ymax > {south}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential', 'track'], class)\n",
+        "outpath_template": "roads_overture.geojson",
+        "attribution": {
+            "url": "https://docs.overturemaps.org/attribution/",
+            "description": "Overture Maps transportation",
+            "license": "https://docs.overturemaps.org/attribution/",
+            "citation": "https://docs.overturemaps.org/attribution/"
+        },
+        "alterations": {
+            "canonicalize": [
+                {
+                    "to": "name",
+                    "from": ["primary_name", "FULLRDNAME"],
+                    "remove_prefix": []
+                }
+            ],
+            "vector_width": {
+                "attribute": "class",
+                "map": {
+                    "primary": 15,
+                    "secondary": 11,
+                    "tertiary": 9
+                },
+                "default": 7
+            }
+        }
+    },
+    "trails_overture": {
+        "asset_type": "inlet",
+        "fetch_type": "overture_duckdb",
+        "interaction": "import",
+        "data_type": "geojson",
+        "out_layer": "trails",
+        "color": [153, 91, 40],
+        "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-06-17.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin < {east}\n  AND bbox.xmax > {west}\n  AND bbox.ymin < {north}\n  AND bbox.ymax > {south}\n  AND\n  LIST_CONTAINS(['path', 'footway', 'steps', 'cycleway', 'bridleway', 'pedestrian'], class)\n",
+        "outpath_template": "trails_overture.geojson",
+        "attribution": {
+            "url": "https://docs.overturemaps.org/attribution/",
+            "description": "Overture Maps transportation",
+            "license": "https://docs.overturemaps.org/attribution/",
+            "citation": "https://docs.overturemaps.org/attribution/"
+        },
+        "alterations": {
+            "canonicalize": [
+                {
+                    "to": "name",
+                    "from": ["primary_name"],
+                    "remove_prefix": []
+                }
+            ]
+        }
+    },
     "local_hillshade":  {
 	"asset_type": "inlet",
 	"fetch_type": "local_raster",
