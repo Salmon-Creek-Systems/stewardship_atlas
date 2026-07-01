@@ -226,6 +226,34 @@ def rename_layer_file(staging_path, old_name, new_name, dry_run=False):
     print(f"  layers/{new_name}/{old_name}.geojson → layers/{new_name}/{new_name}.geojson")
 
 
+def copy_layer_file(staging_path, old_name, new_name, dry_run=False):
+    """Copy a layer's data directory to a new layer name (data only, no deltas).
+
+    Copies layers/{old_name}/ → layers/{new_name}/, then renames any file whose
+    stem is old_name (e.g. {old}.geojson, {old}.tiff, {old}.tiff.jpg) to new_name.
+    Sidecar files like stats.json are left untouched.
+    """
+    staging_path = Path(staging_path)
+    src_dir = staging_path / 'layers' / old_name
+    dst_dir = staging_path / 'layers' / new_name
+    if dry_run:
+        print(f"  [dry_run] layers/{old_name}/ → layers/{new_name}/ (copy)")
+        print(f"  [dry_run] rename files with stem '{old_name}' → '{new_name}' in copy")
+        return
+    if not src_dir.exists():
+        raise FileNotFoundError(f"Layer directory not found: {src_dir}")
+    if dst_dir.exists():
+        raise FileExistsError(f"Destination layer directory already exists: {dst_dir}")
+    shutil.copytree(src_dir, dst_dir)
+    for f in list(dst_dir.iterdir()):
+        # rename only files named after the layer, preserving compound suffixes
+        # (e.g. hydrants.tiff.jpg → hydrants stem, ".tiff.jpg" suffix)
+        if f.is_file() and (f.name == old_name or f.name.startswith(old_name + '.')):
+            suffix = f.name[len(old_name):]
+            f.rename(dst_dir / f'{new_name}{suffix}')
+    print(f"  layers/{old_name}/ → layers/{new_name}/ (copied)")
+
+
 def rename_deltas_dir(staging_path, old_name, new_name, dry_run=False):
     """Rename the deltas directory for a layer (includes work/ subdir)."""
     staging_path = Path(staging_path)

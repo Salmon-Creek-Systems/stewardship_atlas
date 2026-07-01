@@ -459,6 +459,24 @@ function clearLayer(layerName) {
         .catch(function() { showToast('Clear error', true); });
 }
 
+function copyLayer(layerName) {
+    var newName = prompt('Copy “' + layerName + '” to a new layer named:', layerName + '_copy');
+    if (!newName) return;
+    newName = newName.trim();
+    if (!newName) return;
+    showToast('Copying “' + layerName + '” → “' + newName + '”…');
+    fetch(apiurl + '/copy_layer/' + swalename + '/' + layerName + '?new_name=' + encodeURIComponent(newName))
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+        .then(function(res) {
+            if (res.ok && res.d.status === 'success') {
+                showToast(res.d.message || ('Copied to “' + newName + '”'));
+            } else {
+                showToast('Copy failed: ' + (res.d.detail || res.d.message || 'Unknown'), true);
+            }
+        })
+        .catch(function() { showToast('Copy error', true); });
+}
+
 // ── Use cases ────────────────────────────────────────────
 function renderUseCases(useCases) {
     var container = document.getElementById('usecases-container');
@@ -617,6 +635,7 @@ function initializePage(data) {
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Dataset', [
                     { type: 'button', text: 'Replace with File', onclick: function() { uploadGeoJSON(name); } },
+                    { type: 'button', text: 'Copy Layer…', onclick: function() { copyLayer(name); } },
                     { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
                     { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
                 ]));
