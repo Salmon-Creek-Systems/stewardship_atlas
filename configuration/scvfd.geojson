@@ -759,6 +759,157 @@
                             "fill-opacity": 0.15,
                             "fill-outline-color": "#ff8c00"
                         }
+                    },
+                    "road_mileage_oneloop": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            255,
+                            140,
+                            0
+                        ],
+                        "interaction": "interface",
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "route_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "m_start",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "m_end",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "paint": {
+                            "line-color": [
+                                "interpolate",
+                                [
+                                    "linear"
+                                ],
+                                [
+                                    "/",
+                                    [
+                                        "min",
+                                        [
+                                            "coalesce",
+                                            [
+                                                "get",
+                                                "m_start"
+                                            ],
+                                            1000000
+                                        ],
+                                        [
+                                            "coalesce",
+                                            [
+                                                "get",
+                                                "m_end"
+                                            ],
+                                            1000000
+                                        ]
+                                    ],
+                                    1609.34
+                                ],
+                                0,
+                                "#00c800",
+                                1.667,
+                                "#ffff00",
+                                3.333,
+                                "#ffa500",
+                                5,
+                                "#c80000",
+                                100,
+                                "#888888"
+                            ],
+                            "line-width": 5,
+                            "line-opacity": 0.85
+                        },
+                        "qgis_color_stops": {
+                            "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
+                            "stops": [
+                                [
+                                    0,
+                                    "#00a000"
+                                ],
+                                [
+                                    1.667,
+                                    "#999900"
+                                ],
+                                [
+                                    3.333,
+                                    "#cc8400"
+                                ],
+                                [
+                                    5,
+                                    "#a00000"
+                                ],
+                                [
+                                    100,
+                                    "#6c6c6c"
+                                ]
+                            ]
+                        },
+                        "vector_width": true,
+                        "qgis_width_scale": 12.0
+                    },
+                    "mileage_markers_oneloop": {
+                        "geometry_type": "point",
+                        "color": [
+                            255,
+                            255,
+                            255
+                        ],
+                        "fill_color": [
+                            50,
+                            50,
+                            50
+                        ],
+                        "add_labels": true,
+                        "symbol": {
+                            "png": "map_marker.png"
+                        },
+                        "icon-size": 1.5,
+                        "icon-anchor": "bottom",
+                        "interaction": "interface",
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "route_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_mi",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_m",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_km",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "label_color": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "qgis_label_scale": 2.0
                     }
                 },
                 "assets": {
@@ -873,7 +1024,9 @@
                             "poi",
                             "lpss",
                             "hazards",
-                            "mileage_zones_oneloop"
+                            "mileage_zones_oneloop",
+                            "road_mileage_oneloop",
+                            "mileage_markers_oneloop"
                         ],
                         "hidden_layers": [
                             "lpss",
@@ -942,7 +1095,8 @@
                             "hazards",
                             "mileage_markers",
                             "mileage_zones",
-                            "mileage_zones_oneloop"
+                            "mileage_zones_oneloop",
+                            "mileage_markers_oneloop"
                         ],
                         "config_def": "webedit"
                     },
@@ -1045,7 +1199,9 @@
                             "hazards",
                             "watertanks",
                             "road_mileage",
-                            "mileage_markers"
+                            "mileage_markers",
+                            "road_mileage_oneloop",
+                            "mileage_markers_oneloop"
                         ],
                         "access": [
                             "public",
@@ -1084,6 +1240,20 @@
                         "type": "outlet",
                         "name": "console",
                         "config_def": "console"
+                    },
+                    "road_lrs_oneloop": {
+                        "type": "eddy",
+                        "config_def": "road_lrs",
+                        "lrs_zones_layer": "mileage_zones_oneloop",
+                        "out_layer": "road_mileage_oneloop"
+                    },
+                    "road_lrs_markers_oneloop": {
+                        "type": "eddy",
+                        "config_def": "road_lrs_markers",
+                        "in_layer": "road_mileage_oneloop",
+                        "out_layer": "mileage_markers_oneloop",
+                        "marker_interval_mi": 1,
+                        "label_template": "{route_name} {d_mi:.1f} mi"
                     }
                 }
             },
