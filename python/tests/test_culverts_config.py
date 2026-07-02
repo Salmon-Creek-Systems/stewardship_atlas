@@ -51,16 +51,25 @@ class TestCulvertsConfig(unittest.TestCase):
         self.assertEqual(cfg["feature_type"], "point")
         self.assertEqual(cfg["inpath_template"], "scvfd_culverts.geojson")
 
-    def test_present_in_same_outlets_as_watertanks(self):
-        def outlets_with(layer):
-            return {
-                a.get("name", key)
-                for key, a in self.assets.items()
-                if a.get("type") == "outlet" and layer in a.get("in_layers", [])
-            }
-        self.assertEqual(outlets_with("culverts"), outlets_with("watertanks"))
-        self.assertIn("webmap", outlets_with("culverts"))
-        self.assertIn("webedit", outlets_with("culverts"))
+    def _outlets_with(self, layer):
+        return {
+            a.get("name", key)
+            for key, a in self.assets.items()
+            if a.get("type") == "outlet" and layer in a.get("in_layers", [])
+        }
+
+    def test_present_in_edit_and_experimental_map(self):
+        outs = self._outlets_with("culverts")
+        # Culverts is a webedit layer and lives on the experimental map, not the
+        # reduced main webmap or the gazetteer PDF.
+        self.assertIn("webedit", outs)
+        self.assertIn("experimental_webmap", outs)
+        self.assertNotIn("webmap", outs)
+        self.assertNotIn("gazetteer", outs)
+
+    def test_queryable_via_sqldb(self):
+        sqldb = next(a for a in self.assets.values() if a.get("config_def") == "sqldb")
+        self.assertIn("culverts", sqldb["layers"])
 
     def test_icon_png_exists(self):
         png = Path(__file__).resolve().parents[2] / "templates" / "icons" / "culvert.png"

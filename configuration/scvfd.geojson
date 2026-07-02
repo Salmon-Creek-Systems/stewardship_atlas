@@ -1092,6 +1092,29 @@
                             "ponds",
                             "contours",
                             "roads",
+                            "mileage_markers",
+                            "creeks",
+                            "buildings",
+                            "hydrants",
+                            "watertanks",
+                            "hazards"
+                        ],
+                        "hidden_layers": [],
+                        "config_def": "webmap",
+                        "access": [
+                            "public",
+                            "internal",
+                            "admin"
+                        ]
+                    },
+                    "experimental_webmap": {
+                        "type": "outlet",
+                        "name": "experimental_webmap",
+                        "in_layers": [
+                            "basemap",
+                            "ponds",
+                            "contours",
+                            "roads",
                             "mileage_zones",
                             "road_mileage",
                             "mileage_markers",
@@ -1246,7 +1269,8 @@
                         "layers": [
                             "basemap",
                             "roads",
-                            "creeks"
+                            "creeks",
+                            "culverts"
                         ]
                     },
                     "sqlquery": {
@@ -1281,7 +1305,6 @@
                             "hydrants",
                             "hazards",
                             "watertanks",
-                            "culverts",
                             "road_mileage",
                             "mileage_markers",
                             "road_mileage_oneloop",
