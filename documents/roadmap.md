@@ -302,6 +302,8 @@ After running an inlet that writes deltas, a separate `refresh_vector_layer()` c
 - How does auth interact with static file serving? S3/CloudFront doesn't do htpasswd.
 - Federation complicates this: a user trusted by atlas A may need scoped read access to atlas B's shared layers.
 
+**Key reframing — offline as an outlet artifact**: the "static file serving vs. access control" tension dissolves once we stop conflating *static-first* (an implementation property) with *offline access* (a product promise). Make the offline bundle an explicit, downloadable outlet the recipient controls; then public reads go direct from S3 (no auth) and private reads + writes go through the authenticated API / scoped credentials, which finally enforces the layer `access` field for real. Same bundling machinery serves federation. See `documents/development/cloud_migration_plan.md` → "Offline Access as an Outlet Artifact", and the short-term security guardrails in issue #144.
+
 ## North Star: Dagster Orchestration
 
 The atlas was originally built with Dagster handling pipeline orchestration and data dependency tracking. It fell away during rapid feature development but is a long-term goal to restore.
