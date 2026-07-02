@@ -126,6 +126,25 @@ Each phase is independent and can be validated before proceeding to the next:
 
 ---
 
+## Offline Access as an Outlet Artifact
+
+A blocker that stalled the S3 migration: our "static-first" architecture and our "works offline" product promise got fused into one thing — serving the *entire* atlas tree as static files with passive `.htpasswd` access control. That model doesn't survive the move to S3 (S3/CloudFront can't do htpasswd), and it never actually enforced access control anyway (nginx ignores per-directory `.htpasswd`; see security audit, issue #144). The two ideas should be separated:
+
+- **Static-first** is an *implementation* property: outlets are static files; the API is only needed to edit.
+- **Offline access** is a *product promise*: a customer can take data into the field with no connectivity.
+
+**Resolution: make the offline bundle an explicit outlet artifact.** Instead of "everything is static so you can just download whatever," we build a deliberate, self-contained package (e.g. a GeoPackage + a bundled viewer, or a zipped static HTML atlas) as a named outlet. You download it, and access control of the downloaded copy is the recipient's responsibility.
+
+Why this unblocks the migration:
+
+- The **live serving layer no longer needs to expose raw private files statically.** Public reads go direct from S3 (cheap, cacheable, no auth). Private reads + all writes go through the authenticated API / STS-scoped temporary credentials (see Cognito Identity Layer doc), which finally enforces the layer `access` field for real.
+- **Offline stops being a reason to keep everything world-readable.** It's an intentional export, not a side effect of the serving model.
+- It's a **small, self-contained piece** that can be specified and even built early — essentially a `bundle`/`package` outlet that collects the authorized layers plus a viewer.
+
+Product bonus: an explicit, access-controlled export is a *stronger* story than "it's all just static files" — bundles can be scoped to what a given recipient is allowed, timestamped, and logged. That's the same machinery **federation** needs for sharing controlled subsets with regional/agency partners, so this change feeds two commercial narratives, not just closes a security gap.
+
+Caution: "everything through the webapp" must mean everything *sensitive or mutating* — not literally all reads. Routing public map views through the API would kill the scale-to-zero cost win and add cold-start latency to the common case. Keep public reads on the direct static/S3 path.
+
 ## Open Questions
 
 1. **Atlas config location**: Move `atlas_config.json` to S3, or keep in Lambda environment?
