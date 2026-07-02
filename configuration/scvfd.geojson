@@ -491,6 +491,79 @@
                         ],
                         "qgis_icon_scale": 2.0
                     },
+                    "culverts": {
+                        "geometry_type": "point",
+                        "add_labels": true,
+                        "color": [
+                            30,
+                            66,
+                            128
+                        ],
+                        "fill_color": [
+                            20,
+                            45,
+                            95
+                        ],
+                        "label_color": [
+                            30,
+                            66,
+                            128
+                        ],
+                        "symbol": {
+                            "png": "culvert.png"
+                        },
+                        "icon-size": 1.0,
+                        "show_attributes": true,
+                        "interaction": "interface",
+                        "editable_columns": [
+                            {
+                                "name": "diameter",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "condition",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "slope",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "upstream",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "width",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "downstream",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "drop",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "previous_work",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "comments",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "qgis_icon_scale": 2.0
+                    },
                     "ponds": {
                         "geometry_type": "polygon",
                         "color": [
@@ -991,6 +1064,11 @@
                         "out_layer": "watertanks",
                         "config_def": "local_watertanks"
                     },
+                    "local_culverts": {
+                        "type": "inlet",
+                        "out_layer": "culverts",
+                        "config_def": "local_culverts"
+                    },
                     "local_ponds": {
                         "type": "inlet",
                         "out_layer": "ponds",
@@ -1021,6 +1099,7 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
+                            "culverts",
                             "poi",
                             "lpss",
                             "hazards",
@@ -1053,6 +1132,7 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
+                            "culverts",
                             "poi",
                             "lpss",
                             "photos",
@@ -1090,6 +1170,7 @@
                             "poi",
                             "ponds",
                             "watertanks",
+                            "culverts",
                             "photos",
                             "private_notes",
                             "hazards",
@@ -1117,6 +1198,7 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
+                            "culverts",
                             "poi",
                             "lpss",
                             "ponds"
@@ -1143,6 +1225,7 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
+                            "culverts",
                             "poi",
                             "lpss",
                             "ponds",
@@ -1198,6 +1281,7 @@
                             "hydrants",
                             "hazards",
                             "watertanks",
+                            "culverts",
                             "road_mileage",
                             "mileage_markers",
                             "road_mileage_oneloop",

@@ -413,7 +413,7 @@
 
         "local_watertanks": {
             "name": "watertanks",
-            "asset_type": "inlet", 
+            "asset_type": "inlet",
 	    "symbol": "custom/octy",
             "interaction": "interface",
             "fetch_type": "local_ogr",
@@ -426,12 +426,29 @@
 		    "default": 5
 		}
             },
-	    
+
             "attribution": {
 		"url": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111",
 		"description": "USGS National Hydrography Dataset (NHD) Flowline Layer",
 		"license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-usage",
 		"citation": "https://www.sciencebase.gov/catalog/item/5e8111111111111111111111"
+            }
+	},
+
+        "local_culverts": {
+            "name": "culverts",
+            "asset_type": "inlet",
+	    "symbol": {"png": "culvert.png"},
+            "interaction": "interface",
+            "fetch_type": "local_ogr",
+            "data_type": "geojson",
+            "feature_type": "point",
+	    "inpath_template": "scvfd_culverts.geojson",
+            "alterations": {
+		"canonicalize": [{"to": "name", "from":[], "default": "culvert"}],
+		"vector_width": {
+		    "default": 5
+		}
             }
 	},
 

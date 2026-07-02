@@ -5,6 +5,7 @@ Outputs to templates/icons/:
   camera.png         — photos layer marker (bright green, 80x80)
   eye.png            — notes layer marker (bright blue, 80x80)
   map_marker.png     — generic map pin (black/white, 80x80)
+  culvert.png        — culverts layer marker (dark blue tube, 80x80)
 
 Run from repo root: python3 scripts/generate_speech_bubble.py
 """
@@ -115,11 +116,52 @@ def draw_map_marker():
     return img
 
 
+def draw_culvert():
+    """Dark blue tube in slight perspective, open bore facing the viewer.
+
+    Built by sweeping interpolated ellipses from a small far opening to a
+    larger near opening, then drawing the near rim and a dark bore hole on top.
+    Rendered at 4x and downsampled for smooth edges.
+    """
+    ss = 4
+    big = Image.new('RGBA', (SIZE * ss, SIZE * ss), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(big)
+
+    wall = (30, 66, 128, 255)   # dark blue tube wall
+    rim = (54, 100, 170, 255)   # lighter blue near rim
+    bore = (10, 22, 52, 255)    # very dark navy — the hole
+
+    # Near opening (front, lower-left, larger); far opening (back, upper-right, smaller)
+    ncx, ncy, nrx, nry = 30, 50, 22, 25
+    fcx, fcy, frx, fry = 55, 30, 13, 15
+
+    def lerp(a, b, t):
+        return a + (b - a) * t
+
+    def ell(cx, cy, rx, ry, color):
+        draw.ellipse([(cx - rx) * ss, (cy - ry) * ss,
+                      (cx + rx) * ss, (cy + ry) * ss], fill=color)
+
+    # Sweep interpolated ellipses far -> near to build the tube body
+    N = 60
+    for i in range(N + 1):
+        t = i / N  # 0 = far, 1 = near
+        ell(lerp(fcx, ncx, t), lerp(fcy, ncy, t),
+            lerp(frx, nrx, t), lerp(fry, nry, t), wall)
+
+    # Near rim + bore hole (shifted slightly toward far end for depth)
+    ell(ncx, ncy, nrx, nry, rim)
+    ell(ncx + 3, ncy - 2, nrx * 0.62, nry * 0.62, bore)
+
+    return big.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+
+
 icons = [
     ('speech_bubble.png', draw_speech_bubble),
     ('camera.png',        draw_camera),
     ('eye.png',           draw_eye),
     ('map_marker.png',    draw_map_marker),
+    ('culvert.png',       draw_culvert),
 ]
 
 for filename, fn in icons:
