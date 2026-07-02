@@ -301,6 +301,24 @@ async def clear_layer(swalename: str, layer_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/copy_layer/{swalename}/{layer_name}")
+async def copy_layer(swalename: str, layer_name: str, new_name: str):
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        atlas.copy_layer(ac, layer_name, new_name)
+        return {
+            "status": "success",
+            "message": (f"Layer '{layer_name}' copied to '{new_name}'. "
+                        f"Rematerialize webmap/webedit/html on the server for it to appear."),
+            "old_name": layer_name,
+            "new_name": new_name}
+    except (ValueError, FileExistsError, FileNotFoundError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     try:

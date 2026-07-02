@@ -645,6 +645,138 @@ def rename_layer(config, old_name, new_name, dry_run=False):
         print(f"  3. grep -r '{old_name}' {config_dir}")
 
 
+def plan_layer_copy(assets, old_name, new_name):
+    """Decide how assets should change when copying layer old_name → new_name.
+
+    Pure function (no filesystem, no registries): classifies each asset by its
+    resolved layer-reference fields. Returns (clones, appends):
+
+      clones:  list of dicts {"base_key", "new_key", "overrides"} — assets whose
+               effective *output* is old_name. A copy named {base_key}_{new_name}
+               is created with overrides applied (out_layer/in_layer → new_name).
+      appends: list of asset keys whose in_layers list contains old_name and
+               should have new_name appended (multi-layer outlets: webmap/webedit).
+
+    `assets` is the resolved runtime assets dict (config['assets']); each value is
+    read for its resolved 'config' fields, falling back to top-level fields.
+    """
+    clones = []
+    appends = []
+    for key, asset in assets.items():
+        if not isinstance(asset, dict):
+            continue
+        resolved = asset.get('config', asset)
+        out_layer = resolved.get('out_layer')
+        in_layer = resolved.get('in_layer')
+        in_layers = resolved.get('in_layers')
+
+        # Producer: effective output is old_name.
+        if out_layer == old_name:
+            overrides = {'out_layer': new_name}
+            if in_layer == old_name:  # in-place transform (e.g. tiff_to_cog)
+                overrides['in_layer'] = new_name
+            clones.append({'base_key': key, 'new_key': f'{key}_{new_name}',
+                           'overrides': overrides})
+        elif out_layer is None and in_layer == old_name:
+            # in-place eddy or single-layer outlet (e.g. s3_upload) targeting old_name
+            clones.append({'base_key': key, 'new_key': f'{key}_{new_name}',
+                           'overrides': {'in_layer': new_name}})
+
+        # Consumer: multi-layer outlet listing old_name.
+        if isinstance(in_layers, list) and old_name in in_layers:
+            appends.append(key)
+
+    return clones, appends
+
+
+def copy_layer(config, old_name, new_name, rebuild=True):
+    """Copy a layer (data + layer definition + producing/consuming assets).
+
+    Creates new_name as an independent copy of old_name:
+      - copies the layer data directory (data only, no deltas)
+      - deep-copies the layer definition in the source {atlas}.geojson
+      - clones inlet/eddy/outlet assets whose output is old_name to
+        {asset}_{new_name} targeting new_name (see plan_layer_copy)
+      - appends new_name to in_layers of outlets that list old_name (webmap/webedit)
+      - rebuilds atlas_config.json (config_only) so the change takes effect
+
+    Single-file GeoJSON config format only. After running, rematerialize
+    'webmap', 'webedit', and 'html' on the server for the new layer to appear.
+    """
+    import dataswale_geojson
+
+    name = config['name']
+    staging_path = Path(config['data_root']) / name / 'staging'
+    config_dir = Path(config['data_root']) / name / 'app' / 'configuration'
+    geojson_path = config_dir / f'{name}.geojson'
+
+    layer_names = [l['name'] for l in config['dataswale']['layers']]
+    if old_name not in layer_names:
+        raise ValueError(f"Layer '{old_name}' not found. Available: {layer_names}")
+    if new_name in layer_names:
+        raise ValueError(f"Layer '{new_name}' already exists in config.")
+
+    print(f"Copying layer '{old_name}' → '{new_name}' in atlas '{name}'\n")
+
+    print("Filesystem:")
+    dataswale_geojson.copy_layer_file(staging_path, old_name, new_name)
+
+    if not geojson_path.exists():
+        raise FileNotFoundError(
+            f"Source GeoJSON not found: {geojson_path}. copy_layer supports the "
+            f"single-file GeoJSON config format only.")
+
+    gj = json.load(open(geojson_path))
+    props = gj['features'][0]['properties']
+    if 'layers' not in props or 'assets' not in props:
+        raise ValueError(
+            f"{geojson_path.name} does not use the single-file (inline layers/assets) "
+            f"format; copy_layer supports that format only.")
+
+    layers = props['layers']
+    assets = props['assets']
+
+    print("\nConfig files:")
+    # Layer definition (dict keyed by name).
+    if old_name not in layers:
+        raise ValueError(f"Layer '{old_name}' not found in {geojson_path.name} layers.")
+    if new_name in layers:
+        raise ValueError(f"Layer '{new_name}' already exists in {geojson_path.name} layers.")
+    layers[new_name] = copy.deepcopy(layers[old_name])
+    print(f"  layers: '{old_name}' → '{new_name}'")
+
+    # Asset clones/appends, decided from the resolved runtime config.
+    clones, appends = plan_layer_copy(config['assets'], old_name, new_name)
+    for c in clones:
+        base_key, new_key, overrides = c['base_key'], c['new_key'], c['overrides']
+        if base_key not in assets:
+            print(f"  WARNING: asset '{base_key}' not found in {geojson_path.name}, skipping clone")
+            continue
+        if new_key in assets:
+            print(f"  WARNING: asset '{new_key}' already exists, skipping clone")
+            continue
+        new_asset = copy.deepcopy(assets[base_key])
+        new_asset.update(overrides)
+        assets[new_key] = new_asset
+        print(f"  asset clone: '{base_key}' → '{new_key}' ({overrides})")
+    for key in appends:
+        in_layers = assets[key].get('in_layers')
+        if isinstance(in_layers, list) and new_name not in in_layers:
+            in_layers.append(new_name)
+            print(f"  asset '{key}': appended '{new_name}' to in_layers")
+
+    with open(geojson_path, 'w') as f:
+        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+
+    if rebuild:
+        print("\nRebuilding config (config_only):")
+        build_atlas_from_geojson(geojson_path, config_only=True)
+
+    print(f"\nNext steps (on server):")
+    print(f"  1. Rematerialize 'webmap', 'webedit', and 'html'")
+    print(f"  2. grep -r '{new_name}' {config_dir}  (sanity check)")
+
+
 def materialize(config: Dict[str, Any], asset_name: str, materializers: Dict[str, Any]=DEFAULT_MATERIALIZERS):
     materializer_name = config['assets'][asset_name]['config']['fetch_type']
     return materializers[materializer_name](config, asset_name)
