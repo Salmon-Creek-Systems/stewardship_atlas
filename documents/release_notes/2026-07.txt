@@ -1,0 +1,64 @@
+Subject: Stewardship Atlas — Summer 2026 updates
+
+Hi Stewardship Atlas fan and/or user!
+
+Here's a look at what's new in your atlas since the last update.
+
+
+A CLEANER CONSOLE
+
+The console you use to open maps and edit data has a new interface available — layer
+buttons grouped by type, common actions in a tab bar along the bottom, and
+a layout that works better on a phone.  To try the new
+version, click the A/B button at the top right of the current one - you can 
+do the same to switch back. 
+
+
+MILEAGE MARKERS ALONG ROADS (AND MORE)
+
+We can now add mileage markers to a road, creek, powerline, or anything 
+where you might use distance  along a path. Let us know if there's a line
+feature in your atlas you'd like this added to.
+
+
+SHAREABLE 3D VIEW
+
+The 3D terrain view now has its own share link. It remembers your exact
+camera angle and which layers you have showing, so you can send someone a
+link that opens to precisely the view you're looking at — the ridge, the
+tilt, the layers, all of it. Good for briefings and for "look at this
+drainage basin!" conversations.
+
+
+INATURALIST OBSERVATIONS
+
+We can now add a layer of community nature observations from iNaturalist
+for your coverage area — plants, wildlife, and other sightings that people
+have recorded and mapped. Useful background for vegetation and fuels work,
+and interesting in its own right. Let us know if you'd like it turned on
+for your atlas.
+
+
+CREATE YOUR OWN ATLAS
+
+You can now spin up a brand-new atlas yourself, no waiting on us. Go to
+https://fireatlas.org/create, draw a box around the area you care about,
+give it a name and pick a "starter kit" of the kind of data you're 
+interested in, and submit. An atlas is built for that area with a
+webmap, edit tools, and the usual layers, and you're dropped straight into
+it. Give it a try on a neighborhood, a parcel, a favorite hiking area or conservation project.
+
+
+COMING SOON: CONNECTING OVERLAPPING ATLASES
+
+We're starting on a way for atlases that overlap to share
+layers with each other. Sharing is fully opt-in and owner-controlled
+— nothing leaves your atlas unless you choose it, and you pick exactly
+which layers you offer. Worth thinking about now: does anyone near you map
+the same area? With self-service atlases above, that "anyone" could be
+you spinning up a second one. Landowners can track details only they
+need to know about, but share things like water access or turnarounds with
+their local fire department.
+
+
+As always, reply to this email with any questions or if anything looks off.
