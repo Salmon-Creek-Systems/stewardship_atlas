@@ -500,7 +500,7 @@ def webmap_json(config, name, sprite_json=None):
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
             "cog_sources": cog_sources, "cog_layers": cog_layers}
 
-def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view=''):
+def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view='', show_user_location=False):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     source_root = versioning.atlas_path(config, version='app') 
@@ -608,6 +608,7 @@ void await map.loadImage('{im_uri}',
             swalename=config.get('name', ''),
             lidar_basemap_option=lidar_basemap_option,
             default_view=json.dumps(default_view or ""),
+            show_user_location=json.dumps(bool(show_user_location)),
             qr_code=qr_code_html)
 
     with open(output_path, 'w') as f_out:
@@ -809,8 +810,12 @@ def outlet_webmap(config, name):
     page_url = f"{config['base_url']}/staging/outlets/{name}/"
     # Optional default view: a bare share-state blob applied when the map loads with no ?s= param.
     default_view = config['assets'][name].get('default_view', '')
+    # Optional "show my location" control (off by default). When on, webmap.js adds a
+    # MapLibre GeolocateControl the user can tap to plot their live position.
+    show_user_location = config['assets'][name].get('show_user_location', False)
     html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json,
-                                  page_url=page_url, default_view=default_view)
+                                  page_url=page_url, default_view=default_view,
+                                  show_user_location=show_user_location)
   
     return output_path
 

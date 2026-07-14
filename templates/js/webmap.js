@@ -7,6 +7,18 @@ map.addControl(new maplibregl.ScaleControl({
     unit: 'metric'
 }));
 
+// "Show my location" control — opt-in per outlet via the show_user_location asset flag.
+// typeof guard: webmap.js is raw-copied and may be served from a page generated before
+// SHOW_USER_LOCATION existed, where the global is undefined.
+if (typeof SHOW_USER_LOCATION !== 'undefined' && SHOW_USER_LOCATION) {
+    map.addControl(new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserLocation: true,
+        showAccuracyCircle: true
+    }), 'top-right');
+}
+
 // Legend is added inside map.on('load') so dynamically-added layers (COG) exist when it initializes
 
 // Zoom indicator — custom MapLibre control at bottom-left (appears below legend/scale)
