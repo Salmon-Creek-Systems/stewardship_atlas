@@ -1137,6 +1137,7 @@
                             "mileage_markers"
                         ],
                         "config_def": "webmap",
+                        "show_user_location": true,
                         "access": [
                             "public",
                             "internal",
