@@ -326,7 +326,11 @@ async def json_upload(payload: JSONPayload, swalename: str):
         fc = delta_package #['features']
         layer = delta_package['layer']
         action = delta_package['action']
-        print(f"delta_upoad.=: {action} for {layer}: delta_package")
+        # Auto-apply is keyed on the source (issue #131, C7): interactive
+        # sources default to immediate apply; bulk sources send apply=False
+        # to accumulate. Transport flag only — not persisted in the delta.
+        apply_now = bool(delta_package.pop('apply', True))
+        print(f"delta_upoad.=: {action} for {layer}: delta_package (apply={apply_now})")
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))
@@ -334,16 +338,21 @@ async def json_upload(payload: JSONPayload, swalename: str):
         with open(delta_path, "w") as f:
             json.dump(fc, f)
 
-        print(f"refreshing {layer} after {action}")
-        res = dataswale_geojson.refresh_vector_layer(ac, layer)
-        
-        
+        if apply_now:
+            # Cheap update-refresh of the target layer only, no cascade.
+            print(f"refreshing {layer} after {action}")
+            res = dataswale_geojson.refresh_vector_layer(ac, layer)
+            message = f"Data stored successfully, refreshed: {res}"
+        else:
+            print(f"stored delta for {layer} ({action}); apply deferred")
+            message = "Data stored successfully, apply deferred"
+
         return {
             "status": "success",
-            "message": f"Data stored successfully, refreshed: {res}",
+            "message": message,
+            "applied": apply_now,
             "filename": os.path.basename(delta_path),
             "path": delta_path}
-        return {"status": "success"}
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -545,6 +554,87 @@ async def refresh(swale: str, asset: str):
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Global variable to track layer refresh status.
+# Single-flight: one running refresh per webapp process.
+refresh_layer_status = {
+    "running": False,
+    "swale": None,
+    "layer": None,
+    "mode": None,
+    "cascade": None,
+    "started_at": None,
+    "finished_at": None,
+    "success": None,
+    "error": None,
+}
+
+
+@app.get("/refresh_layer")
+async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: BackgroundTasks,
+                                 mode: str = "update", cascade: bool = True):
+    """Refresh one layer through the Dagster asset graph (issue #131, T5).
+
+    mode=update|rebuild, cascade=true|false — see atlas_dagster.refresh_layer.
+    Runs in the background; poll /refresh-layer-status for completion.
+    """
+    if mode not in ("update", "rebuild"):
+        raise HTTPException(status_code=400, detail=f"Unknown refresh mode: {mode!r}")
+    if refresh_layer_status["running"]:
+        return {
+            "status": "already_running",
+            "swale": refresh_layer_status["swale"],
+            "layer": refresh_layer_status["layer"],
+            "mode": refresh_layer_status["mode"],
+            "started_at": refresh_layer_status["started_at"],
+        }
+
+    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+    try:
+        ac = json.load(open(config_path))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
+    layer_names = [l.get('name') for l in ac.get('dataswale', {}).get('layers', [])]
+    if layer not in layer_names:
+        raise HTTPException(status_code=400, detail=f"No layer '{layer}' in atlas '{swale}'")
+
+    refresh_layer_status.update(
+        running=True, swale=swale, layer=layer, mode=mode, cascade=cascade,
+        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
+
+    def run_refresh():
+        # Lazy import: keeps webapp importable where dagster isn't installed.
+        import atlas_dagster
+        try:
+            result = atlas_dagster.refresh_layer(ac, layer, mode=mode, cascade=cascade)
+            refresh_layer_status["success"] = bool(result.success)
+        except Exception as e:
+            logging.error(f"refresh_layer failed for {swale}/{layer}: {e}")
+            logging.error(traceback.format_exc())
+            refresh_layer_status["success"] = False
+            refresh_layer_status["error"] = str(e)
+        finally:
+            refresh_layer_status["finished_at"] = datetime.now().isoformat()
+            refresh_layer_status["running"] = False
+
+    # Plain def: FastAPI runs sync background tasks in the threadpool, so
+    # the blocking dagster.materialize doesn't stall the event loop.
+    background_tasks.add_task(run_refresh)
+    return {
+        "status": "started",
+        "swale": swale,
+        "layer": layer,
+        "mode": mode,
+        "cascade": cascade,
+        "started_at": refresh_layer_status["started_at"],
+    }
+
+
+@app.get("/refresh-layer-status")
+async def get_refresh_layer_status():
+    return refresh_layer_status
+
 
 # Global dict to track atlas creation status, keyed by slug
 create_statuses: Dict[str, Any] = {}

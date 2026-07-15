@@ -133,6 +133,7 @@ Start unified webapp:
 ```bash
 cd /root/swales_dev/app/python
 SWALES_ROOT=/root/swales_dev ATLAS_DATA_BUCKET=scs-atlas-data \
+DAGSTER_HOME=/root/dagster_home \
 uvicorn --port 9000 --host 0.0.0.0 webapp:app --reload \
   --ssl-certfile /etc/letsencrypt/live/fireatlas.org-0001/fullchain.pem \
   --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
@@ -162,8 +163,10 @@ On the deployed server:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /delta_upload/{swalename}` | Store a delta; triggers layer refresh |
+| `POST /delta_upload/{swalename}` | Store a delta; auto-applies (cheap layer refresh, no cascade) unless `apply: false` in payload |
 | `GET /refresh?swale={name}&asset={name}` | Re-materialize a single asset |
+| `GET /refresh_layer?swale={name}&layer={name}&mode=update\|rebuild&cascade=true\|false` | Dagster-graph layer refresh (background); needs `DAGSTER_HOME` for UI visibility |
+| `GET /refresh-layer-status` | Poll refresh job progress (single-flight per process) |
 | `GET /publish?swale={name}` | Async publish — materializes versioned outlets, creates snapshot, updates `CURRENT` |
 | `GET /publish-status?swale={name}` | Poll publish job progress |
 | `POST /save_config/{swalename}` | Persist config changes |
