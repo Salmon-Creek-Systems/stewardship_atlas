@@ -14,6 +14,12 @@ is refreshed, avoiding intermediate-state races.
 Raster inlets write their layer directly (no delta accumulation), so they
 feed downstream eddies/outlets without an intermediate layer_ asset.
 
+Dependencies are ordering-only (`deps=`), never data-passing (`ins=`): all
+assets communicate through the dataswale filesystem, so Dagster must not
+require its own stored outputs to exist before running a downstream asset.
+This keeps direct materialization (notebooks, webapp) and Dagster runs
+interchangeable — disk is the single source of truth.
+
 Known limitation: s3_geojson inlets write to layers/{asset_name}/ rather than
 layers/{out_layer}/ (pre-existing config inconsistency). The dependency graph
 will reflect the out_layer name, which may not match the actual data path.
@@ -25,7 +31,7 @@ Usage:
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from dagster import AssetIn, AssetKey, Definitions, asset
+from dagster import AssetKey, Definitions, asset
 
 import atlas as atlas_module
 import dataswale_geojson
@@ -54,10 +60,6 @@ def _get_out_layer(asset_entry: Dict) -> Optional[str]:
     return _cfg(asset_entry).get('out_layer')
 
 
-def _sanitize(name: str) -> str:
-    return name.replace('-', '_').replace('.', '_')
-
-
 def _find_layer_producer(config: Dict, layer_name: str) -> Optional[str]:
     for name, entry in config['assets'].items():
         if _get_out_layer(entry) == layer_name:
@@ -65,26 +67,26 @@ def _find_layer_producer(config: Dict, layer_name: str) -> Optional[str]:
     return None
 
 
-def _make_materializer_asset(atlas_slug: str, asset_name: str, config: Dict, ins: Dict):
+def _make_materializer_asset(atlas_slug: str, asset_name: str, config: Dict, deps: List[AssetKey]):
     @asset(
         key=AssetKey([atlas_slug, asset_name]),
-        ins=ins,
+        deps=deps,
         group_name=atlas_slug,
     )
-    def _fn(context, **kwargs):
+    def _fn(context):
         atlas_module.materialize(config, asset_name)
 
     return _fn
 
 
-def _make_layer_refresh_asset(atlas_slug: str, layer_name: str, config: Dict, ins: Dict):
+def _make_layer_refresh_asset(atlas_slug: str, layer_name: str, config: Dict, deps: List[AssetKey]):
     @asset(
         key=AssetKey([atlas_slug, f"layer_{layer_name}"]),
-        ins=ins,
+        deps=deps,
         group_name=atlas_slug,
         description=f"Apply accumulated deltas to {layer_name}",
     )
-    def _fn(context, **kwargs):
+    def _fn(context):
         dataswale_geojson.refresh_vector_layer(config, layer_name)
 
     return _fn
@@ -112,15 +114,12 @@ def build_atlas_assets(config: Dict) -> List:
     for asset_name, entry in assets_cfg.items():
         if entry.get('type') != 'inlet':
             continue
-        result.append(_make_materializer_asset(atlas_slug, asset_name, config, {}))
+        result.append(_make_materializer_asset(atlas_slug, asset_name, config, []))
 
     # Synthesized layer_ assets — fan-in from all vector inlets producing that layer.
     for layer_name, inlet_names in by_layer.items():
-        ins = {
-            _sanitize(name): AssetIn(key=AssetKey([atlas_slug, name]))
-            for name in inlet_names
-        }
-        result.append(_make_layer_refresh_asset(atlas_slug, layer_name, config, ins))
+        deps = [AssetKey([atlas_slug, name]) for name in inlet_names]
+        result.append(_make_layer_refresh_asset(atlas_slug, layer_name, config, deps))
 
     # Eddy and outlet assets.
     # Build deps incrementally and guard against cycles with a reachability check.
@@ -146,13 +145,13 @@ def build_atlas_assets(config: Dict) -> List:
             upstream[asset_name] = set()
             continue
 
-        ins = {}
+        deps = []
         asset_upstream: set = set()
         for layer in _get_in_layers(entry):
             if layer in by_layer:
                 # Vector layer: depend on the synthesized layer_ asset.
                 key = f"layer_{layer}"
-                ins[_sanitize(key)] = AssetIn(key=AssetKey([atlas_slug, key]))
+                deps.append(AssetKey([atlas_slug, key]))
                 asset_upstream.add(key)
             else:
                 # Raster or eddy-produced layer: depend directly on the producing asset.
@@ -169,11 +168,11 @@ def build_atlas_assets(config: Dict) -> List:
                         f"(would create cycle via layer '{layer}')"
                     )
                     continue
-                ins[_sanitize(producer)] = AssetIn(key=AssetKey([atlas_slug, producer]))
+                deps.append(AssetKey([atlas_slug, producer]))
                 asset_upstream.add(producer)
 
         upstream[asset_name] = asset_upstream
-        result.append(_make_materializer_asset(atlas_slug, asset_name, config, ins))
+        result.append(_make_materializer_asset(atlas_slug, asset_name, config, deps))
 
     return result
 
