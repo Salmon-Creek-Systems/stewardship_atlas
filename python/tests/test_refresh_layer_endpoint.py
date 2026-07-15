@@ -8,7 +8,12 @@ Tests for the issue #131 webapp wiring:
 
 Mocks out config load, delta writes, layer refresh, and atlas_dagster so
 these run without server infrastructure. Requires fastapi (server env).
+
+The open() fake only intercepts paths under /fake/ and passes everything
+else to the real open — a blanket intercept breaks unrelated file reads
+(botocore data files, dagster's alembic.ini) elsewhere in the process.
 """
+import builtins
 import io
 import json
 import os
@@ -23,6 +28,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient
+
+# webapp reads DATASWALE_PATH at import time — set it before importing.
+# Imported once here, outside any patch, so the real import chain
+# (boto3 etc.) reads its own files normally.
+os.environ.setdefault("DATASWALE_PATH", "/fake/swales")
+import webapp
 
 
 FAKE_CONFIG = {
@@ -44,6 +55,10 @@ DELTA_PAYLOAD = {
     }
 }
 
+FAKE_DELTA_PATH = "/fake/deltas/roads/web__20260715__create.geojson"
+
+_real_open = builtins.open
+
 
 class KeepOpenStringIO(io.StringIO):
     """StringIO whose contents survive the with-block that wrote them."""
@@ -57,40 +72,43 @@ class WebappTestCase(unittest.TestCase):
         self.written = {}
 
         def fake_open(path, *args, **kwargs):
-            if 'w' in (args[0] if args else kwargs.get('mode', 'r')):
+            if not str(path).startswith('/fake/'):
+                return _real_open(path, *args, **kwargs)
+            mode = args[0] if args else kwargs.get('mode', 'r')
+            if 'w' in mode:
                 buf = KeepOpenStringIO()
                 self.written[str(path)] = buf
                 return buf
             return io.StringIO(json.dumps(FAKE_CONFIG))
 
-        self.patchers = [
+        for p in [
             patch("builtins.open", fake_open),
             patch("webapp.SWALES_ROOT", "/fake/swales"),
-            patch("deltas_geojson.delta_path_from_layer",
-                  return_value="/fake/deltas/roads/web__20260715__create.geojson"),
+            patch("deltas_geojson.delta_path_from_layer", return_value=FAKE_DELTA_PATH),
             patch("dataswale_geojson.refresh_vector_layer", return_value="/fake/layer.geojson"),
-        ]
-        for p in self.patchers:
+        ]:
             p.start()
+            self.addCleanup(p.stop)  # runs even if setUp fails later — no leaks
 
         # atlas_dagster is imported lazily inside the endpoint; make the
         # import resolve to a mock whether or not dagster is installed.
         self.mock_atlas_dagster = MagicMock()
         self.mock_atlas_dagster.refresh_layer.return_value = MagicMock(success=True)
+        self._prior_atlas_dagster = sys.modules.get('atlas_dagster')
         sys.modules['atlas_dagster'] = self.mock_atlas_dagster
+        self.addCleanup(self._restore_atlas_dagster)
 
-        import webapp
-        self.webapp = webapp
         # Reset single-flight state between tests.
         webapp.refresh_layer_status.update(
             running=False, swale=None, layer=None, mode=None, cascade=None,
             started_at=None, finished_at=None, success=None, error=None)
         self.client = TestClient(webapp.app, raise_server_exceptions=False)
 
-    def tearDown(self):
-        for p in self.patchers:
-            p.stop()
-        del sys.modules['atlas_dagster']
+    def _restore_atlas_dagster(self):
+        if self._prior_atlas_dagster is not None:
+            sys.modules['atlas_dagster'] = self._prior_atlas_dagster
+        else:
+            sys.modules.pop('atlas_dagster', None)
 
 
 class TestDeltaUploadApplyFlag(WebappTestCase):
@@ -115,8 +133,7 @@ class TestDeltaUploadApplyFlag(WebappTestCase):
     def test_apply_flag_not_persisted_in_delta(self):
         payload = {"data": dict(DELTA_PAYLOAD["data"], apply=False)}
         self.client.post("/delta_upload/testatlas", json=payload)
-        stored = json.loads(
-            self.written["/fake/deltas/roads/web__20260715__create.geojson"].getvalue())
+        stored = json.loads(self.written[FAKE_DELTA_PATH].getvalue())
         self.assertNotIn("apply", stored)
         self.assertEqual(stored["layer"], "roads")
 
@@ -157,8 +174,8 @@ class TestRefreshLayerEndpoint(WebappTestCase):
         self.mock_atlas_dagster.refresh_layer.assert_not_called()
 
     def test_single_flight_guard(self):
-        self.webapp.refresh_layer_status["running"] = True
-        self.webapp.refresh_layer_status["layer"] = "culverts"
+        webapp.refresh_layer_status["running"] = True
+        webapp.refresh_layer_status["layer"] = "culverts"
         resp = self.client.get("/refresh_layer?swale=testatlas&layer=roads")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "already_running")
