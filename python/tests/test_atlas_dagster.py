@@ -25,9 +25,19 @@ import atlas_dagster
 
 
 def make_config():
-    """Minimal atlas config exercising inlet fan-in, eddy, and outlet."""
+    """Minimal atlas config exercising inlet fan-in, eddy, outlet, and the
+    layer taxonomy: inlet-fed (roads), eddy-produced (road_mileage),
+    manual-only (culverts), raster (elevation)."""
     return {
         'name': 'testatlas',
+        'dataswale': {
+            'layers': [
+                {'name': 'roads', 'geometry_type': 'linestring'},
+                {'name': 'road_mileage', 'geometry_type': 'linestring'},
+                {'name': 'culverts', 'geometry_type': 'point'},
+                {'name': 'elevation', 'geometry_type': 'raster'},
+            ],
+        },
         'assets': {
             'roads_osm': {
                 'type': 'inlet',
@@ -64,6 +74,7 @@ def test_graph_shape():
     assert set(by_key) == {
         AssetKey(['testatlas', 'roads_osm']),
         AssetKey(['testatlas', 'roads_overture']),
+        AssetKey(['testatlas', 'layer_culverts']),
         layer_roads, mileage, webmap,
     }
 
@@ -76,6 +87,13 @@ def test_graph_shape():
     assert by_key[mileage].asset_deps[mileage] == {layer_roads}
     # Outlet depends on the layer asset and the eddy that produces road_mileage.
     assert by_key[webmap].asset_deps[webmap] == {layer_roads, mileage}
+
+    # Manual-only layer: dep-less layer_ asset; eddy-produced road_mileage
+    # and raster elevation get none (their producer owns them).
+    culverts = AssetKey(['testatlas', 'layer_culverts'])
+    assert by_key[culverts].asset_deps[culverts] == set()
+    assert AssetKey(['testatlas', 'layer_road_mileage']) not in by_key
+    assert AssetKey(['testatlas', 'layer_elevation']) not in by_key
 
 
 def test_midgraph_asset_materializes_in_isolation(monkeypatch):
@@ -116,3 +134,67 @@ def test_layer_asset_materializes_in_isolation(monkeypatch):
 
     assert result.success
     assert refreshed == ['roads']
+
+
+@pytest.fixture
+def recorders(monkeypatch):
+    """Patch the two work functions with recorders; keep the run ephemeral."""
+    monkeypatch.delenv('DAGSTER_HOME', raising=False)
+    materialized = []
+    refreshed = []
+    monkeypatch.setattr(
+        atlas_dagster.atlas_module, 'materialize',
+        lambda config, name: materialized.append(name),
+    )
+    monkeypatch.setattr(
+        atlas_dagster.dataswale_geojson, 'refresh_vector_layer',
+        lambda config, name, delta_queue_builder=None:
+            refreshed.append((name, delta_queue_builder)),
+    )
+    return materialized, refreshed
+
+
+def test_refresh_layer_update_cascades_downstream_only(recorders):
+    materialized, refreshed = recorders
+    result = atlas_dagster.refresh_layer(make_config(), 'roads')
+
+    assert result.success
+    # Default builder (pending deltas onto current layer), no inlets re-run.
+    assert refreshed == [('roads', None)]
+    assert set(materialized) == {'mileage', 'webmap'}
+
+
+def test_refresh_layer_update_no_cascade(recorders):
+    materialized, refreshed = recorders
+    result = atlas_dagster.refresh_layer(make_config(), 'roads', cascade=False)
+
+    assert result.success
+    assert refreshed == [('roads', None)]
+    assert materialized == []
+
+
+def test_refresh_layer_rebuild_reruns_direct_inlets(recorders):
+    materialized, refreshed = recorders
+    result = atlas_dagster.refresh_layer(make_config(), 'roads', mode='rebuild')
+
+    assert result.success
+    # Fresh base from both direct inlets, overwrite builder, then cascade.
+    assert set(materialized) == {'roads_osm', 'roads_overture', 'mileage', 'webmap'}
+    assert refreshed == [('roads', atlas_dagster.deltas_geojson.apply_deltas_overwrite)]
+
+
+def test_refresh_layer_rebuild_coerced_to_update_for_manual_layer(recorders):
+    materialized, refreshed = recorders
+    result = atlas_dagster.refresh_layer(make_config(), 'culverts', mode='rebuild')
+
+    assert result.success
+    # No inlet upstream: nothing to rebuild, must not empty the layer (C5).
+    assert refreshed == [('culverts', None)]
+    assert materialized == []
+
+
+def test_refresh_layer_rejects_unknown_layer_and_mode(recorders):
+    with pytest.raises(ValueError):
+        atlas_dagster.refresh_layer(make_config(), 'road_mileage')
+    with pytest.raises(ValueError):
+        atlas_dagster.refresh_layer(make_config(), 'roads', mode='sideways')

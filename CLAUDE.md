@@ -10,6 +10,7 @@ A geospatial data management system for creating and maintaining fire safety atl
 
 - **Developer's Guide**: `documents/developers_guide.md` - Configuration, layers, assets, Jupyter workflows
 - **Technical Architecture**: `documents/atlas_technical_architecture.md` - Core concepts and implementation details
+- **Data Architecture**: `documents/data_architecture.md` - Conceptual model: layers, assets, deltas, refresh, versions
 - **Data Interaction Guide**: `documents/data_interaction_guide.md` - All the ways to view/edit data
 - **QGIS Outlets**: `documents/qgis_outlets.md` - PDF generation with QGIS
 - **Roadmap**: `documents/roadmap.md` - Strategic project roadmap

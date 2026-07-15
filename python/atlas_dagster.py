@@ -27,19 +27,38 @@ will reflect the out_layer name, which may not match the actual data path.
 Usage:
     cd python
     SWALES_ROOT=/root/swales_dev dagster dev -f atlas_definitions.py
+
+    # or in-process, from a notebook / the webapp:
+    refresh_layer(config, 'roads')                    # update + cascade
+    refresh_layer(config, 'roads', mode='rebuild')    # fresh base from inlets
+    refresh_layer(config, 'roads', cascade=False)     # layer only, no outlets
 """
+import os
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from dagster import AssetKey, Definitions, asset
+from dagster import (
+    AssetKey,
+    AssetSelection,
+    Config,
+    DagsterInstance,
+    Definitions,
+    asset,
+    materialize,
+)
 
 import atlas as atlas_module
 import dataswale_geojson
+import deltas_geojson
 import raster_inlets as raster_inlets_module
 import vector_inlets as vector_inlets_module
 
 _VECTOR_FETCH_TYPES = frozenset(vector_inlets_module.asset_methods)
 _RASTER_FETCH_TYPES = frozenset(raster_inlets_module.asset_methods)
+
+# Vector geometry types that can carry deltas (see shared_layers_config.json
+# for the vocabulary; 'raster' and 'document' layers are not delta-fed).
+_DELTA_GEOMETRY_TYPES = frozenset({'point', 'linestring', 'polygon'})
 
 
 def _cfg(asset_entry: Dict) -> Dict:
@@ -79,15 +98,32 @@ def _make_materializer_asset(atlas_slug: str, asset_name: str, config: Dict, dep
     return _fn
 
 
-def _make_layer_refresh_asset(atlas_slug: str, layer_name: str, config: Dict, deps: List[AssetKey]):
+class LayerRefreshConfig(Config):
+    """Per-run refresh mode (issue #131, C5: runtime parameter, not layer config).
+
+    update  — apply pending deltas on top of the current layer file (cheap).
+    rebuild — apply pending deltas onto an emptied layer file; pair with
+              re-running the direct inlets for a fresh base (refresh_layer
+              handles that selection). Archived work/ deltas are NOT replayed.
+    """
+    mode: str = "update"
+
+
+def _make_layer_refresh_asset(atlas_slug: str, layer_name: str, atlas_config: Dict, deps: List[AssetKey]):
     @asset(
         key=AssetKey([atlas_slug, f"layer_{layer_name}"]),
         deps=deps,
         group_name=atlas_slug,
         description=f"Apply accumulated deltas to {layer_name}",
     )
-    def _fn(context):
-        dataswale_geojson.refresh_vector_layer(config, layer_name)
+    def _fn(context, config: LayerRefreshConfig):
+        if config.mode == "rebuild":
+            dataswale_geojson.refresh_vector_layer(
+                atlas_config, layer_name, deltas_geojson.apply_deltas_overwrite)
+        elif config.mode == "update":
+            dataswale_geojson.refresh_vector_layer(atlas_config, layer_name)
+        else:
+            raise ValueError(f"Unknown refresh mode: {config.mode!r}")
 
     return _fn
 
@@ -109,6 +145,19 @@ def build_atlas_assets(config: Dict) -> List:
             out_layer = _get_out_layer(entry)
             if out_layer and fetch_type in _VECTOR_FETCH_TYPES:
                 by_layer[out_layer].append(asset_name)
+
+    # Manual-only vector layers (no producing asset at all) also get a
+    # layer_ asset: they are pure delta consumers (webedit, photo ingest)
+    # and refresh is the only thing that materializes them.
+    for layer_def in config.get('dataswale', {}).get('layers', []):
+        layer_name = layer_def.get('name')
+        if not layer_name or layer_name in by_layer:
+            continue
+        if layer_def.get('geometry_type') not in _DELTA_GEOMETRY_TYPES:
+            continue
+        if _find_layer_producer(config, layer_name):
+            continue  # eddy- or raster-produced: that asset owns the layer
+        by_layer[layer_name] = []
 
     # Inlet assets — no upstream Dagster dependencies.
     for asset_name, entry in assets_cfg.items():
@@ -183,3 +232,57 @@ def build_definitions(configs: List[Dict]) -> Definitions:
     for config in configs:
         all_assets.extend(build_atlas_assets(config))
     return Definitions(assets=all_assets)
+
+
+def refresh_layer(config: Dict, layer_name: str, mode: str = "update", cascade: bool = True):
+    """
+    Refresh one layer through the Dagster asset graph (issue #131, T2).
+
+    mode="update"  — apply pending deltas onto the current layer (cheap).
+    mode="rebuild" — re-run the layer's direct inlets for a fresh base, then
+                     apply pending deltas onto an emptied layer. Archived
+                     work/ deltas are not replayed. Manual-only layers (no
+                     inlet) have nothing to rebuild: mode is coerced to
+                     "update" rather than allowed to empty the layer.
+    cascade=True   — also re-derive everything downstream (eddies, outlets).
+
+    Blocks until the run completes; returns the Dagster ExecuteInProcessResult.
+    Uses the persistent DagsterInstance when DAGSTER_HOME is set (so runs
+    appear in the Dagster UI), an ephemeral one otherwise.
+    """
+    if mode not in ("update", "rebuild"):
+        raise ValueError(f"Unknown refresh mode: {mode!r}")
+
+    atlas_slug = config['name']
+    assets = build_atlas_assets(config)
+    layer_key = AssetKey([atlas_slug, f"layer_{layer_name}"])
+
+    layer_asset = next((a for a in assets if layer_key in a.keys), None)
+    if layer_asset is None:
+        raise ValueError(
+            f"No refreshable layer asset for '{layer_name}' in atlas '{atlas_slug}' "
+            f"(eddy- and raster-produced layers are refreshed by materializing their producer)")
+
+    # Manual-only layer: no inlet upstream, nothing to rebuild (C5).
+    has_inlets = bool(layer_asset.asset_deps.get(layer_key))
+    if mode == "rebuild" and not has_inlets:
+        mode = "update"
+
+    selection = AssetSelection.keys(layer_key)
+    if cascade:
+        selection = selection.downstream()  # includes the layer asset itself
+    run_config = None
+    if mode == "rebuild":
+        # Direct inlets only (depth=1) — never the whole ancestry (C6).
+        selection = selection | AssetSelection.keys(layer_key).upstream(depth=1)
+        run_config = {
+            "ops": {f"{atlas_slug}__layer_{layer_name}": {"config": {"mode": "rebuild"}}}
+        }
+
+    instance = DagsterInstance.get() if os.environ.get('DAGSTER_HOME') else None
+    return materialize(
+        assets,
+        selection=selection,
+        run_config=run_config,
+        instance=instance,
+    )
