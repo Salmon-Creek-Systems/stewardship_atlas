@@ -168,13 +168,18 @@
                 document.getElementById('downloads-section').style.display = 'block';
             }
 
-            // Setup versions
-            if (!data.versions || data.versions.length === 0) {
-                document.getElementById('versions-section').style.display = 'none';
-            }
-            if (data.versions && data.versions.length > 0) {
+            // Setup versions: staging (the working copy) pinned on top,
+            // then published snapshots; CURRENT shows as a tag on the
+            // version it points at, not as its own entry.
+            {
                 const versionsList = document.getElementById('versions-list');
-                data.versions.forEach(item => {
+                const stagingLi = document.createElement('li');
+                const stagingA = document.createElement('a');
+                stagingA.href = `${data.baseurl}/staging/outlets/html/admin`;
+                stagingA.textContent = 'staging';
+                stagingLi.appendChild(stagingA);
+                versionsList.appendChild(stagingLi);
+                (data.versions || []).forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
                     a.href = `${data.baseurl}/${item}/outlets/html/admin`;

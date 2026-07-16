@@ -56,7 +56,7 @@
 
         <div class="sb-section" id="sb-versions-section">
             <button class="sb-toggle" aria-expanded="true">
-                <span>Publish</span>
+                <span>Versions</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <div class="sb-body">
@@ -124,7 +124,7 @@
 </div>
 
 <div id="mobile-panel-publish" class="mobile-panel" style="display:none">
-    <div class="mp-heading">Publish &amp; Versions</div>
+    <div class="mp-heading">Versions</div>
     <div class="mobile-publish">
         <div class="version-badge" id="mobile-version-badge"></div>
         <div class="mobile-version-actions">
@@ -600,26 +600,29 @@ function initializePage(data) {
         if (el) el.textContent = data.version_string || 'staging';
     });
 
-    // Version lists
-    if (data.versions && data.versions.length > 0) {
-        ['sb-version-list', 'mobile-version-list'].forEach(function(listId) {
-            var list = document.getElementById(listId);
-            if (!list) return;
-            data.versions.forEach(function(v) {
-                var li = document.createElement('li');
-                var a = document.createElement('a');
-                a.href = data.baseurl + '/' + v + '/outlets/html/admin';
-                // currentVersion = the published version CURRENT points at
-                a.textContent = v === data.currentVersion ? v + ' (current)' : v;
-                if (v === data.currentVersion) a.className = 'current-version';
-                li.appendChild(a);
-                list.appendChild(li);
-            });
+    // Version lists: staging (the working copy) pinned on top, then
+    // published snapshots; CURRENT shows as a tag on the version it
+    // points at, not as its own entry.
+    ['sb-version-list', 'mobile-version-list'].forEach(function(listId) {
+        var list = document.getElementById(listId);
+        if (!list) return;
+        var stagingLi = document.createElement('li');
+        var stagingA = document.createElement('a');
+        stagingA.href = data.baseurl + '/staging/outlets/html/admin';
+        stagingA.textContent = 'staging';
+        stagingLi.appendChild(stagingA);
+        list.appendChild(stagingLi);
+        (data.versions || []).forEach(function(v) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = data.baseurl + '/' + v + '/outlets/html/admin';
+            // currentVersion = the published version CURRENT points at
+            a.textContent = v === data.currentVersion ? v + ' (current)' : v;
+            if (v === data.currentVersion) a.className = 'current-version';
+            li.appendChild(a);
+            list.appendChild(li);
         });
-    } else {
-        var sec = document.getElementById('sb-versions-section');
-        if (sec) sec.style.display = 'none';
-    }
+    });
 
     // Interfaces (Maps)
     if (data.interfaces && data.interfaces.length > 0) {
