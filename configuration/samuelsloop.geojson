@@ -39,7 +39,7 @@
       "base_url": "https://fireatlas.org/samuelsloop",
       "app_url": "https://fireatlas.org:9000",
       "port": 9000,
-      "versioned_outlets": ["html", "webmap"],
+      "versioned_outlets": [],
       "logo_url": "https://scs-atlas-data.s3.amazonaws.com/samuelsloop/logo.png"
     }
   }]
