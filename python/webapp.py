@@ -636,6 +636,74 @@ async def get_refresh_layer_status():
     return refresh_layer_status
 
 
+# Global variable to track single-asset materialize status.
+# Single-flight: one running build per webapp process.
+materialize_status = {
+    "running": False,
+    "swale": None,
+    "asset": None,
+    "started_at": None,
+    "finished_at": None,
+    "success": None,
+    "error": None,
+}
+
+
+@app.get("/materialize_asset")
+async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: BackgroundTasks):
+    """Build one asset (typically an outlet, e.g. runbook) through the
+    Dagster graph (issue #131, T6). No cascade — exactly this asset.
+    Runs in the background; poll /materialize-asset-status for completion.
+    """
+    if materialize_status["running"]:
+        return {
+            "status": "already_running",
+            "swale": materialize_status["swale"],
+            "asset": materialize_status["asset"],
+            "started_at": materialize_status["started_at"],
+        }
+
+    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+    try:
+        ac = json.load(open(config_path))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
+    if asset not in ac.get('assets', {}):
+        raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
+
+    materialize_status.update(
+        running=True, swale=swale, asset=asset,
+        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
+
+    def run_materialize():
+        # Lazy import: keeps webapp importable where dagster isn't installed.
+        import atlas_dagster
+        try:
+            result = atlas_dagster.materialize_asset(ac, asset)
+            materialize_status["success"] = bool(result.success)
+        except Exception as e:
+            logging.error(f"materialize_asset failed for {swale}/{asset}: {e}")
+            logging.error(traceback.format_exc())
+            materialize_status["success"] = False
+            materialize_status["error"] = str(e)
+        finally:
+            materialize_status["finished_at"] = datetime.now().isoformat()
+            materialize_status["running"] = False
+
+    background_tasks.add_task(run_materialize)
+    return {
+        "status": "started",
+        "swale": swale,
+        "asset": asset,
+        "started_at": materialize_status["started_at"],
+    }
+
+
+@app.get("/materialize-asset-status")
+async def get_materialize_asset_status():
+    return materialize_status
+
+
 # Global dict to track atlas creation status, keyed by slug
 create_statuses: Dict[str, Any] = {}
 

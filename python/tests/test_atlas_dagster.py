@@ -198,3 +198,18 @@ def test_refresh_layer_rejects_unknown_layer_and_mode(recorders):
         atlas_dagster.refresh_layer(make_config(), 'road_mileage')
     with pytest.raises(ValueError):
         atlas_dagster.refresh_layer(make_config(), 'roads', mode='sideways')
+
+
+def test_materialize_asset_runs_exactly_one_asset(recorders):
+    materialized, refreshed = recorders
+    result = atlas_dagster.materialize_asset(make_config(), 'webmap')
+
+    assert result.success
+    # No cascade, no upstream — exactly the requested asset.
+    assert materialized == ['webmap']
+    assert refreshed == []
+
+
+def test_materialize_asset_rejects_unknown_asset(recorders):
+    with pytest.raises(ValueError):
+        atlas_dagster.materialize_asset(make_config(), 'nope')

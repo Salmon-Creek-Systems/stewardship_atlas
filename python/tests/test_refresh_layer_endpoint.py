@@ -45,6 +45,7 @@ FAKE_CONFIG = {
             {"name": "culverts", "geometry_type": "point"},
         ]
     },
+    "assets": {"webmap": {"type": "outlet"}},
 }
 
 DELTA_PAYLOAD = {
@@ -105,6 +106,9 @@ class WebappTestCase(unittest.TestCase):
             started_at=None, finished_at=None, success=None, error=None)
         webapp.publish_status.update(
             publishing=False, started_at=None, finished_at=None)
+        webapp.materialize_status.update(
+            running=False, swale=None, asset=None,
+            started_at=None, finished_at=None, success=None, error=None)
         self.client = TestClient(webapp.app, raise_server_exceptions=False)
 
     def _restore_atlas_dagster(self):
@@ -192,6 +196,39 @@ class TestRefreshLayerEndpoint(WebappTestCase):
         self.assertFalse(status["running"])
         self.assertFalse(status["success"])
         self.assertIn("boom", status["error"])
+
+
+class TestMaterializeAssetEndpoint(WebappTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.mock_atlas_dagster.materialize_asset.return_value = MagicMock(success=True)
+
+    def test_build_runs_and_records_status(self):
+        resp = self.client.get("/materialize_asset?swale=testatlas&asset=webmap")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], "started")
+
+        self.mock_atlas_dagster.materialize_asset.assert_called_once()
+        args = self.mock_atlas_dagster.materialize_asset.call_args[0]
+        self.assertEqual(args[1], "webmap")
+
+        status = self.client.get("/materialize-asset-status").json()
+        self.assertFalse(status["running"])
+        self.assertTrue(status["success"])
+
+    def test_unknown_asset_rejected(self):
+        resp = self.client.get("/materialize_asset?swale=testatlas&asset=nope")
+        self.assertEqual(resp.status_code, 400)
+        self.mock_atlas_dagster.materialize_asset.assert_not_called()
+
+    def test_single_flight_guard(self):
+        webapp.materialize_status["running"] = True
+        webapp.materialize_status["asset"] = "runbook"
+        resp = self.client.get("/materialize_asset?swale=testatlas&asset=webmap")
+        self.assertEqual(resp.json()["status"], "already_running")
+        self.assertEqual(resp.json()["asset"], "runbook")
+        self.mock_atlas_dagster.materialize_asset.assert_not_called()
 
 
 class TestPublishIsPureSnapshot(WebappTestCase):

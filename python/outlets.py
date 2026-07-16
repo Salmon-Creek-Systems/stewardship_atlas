@@ -2171,10 +2171,21 @@ def make_console_html(config,
     with open(template_path, 'r') as f:
         template = f.read()
 
+    # Which published version CURRENT points at (None if no publish yet) —
+    # used by consoles to label the live version in the versions list.
+    current_version = None
+    try:
+        current_path = Path(config['data_root']) / config['name'] / 'CURRENT'
+        if current_path.is_symlink():
+            current_version = current_path.resolve().name
+    except OSError:
+        pass
+
     # Prepare the data for the template
     data = {
         'version_string': config.get('version_string', 'staging'),
         'versions': displayed_versions,
+        'currentVersion': current_version,
         'logo': config.get('logo', ''),
         'swaleName': config['name'],
         'baseurl': config.get('base_url', 'http://local'),
@@ -2277,10 +2288,21 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         # and ac.get('access') in ('admin', 'internal', 'public')
     ]
 
+    # Layers with a producing inlet can be rebuilt (fresh source pull);
+    # manual-only layers only have update (issue #131, C5) — the console
+    # derives one vs two refresh buttons from this flag.
+    inlet_out_layers = set()
+    for a in config['assets'].values():
+        if a.get('type') == 'inlet':
+            out_layer = a.get('config', a).get('out_layer')
+            if out_layer:
+                inlet_out_layers.add(out_layer)
+
     admin_layers = [
-        lc for lc in config['dataswale']['layers'] 
+        dict(lc, has_rebuild=(lc.get('name') in inlet_out_layers))
+        for lc in config['dataswale']['layers']
         if lc.get('interaction','') == 'interface'
-        # and ac.get('access',['public']).count('admin') > 0      
+        # and ac.get('access',['public']).count('admin') > 0
         # and ac.get('interaction') == 'interface'
     ]
     

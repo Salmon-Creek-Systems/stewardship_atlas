@@ -286,3 +286,24 @@ def refresh_layer(config: Dict, layer_name: str, mode: str = "update", cascade: 
         run_config=run_config,
         instance=instance,
     )
+
+
+def materialize_asset(config: Dict, asset_name: str):
+    """
+    Materialize one asset through the Dagster asset graph (issue #131, T6).
+
+    No cascade, no upstream: exactly this asset, against whatever is on
+    disk. This is the explicit "build this outlet now" operation (e.g.
+    rebuilding a runbook or gazetteer before publish).
+
+    Blocks until the run completes; returns the Dagster result. Uses the
+    persistent DagsterInstance when DAGSTER_HOME is set.
+    """
+    atlas_slug = config['name']
+    assets = build_atlas_assets(config)
+    key = AssetKey([atlas_slug, asset_name])
+    if not any(key in a.keys for a in assets):
+        raise ValueError(f"No asset '{asset_name}' in atlas '{atlas_slug}'")
+
+    instance = DagsterInstance.get() if os.environ.get('DAGSTER_HOME') else None
+    return materialize(assets, selection=[key], instance=instance)
