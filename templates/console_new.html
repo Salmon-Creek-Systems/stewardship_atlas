@@ -602,8 +602,16 @@ function initializePage(data) {
 
     // Version lists: staging (the working copy) pinned on top, then
     // published snapshots; CURRENT shows as a tag on the version it
-    // points at, not as its own entry.
-    ['sb-version-list', 'mobile-version-list'].forEach(function(listId) {
+    // points at, not as its own entry. Not for the public console —
+    // it must not expose staging links or publish controls.
+    if (data.consoleType === 'PUBLIC') {
+        var sec = document.getElementById('sb-versions-section');
+        if (sec) sec.style.display = 'none';
+        var pubTab = document.querySelector('.tab-btn[data-tab="publish"]');
+        if (pubTab) pubTab.style.display = 'none';
+        var pubPanel = document.getElementById('mobile-panel-publish');
+        if (pubPanel) pubPanel.remove();
+    } else ['sb-version-list', 'mobile-version-list'].forEach(function(listId) {
         var list = document.getElementById(listId);
         if (!list) return;
         var stagingLi = document.createElement('li');

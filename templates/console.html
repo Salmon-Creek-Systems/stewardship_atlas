@@ -170,8 +170,11 @@
 
             // Setup versions: staging (the working copy) pinned on top,
             // then published snapshots; CURRENT shows as a tag on the
-            // version it points at, not as its own entry.
-            {
+            // version it points at, not as its own entry. Not for the
+            // public console — it must not expose staging links.
+            if (data.consoleType === 'PUBLIC') {
+                document.getElementById('versions-section').style.display = 'none';
+            } else {
                 const versionsList = document.getElementById('versions-list');
                 const stagingLi = document.createElement('li');
                 const stagingA = document.createElement('a');
