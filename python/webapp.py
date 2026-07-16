@@ -682,30 +682,18 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         # Add the delayed task to background
 
             
-        async def finish_publishing():
+        def finish_publishing():
+            # Publish is a pure snapshot (issue #131, C8): no inlet, eddy, or
+            # outlet materialization here. Outlets are kept current by refresh
+            # cascades before publish. Plain def so the copytree runs in the
+            # threadpool and /publish-status stays responsive.
             try:
-                print(f"Starting publish with ac: {ac['dataswale'].get('versioned_outlets',[])}\n-----\n{ac}\n---")
-                publish_status["log"].append(  [ (f"Starting publish with ac: {ac['dataswale'].get('versioned_outlets',[])}\n-----\n---", datetime.now().isoformat()) ])
-                # logging.info(f"Starting publish with ac['dataswale']: {ac['dataswale'].get('versioned_outlets',[])}")
-
-                for outlet_name in ac['dataswale'].get('versioned_outlets', []):
-                    print(f"Materializing outlet: {outlet_name}")
-                    logging.info(f"LOG Materializing outlet: {outlet_name}")
-                    publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
-                    atlas.materialize(ac, outlet_name)
-                    publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
-                # res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
 
                 res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
-                # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
-                # publish_status["log"] = []
-                #logger.info(res_json)
-                # let's always refresh the HTML after all this.
-                atlas.materialize(ac, 'html')
                 return str(res)
             except Exception as e:
                 error_msg = f"Error in publish background task: {e}"

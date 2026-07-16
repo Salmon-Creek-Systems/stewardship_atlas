@@ -5,6 +5,7 @@ Tests for the issue #131 webapp wiring:
   default, store-only when apply=False.
 - GET /refresh_layer + /refresh-layer-status (T5): background Dagster
   refresh with single-flight guard.
+- GET /publish (T4): pure snapshot — no outlet materialization.
 
 Mocks out config load, delta writes, layer refresh, and atlas_dagster so
 these run without server infrastructure. Requires fastapi (server env).
@@ -102,6 +103,8 @@ class WebappTestCase(unittest.TestCase):
         webapp.refresh_layer_status.update(
             running=False, swale=None, layer=None, mode=None, cascade=None,
             started_at=None, finished_at=None, success=None, error=None)
+        webapp.publish_status.update(
+            publishing=False, started_at=None, finished_at=None)
         self.client = TestClient(webapp.app, raise_server_exceptions=False)
 
     def _restore_atlas_dagster(self):
@@ -189,3 +192,20 @@ class TestRefreshLayerEndpoint(WebappTestCase):
         self.assertFalse(status["running"])
         self.assertFalse(status["success"])
         self.assertIn("boom", status["error"])
+
+
+class TestPublishIsPureSnapshot(WebappTestCase):
+
+    def test_publish_snapshots_without_materializing(self):
+        with patch("atlas.materialize") as mock_mat, \
+             patch("versioning.publish_new_version",
+                   return_value="/fake/swales/testatlas/2026-07-16") as mock_pub:
+            resp = self.client.get("/publish?swale=testatlas")
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.json()["status"], "success")
+            # Background task ran: snapshot taken, nothing materialized (C8).
+            mock_pub.assert_called_once()
+            mock_mat.assert_not_called()
+
+        status = self.client.get("/publish-status?swale=testatlas").json()
+        self.assertFalse(status.get("publishing"))

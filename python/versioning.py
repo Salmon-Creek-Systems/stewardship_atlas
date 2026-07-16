@@ -70,13 +70,24 @@ def publish_new_version(config, version=None):
    
 
 
-    # copy all files to new version
-    logger.info(f"About to `shutil.copytree` from '{staging_path}' to '{version_path}'...")
-    shutil.copytree(staging_path, version_path, symlinks=True)
+    # Copy staging to the new version. 'versioned_outlets' is a copy filter
+    # (issue #131, C9): which staging/outlets/<name> dirs are included in
+    # the snapshot. Missing or empty means all. It is not a build list —
+    # publish materializes nothing. The full deltas tree (pending + work/
+    # archive) is always copied: versions keep their edit history (C10).
+    versioned = config.get('dataswale', {}).get('versioned_outlets') or []
+    outlets_path = staging_path / 'outlets'
 
-    # empty /work dirs in staging to prepare for new changes
-    for work_dir in staging_path.glob('work/*'):
-        shutil.rmtree(work_dir)
+    def _ignore_unversioned(dirpath, names):
+        if versioned and Path(dirpath) == outlets_path:
+            excluded = set(names) - set(versioned)
+            if excluded:
+                logger.info(f"Snapshot excludes non-versioned outlets: {sorted(excluded)}")
+            return excluded
+        return set()
+
+    logger.info(f"About to `shutil.copytree` from '{staging_path}' to '{version_path}'...")
+    shutil.copytree(staging_path, version_path, symlinks=True, ignore=_ignore_unversioned)
 
     # point "production" to new version
     # repoint symbolic link in atlas root dir to new version
