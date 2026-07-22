@@ -544,6 +544,13 @@
                             "admin"
                         ]
                     },
+                    "config_edit": {
+                        "type": "outlet",
+                        "name": "config_edit",
+                        "config_def": "config_editor",
+                        "access": ["technical"],
+                        "interaction": "interface"
+                    },
                     "gazetteer_grid": {
                         "out_layer": "gazetteer_regions",
                         "config_def": "gazetteer_grid",
