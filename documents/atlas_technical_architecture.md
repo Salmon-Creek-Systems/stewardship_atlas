@@ -3,17 +3,21 @@
   
 
 
+> **Note**: the settled conceptual model for layers, assets, deltas, refresh,
+> and versions lives in [data_architecture.md](data_architecture.md). Where
+> this older spec disagrees with it, that document wins.
+
 # Definitions
 Here are some ideas and components we'll work with a lot. We'll delve more deeply into them, but let's start with some high level overview and context.
 
 * ***Dataswale***: Core dataset at the heart of a Stewardship Atlas. This is a store of geospatial and other data ephasizing self consistency and standards. There is no other data in an atlas, just ways to view, process, and export this primary data store. Example: GeoPackage of a county's roads, hills, and creeks.
 * ***Layer***: A uniquely named single-typed canonicalized dataset in a Dataswale. Example: Roads as geojson linestrings.
-* ***Delta***: A standardized “batch” of data to be applied to a Dataswale layer as a setwise batch boolean update. Example: a new driveway to be added to existing Roads layer.
+* ***Delta***: A standardized “batch” of pending changes to a Dataswale layer. Deltas accumulate and do not modify the layer until a refresh applies them. Example: a new driveway to be added to existing Roads layer.
 * ***Inlet***: A job which generates a Delta from external data sources. Example: OpenStreetMap query
 * ***Eddy:*** A job which processes a layer in a Dataswale into a new layer. Example: Add h3 indexes to each feature in Roads layer. 
 * ***Outlet***: A job which generates some external artifact or representation from a Dataswale. Example: Export Roads and Hills as GeoDF
 * ***Atlas***: a specific configuration and implementation of all the above. Example: A Fire Atlas maintained and used by a locel fire safe council.
-* ***Version***: A specific state of the dataswale. Generally either timestamp or "STAGING" which is always where changes occur, the "working copy". May not include other artifacts (outputs like PDFs, inputs like OSM files) but always contains everything needed to generate them.
+* ***Version***: A frozen, timestamped snapshot of the dataswale. `staging` is the one editable copy (the "working copy"); publishing freezes it as-is — no computation runs at publish time. A version may not include every outlet artifact (see `versioned_outlets` copy filter) but always contains everything needed to regenerate them, including the full delta history.
 * ***Region***: A named polygon feature (currently required to form a bounding box) which may have defined adjacencies.
 
 # Configuration
@@ -121,7 +125,15 @@ Note that the methods to apply a queue to a dataswale should be provided by the 
 * transform : apply simple configured transformations to Features, generally once as part of DQ retrieval.
 
 ### Current Delta queue Implemention
-A directory  for each Layer contains delta files, and a `work` subdir where they are put after being processed into the dataswale.
+A directory  for each Layer contains delta files, and a `work` subdir where they are put after being processed into the dataswale. The `work` archive is the layer's edit history; it is never auto-deleted and is retained in published versions.
+
+## Refresh and Publish
+The operational model (see [data_architecture.md](data_architecture.md) for the full treatment):
+
+* **Refresh is the only operation that mutates a delta-fed layer.** Inlets, eddies, and accumulated deltas are inputs a refresh consumes. Two modes, chosen at run time (never per-layer config): **update** applies pending deltas onto the current layer (cheap, default); **rebuild** re-runs the layer's direct inlets for a fresh base and applies pending deltas onto an emptied layer (archived `work/` deltas are not replayed). Manual-only layers (no inlet) have nothing to rebuild.
+* **Refresh cascades downstream only** — dependent eddies, then outlets — never upstream. A no-cascade option exists for development velocity.
+* **Publish is a pure snapshot.** It copies `staging` to a timestamped version and repoints `CURRENT`; it runs no inlet, eddy, or outlet. What the user saw in staging is exactly what publishes. Expensive outlets (PDF runbook, gazetteer) must be built explicitly before publishing — via a refresh cascade, the console Build buttons, or `/materialize_asset`.
+* Orchestration is a Dagster asset graph built from the atlas config (`atlas_dagster.py`); edges are ordering-only, so any asset can equally be materialized directly from a notebook.
 
 ## Inlets
 Inlets take data from somewhere in the world and move it into the Dataswale  as canonically formatted assets. In particular, an `inlet` always generates a Delta associated with a given Asset (or set of assets I suppose). The inlet should do as little processing of the delta as possible so this can be done in one place uniformly when the deltas are applied to their assets.
