@@ -24,7 +24,7 @@
                 "app_url": "https://fireatlas.org:9000",
                 "port": 9000,
                 "logo_url": "",
-                "versioned_outlets": ["biochar_webedit"],
+                "versioned_outlets": [],
                 "layers": {
                     "regions": {
                         "layer_def": "regions"

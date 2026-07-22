@@ -326,7 +326,11 @@ async def json_upload(payload: JSONPayload, swalename: str):
         fc = delta_package #['features']
         layer = delta_package['layer']
         action = delta_package['action']
-        print(f"delta_upoad.=: {action} for {layer}: delta_package")
+        # Auto-apply is keyed on the source (issue #131, C7): interactive
+        # sources default to immediate apply; bulk sources send apply=False
+        # to accumulate. Transport flag only — not persisted in the delta.
+        apply_now = bool(delta_package.pop('apply', True))
+        print(f"delta_upoad.=: {action} for {layer}: delta_package (apply={apply_now})")
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))
@@ -334,16 +338,21 @@ async def json_upload(payload: JSONPayload, swalename: str):
         with open(delta_path, "w") as f:
             json.dump(fc, f)
 
-        print(f"refreshing {layer} after {action}")
-        res = dataswale_geojson.refresh_vector_layer(ac, layer)
-        
-        
+        if apply_now:
+            # Cheap update-refresh of the target layer only, no cascade.
+            print(f"refreshing {layer} after {action}")
+            res = dataswale_geojson.refresh_vector_layer(ac, layer)
+            message = f"Data stored successfully, refreshed: {res}"
+        else:
+            print(f"stored delta for {layer} ({action}); apply deferred")
+            message = "Data stored successfully, apply deferred"
+
         return {
             "status": "success",
-            "message": f"Data stored successfully, refreshed: {res}",
+            "message": message,
+            "applied": apply_now,
             "filename": os.path.basename(delta_path),
             "path": delta_path}
-        return {"status": "success"}
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -546,6 +555,155 @@ async def refresh(swale: str, asset: str):
         print(traceback_str)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# Global variable to track layer refresh status.
+# Single-flight: one running refresh per webapp process.
+refresh_layer_status = {
+    "running": False,
+    "swale": None,
+    "layer": None,
+    "mode": None,
+    "cascade": None,
+    "started_at": None,
+    "finished_at": None,
+    "success": None,
+    "error": None,
+}
+
+
+@app.get("/refresh_layer")
+async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: BackgroundTasks,
+                                 mode: str = "update", cascade: bool = True):
+    """Refresh one layer through the Dagster asset graph (issue #131, T5).
+
+    mode=update|rebuild, cascade=true|false — see atlas_dagster.refresh_layer.
+    Runs in the background; poll /refresh-layer-status for completion.
+    """
+    if mode not in ("update", "rebuild"):
+        raise HTTPException(status_code=400, detail=f"Unknown refresh mode: {mode!r}")
+    if refresh_layer_status["running"]:
+        return {
+            "status": "already_running",
+            "swale": refresh_layer_status["swale"],
+            "layer": refresh_layer_status["layer"],
+            "mode": refresh_layer_status["mode"],
+            "started_at": refresh_layer_status["started_at"],
+        }
+
+    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+    try:
+        ac = json.load(open(config_path))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
+    layer_names = [l.get('name') for l in ac.get('dataswale', {}).get('layers', [])]
+    if layer not in layer_names:
+        raise HTTPException(status_code=400, detail=f"No layer '{layer}' in atlas '{swale}'")
+
+    refresh_layer_status.update(
+        running=True, swale=swale, layer=layer, mode=mode, cascade=cascade,
+        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
+
+    def run_refresh():
+        # Lazy import: keeps webapp importable where dagster isn't installed.
+        import atlas_dagster
+        try:
+            result = atlas_dagster.refresh_layer(ac, layer, mode=mode, cascade=cascade)
+            refresh_layer_status["success"] = bool(result.success)
+        except Exception as e:
+            logging.error(f"refresh_layer failed for {swale}/{layer}: {e}")
+            logging.error(traceback.format_exc())
+            refresh_layer_status["success"] = False
+            refresh_layer_status["error"] = str(e)
+        finally:
+            refresh_layer_status["finished_at"] = datetime.now().isoformat()
+            refresh_layer_status["running"] = False
+
+    # Plain def: FastAPI runs sync background tasks in the threadpool, so
+    # the blocking dagster.materialize doesn't stall the event loop.
+    background_tasks.add_task(run_refresh)
+    return {
+        "status": "started",
+        "swale": swale,
+        "layer": layer,
+        "mode": mode,
+        "cascade": cascade,
+        "started_at": refresh_layer_status["started_at"],
+    }
+
+
+@app.get("/refresh-layer-status")
+async def get_refresh_layer_status():
+    return refresh_layer_status
+
+
+# Global variable to track single-asset materialize status.
+# Single-flight: one running build per webapp process.
+materialize_status = {
+    "running": False,
+    "swale": None,
+    "asset": None,
+    "started_at": None,
+    "finished_at": None,
+    "success": None,
+    "error": None,
+}
+
+
+@app.get("/materialize_asset")
+async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: BackgroundTasks):
+    """Build one asset (typically an outlet, e.g. runbook) through the
+    Dagster graph (issue #131, T6). No cascade — exactly this asset.
+    Runs in the background; poll /materialize-asset-status for completion.
+    """
+    if materialize_status["running"]:
+        return {
+            "status": "already_running",
+            "swale": materialize_status["swale"],
+            "asset": materialize_status["asset"],
+            "started_at": materialize_status["started_at"],
+        }
+
+    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
+    try:
+        ac = json.load(open(config_path))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
+    if asset not in ac.get('assets', {}):
+        raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
+
+    materialize_status.update(
+        running=True, swale=swale, asset=asset,
+        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
+
+    def run_materialize():
+        # Lazy import: keeps webapp importable where dagster isn't installed.
+        import atlas_dagster
+        try:
+            result = atlas_dagster.materialize_asset(ac, asset)
+            materialize_status["success"] = bool(result.success)
+        except Exception as e:
+            logging.error(f"materialize_asset failed for {swale}/{asset}: {e}")
+            logging.error(traceback.format_exc())
+            materialize_status["success"] = False
+            materialize_status["error"] = str(e)
+        finally:
+            materialize_status["finished_at"] = datetime.now().isoformat()
+            materialize_status["running"] = False
+
+    background_tasks.add_task(run_materialize)
+    return {
+        "status": "started",
+        "swale": swale,
+        "asset": asset,
+        "started_at": materialize_status["started_at"],
+    }
+
+
+@app.get("/materialize-asset-status")
+async def get_materialize_asset_status():
+    return materialize_status
+
+
 # Global dict to track atlas creation status, keyed by slug
 create_statuses: Dict[str, Any] = {}
 
@@ -592,30 +750,18 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         # Add the delayed task to background
 
             
-        async def finish_publishing():
+        def finish_publishing():
+            # Publish is a pure snapshot (issue #131, C8): no inlet, eddy, or
+            # outlet materialization here. Outlets are kept current by refresh
+            # cascades before publish. Plain def so the copytree runs in the
+            # threadpool and /publish-status stays responsive.
             try:
-                print(f"Starting publish with ac: {ac['dataswale'].get('versioned_outlets',[])}\n-----\n{ac}\n---")
-                publish_status["log"].append(  [ (f"Starting publish with ac: {ac['dataswale'].get('versioned_outlets',[])}\n-----\n---", datetime.now().isoformat()) ])
-                # logging.info(f"Starting publish with ac['dataswale']: {ac['dataswale'].get('versioned_outlets',[])}")
-
-                for outlet_name in ac['dataswale'].get('versioned_outlets', []):
-                    print(f"Materializing outlet: {outlet_name}")
-                    logging.info(f"LOG Materializing outlet: {outlet_name}")
-                    publish_status["log"].append(  [ (f'Materializing {outlet_name}', datetime.now().isoformat()) ])
-                    atlas.materialize(ac, outlet_name)
-                    publish_status["log"].append(  [ (f'Finished materializing {outlet_name}', datetime.now().isoformat()) ])
-                # res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
 
                 res = versioning.publish_new_version(ac)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
-                # res = atlas.asset_materialize(ac, dc, ac['assets']['gazetteer'])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
-                # publish_status["log"] = []
-                #logger.info(res_json)
-                # let's always refresh the HTML after all this.
-                atlas.materialize(ac, 'html')
                 return str(res)
             except Exception as e:
                 error_msg = f"Error in publish background task: {e}"

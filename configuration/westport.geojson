@@ -8,10 +8,7 @@
         "app_url": "https://fireatlas.org:9000",
         "data_root": "/root/swales_dev",
         "shared_dir": "/root/data/",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "admin_emails": [
           "westportfire1@gmail.com",
           "tim@caflc.dev",

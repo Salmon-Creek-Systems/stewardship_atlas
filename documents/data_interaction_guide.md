@@ -68,7 +68,7 @@ See: LINK TO HELP PAGE ON DATA PACKAGES
 
 ### Web Map Edit Interface
 
-The edit map interface allows drawing new features directly in the browser. Features are submitted to staging and included in the next publish.
+The edit map interface allows drawing new features directly in the browser. Edits are stored as deltas and applied to the staging layer immediately, so they appear on the edit map right away. Derived products (webmap, PDFs) pick them up on the next layer refresh or explicit build.
 
 **Use cases:**
 - Adding new points of interest from field observations
@@ -205,6 +205,28 @@ See: LINK TO HELP PAGE ON QGIS WORKFLOW
 
 ## Administration
 
+### Refreshing Layers
+
+A layer is defined by its sources (inlets) plus its accumulated deltas; **refresh** is the operation that materializes it. Each layer in the admin console has a Refresh menu:
+
+- **Update (apply edits)** — applies pending deltas onto the current layer. Cheap; this is the everyday choice. Also re-derives everything downstream (dependent layers and outputs).
+- **Rebuild from source** — re-pulls the layer's source data (e.g. a fresh OpenStreetMap query) and applies pending edits onto the fresh base. Only offered for layers that have an external source. **Edits applied in past refreshes are not replayed** — a rebuild reflects fresh source data plus currently-pending edits.
+
+**Use cases:**
+- Making accumulated edits visible in the webmap and other products (Update)
+- Picking up upstream changes, e.g. new OSM roads (Rebuild)
+- Reconciling a layer before publishing (Rebuild)
+
+---
+
+### Building Outputs
+
+Publishing no longer rebuilds outputs — outputs are built by refresh cascades or explicitly. Each entry in the admin console's Maps and Downloads sections has a **Build** button that regenerates that output from current staging data. Build the slow ones (PDF runbook, gazetteer) explicitly before publishing if their data has changed.
+
+Programmatic equivalent: `GET /materialize_asset?swale={atlas}&asset={name}`, polled via `GET /materialize-asset-status`.
+
+---
+
 ### Admin Console
 
 The admin console is the central hub for managing atlas versions, publishing changes, and accessing editing interfaces.
@@ -217,9 +239,11 @@ The admin console is the central hub for managing atlas versions, publishing cha
 
 **How to use:**
 1. Navigate to the admin console URL
-2. Use "Publish Atlas" to create a new version from staging
+2. Use "Publish Atlas" to create a new version from staging. Publish is a pure snapshot: what you see in staging is exactly what gets published, and nothing is recomputed. Build any stale outputs first (see Building Outputs above).
 3. Use "Rollback Version" to revert CURRENT to the previous version
 4. Use "Reset Staging" to discard staging changes and start fresh
+
+The Versions list shows `staging` (the working copy) on top, then published versions newest-first, with "(current)" marking the version visitors currently see.
 
 See: LINK TO HELP PAGE ON ADMIN CONSOLE
 
@@ -236,8 +260,10 @@ The atlas webapp exposes REST endpoints for programmatic access to atlas functio
 - Scripted data uploads from external systems
 
 **Key endpoints:**
-- `POST /delta_upload/{atlas}` - Upload feature changes
-- `GET /publish?swale={atlas}` - Trigger publish
+- `POST /delta_upload/{atlas}` - Upload feature changes; auto-applies to the layer unless `apply: false` in the payload
+- `GET /refresh_layer?swale={atlas}&layer={name}&mode=update|rebuild&cascade=true|false` - Refresh a layer (background; poll `/refresh-layer-status`)
+- `GET /materialize_asset?swale={atlas}&asset={name}` - Build one output (background; poll `/materialize-asset-status`)
+- `GET /publish?swale={atlas}` - Snapshot staging as a new version (background; poll `/publish-status`)
 - `GET /reset-staging/{atlas}` - Reset staging
 - `POST /dereference_url` - Resolve shortened URLs
 

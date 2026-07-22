@@ -34,10 +34,7 @@
         "name": "layt1",
         "description": "Layt1",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "default_h3_resolution": 10,
         "email_photo_default_layer": "photos",
         "data_root": "/root/swales_dev",

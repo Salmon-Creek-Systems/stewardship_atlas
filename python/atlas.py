@@ -52,7 +52,7 @@ DEFAULT_CONFIG = {
     "dataswale": {
         "crs": "EPSG:4269",     
         "bbox": {"north": 0, "south": 0, "east": 0, "west": 0},
-        "versions": ["staging"],
+        "versions": [],
         "layers": []   
     }
 }
@@ -61,26 +61,31 @@ DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_i
 
 
 def discover_versions(swale_path: Path) -> List[str]:
-    """Discover all existing versions in a swale directory.
-    
-    Versions are subdirectories that contain an atlas_config.json file.
-    
+    """Discover published versions in a swale directory.
+
+    Versions are subdirectories that contain an atlas_config.json file,
+    excluding 'staging' (the editable copy) and 'CURRENT' (a symlink to a
+    published version) — neither is a version in its own right.
+
     Args:
         swale_path: Path to the swale directory
-    
+
     Returns:
-        List of version names (directory names)
+        List of version names (directory names), newest first
+        (timestamp-named dirs sort chronologically).
     """
     versions = []
     if not swale_path.exists():
         return versions
-    
+
     for item in swale_path.iterdir():
+        if item.name in ('staging', 'CURRENT'):
+            continue
         if item.is_dir() and (item / 'atlas_config.json').exists():
             versions.append(item.name)
-    
+
     logger.debug(f"Discovered versions in {swale_path}: {versions}")
-    return sorted(versions)
+    return sorted(versions, reverse=True)
 
 
 def add_htpasswds(config, path, access):

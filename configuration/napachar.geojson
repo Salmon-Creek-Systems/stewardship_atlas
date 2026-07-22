@@ -34,10 +34,7 @@
         "name": "napachar",
         "description": "napachar",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "default_h3_resolution": 8,
         "data_root": "/root/swales_dev",
         "shared_dir": "/root/data",

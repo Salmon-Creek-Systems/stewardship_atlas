@@ -91,6 +91,53 @@
             }
 
 
+            // Build button (admin console only): explicit outlet build via
+            // /materialize_asset — publish no longer builds outlets (#131)
+            function makeBuildButton(assetName) {
+                const btn = document.createElement('button');
+                btn.textContent = 'Build';
+                btn.style.marginLeft = '0.5em';
+                btn.style.fontSize = '0.8em';
+                btn.onclick = () => {
+                    btn.disabled = true;
+                    btn.textContent = 'Building…';
+                    fetch(`${apiurl}/materialize_asset?swale=${swalename}&asset=${encodeURIComponent(assetName)}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.status === 'already_running') {
+                                btn.disabled = false;
+                                btn.textContent = 'Build';
+                                alert(`A build is already running: ${d.asset}`);
+                                return;
+                            }
+                            pollBuildStatus(btn);
+                        })
+                        .catch(err => {
+                            btn.disabled = false;
+                            btn.textContent = 'Build';
+                            alert(`Build error: ${err}`);
+                        });
+                };
+                return btn;
+            }
+
+            function pollBuildStatus(btn) {
+                fetch(`${apiurl}/materialize-asset-status`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.running) {
+                            setTimeout(() => pollBuildStatus(btn), 3000);
+                        } else {
+                            btn.disabled = false;
+                            btn.textContent = 'Build';
+                            if (!d.success) alert(`Build failed: ${d.error || 'unknown error'}`);
+                        }
+                    })
+                    .catch(() => { btn.disabled = false; btn.textContent = 'Build'; });
+            }
+
+            const showBuildButtons = data.consoleType === 'ADMINISTRATION';
+
             // Setup interfaces
             if (data.interfaces && data.interfaces.length > 0) {
                 const interfacesList = document.getElementById('interfaces-list');
@@ -100,6 +147,7 @@
                     a.href = `../../${item.name}/`;
                     a.textContent = item.name;
                     li.appendChild(a);
+                    if (showBuildButtons) li.appendChild(makeBuildButton(item.name));
                     interfacesList.appendChild(li);
                 });
                 document.getElementById('interfaces-section').style.display = 'block';
@@ -114,23 +162,33 @@
                     a.href = `../${item.name}/`;
                     a.textContent = item.name;
                     li.appendChild(a);
+                    if (showBuildButtons) li.appendChild(makeBuildButton(item.name));
                     downloadsList.appendChild(li);
                 });
                 document.getElementById('downloads-section').style.display = 'block';
             }
 
-            // Setup versions
-            if (!data.versions || data.versions.length === 0) {
+            // Setup versions: staging (the working copy) pinned on top,
+            // then published snapshots; CURRENT shows as a tag on the
+            // version it points at, not as its own entry. Not for the
+            // public console — it must not expose staging links.
+            if (data.consoleType === 'PUBLIC') {
                 document.getElementById('versions-section').style.display = 'none';
-            }
-            if (data.versions && data.versions.length > 0) {
+            } else {
                 const versionsList = document.getElementById('versions-list');
-                data.versions.forEach(item => {
+                const stagingLi = document.createElement('li');
+                const stagingA = document.createElement('a');
+                stagingA.href = `${data.baseurl}/staging/outlets/html/admin`;
+                stagingA.textContent = 'staging';
+                stagingLi.appendChild(stagingA);
+                versionsList.appendChild(stagingLi);
+                (data.versions || []).forEach(item => {
                     const li = document.createElement('li');
                     const a = document.createElement('a');
                     a.href = `${data.baseurl}/${item}/outlets/html/admin`;
                     a.textContent = item;
-                    if (item === data.version_string) {
+                    // currentVersion = the published version CURRENT points at
+                    if (item === data.currentVersion) {
                         a.classList.add('current-version');
                         a.textContent = item + ' (current)';
                     }
