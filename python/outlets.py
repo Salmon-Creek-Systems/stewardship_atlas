@@ -2680,11 +2680,14 @@ def outlet_config_editor(config: dict, outlet_name: str):
     with open(template_path / 'config_editor.html', 'r') as f:
         template = f.read()
     
-    # Replace placeholders
+    # Replace placeholders. api_url (app_url) is the API origin; base_url
+    # includes the atlas path so it can't take a :9000 suffix (see the
+    # apiurl-vs-base_url gotcha in CLAUDE.md).
     html_content = template.format(
         atlas_name=config['name'],
         swale_name=config['name'],
-        base_url=config.get('base_url', 'http://localhost')
+        base_url=config.get('base_url', 'http://localhost'),
+        api_url=config.get('app_url', f"http://localhost:{config.get('atlasappport', 9997)}")
     )
     
     # Write the HTML file

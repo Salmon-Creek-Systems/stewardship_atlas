@@ -148,6 +148,7 @@
         let originalConfig;
         const swaleName = '{swale_name}';
         const baseUrl = '{base_url}';
+        const apiUrl = '{api_url}';
         
         // Initialize the editor
         document.addEventListener('DOMContentLoaded', function() {{
@@ -182,7 +183,7 @@
         function loadConfig() {{
             showStatus('Loading configuration...', 'info');
             
-            fetch('/staging/atlas_config.json')
+            fetch(`/${{swaleName}}/staging/atlas_config.json`)
                 .then(response => {{
                     if (!response.ok) {{
                         throw new Error('Failed to load configuration: ' + response.statusText);
@@ -215,7 +216,7 @@
                 showStatus('Saving configuration...', 'info');
                 
                 // Save via API
-                fetch(`${{baseUrl}}:9000/save_config/${{swaleName}}`, {{
+                fetch(`${{apiUrl}}/save_config/${{swaleName}}`, {{
                     method: 'POST',
                     headers: {{
                         'Content-Type': 'application/json',
