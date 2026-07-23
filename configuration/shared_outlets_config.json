@@ -20,12 +20,10 @@
         "fetch_type": "export_gsheet"
     },
 "config_editor": {
-    "type": "outlet",
+    "asset_type": "outlet",
     "name": "config_edit",
-    "config": {
-        "fetch_type": "config_editor",
-        "interaction": "interface"
-    },
+    "fetch_type": "config_editor",
+    "interaction": "interface",
     "access": ["admin"]
 },
 
