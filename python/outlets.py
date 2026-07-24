@@ -1,5 +1,6 @@
 import subprocess, math, string, shutil
 import json, csv
+import re
 import sys,os,time
 from io import StringIO
 from pathlib import Path
@@ -2208,6 +2209,30 @@ def make_console_html(config,
     return html
 
 
+def render_styled_doc(md_text, help_template, config, title=None):
+    """Render one markdown doc to a styled HTML page using the help template.
+
+    Rewrites intra-doc relative '.md' links to '.html' (so links between the
+    rendered pages resolve), and enables tables + header anchors so in-page
+    '#section' links work. Returns the full styled HTML string.
+    """
+    import markdown
+    if title is None:
+        first = md_text.splitlines()[0] if md_text else ''
+        title = first.replace('# ', '') if first.startswith('#') else 'Document'
+    html_content = markdown.markdown(md_text, extensions=['tables', 'toc'])
+    # rewrite relative markdown links (skip absolute URLs containing a scheme)
+    html_content = re.sub(
+        r'href="([^":]+?)\.md(#[^"]*)?"',
+        lambda m: f'href="{m.group(1)}.html{m.group(2) or ""}"',
+        html_content)
+    return help_template.format(
+        atlas_name=config['name'],
+        title=title,
+        content=html_content,
+        base_url=config.get('base_url', ''))
+
+
 def make_swale_html(config, outlet_config, store_materialized=True, template_name='console.html', css_name='console.css'):
     """Generate HTML for the swale interface."""
     # Get version string
@@ -2357,14 +2382,34 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         page_list.append((title, html_filename))
         
         logger.info(f"Converted {path.name} to {html_filename}")
-    
+
+    # Render top-level manuals (documents/*.md) alongside about/contact, one
+    # level up from help/. These link into help/*.md, rewritten to .html.
+    manuals_dir = versioning.atlas_path(config, version='app') / 'documents'
+    manual_links = []
+    for manual in ('user_manual', 'admin_manual'):
+        manual_src = manuals_dir / f'{manual}.md'
+        if not manual_src.exists():
+            continue
+        md_text = manual_src.read_text()
+        m_title = md_text.splitlines()[0].replace('# ', '') if md_text.startswith('#') else manual
+        styled = render_styled_doc(md_text, help_template, config, title=m_title)
+        (local_docs_path.parent / f'{manual}.html').write_text(styled, encoding='utf-8')
+        manual_links.append((m_title, f'../{manual}.html'))
+        logger.info(f"Rendered manual {manual}.md")
+
     # Generate index.html with list of all help pages
     if page_list:
         # Create list items for all pages
         page_links = "\n".join([f'        <li><a href="{filename}">{title}</a></li>' for title, filename in sorted(page_list)])
-        
+
+        manuals_section = ""
+        if manual_links:
+            manual_items = "\n".join(f'        <li><a href="{href}">{t}</a></li>' for t, href in manual_links)
+            manuals_section = f"        <h2>Manuals</h2>\n        <ul>\n{manual_items}\n        </ul>\n"
+
         index_content = f"""
-        <h2>Help Topics</h2>
+{manuals_section}        <h2>Help Topics</h2>
         <p>Browse the available help documentation:</p>
         <ul>
 {page_links}
