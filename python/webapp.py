@@ -319,6 +319,29 @@ async def copy_layer(swalename: str, layer_name: str, new_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/add_layer/{swalename}/{layer_name}")
+async def add_layer(swalename: str, layer_name: str, s3_key: str = None,
+                    geometry: str = "point"):
+    """Add a new S3-backed vector layer (issue: layer import). The GeoJSON must
+    already be uploaded to S3 (default s3://scs-atlas-data/{atlas}/imports/
+    {layer}.geojson). Registers layer + inlet, wires consumers, rebuilds config,
+    materializes. Synchronous — materialization can take a while."""
+    try:
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        atlas.add_layer(ac, layer_name, s3_key=s3_key, geometry_type=geometry)
+        return {
+            "status": "success",
+            "message": f"Layer '{layer_name}' added and materialized.",
+            "layer": layer_name}
+    except (ValueError, FileExistsError, FileNotFoundError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"add_layer failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     try:
