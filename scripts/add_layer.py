@@ -45,6 +45,8 @@ def main():
     ap.add_argument("--s3-bucket", default="scs-internal")
     ap.add_argument("--geometry", default="point",
                     choices=["point", "linestring", "polygon"])
+    ap.add_argument("--color", default=None,
+                    help="hex color like '#FFAA33' (default: dark green)")
     ap.add_argument("--consumers",
                     help="comma-separated consumer asset names "
                          "(default: webmap,webedit,sqldb)")
@@ -65,7 +67,7 @@ def main():
     atlas.add_layer(
         config, args.layer,
         s3_key=args.s3_key, s3_bucket=args.s3_bucket,
-        geometry_type=args.geometry, consumers=consumers,
+        geometry_type=args.geometry, color=args.color, consumers=consumers,
         rebuild=not args.no_rebuild, run_materialize=not args.no_materialize)
 
 

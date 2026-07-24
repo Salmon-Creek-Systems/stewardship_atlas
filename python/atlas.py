@@ -791,6 +791,19 @@ def _rgb_hex(rgb):
     return '#%02x%02x%02x' % (int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 
+def _parse_color(color):
+    """Normalize a color to an [r, g, b] list. Accepts a hex string
+    ('#FFAA33' or 'FFAA33') or an [r, g, b] sequence. None passes through."""
+    if color is None:
+        return None
+    if isinstance(color, str):
+        h = color.strip().lstrip('#')
+        if len(h) != 6:
+            raise ValueError(f"Invalid hex color: {color!r} (expected '#RRGGBB')")
+        return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+    return [int(color[0]), int(color[1]), int(color[2])]
+
+
 def _default_layer_style(geometry_type, color=None):
     """Styling defaults for an imported layer: dark green, thick lines, big dots.
 
@@ -799,7 +812,7 @@ def _default_layer_style(geometry_type, color=None):
     to see — point layers get no circle paint, and line-width is data-driven
     (`["get","vector_width"]`), which is absent on imported features.
     """
-    color = list(color) if color else list(_ADD_LAYER_COLOR)
+    color = _parse_color(color) or list(_ADD_LAYER_COLOR)
     css = _rgb_hex(color)
     stroke = _rgb_hex(_ADD_LAYER_STROKE)
     if geometry_type == 'linestring':

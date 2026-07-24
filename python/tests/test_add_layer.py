@@ -68,6 +68,19 @@ class TestPlanAddLayer(unittest.TestCase):
         self.assertEqual(ld['paint']['circle-radius'], 9)    # big dots
         self.assertEqual(ld['paint']['circle-color'], '#0c5e2e')
 
+    def test_hex_color_override(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'x', color='#FFAA33')
+        self.assertEqual(plan['layer_def']['color'], [255, 170, 51])
+        self.assertEqual(plan['layer_def']['paint']['circle-color'], '#ffaa33')
+
+    def test_rgb_list_color_still_accepted(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'x', color=[10, 20, 30])
+        self.assertEqual(plan['layer_def']['color'], [10, 20, 30])
+
+    def test_bad_hex_color_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', color='not-a-color')
+
     def test_layer_def_styling_linestring_is_thick(self):
         plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'fireline', geometry_type='linestring')
         self.assertEqual(plan['layer_def']['paint']['line-width'], 4)   # thick

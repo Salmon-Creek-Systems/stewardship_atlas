@@ -320,16 +320,28 @@ async def copy_layer(swalename: str, layer_name: str, new_name: str):
 
 
 @app.get("/add_layer/{swalename}/{layer_name}")
-async def add_layer(swalename: str, layer_name: str, s3_key: str = None,
-                    geometry: str = "point"):
+async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
+                    s3_key: str = None, s3_bucket: str = "scs-internal",
+                    color: str = None, geometry: str = "point"):
     """Add a new S3-backed vector layer (issue: layer import). The GeoJSON must
     already be uploaded to S3 (default s3://scs-internal/{atlas}/imports/
-    {layer}.geojson). Registers layer + inlet, wires consumers, rebuilds config,
-    materializes. Synchronous — materialization can take a while."""
+    {layer}.geojson). s3_url accepts a full 's3://bucket/key' or a bare key;
+    color is a hex string like '#FFAA33'. Registers layer + inlet, wires
+    consumers, rebuilds config, materializes. Synchronous — can take a while."""
     try:
+        # s3_url convenience: split 's3://bucket/key', else treat as a bare key.
+        if s3_url:
+            if s3_url.startswith("s3://"):
+                bucket, _, key = s3_url[len("s3://"):].partition("/")
+                if bucket:
+                    s3_bucket = bucket
+                s3_key = key
+            else:
+                s3_key = s3_url
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         ac = json.load(open(config_path))
-        atlas.add_layer(ac, layer_name, s3_key=s3_key, geometry_type=geometry)
+        atlas.add_layer(ac, layer_name, s3_key=s3_key, s3_bucket=s3_bucket,
+                        color=color, geometry_type=geometry)
         return {
             "status": "success",
             "message": f"Layer '{layer_name}' added and materialized.",

@@ -33,11 +33,24 @@ python scripts/add_layer.py kennedy parcels  --geometry polygon \
     --s3-key incoming/parcels_2026.geojson --consumers webmap,sqldb
 ```
 
-Equivalent HTTP call:
+Set a custom color with `--color` (hex); it defaults to dark green:
 
 ```
-GET /add_layer/{atlas}/{layer}?geometry=point&s3_key=...
+python scripts/add_layer.py kennedy hazards --color "#FFAA33"
 ```
+
+Equivalent HTTP call (`s3_url` accepts a full `s3://bucket/key` or a bare key;
+`color` is a hex string):
+
+```
+GET /add_layer/{atlas}/{layer}?geometry=point&s3_url=...&color=%23FFAA33
+```
+
+### From the console
+
+The **Technical console** has a `+ Add Layer` button that opens a small form
+(layer name, S3 URL, color) and calls the same endpoint — handy when you don't
+have a shell on the server.
 
 ## What it does
 
