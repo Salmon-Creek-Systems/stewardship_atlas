@@ -420,6 +420,17 @@ AWS credentials are handled automatically: the EC2 IAM role is used on the serve
 
 #### Vector GeoJSON layers from S3
 
+For most cases, use the **`add_layer` tool**, which automates the whole flow
+(register layer + inlet, wire into the outlets, rebuild, materialize) from a file
+already in S3 — see **[Adding a Layer to an Atlas](adding_a_layer.md)**:
+
+```
+python scripts/add_layer.py kennedy derelicts
+```
+
+The manual configuration, when you need field-level control the tool doesn't
+expose, is a single inlet asset:
+
 ```json
 "inaturalist": {
     "type": "inlet",
@@ -430,9 +441,15 @@ AWS credentials are handled automatically: the EC2 IAM role is used on the serve
 }
 ```
 
-Features are filtered to the atlas bounding box automatically. If features carry an `image_url` property it is copied to `URL`, enabling the existing webmap click-to-open-image behaviour. The `name` field is used for map labels — set it on features, or the inlet will derive it from `common_name` if present (useful for iNaturalist exports).
+The `out_layer` field is required: the inlet routes its delta to
+`deltas/{out_layer}/`. Features are filtered to the atlas bounding box
+automatically. If features carry an `image_url` property it is copied to `URL`,
+enabling the existing webmap click-to-open-image behaviour. The `name` field is
+used for map labels — set it on features, or the inlet will derive it from
+`common_name` if present (useful for iNaturalist exports).
 
-After running the inlet and applying deltas, include the layer name in the webmap asset's `in_layers` list and re-materialise the webmap.
+After running the inlet and applying deltas, include the layer name in the webmap
+asset's `in_layers` list and re-materialise the webmap.
 
 ---
 
