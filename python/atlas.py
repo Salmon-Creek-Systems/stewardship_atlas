@@ -819,10 +819,11 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
 
     Returns a dict:
       layer_def:      the {atlas}.geojson layer definition (dark green, styled)
-      inlet_key:      asset key for the inlet — ALWAYS equal to layer_name,
-                      because the s3_geojson inlet writes to layers/{asset_name}/
-                      (out_layer is ignored), so the asset MUST share the name.
-      inlet_asset:    the inlet asset dict (config_def 's3_geojson_inlet')
+      inlet_key:      asset key for the inlet (== layer_name here, a convention).
+      inlet_asset:    the inlet asset dict (config_def 's3_geojson_inlet'). It
+                      MUST carry 'out_layer' == layer_name: delta_path routes the
+                      delta to deltas/{out_layer}/ (and thence layers/{out_layer}/
+                      on refresh). The asset name only prefixes the delta file.
       consumer_edits: list of (asset_key, field) to append layer_name to —
                       'in_layers' for webmap/webedit, 'layers' for sqldb.
 
@@ -838,6 +839,7 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
 
     inlet_asset = {"type": "inlet", "name": layer_name,
                    "config_def": "s3_geojson_inlet",
+                   "out_layer": layer_name,
                    "s3_bucket": s3_bucket,
                    "s3_key": s3_key or f"imports/{layer_name}.geojson"}
 
@@ -878,11 +880,6 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
     config_dir = Path(data_root) / name / 'app' / 'configuration'
     geojson_path = config_dir / f'{name}.geojson'
 
-    existing_layers = [l['name'] for l in config['dataswale']['layers']]
-    if layer_name in existing_layers:
-        raise ValueError(f"Layer '{layer_name}' already exists. Existing: {existing_layers}")
-    if layer_name in config.get('assets', {}):
-        raise ValueError(f"Asset '{layer_name}' already exists; the inlet must be named after the layer.")
     if not geojson_path.exists():
         raise FileNotFoundError(
             f"Source GeoJSON not found: {geojson_path}. add_layer supports the "
@@ -892,6 +889,7 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
     plan = plan_add_layer(config['assets'], layer_name, geometry_type=geometry_type,
                           color=color, s3_bucket=s3_bucket, s3_key=s3_key,
                           consumers=consumers)
+    inlet_key = plan['inlet_key']
 
     gj = json.load(open(geojson_path))
     props = gj['features'][0]['properties']
@@ -900,14 +898,29 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
             f"{geojson_path.name} does not use the single-file (inline layers/assets) format.")
     layers = props['layers']
     assets = props['assets']
-    if layer_name in layers or layer_name in assets:
-        raise ValueError(f"'{layer_name}' already present in {geojson_path.name}.")
 
-    print(f"Adding layer '{layer_name}' ({geometry_type}) to atlas '{name}'")
-    layers[layer_name] = plan['layer_def']
-    assets[plan['inlet_key']] = plan['inlet_asset']
-    print(f"  layers:  + '{layer_name}'")
-    print(f"  assets:  + inlet '{plan['inlet_key']}'  (s3://{s3_bucket}/{s3_key})")
+    # Idempotent upsert: re-running repairs a partial add (e.g. a prior run that
+    # edited config but failed at materialize). Only layers we manage — those
+    # whose inlet is an s3_geojson_inlet — may be overwritten; anything else with
+    # this name is a genuine collision.
+    managed = (isinstance(assets.get(inlet_key), dict)
+               and assets[inlet_key].get('config_def') == 's3_geojson_inlet')
+    if (layer_name in layers or inlet_key in assets) and not managed:
+        raise ValueError(
+            f"'{layer_name}' already exists in {geojson_path.name} and is not an "
+            f"add_layer import; refusing to overwrite.")
+
+    if managed:
+        print(f"Repairing existing import '{layer_name}' in atlas '{name}'")
+    else:
+        print(f"Adding layer '{layer_name}' ({geometry_type}) to atlas '{name}'")
+
+    # Always (re)write the inlet so a repair fixes bucket/key/out_layer; only add
+    # the layer def if missing, so re-runs don't clobber styling customizations.
+    layers.setdefault(layer_name, plan['layer_def'])
+    assets[inlet_key] = plan['inlet_asset']
+    print(f"  layers:  {layer_name}")
+    print(f"  assets:  inlet '{inlet_key}'  (s3://{s3_bucket}/{s3_key} -> layer '{layer_name}')")
 
     for key, field in plan['consumer_edits']:
         src = assets.get(key)

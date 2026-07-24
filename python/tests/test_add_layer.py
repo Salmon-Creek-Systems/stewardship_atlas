@@ -73,12 +73,14 @@ class TestPlanAddLayer(unittest.TestCase):
         self.assertEqual(plan['layer_def']['paint']['line-width'], 4)   # thick
         self.assertEqual(plan['layer_def']['paint']['line-color'], '#0c5e2e')
 
-    def test_inlet_named_same_as_layer(self):
-        # s3_geojson writes to layers/{asset_name}/, so asset name == layer name.
+    def test_inlet_carries_out_layer(self):
+        # delta_path routes deltas to deltas/{out_layer}/, so the inlet must
+        # carry out_layer == layer_name (data lands in layers/{out_layer}/).
         plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'trailheads', s3_key='scvfd/imports/th.geojson')
         self.assertEqual(plan['inlet_key'], 'trailheads')
         inlet = plan['inlet_asset']
         self.assertEqual(inlet['name'], 'trailheads')
+        self.assertEqual(inlet['out_layer'], 'trailheads')
         self.assertEqual(inlet['config_def'], 's3_geojson_inlet')
         self.assertEqual(inlet['s3_bucket'], 'scs-internal')
         self.assertEqual(inlet['s3_key'], 'scvfd/imports/th.geojson')
@@ -178,9 +180,27 @@ class TestAddLayerExecutor(unittest.TestCase):
         self.assertIn('webmap', self.materialized)
         self._refresh_mock.assert_called_once()
 
-    def test_duplicate_layer_rejected(self):
+    def test_collision_with_unmanaged_layer_rejected(self):
+        # 'roads' exists and is not an add_layer import → refuse to overwrite.
         with self.assertRaises(ValueError):
             atlas.add_layer(self.config, 'roads')
+
+    def test_rerun_repairs_partial_import(self):
+        # Simulate a partial add: import registered in the seed but with a
+        # broken inlet (wrong bucket, missing out_layer). Re-running upserts.
+        gj = json.loads(self.seed.read_text())
+        props = gj['features'][0]['properties']
+        props['layers']['derelicts'] = {'name': 'derelicts', 'geometry_type': 'point'}
+        props['assets']['derelicts'] = {'type': 'inlet', 'config_def': 's3_geojson_inlet',
+                                        's3_bucket': 'scs-atlas-data', 's3_key': 'x'}
+        self.seed.write_text(json.dumps(gj, indent=2))
+
+        atlas.add_layer(self.config, 'derelicts', geometry_type='point')
+
+        fixed = json.loads(self.seed.read_text())['features'][0]['properties']['assets']['derelicts']
+        self.assertEqual(fixed['s3_bucket'], 'scs-internal')      # bucket repaired
+        self.assertEqual(fixed['out_layer'], 'derelicts')         # out_layer added
+        self.assertEqual(self.materialized[0], 'derelicts')       # (re)materialized
 
 
 if __name__ == '__main__':
