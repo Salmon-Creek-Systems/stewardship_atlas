@@ -80,7 +80,7 @@ class TestPlanAddLayer(unittest.TestCase):
         inlet = plan['inlet_asset']
         self.assertEqual(inlet['name'], 'trailheads')
         self.assertEqual(inlet['config_def'], 's3_geojson_inlet')
-        self.assertEqual(inlet['s3_bucket'], 'scs-atlas-data')
+        self.assertEqual(inlet['s3_bucket'], 'scs-internal')
         self.assertEqual(inlet['s3_key'], 'scvfd/imports/th.geojson')
 
     def test_consumer_edits_by_field(self):

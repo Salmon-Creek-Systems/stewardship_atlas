@@ -4,7 +4,7 @@
 The GeoJSON file must ALREADY be uploaded to S3. By default the tool expects it
 at:
 
-    s3://scs-atlas-data/{atlas}/imports/{layer}.geojson
+    s3://scs-internal/{atlas}/imports/{layer}.geojson
 
 Override the location with --s3-key (and --s3-bucket). The tool registers the
 layer plus a same-named s3_geojson inlet, wires it into consumer outlets
@@ -42,7 +42,7 @@ def main():
     ap.add_argument("layer", help="new layer name")
     ap.add_argument("--s3-key",
                     help="S3 key of the geojson (default {atlas}/imports/{layer}.geojson)")
-    ap.add_argument("--s3-bucket", default="scs-atlas-data")
+    ap.add_argument("--s3-bucket", default="scs-internal")
     ap.add_argument("--geometry", default="point",
                     choices=["point", "linestring", "polygon"])
     ap.add_argument("--consumers",

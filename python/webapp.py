@@ -323,7 +323,7 @@ async def copy_layer(swalename: str, layer_name: str, new_name: str):
 async def add_layer(swalename: str, layer_name: str, s3_key: str = None,
                     geometry: str = "point"):
     """Add a new S3-backed vector layer (issue: layer import). The GeoJSON must
-    already be uploaded to S3 (default s3://scs-atlas-data/{atlas}/imports/
+    already be uploaded to S3 (default s3://scs-internal/{atlas}/imports/
     {layer}.geojson). Registers layer + inlet, wires consumers, rebuilds config,
     materializes. Synchronous — materialization can take a while."""
     try:

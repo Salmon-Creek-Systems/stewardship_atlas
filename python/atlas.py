@@ -814,7 +814,7 @@ def _default_layer_style(geometry_type, color=None):
 
 
 def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
-                   s3_bucket='scs-atlas-data', s3_key=None, consumers=None):
+                   s3_bucket='scs-internal', s3_key=None, consumers=None):
     """Decide the config additions for a new S3-backed vector layer. Pure.
 
     Returns a dict:
@@ -857,7 +857,7 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
             "consumer_edits": consumer_edits}
 
 
-def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-atlas-data',
+def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
               geometry_type='point', color=None, consumers=None,
               rebuild=True, run_materialize=True):
     """Add a new S3-backed vector layer to an existing atlas.
