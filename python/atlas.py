@@ -782,6 +782,197 @@ def copy_layer(config, old_name, new_name, rebuild=True):
     print(f"  2. grep -r '{new_name}' {config_dir}  (sanity check)")
 
 
+# Default styling for a freshly imported layer: dark green, thick lines, big dots.
+_ADD_LAYER_COLOR = [12, 94, 46]    # dark green
+_ADD_LAYER_STROKE = [6, 60, 28]    # darker green outline/stroke
+
+
+def _rgb_hex(rgb):
+    return '#%02x%02x%02x' % (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+
+
+def _parse_color(color):
+    """Normalize a color to an [r, g, b] list. Accepts a hex string
+    ('#FFAA33' or 'FFAA33') or an [r, g, b] sequence. None passes through."""
+    if color is None:
+        return None
+    if isinstance(color, str):
+        h = color.strip().lstrip('#')
+        if len(h) != 6:
+            raise ValueError(f"Invalid hex color: {color!r} (expected '#RRGGBB')")
+        return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+    return [int(color[0]), int(color[1]), int(color[2])]
+
+
+def _default_layer_style(geometry_type, color=None):
+    """Styling defaults for an imported layer: dark green, thick lines, big dots.
+
+    Returns (color_rgb, extra_fields). extra_fields carries an explicit 'paint'
+    override because the webmap generator otherwise leaves a plain import hard
+    to see — point layers get no circle paint, and line-width is data-driven
+    (`["get","vector_width"]`), which is absent on imported features.
+    """
+    color = _parse_color(color) or list(_ADD_LAYER_COLOR)
+    css = _rgb_hex(color)
+    stroke = _rgb_hex(_ADD_LAYER_STROKE)
+    if geometry_type == 'linestring':
+        return color, {"paint": {"line-color": css, "line-width": 4}}
+    if geometry_type == 'polygon':
+        return color, {"fill_color": color,
+                       "paint": {"fill-color": css, "fill-opacity": 0.5,
+                                 "fill-outline-color": stroke}}
+    # point (default)
+    return color, {"paint": {"circle-radius": 9, "circle-color": css,
+                             "circle-stroke-width": 1.5, "circle-stroke-color": stroke}}
+
+
+def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
+                   s3_bucket='scs-internal', s3_key=None, consumers=None):
+    """Decide the config additions for a new S3-backed vector layer. Pure.
+
+    Returns a dict:
+      layer_def:      the {atlas}.geojson layer definition (dark green, styled)
+      inlet_key:      asset key for the inlet (== layer_name here, a convention).
+      inlet_asset:    the inlet asset dict (config_def 's3_geojson_inlet'). It
+                      MUST carry 'out_layer' == layer_name: delta_path routes the
+                      delta to deltas/{out_layer}/ (and thence layers/{out_layer}/
+                      on refresh). The asset name only prefixes the delta file.
+      consumer_edits: list of (asset_key, field) to append layer_name to —
+                      'in_layers' for webmap/webedit, 'layers' for sqldb.
+
+    `assets` is the resolved runtime assets dict (config['assets']); used only
+    to discover which named consumers exist and which list-field they use.
+    """
+    if consumers is None:
+        consumers = ['webmap', 'webedit', 'sqldb']
+    color_rgb, extra = _default_layer_style(geometry_type, color)
+    layer_def = {"name": layer_name, "geometry_type": geometry_type,
+                 "color": color_rgb, "interaction": "interface"}
+    layer_def.update(extra)
+
+    inlet_asset = {"type": "inlet", "name": layer_name,
+                   "config_def": "s3_geojson_inlet",
+                   "out_layer": layer_name,
+                   "s3_bucket": s3_bucket,
+                   "s3_key": s3_key or f"imports/{layer_name}.geojson"}
+
+    consumer_edits = []
+    for key in consumers:
+        asset = assets.get(key)
+        if not isinstance(asset, dict):
+            continue
+        resolved = asset.get('config', asset)
+        if 'in_layers' in resolved or 'in_layers' in asset:
+            consumer_edits.append((key, 'in_layers'))
+        elif 'layers' in resolved or 'layers' in asset:
+            consumer_edits.append((key, 'layers'))
+
+    return {"layer_name": layer_name, "layer_def": layer_def,
+            "inlet_key": layer_name, "inlet_asset": inlet_asset,
+            "consumer_edits": consumer_edits}
+
+
+def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
+              geometry_type='point', color=None, consumers=None,
+              rebuild=True, run_materialize=True):
+    """Add a new S3-backed vector layer to an existing atlas.
+
+    Assumes the GeoJSON file is ALREADY in S3 at s3://{s3_bucket}/{s3_key}
+    (default key '{atlas}/imports/{layer_name}.geojson'). Registers the layer
+    plus a same-named s3_geojson inlet, wires it into consumer outlets
+    (webmap/webedit/sqldb by default), rebuilds config, and materializes.
+
+    Single-file GeoJSON config format only. The inlet bbox-filters to the
+    atlas extent, so features outside the atlas area are dropped.
+    """
+    import dataswale_geojson
+
+    name = config['name']
+    data_root = config['data_root']
+    staging_path = Path(data_root) / name / 'staging'
+    config_dir = Path(data_root) / name / 'app' / 'configuration'
+    geojson_path = config_dir / f'{name}.geojson'
+
+    if not geojson_path.exists():
+        raise FileNotFoundError(
+            f"Source GeoJSON not found: {geojson_path}. add_layer supports the "
+            f"single-file GeoJSON config format only.")
+
+    s3_key = s3_key or f"{name}/imports/{layer_name}.geojson"
+    plan = plan_add_layer(config['assets'], layer_name, geometry_type=geometry_type,
+                          color=color, s3_bucket=s3_bucket, s3_key=s3_key,
+                          consumers=consumers)
+    inlet_key = plan['inlet_key']
+
+    gj = json.load(open(geojson_path))
+    props = gj['features'][0]['properties']
+    if 'layers' not in props or 'assets' not in props:
+        raise ValueError(
+            f"{geojson_path.name} does not use the single-file (inline layers/assets) format.")
+    layers = props['layers']
+    assets = props['assets']
+
+    # Idempotent upsert: re-running repairs a partial add (e.g. a prior run that
+    # edited config but failed at materialize). Only layers we manage — those
+    # whose inlet is an s3_geojson_inlet — may be overwritten; anything else with
+    # this name is a genuine collision.
+    managed = (isinstance(assets.get(inlet_key), dict)
+               and assets[inlet_key].get('config_def') == 's3_geojson_inlet')
+    if (layer_name in layers or inlet_key in assets) and not managed:
+        raise ValueError(
+            f"'{layer_name}' already exists in {geojson_path.name} and is not an "
+            f"add_layer import; refusing to overwrite.")
+
+    if managed:
+        print(f"Repairing existing import '{layer_name}' in atlas '{name}'")
+    else:
+        print(f"Adding layer '{layer_name}' ({geometry_type}) to atlas '{name}'")
+
+    # Always (re)write the inlet so a repair fixes bucket/key/out_layer; only add
+    # the layer def if missing, so re-runs don't clobber styling customizations.
+    layers.setdefault(layer_name, plan['layer_def'])
+    assets[inlet_key] = plan['inlet_asset']
+    print(f"  layers:  {layer_name}")
+    print(f"  assets:  inlet '{inlet_key}'  (s3://{s3_bucket}/{s3_key} -> layer '{layer_name}')")
+
+    for key, field in plan['consumer_edits']:
+        src = assets.get(key)
+        if src is None:
+            print(f"  WARNING: consumer '{key}' not in source geojson, skipping")
+            continue
+        current = src.get(field)
+        if current is None:
+            # Field lives only in the shared template; materialize the resolved
+            # list into the source so we don't drop the template's entries.
+            resolved = config['assets'].get(key, {})
+            current = list(resolved.get('config', resolved).get(field, []))
+        if layer_name not in current:
+            current.append(layer_name)
+            src[field] = current
+            print(f"  asset '{key}': appended '{layer_name}' to {field}")
+
+    with open(geojson_path, 'w') as f:
+        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+
+    if rebuild:
+        print("Rebuilding config (config_only)...")
+        build_atlas_from_geojson(geojson_path, config_only=True)
+
+    if run_materialize:
+        fresh = json.load(open(staging_path / 'atlas_config.json'))
+        print("Materializing inlet -> layer -> consumers...")
+        materialize(fresh, layer_name)                          # inlet: S3 -> delta
+        dataswale_geojson.refresh_vector_layer(fresh, layer_name)  # delta -> layer
+        for key, _field in plan['consumer_edits']:
+            materialize(fresh, key)
+        for outlet in ('html', 'console'):
+            if outlet in fresh.get('assets', {}):
+                materialize(fresh, outlet)
+
+    print(f"\nDone. Verify at /{name}/staging/outlets/webmap/")
+    return geojson_path
+
+
 def materialize(config: Dict[str, Any], asset_name: str, materializers: Dict[str, Any]=DEFAULT_MATERIALIZERS):
     materializer_name = config['assets'][asset_name]['config']['fetch_type']
     return materializers[materializer_name](config, asset_name)

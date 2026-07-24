@@ -60,6 +60,24 @@
         </main>
     </div>
 
+    <!-- Add Layer modal (technical view only) -->
+    <div id="add-layer-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+      <div style="background:#fff; color:#111; padding:1.25rem; border-radius:8px; width:min(440px,92vw); box-shadow:0 8px 32px rgba(0,0,0,0.3); font-size:0.9rem;">
+        <h3 style="margin:0 0 0.75rem;">Add Layer</h3>
+        <label style="display:block; margin:0.6rem 0 0.15rem;">Layer name</label>
+        <input id="al-name" type="text" placeholder="e.g. derelicts" style="width:100%; box-sizing:border-box; padding:0.4rem;">
+        <label style="display:block; margin:0.6rem 0 0.15rem;">S3 URL or key</label>
+        <input id="al-s3" type="text" placeholder="s3://scs-internal/atlas/imports/derelicts.geojson" style="width:100%; box-sizing:border-box; padding:0.4rem;">
+        <label style="display:block; margin:0.6rem 0 0.15rem;">Color (hex)</label>
+        <input id="al-color" type="text" value="#0c5e2e" style="width:100%; box-sizing:border-box; padding:0.4rem;">
+        <div id="al-status" style="margin-top:0.6rem; min-height:1.1em; color:#a00;"></div>
+        <div style="margin-top:1rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+          <button onclick="closeAddLayerModal()" class="btn">Cancel</button>
+          <button id="al-create" onclick="submitAddLayer()" class="btn">Create</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       function initializePage(data) {
             if (data.logo) document.getElementById('logo').src = data.logo;
@@ -221,8 +239,16 @@
                 renderUseCases(data.useCases);
             }
 
-            // For the technical console, fetch live log data on load
+            // For the technical console: Add Layer button + live log
             if (data.consoleType === 'TECHNICAL') {
+                const main = document.getElementById('layers-section');
+                const addBtn = document.createElement('button');
+                addBtn.className = 'btn';
+                addBtn.textContent = '+ Add Layer';
+                addBtn.style.marginBottom = '0.75rem';
+                addBtn.onclick = openAddLayerModal;
+                main.insertBefore(addBtn, main.firstChild);
+
                 document.getElementById('usecases-list').innerHTML = '<li>Loading log…</li>';
                 fetch(`${apiurl}/log/${swalename}`)
                     .then(r => r.json())
@@ -351,6 +377,46 @@
                     layersList.appendChild(li);
                 });
             }
+        }
+
+        // ── Add Layer modal (technical view) ──────────────────
+        function openAddLayerModal() {
+            document.getElementById('al-status').textContent = '';
+            document.getElementById('add-layer-modal').style.display = 'flex';
+        }
+
+        function closeAddLayerModal() {
+            document.getElementById('add-layer-modal').style.display = 'none';
+        }
+
+        function submitAddLayer() {
+            const name = document.getElementById('al-name').value.trim();
+            const s3 = document.getElementById('al-s3').value.trim();
+            const color = document.getElementById('al-color').value.trim();
+            const status = document.getElementById('al-status');
+            if (!name || !s3) { status.textContent = 'Layer name and S3 URL are required.'; return; }
+
+            const btn = document.getElementById('al-create');
+            btn.disabled = true;
+            btn.textContent = 'Creating…';
+            status.style.color = '#555';
+            status.textContent = 'Creating layer… this can take a minute.';
+
+            const url = `${apiurl}/add_layer/${swalename}/${encodeURIComponent(name)}`
+                      + `?s3_url=${encodeURIComponent(s3)}&color=${encodeURIComponent(color)}`;
+            fetch(url)
+                .then(r => r.json().then(body => ({ ok: r.ok, body })))
+                .then(res => {
+                    if (res.ok && res.body.status === 'success') {
+                        alert(`Layer "${name}" created`);
+                        closeAddLayerModal();
+                    } else {
+                        status.style.color = '#a00';
+                        status.textContent = 'Failed: ' + (res.body.detail || 'unknown error');
+                    }
+                })
+                .catch(err => { status.style.color = '#a00'; status.textContent = 'Error: ' + err; })
+                .finally(() => { btn.disabled = false; btn.textContent = 'Create'; });
         }
 
         function startPublish() {
