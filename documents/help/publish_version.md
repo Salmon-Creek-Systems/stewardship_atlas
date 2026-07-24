@@ -30,11 +30,16 @@ Publish a new version when:
 
 ### What Happens During Publishing
 
+Publishing is a pure snapshot: it copies staging as-is and computes nothing.
+Outputs are **not** rebuilt at publish time — build any that need it first (see
+[Build an Output](build_outputs.md)).
+
 1. A new version is created with a timestamp name (e.g., `2024-01-15_14-30-00`)
-2. All staging data is copied to the new version folder
+2. All staging data is copied to the new version folder, exactly as it stands
 3. The version is added to the configuration's version list
-4. The staging `/work` directories are cleared for new changes
-5. The new version becomes accessible at its own URL path
+4. The full edit history (deltas) is retained in the snapshot; nothing is deleted
+5. The new version becomes accessible at its own URL path, and becomes the
+   version public/internal viewers see
 
 ## After Publishing
 
@@ -55,8 +60,14 @@ Published versions are accessible at:
 - ⚠️ **Published versions cannot be modified** - they are permanent snapshots
 - Publishing does not delete or change the staging data
 - You can continue editing in staging immediately after publishing
-- There is no automatic rollback - treat publishing as permanent
 - Store the version name if you need to reference it later
+
+## Rollback and Reset
+
+- **Rollback** (button in the Versions section) repoints the live version to the
+  previous published version — useful if a publish shouldn't have gone out.
+- **Reset Staging** discards staging changes and restores it from the current
+  published version. Existing staging is backed up first.
 
 ## Troubleshooting
 
