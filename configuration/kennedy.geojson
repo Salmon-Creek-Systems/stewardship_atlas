@@ -266,6 +266,70 @@
                         "paint": {
                             "raster-opacity": 0.5
                         }
+                    },
+                    "derelicts": {
+                        "name": "derelicts",
+                        "geometry_type": "point",
+                        "color": [
+                            12,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "paint": {
+                            "circle-radius": 9,
+                            "circle-color": "#0c5e2e",
+                            "circle-stroke-width": 1.5,
+                            "circle-stroke-color": "#063c1c"
+                        }
+                    },
+                    "derelict_structures": {
+                        "name": "derelict_structures",
+                        "geometry_type": "point",
+                        "color": [
+                            12,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "paint": {
+                            "circle-radius": 9,
+                            "circle-color": "#0c5e2e",
+                            "circle-stroke-width": 1.5,
+                            "circle-stroke-color": "#063c1c"
+                        }
+                    },
+                    "srsly_old": {
+                        "name": "srsly_old",
+                        "geometry_type": "point",
+                        "color": [
+                            255,
+                            170,
+                            153
+                        ],
+                        "interaction": "interface",
+                        "paint": {
+                            "circle-radius": 9,
+                            "circle-color": "#ffaa99",
+                            "circle-stroke-width": 1.5,
+                            "circle-stroke-color": "#063c1c"
+                        }
+                    },
+                    "potential_culverts": {
+                        "name": "potential_culverts",
+                        "geometry_type": "point",
+                        "color": [
+                            12,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "paint": {
+                            "circle-radius": 9,
+                            "circle-color": "#0c5e2e",
+                            "circle-stroke-width": 1.5,
+                            "circle-stroke-color": "#063c1c"
+                        }
                     }
                 },
                 "assets": {
@@ -414,14 +478,21 @@
                             "burn_areas",
                             "processing_sites",
                             "contours",
-                            "roads_index","creeks_index","burns_index","processing_sites_index",
+                            "roads_index",
+                            "creeks_index",
+                            "burns_index",
+                            "processing_sites_index",
                             "roads",
                             "creeks",
                             "buildings",
                             "hydrants",
                             "watertanks",
                             "poi",
-                            "notes"
+                            "notes",
+                            "derelicts",
+                            "derelict_structures",
+                            "srsly_old",
+                            "potential_culverts"
                         ],
                         "config_def": "webmap",
                         "access": [
@@ -469,7 +540,11 @@
                             "poi",
                             "ponds",
                             "watertanks",
-                            "notes"
+                            "notes",
+                            "derelicts",
+                            "derelict_structures",
+                            "srsly_old",
+                            "potential_culverts"
                         ],
                         "config_def": "webedit"
                     },
@@ -535,7 +610,11 @@
                         "layers": [
                             "basemap",
                             "roads",
-                            "creeks"
+                            "creeks",
+                            "derelicts",
+                            "derelict_structures",
+                            "srsly_old",
+                            "potential_culverts"
                         ]
                     },
                     "sqlquery": {
@@ -548,7 +627,9 @@
                         "type": "outlet",
                         "name": "config_edit",
                         "config_def": "config_editor",
-                        "access": ["technical"],
+                        "access": [
+                            "technical"
+                        ],
                         "interaction": "interface"
                     },
                     "gazetteer_grid": {
@@ -585,6 +666,38 @@
                         "access": [
                             "technical"
                         ]
+                    },
+                    "derelicts": {
+                        "type": "inlet",
+                        "name": "derelicts",
+                        "config_def": "s3_geojson_inlet",
+                        "out_layer": "derelicts",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "kennedy/imports/derelicts.geojson"
+                    },
+                    "derelict_structures": {
+                        "type": "inlet",
+                        "name": "derelict_structures",
+                        "config_def": "s3_geojson_inlet",
+                        "out_layer": "derelict_structures",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "kennedy/imports/derelict_structures.geojson"
+                    },
+                    "srsly_old": {
+                        "type": "inlet",
+                        "name": "srsly_old",
+                        "config_def": "s3_geojson_inlet",
+                        "out_layer": "srsly_old",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "kennedy/imports/derelicts.geojson"
+                    },
+                    "potential_culverts": {
+                        "type": "inlet",
+                        "name": "potential_culverts",
+                        "config_def": "s3_geojson_inlet",
+                        "out_layer": "potential_culverts",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "SF_eel_likely_culverts.geojson"
                     }
                 }
             }
