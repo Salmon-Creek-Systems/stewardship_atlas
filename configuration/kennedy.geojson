@@ -479,6 +479,7 @@
                         "regions_layer": "regions",
                         "feature_scale": 0.5,
                         "blend_percent": 50,
+                        "concat_pdf": true,
                         "in_layers": [
                             "lidar_basemap",
                             "basemap",
@@ -505,6 +506,7 @@
                         "regions_layer": "regions",
                         "feature_scale": 0.5,
                         "blend_percent": 50,
+                        "concat_pdf": true,
                         "in_layers": [
                             "lidar_basemap",
                             "basemap",
