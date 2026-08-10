@@ -39,6 +39,14 @@ server {
 	# include snippets/snakeoil.conf;
 
 	root /root/swales_dev/scvfd/;
+
+	# Security: never serve dotfiles/dirs (.git, .env, .ht*). 404 hides existence.
+	# Excludes .well-known so certbot ACME HTTP-01 challenges still work.
+	location ~ /\.(?!well-known) {
+		deny all;
+		return 404;
+	}
+
 	# root /var/www/html/scvfd;
 	# root /root/dagster-quickstart/scs/data;
 

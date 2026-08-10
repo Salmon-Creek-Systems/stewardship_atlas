@@ -1,6 +1,13 @@
 server {
 	root /root/swales_dev/kennedy/;
 
+	# Security: never serve dotfiles/dirs (.git, .env, .ht*). 404 hides existence.
+	# Excludes .well-known so certbot ACME HTTP-01 challenges still work.
+	location ~ /\.(?!well-known) {
+		deny all;
+		return 404;
+	}
+
 	index index.html index.htm index.nginx-debian.html;
 
 	server_name kennedy.fireatlas.org;
