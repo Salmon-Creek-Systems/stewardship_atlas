@@ -173,3 +173,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .DS_Store
+
+# Auth artifacts — never commit credentials (htpasswd hashes or plaintext roles).
+# Generated at runtime; the live source is {data_root}/roles/. Being replaced by
+# Cognito/Google SSO (see documents/cloud_native_plan.md).
+infrastructure/htpasswd/
