@@ -290,9 +290,11 @@ def outlet_runbook_qgis_atlas(config, outlet_name, only_generate=[], refresh_pdf
         output_dir.mkdir(parents=True, exist_ok=True)
         
         multipage_pdf = outlet_config.get('multipage_pdf', True)
+        concat_pdf = outlet_config.get('concat_pdf', False)
         results = export_atlas(
             layout, output_dir, config.get('name', 'atlas'),
             multipage_pdf=multipage_pdf,
+            concat_pdf=concat_pdf,
             outlet_config=outlet_config,
             layers_config=layers_config,
             loaded_layers=loaded_layers,
@@ -833,8 +835,8 @@ def add_map_collar(layout, map_item, config, outlet_config, page_width, page_hei
 
 
 def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf=True,
-                 outlet_config=None, layers_config=None, loaded_layers=None,
-                 atlas_config=None, refresh_pdfs=True):
+                 concat_pdf=False, outlet_config=None, layers_config=None,
+                 loaded_layers=None, atlas_config=None, refresh_pdfs=True):
     """
     Export atlas to both multi-page PDF and individual PDFs per region.
     Also exports a PNG thumbnail per page (map area only, collar cropped out).
@@ -843,12 +845,22 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     those layers and at grid_feature_scale line width (thicker roads/creeks).
     When refresh_pdfs=False, PDFs are skipped and only thumbnails are exported.
 
+    Two ways to produce a single combined runbook are supported:
+    - multipage_pdf: QGIS Atlas exportToPdf — one render pass over all regions.
+      Correct but memory-heavy (holds every region's geodata at once).
+    - concat_pdf: after the individual per-region PDFs are written, concatenate
+      them into one file with pypdf. No geodata is reloaded; roughly one-page
+      memory. Off by default; enable per-asset once validated against multipage.
+    Both can be enabled together for comparison; to avoid clobbering, concat then
+    writes {atlas_name}_runbook_concat.pdf instead of {atlas_name}_runbook.pdf.
+
     Args:
         layout: QgsPrintLayout with atlas enabled
         output_dir: Output directory path
         atlas_name: Base name for output files
         thumbnail_dpi: DPI for PNG thumbnails (default 72)
         multipage_pdf: Whether to generate the combined multi-page PDF (default True)
+        concat_pdf: Whether to concatenate individual PDFs into one file (default False)
         outlet_config: Outlet asset config dict (for grid_layers, grid_feature_scale)
         layers_config: Dict of layer_name -> layer config
         loaded_layers: Dict of layer_name -> QgsMapLayer
@@ -878,10 +890,15 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
     results = {
         'status': 'success',
         'multi_page_pdf': None,
+        'concat_pdf': None,
         'individual_pdfs': [],
         'individual_pngs': [],
         'total_pages': 0
     }
+
+    # (path, title) per successfully exported individual page, in render order —
+    # used to concatenate a combined PDF with per-region bookmarks.
+    concat_entries = []
     
     # Resolve grid thumbnail parameters (used inside the per-page loop)
     map_item = next(
@@ -965,6 +982,7 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
             result = exporter.exportToPdf(str(individual_pdf_path), pdf_settings)
             if result == QgsLayoutExporter.Success:
                 results['individual_pdfs'].append(str(individual_pdf_path))
+                concat_entries.append((individual_pdf_path, region_name))
                 logger.info(f"  ✓ PDF {page_num}: {region_name}")
             else:
                 error_msg = get_export_error_message(result)
@@ -1018,7 +1036,27 @@ def export_atlas(layout, output_dir, atlas_name, thumbnail_dpi=72, multipage_pdf
 
     atlas.endRender()
     results['total_pages'] = page_num
-    
+
+    # Concatenate individual PDFs into one combined runbook (lightweight path).
+    # Only when we actually (re)generated the individual PDFs this run.
+    if concat_pdf and refresh_pdfs:
+        if concat_entries:
+            # Don't clobber the QGIS combined output when both are enabled, so the
+            # two can be diffed; otherwise use the canonical runbook filename.
+            concat_name = (f"{atlas_name}_runbook_concat.pdf"
+                           if multipage_pdf else f"{atlas_name}_runbook.pdf")
+            concat_path = output_dir / concat_name
+            try:
+                from pdf_concat import concat_individual_pdfs
+                concat_individual_pdfs(concat_entries, concat_path)
+                results['concat_pdf'] = str(concat_path)
+                logger.info(f"✓ Concatenated {len(concat_entries)} pages -> {concat_path}")
+            except Exception as e:
+                logger.error(f"✗ PDF concatenation failed: {e}")
+                results['status'] = 'partial'
+        else:
+            logger.warning("concat_pdf enabled but no individual PDFs were exported; skipping")
+
     logger.info(f"Atlas export complete: {page_num} pages")
     return results
 

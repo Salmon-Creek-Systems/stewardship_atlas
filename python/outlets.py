@@ -1609,8 +1609,12 @@ def make_regions_index(config, outlet_name, regions):
     # regions = regions_from_geojson(regions_path)
     # return regions
 
-    runbook_name  = config.get('name', f"combined_{outlet_name}").replace(" ", "+")
-    runbook_url = f"{config['base_url']}/{runbook_name}_{outlet_name}.pdf"
+    # The combined PDF is written by export_atlas as "{name}_runbook.pdf" into this
+    # outlet's own directory, and this index.html lives in that same directory — so
+    # link to it relatively (like the individual_pages/ and ../webmap links below).
+    # Using config['base_url'] here was wrong: that's the global atlas URL prefix,
+    # which resolves to /{atlas}/{name}_runbook.pdf instead of the outlet dir.
+    runbook_url = f"{config.get('name', 'atlas')}_runbook.pdf"
     #   index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
 
 

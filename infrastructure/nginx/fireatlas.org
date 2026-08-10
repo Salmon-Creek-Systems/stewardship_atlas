@@ -32,6 +32,14 @@ server {
     # fireatlas.org/{atlas}/staging/outlets/html/public → /root/swales_dev/{atlas}/staging/...
     root /root/swales_dev;
 
+    # Security: never serve dotfiles/dirs (.git, .env, .ht*). 404 hides existence.
+    # Placed first so this regex wins over the location blocks below.
+    # Excludes .well-known so certbot ACME HTTP-01 challenges still work.
+    location ~ /\.(?!well-known) {
+        deny all;
+        return 404;
+    }
+
     # Landing page served from the shared app checkout
     location = / {
         root /root/swales_dev/app/documents/html;
