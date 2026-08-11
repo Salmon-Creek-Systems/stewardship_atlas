@@ -1,6 +1,11 @@
 {
   "app": "../../.venv/bin/python3 app.py",
   "context": {
-    "@aws-cdk/aws-s3:keepNotificationInImportedBucket": false
+    "@aws-cdk/aws-s3:keepNotificationInImportedBucket": false,
+    "env_name": "prod",
+    "atlas_domain": "next.fireatlas.org",
+    "certificate_arn": "",
+    "google_client_id": "",
+    "google_secret_name": "atlas/google-oauth-client-secret"
   }
 }

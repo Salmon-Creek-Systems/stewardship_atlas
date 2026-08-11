@@ -1,0 +1,2 @@
+# Placeholder API has no dependencies yet. Phase 4 brings fastapi, mangum (or the
+# Lambda Web Adapter), and the geo stack.
