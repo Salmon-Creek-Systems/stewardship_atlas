@@ -30,6 +30,7 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_cognito as cognito,
     aws_ecr as ecr,
+    aws_iam as iam,
     aws_lambda as lambda_,
     aws_s3 as s3,
     aws_sqs as sqs,
@@ -229,6 +230,22 @@ class AtlasCloudStack(Stack):
             domain_names=[domain_name] if certificate else None,
             certificate=certificate,
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
+        )
+
+        # Lambda-URL OAC needs *two* grants, and CDK's
+        # with_origin_access_control() only adds the first. Without this second
+        # one CloudFront's signed request is rejected before the function is
+        # ever invoked — a 403 with no log group to show for it.
+        # See "Restrict access to an AWS Lambda function URL origin" in the
+        # CloudFront developer guide.
+        api_fn.add_permission(
+            "AllowCloudFrontInvoke",
+            principal=iam.ServicePrincipal("cloudfront.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=(
+                f"arn:aws:cloudfront::{self.account}:distribution/"
+                f"{distribution.distribution_id}"
+            ),
         )
 
         # --- Cognito ---------------------------------------------------------
