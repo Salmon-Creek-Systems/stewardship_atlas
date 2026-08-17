@@ -35,10 +35,10 @@ class GithubOidcStack(Stack):
             client_ids=["sts.amazonaws.com"],
         )
 
-        # Any branch of this repo, but only this repo: a fork's token carries
-        # "repo:<fork>/..." and a pull_request token carries ":pull_request",
-        # so neither matches. Tighten to refs/heads/main once the workflow is
-        # settled and deploys only happen from main.
+        # Deploys come from main only. A fork's token carries "repo:<fork>/...",
+        # a pull_request token carries ":pull_request", and a feature branch
+        # carries its own ref — none of them match, so none can deploy. Widen to
+        # "refs/heads/*" temporarily if a branch ever needs to exercise CI.
         deploy_role = iam.Role(
             self, "DeployRole",
             role_name=role_name,
@@ -51,7 +51,7 @@ class GithubOidcStack(Stack):
                     },
                     "StringLike": {
                         "token.actions.githubusercontent.com:sub":
-                            f"repo:{repo}:ref:refs/heads/*",
+                            f"repo:{repo}:ref:refs/heads/main",
                     },
                 },
             ),
