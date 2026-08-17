@@ -1,0 +1,6 @@
+# Pinned: 2.255.0 is the last aws-cdk-lib release that supports Python 3.9,
+# which is all macOS CommandLineTools ships. Keeping CI on the same pin means
+# laptop synth and CI synth produce the same template. Bump this (and drop the
+# pin) once a modern Python is installed locally.
+aws-cdk-lib==2.255.0
+constructs>=10.0.0,<11

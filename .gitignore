@@ -178,3 +178,7 @@ cython_debug/
 # Generated at runtime; the live source is {data_root}/roles/. Being replaced by
 # Cognito/Google SSO (see documents/cloud_native_plan.md).
 infrastructure/htpasswd/
+
+# CDK / Lambda build artifacts
+infrastructure/cdk/cdk.out/
+infrastructure/lambda_build/

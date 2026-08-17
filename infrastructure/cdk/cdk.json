@@ -1,6 +1,11 @@
 {
   "app": "../../.venv/bin/python3 app.py",
   "context": {
-    "@aws-cdk/aws-s3:keepNotificationInImportedBucket": false
+    "@aws-cdk/aws-s3:keepNotificationInImportedBucket": false,
+    "env_name": "prod",
+    "atlas_domain": "next.fireatlas.org",
+    "certificate_arn": "arn:aws:acm:us-east-1:438886543302:certificate/436aba4d-1967-41f9-8aeb-6ab078306c74",
+    "google_client_id": "732932899752-69sttkhd18g3sajvbhca9skjcfv3u0n4.apps.googleusercontent.com",
+    "google_secret_name": "atlas/google-oauth-client-secret"
   }
 }

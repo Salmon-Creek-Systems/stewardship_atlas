@@ -1,0 +1,102 @@
+name: Deploy cloud substrate
+
+# Builds the API container, pushes it to ECR, and deploys the cloud-native
+# substrate stack (documents/cloud_native_plan.md, Phase 1b).
+#
+# Auth is GitHub OIDC — no AWS keys are stored in this repo. The role is created
+# by the AtlasGithubOidc stack, which is deployed once from a laptop.
+#
+# The AtlasCloud-<env> stack must already exist (first deploy is from a laptop,
+# with no api_image_tag, which creates the ECR repository this workflow pushes
+# to). See infrastructure/cdk/README.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      env_name:
+        description: Which substrate instance to deploy
+        default: prod
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - infrastructure/cdk/**
+      - infrastructure/api/**
+      - .github/workflows/deploy-cloud.yml
+
+permissions:
+  id-token: write   # required to request the OIDC token
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  DEPLOY_ROLE: arn:aws:iam::438886543302:role/atlas-github-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target environment
+        id: target
+        run: |
+          ENV_NAME="${{ inputs.env_name || 'prod' }}"
+          echo "env_name=$ENV_NAME" >> "$GITHUB_OUTPUT"
+          echo "ecr_repo=atlas-api-$ENV_NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check the ECR repository exists
+        run: |
+          if ! aws ecr describe-repositories \
+                 --repository-names "${{ steps.target.outputs.ecr_repo }}" \
+                 --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "::error::ECR repo ${{ steps.target.outputs.ecr_repo }} not found."
+            echo "::error::Run the first deploy from a laptop (no api_image_tag) to create it."
+            exit 1
+          fi
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Build and push the API image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/${{ steps.target.outputs.ecr_repo }}:${GITHUB_SHA}"
+          docker build -t "$IMAGE" infrastructure/api
+          docker push "$IMAGE"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install CDK
+        run: |
+          # cdk.json runs the app with ../../.venv/bin/python3
+          python -m venv .venv
+          .venv/bin/pip install --quiet -r infrastructure/cdk/requirements.txt
+          npm install -g aws-cdk@2
+
+      - name: Stage the email-inlet Lambda bundle
+        run: |
+          # app.py constructs every stack, and the email stack's asset directory
+          # is gitignored, so synth fails without it — even though this workflow
+          # only deploys AtlasCloud.
+          pip install --quiet -r infrastructure/lambda/requirements.txt \
+            -t infrastructure/lambda_build/
+          cp infrastructure/lambda/email_photo_handler.py infrastructure/lambda_build/
+
+      - name: Deploy
+        working-directory: infrastructure/cdk
+        run: |
+          cdk deploy "AtlasCloud-${{ steps.target.outputs.env_name }}" \
+            -c "env_name=${{ steps.target.outputs.env_name }}" \
+            -c "api_image_tag=${GITHUB_SHA}" \
+            --require-approval never
