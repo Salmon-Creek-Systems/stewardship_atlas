@@ -14,6 +14,8 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Data Interaction Guide**: `documents/data_interaction_guide.md` - All the ways to view/edit data
 - **QGIS Outlets**: `documents/qgis_outlets.md` - PDF generation with QGIS
 - **Roadmap**: `documents/roadmap.md` - Strategic project roadmap
+- **Cloud-Native Plan**: `documents/cloud_native_plan.md` - Phased migration to S3/CloudFront + Lambda; Phase 1 done
+- **CDK Runbook**: `infrastructure/cdk/README.md` - Stacks, toolchain, first-deploy steps
 
 ## Core Architecture Concepts
 
@@ -235,27 +237,31 @@ Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces
 
 ### Accounts and Profiles
 
-- **Atlas account**: 438886543302, profile name `atlas` in `~/.aws/credentials`
-- **Personal account**: default profile — has Route 53 for fireatlas.org DNS only; nothing else relevant
+- **Atlas account**: 438886543302, profile `atlas` in `~/.aws/credentials` — since 2026-08-17 this is IAM user `atlas-laptop` (AdministratorAccess), **not** the account root. Root access keys were deleted (issue #164); root MFA is still not enabled.
+- **Personal account**: 280439772481, profile `personal` — has Route 53 for fireatlas.org DNS only. Use it for DNS work rather than routing through the console.
 
-### CDK Stack
+### CDK Toolchain
 
-Stack in `infrastructure/cdk/`. Deploy with:
+`cdk` and `node` live at `~/.local/node/bin` (Node 24 LTS from the nodejs.org tarball — **not** Homebrew), exported from `~/.zshrc`. `~/.zshrc` is interactive-only, so scripts and cron won't see them.
+
 ```bash
-cd infrastructure/cdk && npx aws-cdk deploy AtlasEmailPhotoStack --profile atlas
+cd infrastructure/cdk && cdk deploy <StackName> --profile atlas
 ```
-(`cdk` is not on PATH — use `npx aws-cdk`.)
 
-Security-sensitive CDK changes (IAM/bucket policy) require `--require-approval broadening` or the deploy will fail non-interactively.
+- `cdk.json` runs the app as `../../.venv/bin/python3 app.py`, so a venv must exist at repo root with `infrastructure/cdk/requirements.txt` installed.
+- **`aws-cdk-lib` is pinned to 2.255.0** — the last release supporting Python 3.9, which is all macOS CommandLineTools ships. Installing a modern Python is what unblocks the bump.
+- `app.py` constructs *every* stack, so any synth needs the gitignored `infrastructure/lambda_build/` to exist (see Lambda Dependency Bundling below).
+
+**Deploys touching IAM need a TTY.** CDK's approval prompt can't be answered from Claude Code's Bash tool *or* from `!` bash mode — both fail with "terminal (TTY) is not attached". So either run those from a real terminal, or **read the `cdk diff` together first and then tell Claude to pass `--require-approval never`**. Don't let Claude add that flag unilaterally.
 
 ### Lambda Dependency Bundling
 
-No Docker available locally, so CDK `BundlingOptions` doesn't work. Pre-build deps manually:
+No Docker available locally, so CDK `BundlingOptions` doesn't work, and container images are built in CI instead (see Cloud-Native Substrate). For the zip-based email inlet Lambda, pre-build deps manually:
 ```bash
 pip3 install -r infrastructure/lambda/requirements.txt -t infrastructure/lambda_build/
 cp infrastructure/lambda/email_photo_handler.py infrastructure/lambda_build/
 ```
-Then `cdk deploy`. The `lambda_build/` dir is gitignored.
+Then `cdk deploy`. The `lambda_build/` dir is gitignored — but any `cdk synth` fails without it.
 
 ### IAM Summary
 
@@ -274,7 +280,30 @@ Lambda role: S3 GetObject + DeleteObject on `atlas-ingress`.
 
 ### Route 53
 
-DNS records for fireatlas.org are in the **personal** AWS account, not the atlas account.
+DNS records for fireatlas.org are in the **personal** AWS account, not the atlas account. Hosted zone `Z053813635B6S6EHA5GKU`. For a CloudFront alias record the target zone ID is always `Z2FDTNDATAQYW2` — fixed globally, not something to look up.
+
+ACM DNS validation can take ~30 minutes *after* the CNAME goes live. To tell "not saved yet" from "still propagating", query the authoritative nameservers directly (`dig +short CNAME <name> @ns-1514.awsdns-61.org`) — NXDOMAIN there means the record genuinely isn't in the zone.
+
+### Cloud-Native Substrate (Phase 1, deployed 2026-08-17)
+
+The serverless substrate from `documents/cloud_native_plan.md`. Live but **not customer-facing** — the EC2 box still serves every atlas. Runbook and per-stack detail: `infrastructure/cdk/README.md`.
+
+Stacks (all **us-east-1**, since CloudFront requires its ACM cert there):
+
+| Stack | Contents |
+|---|---|
+| `AtlasCloud-prod` | Buckets `scs-atlas-private-prod` / `scs-atlas-outlets-prod`, CloudFront `E1A5S5MB0K3FZG` (`next.fireatlas.org`), Cognito pool `us-east-1_aOHBCuAoc` with Google SSO + `{atlas}-{admin,internal}` groups, SQS `atlas-render-prod` + DLQ, API Lambda, ECR `atlas-api-prod` |
+| `AtlasCert-prod` | ACM cert — separate because DNS validation is a manual record in the personal account |
+| `AtlasGithubOidc` | GitHub OIDC provider + `atlas-github-deploy` role, trust scoped to `refs/heads/main` |
+
+`env_name` context parameterizes the whole substrate, so `-c env_name=staging` gives a parallel instance — this is where the long-wanted staging environment comes from.
+
+**CI/CD:** `.github/workflows/deploy-cloud.yml` — push to `main` touching `infrastructure/cdk/**` or `infrastructure/api/**` builds the API container, pushes to ECR tagged with the commit SHA, and runs `cdk deploy`. Auth is OIDC; no AWS keys are stored in GitHub. This is the mechanism that ends the live-checkout/`.git`-exposure/`--reload` class of problem — prod becomes an immutable image.
+
+**Gotchas:**
+- **Lambda function-URL OAC needs two grants.** CDK's `FunctionUrlOrigin.with_origin_access_control()` adds only `lambda:InvokeFunctionUrl`; AWS also requires `lambda:InvokeFunction` for the `cloudfront.amazonaws.com` principal. Symptom: 403 through CloudFront with **no log group ever created**.
+- **Never set a custom `function_name` on a Lambda whose packaging might change.** Zip → container image is a *replacement*, and CloudFormation refuses to replace a custom-named resource. The API Lambda is deliberately unnamed; find it via the `ApiFunctionName` stack output.
+- An empty outlets bucket returns **403, not 404** — OAC grants no `ListBucket`.
 
 ## PMTiles and Terrain
 
