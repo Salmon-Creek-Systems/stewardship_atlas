@@ -154,11 +154,15 @@ class AtlasCloudStack(Stack):
             "RENDER_QUEUE_URL": render_queue.queue_url,
         }
 
+        # Deliberately unnamed. Switching between a zip and a container image
+        # replaces the function, and CloudFormation refuses to replace a
+        # custom-named resource — the new one would collide with the old one's
+        # name mid-update. The generated name is the price of being able to
+        # change packaging; use the ApiFunctionName output to find it.
         if api_image_tag:
             # Normal path: CI built and pushed the image, and passes its tag.
             api_fn = lambda_.DockerImageFunction(
                 self, "ApiFunction",
-                function_name=f"atlas-api-{env_name}",
                 code=lambda_.DockerImageCode.from_ecr(api_repo, tag_or_digest=api_image_tag),
                 memory_size=1024,
                 timeout=Duration.seconds(30),
@@ -170,7 +174,6 @@ class AtlasCloudStack(Stack):
             # and forth casually, the function URL changes with it.
             api_fn = lambda_.Function(
                 self, "ApiFunction",
-                function_name=f"atlas-api-{env_name}",
                 runtime=lambda_.Runtime.PYTHON_3_12,
                 handler="index.handler",
                 code=lambda_.Code.from_inline(PLACEHOLDER_SOURCE),
