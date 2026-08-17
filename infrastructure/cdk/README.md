@@ -113,6 +113,9 @@ aws cloudformation describe-stacks --stack-name AtlasCloud-prod \
 curl https://<DistributionDomain>/api/health     # placeholder JSON
 ```
 
+The API Lambda has no fixed name — a custom name would block the zip→container
+replacement — so find it via the `ApiFunctionName` output rather than guessing.
+
 ## Notes
 
 - **Access model:** every resource is either public (CloudFront → S3, OAC) or

@@ -23,6 +23,9 @@ on:
       - infrastructure/cdk/**
       - infrastructure/api/**
       - .github/workflows/deploy-cloud.yml
+      # Docs don't change infrastructure, and every run rebuilds and pushes an
+      # image tagged with the commit SHA.
+      - '!infrastructure/**/*.md'
 
 permissions:
   id-token: write   # required to request the OIDC token
