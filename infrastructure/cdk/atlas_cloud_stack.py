@@ -8,6 +8,11 @@ One stack holding the pieces the migration builds on:
   - SQS queue for QGIS render jobs (Phase 5)
   - an API Lambda placeholder + its ECR repository (Phase 4)
 
+Phase 2 added the pieces that make the read path actually servable: a
+viewer-request function so directory URLs resolve to index.html, write access to
+the outlets bucket for the box that publishes into it, and a cache TTL raised now
+that publish invalidates.
+
 Nothing customer-facing points at any of this yet. The stack is deployable on its
 own and every resource that holds data is RETAIN on delete.
 
@@ -56,6 +61,31 @@ def handler(event, context):
         "body": json.dumps({"status": "placeholder", "phase": 1}),
     }
 """
+
+
+# Outlets are directories: /kennedy/current/outlets/webmap/ needs to resolve to
+# that directory's index.html. CloudFront's default_root_object only covers the
+# distribution root, and an S3 origin behind OAC does no directory indexing, so
+# without this every outlet URL 403s (an empty/missing key under OAC returns 403,
+# not 404 — see the Phase 1 gotchas). Viewer-request function on the static
+# behavior only; /api/* has its own behavior and is untouched.
+DIRECTORY_INDEX_SOURCE = """
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+    if (uri.endsWith('/')) {
+        request.uri = uri + 'index.html';
+    } else if (!uri.split('/').pop().includes('.')) {
+        request.uri = uri + '/index.html';
+    }
+    return request;
+}
+"""
+
+# The box publishes into the read path. Imported by ARN rather than wired as a
+# cross-stack reference: the role belongs to AtlasEmailPhotoStack, and an export
+# would couple the two stacks' deploy order for what is just a policy attachment.
+WEBAPP_EC2_ROLE_NAME = "atlas-webapp-ec2-role"
 
 
 def _logical(name: str) -> str:
@@ -191,17 +221,25 @@ class AtlasCloudStack(Stack):
         api_url = api_fn.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM)
 
         # --- CloudFront: the single front door -------------------------------
-        # Short default TTL while we migrate — outlets are regenerated on publish
-        # and we don't have invalidation wired up yet. Raise once publish
-        # invalidates (Phase 2).
+        # Phase 2 wired invalidation into publish (atlas_store.invalidate_current),
+        # so the 5-minute stopgap TTL is no longer needed. Published content only
+        # changes on publish, and publish now invalidates the atlas prefix.
         outlet_cache_policy = cloudfront.CachePolicy(
             self, "OutletCachePolicy",
             cache_policy_name=f"atlas-outlets-{env_name}",
-            default_ttl=Duration.minutes(5),
+            default_ttl=Duration.hours(1),
             min_ttl=Duration.seconds(0),
             max_ttl=Duration.days(1),
             enable_accept_encoding_gzip=True,
             enable_accept_encoding_brotli=True,
+        )
+
+        directory_index = cloudfront.Function(
+            self, "DirectoryIndex",
+            function_name=f"atlas-directory-index-{env_name}",
+            code=cloudfront.FunctionCode.from_inline(DIRECTORY_INDEX_SOURCE),
+            runtime=cloudfront.FunctionRuntime.JS_2_0,
+            comment="Append index.html to directory URIs",
         )
 
         certificate = None
@@ -218,6 +256,12 @@ class AtlasCloudStack(Stack):
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=outlet_cache_policy,
                 compress=True,
+                function_associations=[
+                    cloudfront.FunctionAssociation(
+                        function=directory_index,
+                        event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                    ),
+                ],
             ),
             additional_behaviors={
                 # Everything mutating, and every protected read, goes here.
@@ -250,6 +294,30 @@ class AtlasCloudStack(Stack):
                 f"{distribution.distribution_id}"
             ),
         )
+
+        # --- The box writes the read path (Phase 2) --------------------------
+        # Publishing an atlas mirrors its public outlets to the outlets bucket
+        # and invalidates the atlas prefix (python/atlas_store.py). Until the
+        # API moves to Lambda in Phase 4 that publish still runs on the EC2 box,
+        # so the box's instance role needs write access here.
+        #
+        # ListBucket matters as much as the writes: pruning stale keys is what
+        # keeps the current/ prefix a true mirror of the published version
+        # rather than an accumulating pile of removed layers.
+        webapp_role = iam.Role.from_role_arn(
+            self, "WebappEc2Role",
+            f"arn:aws:iam::{self.account}:role/{WEBAPP_EC2_ROLE_NAME}",
+            mutable=True,
+        )
+        public_outlets.grant_read_write(webapp_role)
+        public_outlets.grant_delete(webapp_role)
+        webapp_role.add_to_principal_policy(iam.PolicyStatement(
+            actions=["cloudfront:CreateInvalidation"],
+            resources=[
+                f"arn:aws:cloudfront::{self.account}:distribution/"
+                f"{distribution.distribution_id}"
+            ],
+        ))
 
         # --- Cognito ---------------------------------------------------------
         user_pool = cognito.UserPool(
