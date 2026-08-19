@@ -41,7 +41,19 @@
         "admin_emails": [],
         "logo_url": "",
         "email_photo_default_layer": "photos",
-        "versioned_outlets": [],
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "cloud": {
+          "enabled": true,
+          "outlets_bucket": "scs-atlas-outlets-prod",
+          "distribution_id": "E1A5S5MB0K3FZG",
+          "outlets": [
+            "webmap",
+            "html"
+          ]
+        },
         "layers": {
           "regions": { "layer_def": "regions" },
           "roads":   { "layer_def": "roads" },
@@ -117,6 +129,7 @@
             "name": "webmap",
             "in_layers": ["regions", "roads", "creeks", "trails", "landmarks", "photos", "inaturalist"],
             "config_def": "webmap",
+            "bake_data": true,
             "access": ["public", "internal", "admin"]
           },
           "webedit": {

@@ -34,7 +34,19 @@
         "name": "king_range_hike",
         "description": "King Range Hike",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [],
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "cloud": {
+          "enabled": true,
+          "outlets_bucket": "scs-atlas-outlets-prod",
+          "distribution_id": "E1A5S5MB0K3FZG",
+          "outlets": [
+            "webmap",
+            "html"
+          ]
+        },
         "default_h3_resolution": 11,
         "email_photo_default_layer": "photos",
         "data_root": "/root/swales_dev",
@@ -339,7 +351,8 @@
                 "internal",
                 "admin"
               ]
-            }
+            },
+            "bake_data": true
           },
           "webedit": {
             "type": "outlet",

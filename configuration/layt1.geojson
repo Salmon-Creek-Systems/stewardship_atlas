@@ -34,7 +34,19 @@
         "name": "layt1",
         "description": "Layt1",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [],
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "cloud": {
+          "enabled": true,
+          "outlets_bucket": "scs-atlas-outlets-prod",
+          "distribution_id": "E1A5S5MB0K3FZG",
+          "outlets": [
+            "webmap",
+            "html"
+          ]
+        },
         "default_h3_resolution": 10,
         "email_photo_default_layer": "photos",
         "data_root": "/root/swales_dev",
@@ -468,6 +480,7 @@
             "type": "outlet",
             "name": "webmap",
             "config_def": "webmap",
+            "bake_data": true,
             "in_layers": [
               "regions",
 	      "parcels",
