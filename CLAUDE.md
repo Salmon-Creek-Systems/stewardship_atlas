@@ -334,6 +334,14 @@ Absent or `enabled: false` → publish behaves exactly as before. Env fallbacks:
 - **Publish never fails on a failed S3 push** — `publish_public_outlets` logs and returns `{'status': 'error'}`. Check the publish log; a silent stale CloudFront copy is the failure mode.
 - **`ListBucket` matters as much as the writes.** Pruning stale keys is what keeps `current/` a true mirror rather than an accumulating pile of removed layers.
 
+### Backups (added 2026-08-19)
+
+Until Phase 6 retires the box, its EBS volume `vol-09ea03f2f799ff5c6` is the **only** copy of the hand-collected dataswale. Config is in git and inlet-derived layers (OSM, Overture, LANDFIRE, terrain) are re-derivable; hydrants, watertanks, culverts, notes, road mileage and conversations are not. It had **never been snapshotted** before 2026-08-19 (baseline: `snap-0fc5567b996cce935`).
+
+- `AtlasBackup` stack (**us-west-1**, with the volume — the cloud substrate is us-east-1) runs a DLM policy: daily retained 14, weekly retained 8. It targets the tag **`Backup=atlas-daily`** on the volume, not a hardcoded id, so a new volume is covered by tagging it.
+- **`scs-atlas-outlets-prod` is versioned** (90-day noncurrent expiry). This matters because publish *mirrors*: stale-key pruning deletes keys the new plan omits, so a publish following a bad wipe on the box would propagate the wipe. Versioning is what makes the published copy a replica rather than a mirror.
+- The threat is not only the open `:9000` API — a mistaken `clear_layer` or a volume failure loses the same data.
+
 ## PMTiles and Terrain
 
 PMTiles is the chosen tile format — single file, S3-compatible range requests, no tile server needed, MapLibre native support via `pmtiles://` protocol. Pre-generate on publish, serve static from nginx/S3. No runtime compute.

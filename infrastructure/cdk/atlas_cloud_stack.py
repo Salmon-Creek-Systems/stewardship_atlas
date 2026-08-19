@@ -137,6 +137,16 @@ class AtlasCloudStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
             enforce_ssl=True,
             removal_policy=RemovalPolicy.RETAIN,
+            # Publish *mirrors*: stale-key pruning deletes keys the new plan
+            # does not write, so without versioning a publish that followed a
+            # bad wipe on the box would propagate the wipe and destroy the last
+            # good copy. Versioning is what makes this a replica rather than a
+            # mirror. 90 days, longer than the private bucket's 30, because the
+            # damage this protects against can go unnoticed for a while.
+            versioned=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(noncurrent_version_expiration=Duration.days(90)),
+            ],
             # COG and PMTiles are read with HTTP range requests from the browser.
             cors=[
                 s3.CorsRule(

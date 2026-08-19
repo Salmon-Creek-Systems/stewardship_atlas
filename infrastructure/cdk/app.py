@@ -2,6 +2,7 @@
 import aws_cdk as cdk
 from email_photo_stack import EmailPhotoStack
 from atlas_provisioning_stack import AtlasDnsStack, AtlasSecurityGroupStack
+from atlas_backup_stack import AtlasBackupStack
 from atlas_cloud_stack import AtlasCloudStack
 from atlas_cert_stack import AtlasCertStack
 from github_oidc_stack import GithubOidcStack
@@ -37,6 +38,14 @@ AtlasDnsStack(
     ec2_ip=EC2_IP,
     hosted_zone_id=FIREATLAS_ZONE_ID,
     env=cdk.Environment(account=PERSONAL_ACCOUNT, region="us-east-1"),
+)
+
+# Backups for the box. us-west-1, with the volume it protects. Until Phase 6
+# retires the box, its EBS volume is the only copy of the hand-collected
+# dataswale — it had never been snapshotted before 2026-08-19.
+AtlasBackupStack(
+    app, "AtlasBackup",
+    env=cdk.Environment(account=ATLAS_ACCOUNT, region="us-west-1"),
 )
 
 AtlasSecurityGroupStack(
