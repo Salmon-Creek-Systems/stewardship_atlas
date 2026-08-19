@@ -8,7 +8,23 @@
                 "app_url": "https://fireatlas.org:9000",
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data/",
-                "versioned_outlets": [],
+                "versioned_outlets": [
+                    "html",
+                    "webmap",
+                    "private_webmap",
+                    "webedit",
+                    "gazetteer"
+                ],
+                "cloud": {
+                    "enabled": true,
+                    "outlets_bucket": "scs-atlas-outlets-prod",
+                    "distribution_id": "E1A5S5MB0K3FZG",
+                    "outlets": [
+                        "webmap",
+                        "html",
+                        "gazetteer"
+                    ]
+                },
                 "admin_emails": [
                     "gateless@gmail.com",
                     "planephun@gmail.com"
@@ -1095,6 +1111,7 @@
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
+                        "bake_data": true,
                         "access": [
                             "public",
                             "internal",

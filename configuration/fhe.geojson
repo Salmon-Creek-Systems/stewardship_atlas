@@ -34,13 +34,28 @@
         "name": "fhe",
         "description": "Foreest Health Extravaganza",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [],
+        "versioned_outlets": [
+          "html",
+          "webmap"
+        ],
+        "cloud": {
+          "enabled": true,
+          "outlets_bucket": "scs-atlas-outlets-prod",
+          "distribution_id": "E1A5S5MB0K3FZG",
+          "outlets": [
+            "webmap",
+            "html"
+          ]
+        },
         "default_h3_resolution": 10,
         "data_root": "/root/swales_dev",
         "shared_dir": "/root/data",
         "base_url": "https://fireatlas.org/fhe",
         "port": 9000,
-        "admin_emails": [],
+        "admin_emails": [
+          "gateless@gmail.com",
+          "tim@caflc.dev"
+        ],
         "logo_url": "",
         "layers": {
           "regions": {
@@ -631,7 +646,8 @@
               "public",
               "internal",
               "admin"
-            ]
+            ],
+            "bake_data": true
           },
           "webedit": {
             "type": "outlet",
