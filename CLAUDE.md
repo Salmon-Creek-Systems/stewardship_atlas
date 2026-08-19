@@ -305,6 +305,33 @@ Stacks (all **us-east-1**, since CloudFront requires its ACM cert there):
 - **Never set a custom `function_name` on a Lambda whose packaging might change.** Zip → container image is a *replacement*, and CloudFormation refuses to replace a custom-named resource. The API Lambda is deliberately unnamed; find it via the `ApiFunctionName` stack output.
 - An empty outlets bucket returns **403, not 404** — OAC grants no `ListBucket`.
 
+### Read Path to S3/CloudFront (Phase 2, `feature/cloud-phase2-s3-reads`)
+
+`python/atlas_store.py` mirrors a published version's **public** outlets to `scs-atlas-outlets-prod` under `{atlas}/current/outlets/{name}/`, called from `versioning.publish_new_version()` after the local snapshot. Scope decisions and rationale live in `documents/cloud_native_plan.md`.
+
+**Per-atlas cutover is a config flag** — add a `cloud` block to `{atlas}.geojson` (flows into the merged config via `config.update(props)` like any other property), then re-run `build_atlas.py config_only`:
+
+```json
+"cloud": {
+  "enabled": true,
+  "outlets_bucket": "scs-atlas-outlets-prod",
+  "distribution_id": "E1A5S5MB0K3FZG",
+  "outlets": ["webmap", "console", "html", "3dview", "runbook"]
+}
+```
+
+Absent or `enabled: false` → publish behaves exactly as before. Env fallbacks: `ATLAS_OUTLETS_BUCKET`, `ATLAS_DISTRIBUTION_ID`.
+
+**`access` defaults to public, and that is a fail-open trap.** `atlas.py` does `.get('access', ['public'])`, so any outlet without an explicit `access` reads as public — including **`sqldb`, whose `atlas.db` contains every layer**, admin-only ones included. `stac` and `spreadsheet_export` default the same way. Always set `cloud.outlets` as an explicit allowlist rather than relying on tier alone; publishing on a *missing* `access` field logs a warning. The allowlist can only narrow — a protected outlet named in it is still refused.
+
+**`bake_data: true`** on a webmap asset makes it copy its `in_layers` into the outlet's own `data/` dir and emit `data/{layer}.geojson` URLs, instead of pointing at `../../layers/`. Required before an outlet can be served standalone — otherwise publishing the outlet means publishing the whole raw layer tree. Only layers in `in_layers` are copied, which is what makes it fail-closed.
+
+**Gotchas:**
+- **Directory URLs need a CloudFront Function.** `default_root_object` only covers the distribution root, and an S3 origin behind OAC does no directory indexing — so `/kennedy/current/outlets/webmap/` 403s without the `atlas-directory-index-prod` viewer-request function that appends `index.html`.
+- **The local `CURRENT ->` symlink is deliberately untouched.** The box serves from it and `reset_staging()` asserts `is_symlink()`. S3 gets a separate `{atlas}/current.json` pointer object instead.
+- **Publish never fails on a failed S3 push** — `publish_public_outlets` logs and returns `{'status': 'error'}`. Check the publish log; a silent stale CloudFront copy is the failure mode.
+- **`ListBucket` matters as much as the writes.** Pruning stale keys is what keeps `current/` a true mirror rather than an accumulating pile of removed layers.
+
 ## PMTiles and Terrain
 
 PMTiles is the chosen tile format — single file, S3-compatible range requests, no tile server needed, MapLibre native support via `pmtiles://` protocol. Pre-generate on publish, serve static from nginx/S3. No runtime compute.

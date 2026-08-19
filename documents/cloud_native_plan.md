@@ -103,12 +103,39 @@ The cloud-native substrate, deployable from CI, before app logic moves.
 ### Phase 2 — Read path to S3 + CloudFront · *M, first visible win*
 A strict subset of the end state; banks security/burn/stability early.
 
-- **2a. Outlet-write to S3 by tier** — `publish`/materialize write outlets to S3, prefix chosen from the outlet `access` field. Publish's "pure snapshot" becomes a server-side S3 copy to a `current/` prefix (replaces `CURRENT ->`). *(Touches `versioning.py`, `outlets.py`.)*
-- **2b. Public outlets bake their own data** — the webmap outlet materializes the public geojson it needs into its own prefix instead of referencing raw layers, so raw data never has to be public (fail-closed).
-- **2c. CloudFront front door** — public served static; protected proxied through the Lambda (Cognito/Google), edge-auth deferred. Cut over **kennedy** on the temp hostname, validate, then per-atlas.
+- **2a. Outlet-write to S3 by tier** — `publish` mirrors a version's public outlets to S3. *(`python/atlas_store.py`, hooked from `versioning.publish_new_version`.)*
+- **2b. Public outlets bake their own data** — the webmap copies the layers it uses into its own `data/` dir instead of referencing `../../layers/`, so raw data never has to be public (fail-closed).
+- **2c. CloudFront front door** — public served static. Cut over **kennedy** on the temp hostname, validate, then per-atlas.
 - **2d. Flip the apex** to CloudFront once validated; **box goes private** (reads leave it).
 
-**Deliverable:** serving is off the box; box no longer public; a render can't take down the site; burn starts dropping; Google-SSO-gated protected outlets live.
+**Deliverable:** public serving is off the box; a render can't take down the site; burn starts dropping.
+
+#### Scope decisions taken when Phase 2 started (2026-08-17)
+
+- **Public tier only.** Protected (admin/internal/technical) outlets stay on the box behind nginx until Phase 4. The admin consoles are mostly calls to the API, which doesn't move until then — building a Cognito proxy into the placeholder Lambda now would be throwaway work. *SSO-gated protected outlets move from the Phase 2 deliverable to Phase 4.*
+- **Published versions only.** `staging/` stays on the box as the working copy; CloudFront serves published content. "Static reads are published reads."
+- **No versioned prefixes in S3 yet.** Publish writes straight to `{atlas}/current/`, so URLs stay static and no edge resolver is needed. Version *history* already lives on the box. Phase 3 revisits this — once S3 is the source of truth, a pointer object plus a CloudFront KeyValueStore lookup is the better shape.
+- **The local `CURRENT ->` symlink is untouched.** Replacing it would break nginx serving and `reset_staging()` on a production box for no Phase 2 benefit. The S3 side gets an equivalent `{atlas}/current.json` pointer object instead — which is the "two implementations of one interface" idea in miniature.
+- **Publish never fails on a failed push.** `publish_public_outlets` logs and returns an error dict. The box is still serving, so the worst case is a stale CloudFront copy.
+
+#### The public-by-default hazard
+
+`access` is optional and absent means public (`atlas.py` does `.get('access', ['public'])`). That default predates anything being genuinely world-readable, and it sweeps in outlets that must not be: **`sqldb` builds an `atlas.db` containing every layer**, including ones only an admin-only webmap references. `stac` and `spreadsheet_export` default the same way.
+
+So tier alone does not decide what gets published. `cloud.outlets` is an explicit allowlist and is the recommended way to cut an atlas over; publishing an outlet on the strength of a *missing* `access` field logs a warning. The allowlist can only ever narrow — a name in it that resolves to a protected outlet is still refused.
+
+#### Per-atlas config
+
+```json
+"cloud": {
+  "enabled": true,
+  "outlets_bucket": "scs-atlas-outlets-prod",
+  "distribution_id": "E1A5S5MB0K3FZG",
+  "outlets": ["webmap", "console", "html", "3dview", "runbook"]
+}
+```
+
+Absent or `enabled: false` → publish behaves exactly as before. That flag is the per-atlas cutover switch. `bake_data: true` on a webmap asset turns on 2b for that outlet.
 
 ### Phase 3 — S3 data-layer refactor · *L, the long pole*
 Makes the *source* data S3-native so compute can be stateless. The real engineering.
@@ -174,3 +201,4 @@ private. Revisit after Phase 2:
 - **Read-path-to-S3 before the data refactor** — cheap, reversible, a strict subset of the end state; banks the security/burn win weeks before the long-pole refactor lands.
 - **No throwaway "private box" step** — the existing box is hardened and its responsibilities *wither* (reads → S3, API → Lambda) until only QGIS remains. We effectively go straight to serverless.
 - **All-CDK, CI-built container images** — one source of truth; immutable artifacts end the live-checkout antipattern and the whole `.git`-exposure class.
+- **The storage seam is built where a phase forces it, not up front** — `atlas_store.py` splits into a pure half (tiers, keys, upload plans; unit-testable with no AWS) and an S3 half, so a different backend reimplements the second against the same plan objects. That is the "multiple implementations of one interface" idea the dataswale was designed around, applied narrowly. It is deliberately *not* a general filesystem abstraction: Phase 3 generalizes it with real usage to point at. Note the existing seam is routinely bypassed — `outlets.py` has 58 direct `versioning.atlas_path()` calls and `eddies.py` 27, all reaching around `dataswale_geojson` straight to a concrete `pathlib.Path`. That return type is the load-bearing leak.

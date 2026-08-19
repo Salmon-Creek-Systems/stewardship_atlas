@@ -4,6 +4,8 @@ import logging
 import shutil
 import json
 
+import atlas_store
+
 # Configure logging
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -99,6 +101,16 @@ def publish_new_version(config, version=None):
     current_path.symlink_to(version_path)
     logger.info(f"Linked {current_path} to {version_path}")
     print(f"Linked {current_path} to {version_path}")
+
+    # Phase 2 (cloud_native_plan.md): mirror the public outlets of this version
+    # to S3 so CloudFront can serve the read path. The local CURRENT symlink
+    # above is deliberately untouched — the box keeps serving exactly as it
+    # did, and this is additive until an atlas is cut over. A no-op unless the
+    # atlas has `cloud.enabled`, and it never raises: a failed push must not
+    # fail a good publish.
+    push = atlas_store.publish_public_outlets(config, version_path, version)
+    logger.info(f"S3 outlet publish: {push}")
+
     return version_path
 
 

@@ -44,6 +44,64 @@ def _resolve_cog_color(config, layer_name, cog_color):
     return ','.join(parts)
 
 
+# --- Baked outlet data (Phase 2, cloud_native_plan.md 2b) -------------------
+#
+# By default a webmap points at the shared dataswale with `../../layers/...`,
+# which means serving the outlet requires serving the raw layer tree too. For
+# an outlet published to public S3 that is the wrong default: it would put
+# every layer in the atlas — not just the ones on the map — behind a public
+# URL. With `bake_data` set, the outlet copies the layers it actually uses
+# into its own `data/` directory and references those instead, so the outlet
+# directory is self-contained and only listed layers can ever leave the box.
+#
+# Opt-in per outlet asset so atlases cut over one at a time. Also makes the
+# outlet directory genuinely portable, which is what "static-first" promised.
+
+def _bakes_data(config, outlet_name) -> bool:
+    return bool(config['assets'][outlet_name].get('bake_data', False))
+
+
+def _layer_data_url(bake: bool, layer_name: str, filename: str) -> str:
+    """URL a webmap should use for a layer file, baked or shared."""
+    if bake:
+        return f"data/{filename}"
+    return f"../../layers/{layer_name}/{filename}"
+
+
+def bake_layer_data(config, outlet_name, layer_names) -> list:
+    """Copy each layer's servable files into the outlet's own `data/` dir.
+
+    Only the layers passed in are copied — that list is the outlet's
+    `in_layers`, which is what makes this fail-closed. Returns the filenames
+    copied, for logging.
+
+    COG rasters are skipped: they already live in their own public S3 bucket
+    and are referenced absolutely, so there is nothing local to bake.
+    """
+    data_dir = versioning.atlas_path(config, "outlets") / outlet_name / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+
+    copied = []
+    for layer_name in layer_names:
+        layer = layers_dict.get(layer_name, {})
+        if layer.get('cog'):
+            continue
+        layer_dir = versioning.atlas_path(config, "layers") / layer_name
+        # Candidate servable artifacts; whichever exist get baked.
+        for filename in (f"{layer_name}.geojson",
+                         f"{layer_name}.tiff.png",
+                         f"{layer_name}.tiff.jpg",
+                         f"{layer_name}.pmtiles"):
+            source = layer_dir / filename
+            if source.exists():
+                shutil.copy2(source, data_dir / filename)
+                copied.append(filename)
+
+    logger.info(f"bake_layer_data: baked {len(copied)} file(s) into {data_dir}")
+    return copied
+
+
 def webmap_json(config, name, sprite_json=None):
     """Generate a JSON object for a web map in MapLibre.
     We will set up sources and layers as static content loaded initially in HTML where possible.
@@ -76,6 +134,10 @@ def webmap_json(config, name, sprite_json=None):
     cog_layers = []
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
+
+    # When this outlet bakes its data, sources point at its own data/ dir
+    # instead of the shared layer tree (see _layer_data_url).
+    bake = _bakes_data(config, name)
 
     # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
     in_layers_list = outlet_config['in_layers']
@@ -126,7 +188,7 @@ def webmap_json(config, name, sprite_json=None):
                                    else f"{layer_name}.tiff.jpg")
                 map_sources[layer_name] = {
                     'type': 'image',
-                    'url': f"../../layers/{layer_name}/{raster_filename}",
+                    'url': _layer_data_url(bake, layer_name, raster_filename),
                     'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
@@ -138,7 +200,7 @@ def webmap_json(config, name, sprite_json=None):
         else:
             map_sources[layer_name] =  {
             'type': 'geojson',
-            'data': f"../../layers/{layer_name}/{layer_name}.geojson"
+            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson")
             }
         # Add Display Layer
         map_layer = {
@@ -348,7 +410,7 @@ def webmap_json(config, name, sprite_json=None):
                         # Add source for this layer if it doesn't exist
                         map_sources[layer_name] = {
                             'type': 'geojson',
-                            'data': f"../../layers/{layer_name}/{layer_name}.geojson"
+                            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson")
                         }
                     
                     # Add metadata for legend display
@@ -797,6 +859,12 @@ def outlet_webmap(config, name):
                 utils.tiff2jpg(str(tiff_path))
             else:
                 logger.warning(f"No tiff found for raster layer {layer_name}, skipping")
+
+    # Bake this outlet's layer data into its own data/ dir, after the raster
+    # conversion above so the generated .jpg is there to copy. webmap_json
+    # emits data/ URLs to match (see _layer_data_url).
+    if _bakes_data(config, name):
+        bake_layer_data(config, name, config['assets'][name]['in_layers'])
 
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)

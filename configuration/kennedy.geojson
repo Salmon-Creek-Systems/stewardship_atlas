@@ -42,6 +42,18 @@
                 "port": 9000,
                 "logo_url": "https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png",
                 "versioned_outlets": [],
+                "cloud": {
+                    "enabled": true,
+                    "outlets_bucket": "scs-atlas-outlets-prod",
+                    "distribution_id": "E1A5S5MB0K3FZG",
+                    "outlets": [
+                        "webmap",
+                        "console",
+                        "html",
+                        "3dview",
+                        "runbook"
+                    ]
+                },
                 "layers": {
                     "regions": {
                         "layer_def": "regions"
@@ -495,6 +507,7 @@
                             "potential_culverts"
                         ],
                         "config_def": "webmap",
+                        "bake_data": true,
                         "access": [
                             "public",
                             "internal",
