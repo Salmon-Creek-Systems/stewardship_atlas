@@ -87,6 +87,27 @@ def normalize_access(access) -> list:
     return list(access)
 
 
+# Role-variant subdirectories inside a single outlet directory.
+#
+# `html` and `console` each generate ALL FOUR role variants in one pass —
+# public/, internal/, admin/, technical/ — into one outlet directory (see the
+# asset-method table in CLAUDE.md). So the outlet's own `access` field is the
+# wrong granularity for them: the outlet reads as public because its *public*
+# variant is, while the same directory also holds the admin console, whose HTML
+# spells out the mutating API surface.
+#
+# Pruned at the first path segment only, which is where the variants live
+# (html/admin/index.html). Deeper matches are left alone so a layer that happens
+# to be named "admin" keeps its html/{layer}/attribution.html page.
+PROTECTED_OUTLET_SUBDIRS = ('admin', 'internal', 'technical')
+
+
+def is_protected_path(relative_posix: str) -> bool:
+    """True when a path inside an outlet directory is a non-public role variant."""
+    head, _, rest = relative_posix.partition('/')
+    return bool(rest) and head in PROTECTED_OUTLET_SUBDIRS
+
+
 def is_public(access) -> bool:
     """True when an asset is served to everyone.
 
@@ -205,17 +226,28 @@ def plan_upload(local_dir, key_prefix: str) -> list:
     Symlinks are followed (``is_file()`` resolves them) because version
     snapshots are copied with ``symlinks=True`` and the *content* is what
     should be served. Empty directories are skipped — S3 has no such thing.
+
+    Non-public role-variant subdirectories are pruned — see
+    ``PROTECTED_OUTLET_SUBDIRS`` for why one outlet directory can hold more than
+    one access tier.
     """
     local_dir = Path(local_dir)
     if not local_dir.is_dir():
         return []
 
     plan = []
+    pruned = set()
     for path in sorted(local_dir.rglob('*')):
         if not path.is_file():
             continue
         relative = path.relative_to(local_dir).as_posix()
+        if is_protected_path(relative):
+            pruned.add(relative.partition('/')[0])
+            continue
         plan.append((path, f"{key_prefix.rstrip('/')}/{relative}", content_type_for(path)))
+    if pruned:
+        logger.info(f"atlas_store: pruned role-variant subdirs from {local_dir}: "
+                    f"{sorted(pruned)}")
     return plan
 
 

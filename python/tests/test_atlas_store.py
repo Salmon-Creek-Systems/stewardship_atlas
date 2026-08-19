@@ -255,6 +255,58 @@ class TestPlanUpload(unittest.TestCase):
         self.assertEqual(len(atlas_store.plan_upload(self.tmp, 'p')), 1)
 
 
+class TestRoleVariantPruning(unittest.TestCase):
+    """`html` and `console` generate all four role variants into one directory.
+
+    The outlet's own access field reads as public because its public/ variant
+    is, so outlet-level tiering alone published the admin console. Regression
+    test for that leak.
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _write(self, relative):
+        path = self.tmp / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('x')
+
+    def test_is_protected_path(self):
+        self.assertTrue(atlas_store.is_protected_path('admin/index.html'))
+        self.assertTrue(atlas_store.is_protected_path('internal/index.html'))
+        self.assertTrue(atlas_store.is_protected_path('technical/index.html'))
+        self.assertFalse(atlas_store.is_protected_path('public/index.html'))
+        self.assertFalse(atlas_store.is_protected_path('index.html'))
+
+    def test_only_first_segment_is_pruned(self):
+        # A layer named "admin" must keep its html/{layer}/attribution.html.
+        self.assertFalse(atlas_store.is_protected_path('data/admin.geojson'))
+        self.assertFalse(atlas_store.is_protected_path('admin'))
+
+    def test_role_variants_are_not_uploaded(self):
+        self._write('public/index.html')
+        self._write('admin/index.html')
+        self._write('internal/index.html')
+        self._write('technical/index.html')
+        self._write('roads/attribution.html')
+
+        keys = sorted(key for _, key, _ in atlas_store.plan_upload(self.tmp, 'p'))
+        self.assertEqual(keys, ['p/public/index.html', 'p/roads/attribution.html'])
+
+    def test_leaked_keys_are_pruned_on_republish(self):
+        # The mirror design closes the leak by itself: keys already in the
+        # bucket that the new plan does not write get deleted.
+        self._write('public/index.html')
+        self._write('admin/index.html')
+        planned = [key for _, key, _ in atlas_store.plan_upload(self.tmp, 'p')]
+        already_in_bucket = ['p/public/index.html', 'p/admin/index.html']
+        self.assertEqual(atlas_store.stale_keys(already_in_bucket, planned),
+                         ['p/admin/index.html'])
+
+
 class TestPlanPublish(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
