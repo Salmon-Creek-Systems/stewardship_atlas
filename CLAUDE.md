@@ -324,6 +324,8 @@ Absent or `enabled: false` → publish behaves exactly as before. Env fallbacks:
 
 **`access` defaults to public, and that is a fail-open trap.** `atlas.py` does `.get('access', ['public'])`, so any outlet without an explicit `access` reads as public — including **`sqldb`, whose `atlas.db` contains every layer**, admin-only ones included. `stac` and `spreadsheet_export` default the same way. Always set `cloud.outlets` as an explicit allowlist rather than relying on tier alone; publishing on a *missing* `access` field logs a warning. The allowlist can only narrow — a protected outlet named in it is still refused.
 
+**One outlet directory can hold more than one access tier.** `html` and `console` generate *all four* role variants (`public/`, `internal/`, `admin/`, `technical/`) into a single outlet directory, so the outlet's `access` field reads as public on the strength of its public variant while the same directory also holds the admin console — whose HTML spells out the mutating API surface. `atlas_store.PROTECTED_OUTLET_SUBDIRS` prunes those subdirectories at the first path segment. Found the hard way: kennedy's first publish put `html/admin/`, `html/internal/`, `html/technical/` and `console/admin/` on CloudFront unauthenticated.
+
 **`bake_data: true`** on a webmap asset makes it copy its `in_layers` into the outlet's own `data/` dir and emit `data/{layer}.geojson` URLs, instead of pointing at `../../layers/`. Required before an outlet can be served standalone — otherwise publishing the outlet means publishing the whole raw layer tree. Only layers in `in_layers` are copied, which is what makes it fail-closed.
 
 **Gotchas:**

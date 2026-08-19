@@ -124,6 +124,12 @@ A strict subset of the end state; banks security/burn/stability early.
 
 So tier alone does not decide what gets published. `cloud.outlets` is an explicit allowlist and is the recommended way to cut an atlas over; publishing an outlet on the strength of a *missing* `access` field logs a warning. The allowlist can only ever narrow — a name in it that resolves to a protected outlet is still refused.
 
+#### A second granularity problem: role variants inside one outlet
+
+Tier-per-outlet is not fine-grained enough either. `html` and `console` build **all four** role variants into one directory, so the outlet reads as public via its `public/` variant while the same directory carries the admin console. kennedy's first publish exposed `html/{admin,internal,technical}/` and `console/admin/` on CloudFront with no auth — no *new* capability, since the `:9000` API is already open, but the `html/` variants had been htpasswd-gated on the box and a discoverable admin UI lowers the effort to abuse it.
+
+`atlas_store.PROTECTED_OUTLET_SUBDIRS` prunes those subdirectories. Because publish mirrors rather than merely uploads, a re-publish deletes already-leaked keys on its own.
+
 #### Per-atlas config
 
 ```json
