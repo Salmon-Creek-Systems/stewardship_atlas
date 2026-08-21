@@ -139,8 +139,15 @@ if [ -n "$CDN_URL" ] && [ "$CLOUD_ENABLED" = "True" ]; then
   step "checking the published copy"
   ok=1
   for outlet in ${CLOUD_OUTLETS//,/ }; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/outlets/$outlet/")"
-    printf '   %-14s %s\n' "$outlet" "$code"
+    # `html` and `console` generate all four role variants into subdirectories
+    # and have no root index of their own, so the public entry point is the
+    # public/ variant. Checking the outlet root would always 403.
+    case "$outlet" in
+      html|console) entry="$outlet/public" ;;
+      *)            entry="$outlet" ;;
+    esac
+    code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/outlets/$entry/")"
+    printf '   %-20s %s\n' "$entry" "$code"
     [ "$code" = "200" ] || ok=0
   done
   # Role variants live inside html/ and console/ and must never be public.
