@@ -83,12 +83,14 @@ def bake_layer_data(config, outlet_name, layer_names) -> list:
     layers_dict = {l['name']: l for l in config['dataswale']['layers']}
 
     copied = []
+    stubbed = []
     for layer_name in layer_names:
         layer = layers_dict.get(layer_name, {})
         if layer.get('cog'):
             continue
         layer_dir = versioning.atlas_path(config, "layers") / layer_name
         # Candidate servable artifacts; whichever exist get baked.
+        found = False
         for filename in (f"{layer_name}.geojson",
                          f"{layer_name}.tiff.png",
                          f"{layer_name}.tiff.jpg",
@@ -97,8 +99,32 @@ def bake_layer_data(config, outlet_name, layer_names) -> list:
             if source.exists():
                 shutil.copy2(source, data_dir / filename)
                 copied.append(filename)
+                found = True
+
+        # A layer with no producing inlet has no file until something writes
+        # one (issue #135), so the webmap would emit a source URL pointing at
+        # nothing. Bake an empty FeatureCollection instead: the layer stays in
+        # the map and legend and loads cleanly, rather than erroring. Dropping
+        # the source entirely would be worse — a layer like `hydrants` is meant
+        # to exist and simply has no data yet, and silently vanishing from the
+        # legend hides that.
+        #
+        # The condition deliberately mirrors webmap_json's source-emitting
+        # branch: everything that is not 'raster' or 'documents' falls through
+        # to a geojson source there, so that is exactly the set needing a file.
+        # Keep the two in step. Rasters are left absent on purpose — an empty
+        # FeatureCollection is meaningless for an image source.
+        if not found and layer.get('geometry_type') not in ('raster', 'documents'):
+            filename = f"{layer_name}.geojson"
+            (data_dir / filename).write_text(
+                json.dumps({"type": "FeatureCollection", "features": []}))
+            copied.append(filename)
+            stubbed.append(layer_name)
 
     logger.info(f"bake_layer_data: baked {len(copied)} file(s) into {data_dir}")
+    if stubbed:
+        logger.warning(f"bake_layer_data: no data file for {stubbed} — baked empty "
+                       f"FeatureCollections (see issue #135)")
     return copied
 
 
