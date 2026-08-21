@@ -106,9 +106,33 @@ A strict subset of the end state; banks security/burn/stability early.
 - **2a. Outlet-write to S3 by tier** — `publish` mirrors a version's public outlets to S3. *(`python/atlas_store.py`, hooked from `versioning.publish_new_version`.)*
 - **2b. Public outlets bake their own data** — the webmap copies the layers it uses into its own `data/` dir instead of referencing `../../layers/`, so raw data never has to be public (fail-closed).
 - **2c. CloudFront front door** — public served static. Cut over **kennedy** on the temp hostname, validate, then per-atlas.
-- **2d. Flip the apex** to CloudFront once validated; **box goes private** (reads leave it).
+- **2d. Flip traffic** to CloudFront once validated. **Deferred into Phase 4 — see below.**
 
-**Deliverable:** public serving is off the box; a render can't take down the site; burn starts dropping.
+**Deliverable:** every atlas's public outlets are published to S3 and served by CloudFront, verified. Traffic still goes to the box.
+
+#### Status: 2a–2c DONE (2026-08-21)
+
+All eight atlases cut over and verified — kennedy, layt1, gilhamhike, napachar, king_range, fhe, scvfd, westport. 563 objects in `scs-atlas-outlets-prod`. Allowlists exactly respected, role variants 403 everywhere, no stale `../../layers/` references.
+
+`scripts/atlas_full_refresh.sh <atlas>` runs the per-atlas sequence and verifies the published copy, including a role-variant leak check on every publish.
+
+#### 2d is deferred into Phase 4, deliberately
+
+2d was written assuming Phase 2 would move *all* reads. We narrowed it to the public tier (protected outlets stay on the box until the API moves), and that quietly pushed 2d's remainder into Phase 4's dependency set. Recording it so it doesn't later read as skipped work.
+
+**2d's stated deliverable is unreachable as things stand.** "Box goes private (reads leave it)" cannot hold while protected outlets and the `:9000` API still live there — a CloudFront origin pointing back at the box requires the box to stay reachable. That outcome needs Phase 4, not more Phase 2 effort.
+
+What 2d would require, and what survives:
+
+| Piece | Survives Phase 4/6? |
+|---|---|
+| Second CloudFront origin → the box, for protected outlets and the API | **No** — deleted at Phase 4. The bulk of the work |
+| Path-rewrite for legacy URL shapes (`/staging/outlets/…`, `/CURRENT/outlets/…`) | Yes — but Phase 3 sets what it rewrites *to* |
+| DNS flip | Yes, and trivial whenever done |
+
+Doing 2d before Phase 3 means building the dual-origin config that Phase 4 deletes, and building the path-rewrite against a URL scheme Phase 3 is about to change (`current/` likely becomes a pointer resolved at the edge). After Phase 4, 2d collapses to a DNS change plus one rewrite function built against a settled scheme.
+
+**Cost of waiting:** the published copies sit unread (245 MB, pennies), and the "a render can't take down the site" win is not yet banked because no traffic uses them. Nothing structural is lost.
 
 #### Scope decisions taken when Phase 2 started (2026-08-17)
 
@@ -151,12 +175,21 @@ Makes the *source* data S3-native so compute can be stateless. The real engineer
 
 **Deliverable:** no local-disk/symlink dependence; S3 is source of truth. Box still runs the API, now statelessly — the precondition for Lambda.
 
+**Starting point:** `python/atlas_store.py` is the first slice of this seam, built in Phase 2 and deliberately shaped so Phase 3 extends rather than replaces it — a pure half (tiers, keys, upload plans; no boto3, unit-testable locally) and an S3 half.
+
+**The load-bearing leak** is `versioning.atlas_path()` returning a concrete `pathlib.Path`. `outlets.py` has 58 direct calls and `eddies.py` 27, all reaching around `dataswale_geojson` straight to the filesystem — so the dataswale seam exists nominally but is routinely bypassed.
+
+**Do not build a `Path` lookalike.** Third-party libraries (rasterio, QGIS, geopandas, shutil) call `os.fspath()` on whatever they are handed and then open a real file; partial emulation fails silently inside a dependency. Keep compute filesystem-native and move only the boundaries — explicit fetch/publish around a materializer, `fsspec` underneath. QGIS and gdal2tiles need real paths regardless, so a local workspace is part of the design, not a failure of it.
+
+**What actually breaks under S3**, in order of how much it will hurt: call granularity (a free `.exists()` becomes a network round trip — the failure mode is *correct but unusably slow*), mutation semantics (no rename, no append, no symlinks), and read-modify-write concurrency. The delta system is already the right answer to the third; `atlas_config.json` rewritten in place is not.
+
 ### Phase 4 — API → Lambda · *M–L*
 - **4a.** FastAPI as a Lambda container image (Lambda Web Adapter or Mangum), behind API Gateway/Function URL with a Cognito authorizer on writes.
 - **4b.** Move all non-QGIS compute into it (inlets, eddies, COG/tiles/pmtiles, webmap/html/console, publish-snapshot).
 - **4c.** Retire the monolith API on the box.
+- **4d. (inherited from 2d)** Flip traffic to CloudFront: path-rewrite for the legacy `/staging/outlets/…` and `/CURRENT/outlets/…` URL shapes, protected reads through the Lambda with Cognito, then DNS. Only now can the box actually go private.
 
-**Deliverable:** scale-to-zero API. Box now runs **only** QGIS.
+**Deliverable:** scale-to-zero API. Box now runs **only** QGIS, with no public exposure.
 
 ### Phase 5 — QGIS as an async SQS worker · *M*
 - **5a.** Lambda enqueues render jobs `{atlas, asset, version}` to SQS; a worker on the box consumes them, reads layers via `/vsis3/`, writes PDFs to S3, updates a status object the client polls (matches submit→spinner→poll).
@@ -184,6 +217,10 @@ Makes the *source* data S3-native so compute can be stateless. The real engineer
 The plan is clean to **pause** after **Phase 2** (safe, cheap, stable) or after **Phase 4**
 (serverless API, QGIS on a box) — both are resting points, not half-states.
 
+Note that pausing after Phase 2 now means the box is still serving all traffic, since 2d
+moved to Phase 4. It is a safe resting point, but the security/burn/stability wins are
+banked at **Phase 4**, not here.
+
 ## Deferred — post-migration verification checklist
 
 Do **not** touch now; much of it dissolves once reads move to CloudFront and the box goes
@@ -207,4 +244,5 @@ private. Revisit after Phase 2:
 - **Read-path-to-S3 before the data refactor** — cheap, reversible, a strict subset of the end state; banks the security/burn win weeks before the long-pole refactor lands.
 - **No throwaway "private box" step** — the existing box is hardened and its responsibilities *wither* (reads → S3, API → Lambda) until only QGIS remains. We effectively go straight to serverless.
 - **All-CDK, CI-built container images** — one source of truth; immutable artifacts end the live-checkout antipattern and the whole `.git`-exposure class.
+- **2d deferred into Phase 4 rather than done at the end of Phase 2** — its larger half (a CloudFront origin pointing back at the box) is deleted by Phase 4, and its durable half (the path-rewrite) targets a URL scheme Phase 3 is about to change. Narrowing Phase 2 to the public tier is what created this dependency; it is recorded rather than silently skipped.
 - **The storage seam is built where a phase forces it, not up front** — `atlas_store.py` splits into a pure half (tiers, keys, upload plans; unit-testable with no AWS) and an S3 half, so a different backend reimplements the second against the same plan objects. That is the "multiple implementations of one interface" idea the dataswale was designed around, applied narrowly. It is deliberately *not* a general filesystem abstraction: Phase 3 generalizes it with real usage to point at. Note the existing seam is routinely bypassed — `outlets.py` has 58 direct `versioning.atlas_path()` calls and `eddies.py` 27, all reaching around `dataswale_geojson` straight to a concrete `pathlib.Path`. That return type is the load-bearing leak.
