@@ -342,6 +342,16 @@ Until Phase 6 retires the box, its EBS volume `vol-09ea03f2f799ff5c6` is the **o
 - **`scs-atlas-outlets-prod` is versioned** (90-day noncurrent expiry). This matters because publish *mirrors*: stale-key pruning deletes keys the new plan omits, so a publish following a bad wipe on the box would propagate the wipe. Versioning is what makes the published copy a replica rather than a mirror.
 - The threat is not only the open `:9000` API — a mistaken `clear_layer` or a volume failure loses the same data.
 
+### Phase 2 Status and What's Next
+
+**Phase 2a–2c complete (2026-08-21).** All eight atlases publish their public outlets to `scs-atlas-outlets-prod`, served by CloudFront at `next.fireatlas.org`. **No traffic goes there yet** — the box still serves everything.
+
+Use `scripts/atlas_full_refresh.sh <atlas>` for the per-atlas sequence (config rebuild → webmap → staging check → html → publish → verify). It encodes the ordering and runs a role-variant leak check on every publish. `-y` skips the staging prompt.
+
+**`html` and `console` have no root `index.html`** — all four role variants are subdirectories, so the public entry point is `html/public/`. Checking `html/` always 403s.
+
+**2d moved to Phase 4** (#160). Its stated deliverable, "box goes private", is unreachable while protected outlets and the `:9000` API still live on the box. Next up is **Phase 3** (#159) — the S3 data-layer refactor; that issue's comment carries the full starting context.
+
 ## PMTiles and Terrain
 
 PMTiles is the chosen tile format — single file, S3-compatible range requests, no tile server needed, MapLibre native support via `pmtiles://` protocol. Pre-generate on publish, serve static from nginx/S3. No runtime compute.
