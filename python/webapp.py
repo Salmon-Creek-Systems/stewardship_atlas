@@ -1012,6 +1012,18 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
                     create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
 
+            # Inlets only wrote deltas; apply them so the layers actually hold
+            # data, and give inlet-less layers an empty FeatureCollection so the
+            # webmap doesn't 404 on a missing file. Must precede the outlets,
+            # which read these files at materialize time.
+            for layer_name, action in await asyncio.to_thread(
+                    dataswale_geojson.refresh_all_vector_layers, ac):
+                if action.startswith('failed'):
+                    logging.warning(f"Layer {layer_name} for {slug}: {action}")
+                    create_statuses[slug]["log"].append([f"Warning: layer {layer_name} {action}", datetime.now().isoformat()])
+                else:
+                    create_statuses[slug]["log"].append([f"Layer {layer_name} {action}", datetime.now().isoformat()])
+
             # Outlets: webmap must precede html (console HTML checks for the
             # webmap output); notebook first, html last.
             _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
