@@ -111,7 +111,7 @@ class TestStarterBundles(unittest.TestCase):
 
     def test_starters_present(self):
         keys = {p.name[:-len('_starter.json')] for p in self._starter_files()}
-        for expected in ('simple', 'nature', 'vfd', 'biochar', 'foresthealth'):
+        for expected in ('simple', 'nature', 'vfd', 'biochar', 'foresthealth', 'fieldtrip'):
             self.assertIn(expected, keys, f"missing starter bundle '{expected}'")
 
     def test_starter_structure_and_references(self):
@@ -150,6 +150,122 @@ class TestStarterBundles(unittest.TestCase):
                 outlet_names = {n for n, a in assets.items() if a.get('type') == 'outlet'}
                 self.assertTrue(CORE_OUTLETS.issubset(outlet_names),
                     f"missing core outlets: {CORE_OUTLETS - outlet_names}")
+
+    def test_starter_config_defs_resolve(self):
+        """Every config_def must exist in the shared configs.
+
+        atlas.create_config does all_configs[asset['config_def']], so a typo
+        here is a KeyError at atlas-creation time rather than a config error.
+        """
+        all_configs = set()
+        for fname in ('shared_inlets_config.json', 'shared_eddies_config.json',
+                      'shared_outlets_config.json'):
+            all_configs |= set(self._load(CONFIG_DIR / fname).keys())
+
+        for path in self._starter_files():
+            with self.subTest(starter=path.name):
+                for aname, a in self._load(path)['assets'].items():
+                    if 'config_def' in a:
+                        self.assertIn(a['config_def'], all_configs,
+                            f"asset '{aname}' config_def '{a['config_def']}' "
+                            f"not in any shared config")
+
+    def test_fieldtrip_road_tiers_partition_by_class(self):
+        """The three Field Trip road tiers must partition road classes exactly.
+
+        Each tier is the same overture_roads inlet narrowed by an
+        alterations.filter rule. An overlap would draw a road twice at two
+        widths; a gap would silently drop it from the map.
+        """
+        data = self._load(CONFIG_DIR / 'fieldtrip_starter.json')
+        tiers = {n: a for n, a in data['assets'].items()
+                 if n.startswith('public_roads_')}
+        self.assertEqual(len(tiers), 3, "expected three road tier inlets")
+
+        # Overture transportation segment class vocabulary, plus None for
+        # features that carry no class at all.
+        vocabulary = [
+            'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+            'unclassified', 'residential', 'living_street', 'service',
+            'pedestrian', 'footway', 'path', 'track', 'steps', 'cycleway',
+            'bridleway', 'unknown', None,
+        ]
+
+        def matches(rule, value):
+            op, _field, values = rule
+            return value in values if op == 'require' else value not in values
+
+        for klass in vocabulary:
+            hits = [a['out_layer'] for a in tiers.values()
+                    if all(matches(r, klass) for r in a['alterations']['filter'])]
+            self.assertEqual(len(hits), 1,
+                f"class {klass!r} lands in {len(hits)} tiers ({hits}), expected exactly 1")
+
+    def _resolved_asset(self, asset, shared):
+        """Merge a starter asset over its config_def template.
+
+        Mirrors atlas.create_config: the shared template is the base, then every
+        per-asset key overwrites it. Note the overwrite is shallow — a per-asset
+        'alterations' REPLACES the template's block rather than merging into it.
+        """
+        merged = dict(shared.get(asset['config_def'], {})) if 'config_def' in asset else {}
+        for key, value in asset.items():
+            if key != 'config':
+                merged[key] = value
+        return merged
+
+    def test_starter_vector_width_layers_get_a_width(self):
+        """A linestring layer with vector_width needs its features stamped.
+
+        The webmap paints line-width as ["get", "vector_width"] (outlets.py),
+        reading the value off each feature — not off the layer config. If the
+        producing inlet contributes no alterations.vector_width, every line in
+        the layer renders with a null width.
+
+        Checked against the RESOLVED asset, since most starters inherit the
+        width from their config_def template rather than setting it inline.
+        """
+        shared = {}
+        for fname in ('shared_inlets_config.json', 'shared_eddies_config.json',
+                      'shared_outlets_config.json'):
+            shared.update(self._load(CONFIG_DIR / fname))
+
+        for path in self._starter_files():
+            data = self._load(path)
+            for lname, ldef in data['layers'].items():
+                if not ldef.get('vector_width'):
+                    continue
+                producers = [a for a in data['assets'].values()
+                             if a.get('out_layer') == lname and a.get('type') == 'inlet']
+                if not producers:
+                    continue  # hand-entry layer; width comes from editable_columns
+                for a in producers:
+                    with self.subTest(starter=path.name, layer=lname):
+                        resolved = self._resolved_asset(a, shared)
+                        self.assertIn('vector_width', resolved.get('alterations', {}),
+                            f"layer '{lname}' uses vector_width but its inlet "
+                            f"contributes no alterations.vector_width")
+
+    def test_starter_alterations_override_keeps_canonicalize(self):
+        """An inline alterations override must not drop the template's canonicalize.
+
+        Per-asset overrides replace the whole alterations dict rather than
+        deep-merging, so an inline block that omits a canonicalize the template
+        provided silently breaks labels (overture_roads maps primary_name ->
+        name, which is where road labels come from).
+        """
+        shared = self._load(CONFIG_DIR / 'shared_inlets_config.json')
+        for path in self._starter_files():
+            for aname, a in self._load(path)['assets'].items():
+                if 'alterations' not in a or 'config_def' not in a:
+                    continue
+                template = shared.get(a['config_def'], {}).get('alterations', {})
+                if 'canonicalize' not in template:
+                    continue
+                with self.subTest(starter=path.name, asset=aname):
+                    self.assertIn('canonicalize', a['alterations'],
+                        f"asset '{aname}' overrides alterations but drops the "
+                        f"canonicalize from '{a['config_def']}' — labels will break")
 
 
 if __name__ == '__main__':

@@ -1,0 +1,347 @@
+{
+  "label": "Field Trip",
+  "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled) and research-grade iNaturalist observations.",
+  "properties": {
+    "email_photo_default_layer": "photos"
+  },
+  "layers": {
+    "regions": {
+      "layer_def": "regions"
+    },
+    "roads_primary": {
+      "geometry_type": "linestring",
+      "color": [
+        40,
+        40,
+        40
+      ],
+      "add_labels": true,
+      "interaction": "interface",
+      "vector_width": true,
+      "vis": {
+        "minzoom": 10,
+        "maxzoom": 22
+      },
+      "editable_columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "default": "Road"
+        },
+        {
+          "name": "class",
+          "type": "string",
+          "default": ""
+        }
+      ]
+    },
+    "roads_secondary": {
+      "geometry_type": "linestring",
+      "color": [
+        90,
+        90,
+        90
+      ],
+      "add_labels": true,
+      "interaction": "interface",
+      "vector_width": true,
+      "vis": {
+        "minzoom": 13,
+        "maxzoom": 22
+      },
+      "editable_columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "default": "Road"
+        },
+        {
+          "name": "class",
+          "type": "string",
+          "default": ""
+        }
+      ]
+    },
+    "roads_tertiary": {
+      "geometry_type": "linestring",
+      "color": [
+        150,
+        120,
+        90
+      ],
+      "add_labels": true,
+      "interaction": "interface",
+      "vector_width": true,
+      "vis": {
+        "minzoom": 16,
+        "maxzoom": 22
+      },
+      "editable_columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "default": "Road"
+        },
+        {
+          "name": "class",
+          "type": "string",
+          "default": ""
+        }
+      ]
+    },
+    "creeks": {
+      "layer_def": "creeks"
+    },
+    "landmarks": {
+      "layer_def": "poi"
+    },
+    "photos": {
+      "geometry_type": "point",
+      "conversations_enabled": true,
+      "color": [
+        255,
+        100,
+        0
+      ],
+      "fill_color": [
+        255,
+        255,
+        255
+      ],
+      "add_labels": true,
+      "label_background": true,
+      "symbol": {
+        "png": "camera.png",
+        "icon": "camera"
+      },
+      "icon-size": 1.0,
+      "interaction": "interface",
+      "editable_columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "default": "Photo"
+        }
+      ]
+    },
+    "inaturalist": {
+      "geometry_type": "point",
+      "color": [
+        60,
+        160,
+        60
+      ],
+      "add_labels": true,
+      "show_attributes": true,
+      "symbol": {
+        "png": "flower.png",
+        "icon": "flower"
+      },
+      "icon-size": 1.5,
+      "interaction": "interface",
+      "vis": {
+        "layout": {
+          "visibility": "none"
+        }
+      },
+      "editable_columns": [
+        {
+          "name": "common_name",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "taxon_name",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "iconic_taxon",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "observed_on",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "quality_grade",
+          "type": "string",
+          "default": ""
+        }
+      ]
+    }
+  },
+  "assets": {
+    "public_roads_primary": {
+      "type": "inlet",
+      "out_layer": "roads_primary",
+      "config_def": "overture_roads",
+      "alterations": {
+        "canonicalize": [
+          {
+            "to": "name",
+            "from": [
+              "primary_name",
+              "FULLRDNAME"
+            ],
+            "remove_prefix": []
+          }
+        ],
+        "filter": [
+          [
+            "require",
+            "class",
+            [
+              "trunk"
+            ]
+          ]
+        ],
+        "vector_width": {
+          "default": 9
+        }
+      }
+    },
+    "public_roads_secondary": {
+      "type": "inlet",
+      "out_layer": "roads_secondary",
+      "config_def": "overture_roads",
+      "alterations": {
+        "canonicalize": [
+          {
+            "to": "name",
+            "from": [
+              "primary_name",
+              "FULLRDNAME"
+            ],
+            "remove_prefix": []
+          }
+        ],
+        "filter": [
+          [
+            "require",
+            "class",
+            [
+              "residential",
+              "service"
+            ]
+          ]
+        ],
+        "vector_width": {
+          "default": 6
+        }
+      }
+    },
+    "public_roads_tertiary": {
+      "type": "inlet",
+      "out_layer": "roads_tertiary",
+      "config_def": "overture_roads",
+      "alterations": {
+        "canonicalize": [
+          {
+            "to": "name",
+            "from": [
+              "primary_name",
+              "FULLRDNAME"
+            ],
+            "remove_prefix": []
+          }
+        ],
+        "filter": [
+          [
+            "remove",
+            "class",
+            [
+              "trunk",
+              "residential",
+              "service"
+            ]
+          ]
+        ],
+        "vector_width": {
+          "default": 3
+        }
+      }
+    },
+    "public_creeks": {
+      "type": "inlet",
+      "out_layer": "creeks",
+      "config_def": "nhd_creeks"
+    },
+    "public_landmarks": {
+      "type": "inlet",
+      "out_layer": "landmarks",
+      "config_def": "osm_poi"
+    },
+    "inat_obs": {
+      "type": "inlet",
+      "out_layer": "inaturalist",
+      "config_def": "inaturalist",
+      "time_range": null,
+      "quality_grade": "research"
+    },
+    "webmap": {
+      "type": "outlet",
+      "name": "webmap",
+      "config_def": "webmap",
+      "in_layers": [
+        "regions",
+        "roads_tertiary",
+        "roads_secondary",
+        "roads_primary",
+        "creeks",
+        "landmarks",
+        "photos",
+        "inaturalist"
+      ],
+      "access": [
+        "public",
+        "internal",
+        "admin"
+      ]
+    },
+    "webedit": {
+      "type": "outlet",
+      "name": "webedit",
+      "config_def": "webedit",
+      "in_layers": [
+        "regions",
+        "roads_tertiary",
+        "roads_secondary",
+        "roads_primary",
+        "creeks",
+        "landmarks",
+        "photos"
+      ]
+    },
+    "3dview": {
+      "type": "outlet",
+      "name": "3dview",
+      "config_def": "3dview",
+      "access": [
+        "public",
+        "internal",
+        "admin"
+      ]
+    },
+    "html": {
+      "type": "outlet",
+      "name": "html",
+      "config_def": "static_html"
+    },
+    "notebook": {
+      "type": "outlet",
+      "name": "notebook",
+      "config_def": "jupyter_notebook",
+      "access": [
+        "technical"
+      ]
+    }
+  }
+}
