@@ -1,6 +1,6 @@
 {
   "label": "Field Trip",
-  "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled) and recent research-grade iNaturalist observations.",
+  "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled), recent research-grade iNaturalist observations and a threatened-species layer.",
   "properties": {
     "email_photo_default_layer": "photos"
   },
@@ -217,6 +217,59 @@
           "default": ""
         }
       ]
+    },
+    "inaturalist_threatened": {
+      "geometry_type": "point",
+      "color": [
+        230,
+        160,
+        20
+      ],
+      "add_labels": true,
+      "show_attributes": true,
+      "symbol": {
+        "png": "flower.png",
+        "icon": "flower"
+      },
+      "icon-size": 1.7,
+      "interaction": "interface",
+      "vis": {
+        "layout": {
+          "visibility": "none"
+        }
+      },
+      "editable_columns": [
+        {
+          "name": "common_name",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "taxon_name",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "iconic_taxon",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "observed_on",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "quality_grade",
+          "type": "string",
+          "default": ""
+        }
+      ]
     }
   },
   "assets": {
@@ -342,7 +395,8 @@
         "creeks",
         "landmarks",
         "photos",
-        "inaturalist"
+        "inaturalist",
+        "inaturalist_threatened"
       ],
       "access": [
         "public",
@@ -386,6 +440,15 @@
       "access": [
         "technical"
       ]
+    },
+    "inat_threatened": {
+      "type": "inlet",
+      "out_layer": "inaturalist_threatened",
+      "config_def": "inaturalist",
+      "quality_grade": "research",
+      "api_params": {
+        "threatened": true
+      }
     }
   }
 }

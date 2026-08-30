@@ -336,6 +336,42 @@ def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     logger.info(f"h3_grid_inlet: generated {len(features)} cells at resolution {resolution}")
 
 
+# Query params inaturalist_inlet owns: the bbox comes from the atlas region and
+# the rest drive the id_above paging loop. Letting config override any of these
+# would silently break paging or scope, so api_params may not set them.
+INAT_RESERVED_PARAMS = frozenset({
+    'swlng', 'swlat', 'nelng', 'nelat',
+    'per_page', 'order', 'order_by', 'id_above',
+})
+
+
+def _inat_api_params(inlet_config):
+    """Validate and normalise the config's api_params passthrough.
+
+    Exposes the whole iNaturalist observations API to config (threatened,
+    native, endemic, introduced, popular, iconic_taxa, taxon_id, ...) without
+    plumbing each parameter by hand. Booleans become 'true'/'false' strings,
+    which is what the API expects; None values are dropped so a key can be
+    declared-but-unset in a shared template.
+    """
+    api_params = inlet_config.get('api_params') or {}
+    if not isinstance(api_params, dict):
+        raise ValueError(f"api_params must be a dict, got {type(api_params).__name__}")
+
+    reserved = INAT_RESERVED_PARAMS & set(api_params)
+    if reserved:
+        raise ValueError(
+            f"api_params may not override {sorted(reserved)} — the bbox comes from "
+            f"the atlas region and the paging keys drive the fetch loop")
+
+    out = {}
+    for key, value in api_params.items():
+        if value is None:
+            continue
+        out[key] = str(value).lower() if isinstance(value, bool) else value
+    return out
+
+
 def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch iNaturalist observations for configured bbox regions into a point layer."""
     import requests, time
@@ -349,6 +385,7 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     users = inlet_config.get('users') or []
     time_range = inlet_config.get('time_range')
     quality_grade = inlet_config.get('quality_grade')
+    api_params = _inat_api_params(inlet_config)
     out_layer = inlet_config.get('out_layer', 'inaturalist')
 
     features = []
@@ -367,6 +404,8 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
             base_params['d1'], base_params['d2'] = time_range[0], time_range[1]
         if quality_grade:
             base_params['quality_grade'] = quality_grade
+        # applied last so an explicit api_params entry wins over the named keys
+        base_params.update(api_params)
 
         id_above = None
         while True:

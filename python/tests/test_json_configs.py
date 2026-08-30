@@ -358,6 +358,29 @@ class TestStarterBundles(unittest.TestCase):
         self.assertRegex(start, r'^\d{4}-\d{2}-\d{2}$', "time_range needs a real start date")
         self.assertIsNone(end, "time_range end must be null so the window stays open-ended")
 
+    def test_fieldtrip_threatened_layer(self):
+        """The threatened layer keeps the quality bar but drops the recency window.
+
+        460 research-grade threatened observations all-time is already a small
+        layer; applying the general layer's 2024 window would cut it to ~211 and
+        hide long-standing records of exactly the species worth flagging.
+        """
+        data = self._load(CONFIG_DIR / 'fieldtrip_starter.json')
+        layer = data['layers']['inaturalist_threatened']
+        inlet = data['assets']['inat_threatened']
+
+        self.assertEqual(inlet['out_layer'], 'inaturalist_threatened')
+        self.assertEqual(inlet['quality_grade'], 'research')
+        self.assertEqual(inlet['api_params'], {'threatened': True})
+        self.assertNotIn('time_range', inlet, "threatened layer must not be date-limited")
+
+        # same icon as the general layer, different colour
+        general = data['layers']['inaturalist']
+        self.assertEqual(layer['symbol'], general['symbol'])
+        self.assertNotEqual(layer['color'], general['color'])
+
+        self.assertIn('inaturalist_threatened', data['assets']['webmap']['in_layers'])
+
     def test_starter_alterations_override_keeps_canonicalize(self):
         """An inline alterations override must not drop the template's canonicalize.
 
