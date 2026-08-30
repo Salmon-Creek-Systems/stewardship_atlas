@@ -343,6 +343,21 @@ class TestStarterBundles(unittest.TestCase):
         # and nothing at all below the layer's own floor
         self.assertEqual(creeks['vis']['minzoom'], 10)
 
+    def test_fieldtrip_inat_is_filtered(self):
+        """Field Trip narrows iNaturalist to recent research-grade observations.
+
+        On ft3's bbox the unfiltered bbox holds 15419 observations; research
+        grade cuts it to 7096 and the 2024 start to ~3474. The end of the
+        window must stay null: the inlet hands time_range straight to d1/d2 and
+        requests drops a None param, so null means "to now" — a literal end date
+        would quietly stop including new observations.
+        """
+        inat = self._load(CONFIG_DIR / 'fieldtrip_starter.json')['assets']['inat_obs']
+        self.assertEqual(inat['quality_grade'], 'research')
+        start, end = inat['time_range']
+        self.assertRegex(start, r'^\d{4}-\d{2}-\d{2}$', "time_range needs a real start date")
+        self.assertIsNone(end, "time_range end must be null so the window stays open-ended")
+
     def test_starter_alterations_override_keeps_canonicalize(self):
         """An inline alterations override must not drop the template's canonicalize.
 

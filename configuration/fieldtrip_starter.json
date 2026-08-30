@@ -1,6 +1,6 @@
 {
   "label": "Field Trip",
-  "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled) and research-grade iNaturalist observations.",
+  "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled) and recent research-grade iNaturalist observations.",
   "properties": {
     "email_photo_default_layer": "photos"
   },
@@ -324,7 +324,10 @@
       "type": "inlet",
       "out_layer": "inaturalist",
       "config_def": "inaturalist",
-      "time_range": null,
+      "time_range": [
+        "2024-01-01",
+        null
+      ],
       "quality_grade": "research"
     },
     "webmap": {
