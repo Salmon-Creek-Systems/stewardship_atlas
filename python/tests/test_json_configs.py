@@ -246,6 +246,29 @@ class TestStarterBundles(unittest.TestCase):
                             f"layer '{lname}' uses vector_width but its inlet "
                             f"contributes no alterations.vector_width")
 
+    def test_fieldtrip_road_tiers_zoom_thresholds_ascend(self):
+        """Road tier minzooms must ascend, and the top tier must always show.
+
+        The webmap opens with fitBounds, so for a county-scale bbox the initial
+        zoom is around 11. If the primary tier's minzoom sits above that, the
+        map opens with no roads at all — which is what the first cut of this
+        starter did (thresholds were borrowed from wvfd_dev, whose bbox is a
+        single fire district and so opens much further in).
+        """
+        layers = self._load(CONFIG_DIR / 'fieldtrip_starter.json')['layers']
+        tiers = ['roads_primary', 'roads_secondary', 'roads_tertiary']
+        minzooms = [layers[t]['vis']['minzoom'] for t in tiers]
+
+        self.assertEqual(minzooms[0], 0,
+            "primary tier must be visible at every zoom, or the map can open empty")
+        self.assertEqual(minzooms, sorted(minzooms),
+            f"tier minzooms must ascend primary->tertiary, got {minzooms}")
+        self.assertEqual(len(set(minzooms)), 3,
+            f"tiers need distinct minzooms to actually fade, got {minzooms}")
+        for t in tiers:
+            self.assertGreater(layers[t]['vis']['maxzoom'], max(minzooms),
+                f"{t} maxzoom must exceed every tier minzoom")
+
     def test_starter_alterations_override_keeps_canonicalize(self):
         """An inline alterations override must not drop the template's canonicalize.
 

@@ -19,7 +19,7 @@
       "interaction": "interface",
       "vector_width": true,
       "vis": {
-        "minzoom": 10,
+        "minzoom": 0,
         "maxzoom": 22
       },
       "editable_columns": [
@@ -46,7 +46,7 @@
       "interaction": "interface",
       "vector_width": true,
       "vis": {
-        "minzoom": 13,
+        "minzoom": 11,
         "maxzoom": 22
       },
       "editable_columns": [
@@ -73,7 +73,7 @@
       "interaction": "interface",
       "vector_width": true,
       "vis": {
-        "minzoom": 16,
+        "minzoom": 14,
         "maxzoom": 22
       },
       "editable_columns": [
