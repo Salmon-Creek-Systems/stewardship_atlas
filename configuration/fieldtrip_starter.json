@@ -90,7 +90,48 @@
       ]
     },
     "creeks": {
-      "layer_def": "creeks"
+      "layer_def": "creeks",
+      "vis": {
+        "minzoom": 10,
+        "maxzoom": 22
+      },
+      "paint": {
+        "line-opacity": [
+          "step",
+          [
+            "zoom"
+          ],
+          [
+            "case",
+            [
+              ">=",
+              [
+                "get",
+                "vector_width"
+              ],
+              3
+            ],
+            1,
+            0
+          ],
+          13,
+          [
+            "case",
+            [
+              ">=",
+              [
+                "get",
+                "vector_width"
+              ],
+              2
+            ],
+            1,
+            0
+          ],
+          16,
+          1
+        ]
+      }
     },
     "landmarks": {
       "layer_def": "poi"

@@ -266,6 +266,83 @@ class TestStarterBundles(unittest.TestCase):
             self.assertGreater(layers[t]['vis']['maxzoom'], max(minzooms),
                 f"{t} maxzoom must exceed every tier minzoom")
 
+    def test_starter_paint_zoom_expressions_are_legal(self):
+        """["zoom"] may only be the input to a top-level step/interpolate.
+
+        From the MapLibre style spec: "in layout or paint properties, ["zoom"]
+        may appear only as the input to an outer interpolate or step
+        expression". So ["case", [">=", ["zoom"], ...]] silently breaks the
+        style. Guards every paint block in every starter.
+        """
+        def zoom_positions(node, path='', top=True):
+            """Yield the path of every ["zoom"] that is NOT a legal top-level input."""
+            if not isinstance(node, list) or not node:
+                return
+            if node[0] == 'zoom':
+                if not top:
+                    yield path
+                return
+            legal_input = node[0] in ('step', 'interpolate', 'interpolate-hcl',
+                                      'interpolate-lab')
+            for i, child in enumerate(node[1:], start=1):
+                # only the operator's input slot may be a bare ["zoom"]
+                is_input = legal_input and (i == 1 if node[0] == 'step' else i == 2)
+                yield from zoom_positions(child, f'{path}[{i}]', top=is_input)
+
+        for path in self._starter_files():
+            data = self._load(path)
+            for lname, ldef in data['layers'].items():
+                for prop, expr in (ldef.get('paint') or {}).items():
+                    with self.subTest(starter=path.name, layer=lname, prop=prop):
+                        bad = list(zoom_positions(expr, top=False))
+                        self.assertEqual(bad, [],
+                            f"{lname}.{prop}: ['zoom'] used outside a top-level "
+                            f"step/interpolate input at {bad}")
+
+    def test_fieldtrip_creeks_zoom_bands(self):
+        """Creeks fade in by tier within a single layer, mirroring the roads tiers.
+
+        vector_width doubles as the tier (nhd_creeks: perennial 3, ephemeral 2,
+        intermittent/artificial 1), so this checks the step expression actually
+        gates those tiers at the intended zooms rather than just parsing.
+        """
+        creeks = self._load(CONFIG_DIR / 'fieldtrip_starter.json')['layers']['creeks']
+        expr = creeks['paint']['line-opacity']
+
+        def ev(node, zoom, props):
+            if not isinstance(node, list):
+                return node
+            op = node[0]
+            if op == 'zoom':
+                return zoom
+            if op == 'get':
+                return props[node[1]]
+            if op == '>=':
+                return ev(node[1], zoom, props) >= ev(node[2], zoom, props)
+            if op == 'case':
+                return (ev(node[2], zoom, props) if ev(node[1], zoom, props)
+                        else ev(node[3], zoom, props))
+            if op == 'step':
+                value, out = ev(node[1], zoom, props), node[2]
+                for stop, result in zip(node[3::2], node[4::2]):
+                    if value >= stop:
+                        out = result
+                return ev(out, zoom, props)
+            raise AssertionError(f"unhandled op {op!r}")
+
+        # (zoom, tier) -> visible?   tier 3 perennial, 2 ephemeral, 1 intermittent
+        cases = {
+            (11, 3): 1, (11, 2): 0, (11, 1): 0,   # zoomed out: perennial only
+            (13, 3): 1, (13, 2): 1, (13, 1): 0,   # + ephemeral
+            (16, 3): 1, (16, 2): 1, (16, 1): 1,   # everything
+        }
+        for (zoom, tier), expected in cases.items():
+            with self.subTest(zoom=zoom, tier=tier):
+                self.assertEqual(ev(expr, zoom, {'vector_width': tier}), expected)
+
+        # and nothing at all below the layer's own floor
+        self.assertEqual(creeks['vis']['minzoom'], 10)
+
     def test_starter_alterations_override_keeps_canonicalize(self):
         """An inline alterations override must not drop the template's canonicalize.
 
