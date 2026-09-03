@@ -48,6 +48,7 @@ CONTENT_TYPES = {
     '.pmtiles': 'application/octet-stream',
     '.db':      'application/octet-stream',
     '.gpkg':    'application/geopackage+sqlite3',
+    '.parquet': 'application/vnd.apache.parquet',
     '.pdf':     'application/pdf',
     '.tif':     'image/tiff',
     '.tiff':    'image/tiff',
