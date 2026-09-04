@@ -5,6 +5,7 @@ import shutil
 import json
 
 import atlas_store
+import atlas_catalog
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -91,6 +92,17 @@ def publish_new_version(config, version=None):
     logger.info(f"About to `shutil.copytree` from '{staging_path}' to '{version_path}'...")
     shutil.copytree(staging_path, version_path, symlinks=True, ignore=_ignore_unversioned)
 
+    # Phase 3 (#159): note what CURRENT points at *before* it is repointed. The
+    # new version's catalog needs the previous version's Items so a layer whose
+    # bytes did not change can be referenced there instead of re-stamped.
+    previous_version_path = None
+    _current_probe = atlas_path(config, version='CURRENT')
+    try:
+        if _current_probe.is_symlink():
+            previous_version_path = _current_probe.resolve()
+    except OSError as exc:
+        logger.warning(f"Could not resolve CURRENT for catalog history: {exc}")
+
     # point "production" to new version
     # repoint symbolic link in atlas root dir to new version
     #atlas_root = Path(config['data_root']) / config['name']
@@ -108,6 +120,18 @@ def publish_new_version(config, version=None):
     # did, and this is additive until an atlas is cut over. A no-op unless the
     # atlas has `cloud.enabled`, and it never raises: a failed push must not
     # fail a good publish.
+    # Phase 3 (#159): describe this version as a STAC catalog — Collection per
+    # layer, Item per version — written into {version}/stac/. Additive: nothing
+    # reads it yet, and like the S3 push below it must never fail a good
+    # publish. A missing index is recoverable; a failed publish is an outage.
+    try:
+        catalog_summary = atlas_catalog.publish_catalog(
+            config, version_path, version, previous_version_path)
+        logger.info(f"STAC catalog: {catalog_summary}")
+    except Exception as exc:
+        logger.error(f"STAC catalog write failed for version {version} "
+                     f"(publish continues): {exc}", exc_info=True)
+
     push = atlas_store.publish_public_outlets(config, version_path, version)
     logger.info(f"S3 outlet publish: {push}")
 

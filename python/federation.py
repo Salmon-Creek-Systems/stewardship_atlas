@@ -592,3 +592,132 @@ def select_reusable_items(previous_items: Dict[str, Dict[str, Any]],
         else:
             write.append(name)
     return reuse, sorted(write)
+
+
+# --------------------------------------------------------------------------- #
+# Assembling a whole atlas catalog for one published version
+#
+# Built from the **config's layer list**, never from directory contents. That
+# is deliberate: a catalog built by walking the filesystem would faithfully
+# preserve orphans forever (see #173, where a superseded pipeline's output sat
+# in every published version for months). Config is the declaration of intent;
+# anything on disk it does not name is, by construction, garbage.
+# --------------------------------------------------------------------------- #
+
+def classify_layer(layer: Dict[str, Any]) -> str:
+    """'raster' or 'vector' for one layer config.
+
+    Decides whether a layer is *copied* into each version (vector: measured at
+    ~5% of scvfd's layer bytes and ~0.6% of fhe's, so copying is free and keeps
+    the version prefix traversable by DuckDB/Athena) or *referenced* at its own
+    stamped key (raster and tiles: where all the duplication savings are).
+    """
+    if layer.get('cog'):
+        return 'raster'
+    return 'raster' if layer.get('geometry_type') == 'raster' else 'vector'
+
+
+def build_atlas_catalog(atlas_id: str, atlas_description: str,
+                        layers: List[Dict[str, Any]], bbox: Dict[str, float],
+                        version: str, layer_assets: Dict[str, Dict[str, Any]],
+                        *, history: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+                        catalog_base_url: str = '',
+                        datetime_iso: Optional[str] = None) -> Dict[str, Any]:
+    """Assemble every document describing one published version.
+
+    Args:
+        layers: the config's layer list — the source of truth for what exists.
+        layer_assets: {layer_name: {'href', 'size', 'checksum', 'media_type',
+            'roles'}} for layers that actually have a file in this version.
+        history: {layer_name: [Items, oldest first]} from previous versions.
+            Empty or absent for a first publish.
+
+    Returns a dict with:
+        catalog          the atlas root Catalog
+        collections      {layer_name: Collection}
+        items            {layer_name: Item} — only the *newly written* ones
+        version_catalog  the thin Catalog that is this version's manifest
+        reused           layer names referenced at an older version
+        written          layer names that got a new Item
+        missing          layers declared in config with no file in this version
+
+    Nothing here writes anything; the caller decides what to persist.
+    """
+    history = {k: list(v) for k, v in (history or {}).items()}
+    when = datetime_iso or utc_now_iso()
+    catalog_self = catalog_base_url + 'catalog.json'
+
+    previous_items = {name: items[-1] for name, items in history.items() if items}
+    current_checksums = {name: layer_assets[name].get('checksum')
+                         for name in layer_assets}
+    reuse, _ = select_reusable_items(previous_items, current_checksums)
+
+    collections: Dict[str, Dict[str, Any]] = {}
+    new_items: Dict[str, Dict[str, Any]] = {}
+    version_items: List[Dict[str, Any]] = []
+    reused: List[str] = []
+    written: List[str] = []
+    missing: List[str] = []
+
+    for layer in layers:
+        name = layer.get('name')
+        if not name:
+            continue
+        spec = layer_assets.get(name)
+        if spec is None:
+            missing.append(name)
+            continue
+
+        if name in reuse:
+            item = reuse[name]
+            reused.append(name)
+        else:
+            assets = {'data': stac_asset(
+                spec['href'],
+                media_type=spec.get('media_type'),
+                roles=spec.get('roles') or ['data'],
+                title=layer.get('title', name),
+                size=spec.get('size'),
+                checksum=spec.get('checksum'))}
+            item = build_layer_item(
+                atlas_id, name, version, bbox, assets,
+                datetime_iso=when, catalog_base_url=catalog_base_url,
+                properties={'atlas:layer_type': classify_layer(layer),
+                            'atlas:access': layer_access(layer)},
+                derived_from=spec.get('derived_from'))
+            history.setdefault(name, []).append(item)
+            new_items[name] = item
+            written.append(name)
+
+        version_items.append(item)
+        collections[name] = build_layer_collection(
+            atlas_id, layer, bbox, link_version_chain(history.get(name, [])),
+            catalog_base_url=catalog_base_url)
+
+    catalog = {
+        'stac_version': STAC_VERSION,
+        'type': 'Catalog',
+        'id': atlas_id,
+        'description': atlas_description,
+        'links': [
+            {'rel': 'root', 'href': catalog_self},
+            {'rel': 'self', 'href': catalog_self},
+        ],
+    }
+    for name in collections:
+        catalog['links'].append({'rel': 'child', 'href': f'./{name}/collection.json'})
+    catalog['links'].append(
+        {'rel': 'version-history',
+         'href': f'./versions/{version}/catalog.json', 'title': version})
+
+    return {
+        'catalog': catalog,
+        'collections': collections,
+        'items': new_items,
+        'version_catalog': build_version_catalog(
+            atlas_id, version, version_items,
+            datetime_iso=when, catalog_base_url=catalog_base_url),
+        'reused': reused,
+        'written': written,
+        'missing': missing,
+    }
