@@ -162,6 +162,11 @@ def test_unchanged_layer_is_reused_at_its_own_version(tmp_path):
     assert any(f'roads-{V1}' in h for h in hrefs), \
         'unchanged layer referenced at V1, not re-stamped at V2'
     assert any(f'hydrants-{V2}' in h for h in hrefs)
+    # The href must be the reused Item's OWN self link. Asserting only that the
+    # id appears is what let a wrong *directory* through: the reconstructed
+    # href named V2's directory with V1's filename, pointing at nothing.
+    roads_self = F.item_self_href(built_v1['items']['roads'])
+    assert [h for h in hrefs if 'roads-' in h] == [roads_self]
 
 
 def test_collection_accumulates_history_across_versions(tmp_path):
@@ -267,3 +272,60 @@ def test_corrupt_previous_catalog_does_not_stop_a_publish(tmp_path):
 
 def test_load_history_is_empty_for_a_first_publish(tmp_path):
     assert AC.load_history(tmp_path / 'nope' / 'stac') == {}
+
+
+def _href_to_path(href, config, tmp_path):
+    """Map a catalog href back to the file it claims to be at."""
+    prefix = config['base_url'].rstrip('/') + '/'
+    assert href.startswith(prefix), href
+    return tmp_path / href[len(prefix):]
+
+
+def test_every_href_in_a_catalog_resolves_to_a_real_file(tmp_path):
+    """The regression that the on-box kennedy publish caught.
+
+    A reused Item lives under the version that first wrote it. Rebuilding its
+    href from the *current* version's base URL produced
+    `.../{V2}/stac/roads/roads-{V1}.json` — V2's directory, V1's filename,
+    nothing there. Resolving every href to disk is the assertion that holds.
+    """
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    version_catalog = json.loads(
+        (v2_dir / 'stac' / 'versions' / V2 / 'catalog.json').read_text())
+    item_hrefs = [l['href'] for l in version_catalog['links']
+                  if l.get('rel') == 'item']
+    assert item_hrefs, 'version catalog must name its items'
+    for href in item_hrefs:
+        assert _href_to_path(href, config, tmp_path).is_file(), \
+            f'version catalog points at a nonexistent file: {href}'
+
+    for layer in ('roads', 'hydrants', 'lidar_basemap'):
+        collection = json.loads(
+            (v2_dir / 'stac' / layer / 'collection.json').read_text())
+        for link in collection['links']:
+            if link.get('rel') == 'item':
+                assert _href_to_path(link['href'], config, tmp_path).is_file(), \
+                    f"collection {layer} points at a nonexistent file: {link['href']}"
+
+
+def test_reused_item_href_names_the_version_that_wrote_it(tmp_path):
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    version_catalog = json.loads(
+        (v2_dir / 'stac' / 'versions' / V2 / 'catalog.json').read_text())
+    roads = next(l['href'] for l in version_catalog['links']
+                 if l.get('title') == 'roads')
+    hydrants = next(l['href'] for l in version_catalog['links']
+                    if l.get('title') == 'hydrants')
+
+    assert roads == f'{config["base_url"]}/{V1}/stac/roads/roads-{V1}.json'
+    assert hydrants == f'{config["base_url"]}/{V2}/stac/hydrants/hydrants-{V2}.json'

@@ -398,6 +398,21 @@ def item_id(layer_name: str, version: str) -> str:
     return f'{layer_name}-{version}'
 
 
+def item_self_href(item: Dict[str, Any]) -> Optional[str]:
+    """The Item's own `self` link, which is where it actually lives.
+
+    Load-bearing for reuse: a reused Item lives under the version that first
+    wrote it, so a link to it must NOT be rebuilt from the *current* version's
+    base URL. Reconstructing produced hrefs like
+    `.../{new_version}/stac/roads/roads-{old_version}.json` — the new version's
+    directory with the old version's filename, pointing at nothing.
+    """
+    for link in item.get('links', []):
+        if link.get('rel') == 'self':
+            return link.get('href')
+    return None
+
+
 def build_layer_item(atlas_id: str, layer_name: str, version: str,
                      bbox: Dict[str, float], assets: Dict[str, Dict[str, Any]],
                      *, datetime_iso: Optional[str] = None,
@@ -485,8 +500,8 @@ def build_layer_collection(atlas_id: str, layer: Dict[str, Any],
     if items:
         collection['version'] = items[-1]['properties']['version']
     for item in items:
-        collection['links'].append(
-            {'rel': 'item', 'href': f"{catalog_base_url}{name}/{item['id']}.json"})
+        href = item_self_href(item) or f"{catalog_base_url}{name}/{item['id']}.json"
+        collection['links'].append({'rel': 'item', 'href': href})
     return collection
 
 
@@ -515,10 +530,9 @@ def build_version_catalog(atlas_id: str, version: str,
     catalog['published'] = datetime_iso or utc_now_iso()
     for item in items:
         layer_name = item.get('collection') or item['id']
-        catalog['links'].append(
-            {'rel': 'item',
-             'href': f"{catalog_base_url}{layer_name}/{item['id']}.json",
-             'title': layer_name})
+        href = (item_self_href(item)
+                or f"{catalog_base_url}{layer_name}/{item['id']}.json")
+        catalog['links'].append({'rel': 'item', 'href': href, 'title': layer_name})
     return catalog
 
 
