@@ -273,3 +273,84 @@ def publish_catalog(config: dict, version_path, version: str,
     if built['missing']:
         logger.info(f"atlas_catalog: no data file for {built['missing']}")
     return summary
+
+
+def item_version(item: dict):
+    """The version an Item describes, from the `version` extension property."""
+    return (item.get('properties') or {}).get('version')
+
+
+def resolve_pinned_layers(layers, staging_layers_root, previous_stac_dir,
+                          base_url: str = '', atlas_root=None) -> dict:
+    """`{layer_name: version}` for layers a publish would *not* rewrite.
+
+    A layer whose staging bytes match the newest Item in the previous version's
+    catalog will be reused rather than re-stamped, so an outlet built now should
+    address it at the version that actually holds it — not at `../../layers/`,
+    which assumes every layer is copied into every version. Removing that
+    assumption is the point: it has no counterpart in an object store, and
+    propping it up with hard/symlinks would be work to undo at the S3 cutover.
+
+    Layers absent from the result are changed (or new), will be written into the
+    version being built, and keep addressing it locally.
+
+    Costs one sha256 per layer file, so callers should only ask when the feature
+    is on — see `outlets._pinned_layers()`.
+    """
+    history = load_history(previous_stac_dir, base_url=base_url,
+                           atlas_root=atlas_root)
+    if not history:
+        return {}
+
+    staging_layers_root = Path(staging_layers_root)
+    pinned = {}
+    for layer in layers:
+        name = layer.get('name')
+        items = history.get(name) if name else None
+        if not items:
+            continue
+        path = find_layer_file(staging_layers_root, name)
+        if path is None:
+            continue
+        version = item_version(items[-1])
+        if version and item_checksum_matches(items[-1], sha256_multihash(path)):
+            pinned[name] = version
+    return pinned
+
+
+def item_checksum_matches(item: dict, checksum: str) -> bool:
+    """True only on a real match — an absent checksum on either side is False.
+
+    Fail-closed: treating 'unknown' as 'unchanged' would pin an outlet at a
+    version whose bytes we never verified.
+    """
+    if not checksum:
+        return False
+    import federation
+    return federation.item_checksum(item) == checksum
+
+
+def layer_data_url(bake: bool, layer_name: str, filename: str,
+                   pinned: dict = None) -> str:
+    """URL a webmap should use for a layer file: baked, pinned, or shared.
+
+    Lives here rather than in `outlets` because `outlets` imports duckdb and
+    cannot be imported in the bare local env — the same reason `federation`
+    holds the federation logic. `outlets._layer_data_url` delegates.
+
+    `pinned` maps layer name -> the version that actually holds the data, for
+    layers a publish would reuse rather than copy. Staging and every published
+    version are sibling directories under the atlas root, so
+    `../../../{version}/...` resolves identically from a staging outlet and
+    from a published one. That is what lets an outlet stop assuming its layers
+    were copied alongside it — an assumption with no counterpart in an object
+    store.
+
+    Empty `pinned` reproduces the previous behaviour exactly.
+    """
+    if bake:
+        return f"data/{filename}"
+    version = (pinned or {}).get(layer_name)
+    if version:
+        return f"../../../{version}/layers/{layer_name}/{filename}"
+    return f"../../layers/{layer_name}/{filename}"

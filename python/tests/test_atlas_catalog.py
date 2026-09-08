@@ -399,3 +399,90 @@ def test_missing_referenced_item_falls_back_to_rewriting(tmp_path):
     s3 = AC.publish_catalog(config, v3_dir, V3, previous_version_path=v2_dir)
     assert 'roads' in s3['written_layers'], \
         'a dangling reference must mean rewrite, never a broken catalog'
+
+
+# --------------------------------------------------------------------------- #
+# Addressing a layer that lives in another version (slice 3)
+# --------------------------------------------------------------------------- #
+
+def test_layer_data_url_modes():
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson') == \
+        '../../layers/roads/roads.geojson'
+    assert AC.layer_data_url(True, 'roads', 'roads.geojson', {'roads': V1}) == \
+        'data/roads.geojson', 'baking wins over pinning'
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson', {'roads': V1}) == \
+        f'../../../{V1}/layers/roads/roads.geojson'
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson', {'other': V1}) == \
+        '../../layers/roads/roads.geojson', 'a layer not pinned is unaffected'
+
+
+def test_pinned_url_resolves_from_staging_and_from_a_version(tmp_path):
+    """The property that removes the co-location assumption.
+
+    Staging and every published version are siblings under the atlas root, so
+    one relative URL has to work from both. This walks the URL from each
+    starting point and asserts it lands on the same real file.
+    """
+    atlas = tmp_path / 'kennedy'
+    data = atlas / V1 / 'layers' / 'roads'
+    data.mkdir(parents=True)
+    (data / 'roads.geojson').write_text('R1')
+
+    url = AC.layer_data_url(False, 'roads', 'roads.geojson', {'roads': V1})
+
+    for outlet_dir in (atlas / 'staging' / 'outlets' / 'webmap',
+                       atlas / V2 / 'outlets' / 'webmap'):
+        outlet_dir.mkdir(parents=True)
+        resolved = (outlet_dir / url).resolve()
+        assert resolved == (data / 'roads.geojson').resolve(), \
+            f'{url} must resolve to the real file from {outlet_dir}'
+        assert resolved.is_file()
+
+
+def test_resolve_pinned_layers_pins_only_unchanged_layers(tmp_path):
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+
+    # staging: hydrants edited, roads and the raster untouched
+    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
+
+    pinned = AC.resolve_pinned_layers(
+        LAYERS, staging / 'layers', v1_dir / 'stac',
+        base_url=config['base_url'], atlas_root=tmp_path)
+
+    assert pinned == {'roads': V1, 'lidar_basemap': V1}
+    assert 'hydrants' not in pinned, 'an edited layer must address the new version'
+
+
+def test_resolve_pinned_layers_is_empty_without_history(tmp_path):
+    staging = _make_version(tmp_path, 'staging')
+    assert AC.resolve_pinned_layers(
+        LAYERS, staging / 'layers', tmp_path / 'nope') == {}
+
+
+def test_pinning_follows_a_layer_back_through_hops(tmp_path):
+    """A layer reused in V2 pins to V1, where its data actually lives."""
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
+    pinned = AC.resolve_pinned_layers(
+        LAYERS, staging / 'layers', v2_dir / 'stac',
+        base_url=config['base_url'], atlas_root=tmp_path)
+
+    assert pinned['roads'] == V1, 'roads data lives at V1, not V2'
+    assert pinned['hydrants'] == V2, 'hydrants was rewritten at V2'
+
+
+def test_checksum_match_fails_closed_on_missing_values(tmp_path):
+    item = F.build_layer_item('scvfd', 'x', V1, BBOX,
+                              {'data': F.stac_asset('x.parquet')})
+    assert AC.item_checksum_matches(item, 'abc') is False, 'no checksum on Item'
+    with_sum = F.build_layer_item('scvfd', 'x', V1, BBOX,
+                                  {'data': F.stac_asset('x.parquet', checksum='abc')})
+    assert AC.item_checksum_matches(with_sum, '') is False, 'no checksum to compare'
+    assert AC.item_checksum_matches(with_sum, 'abc') is True
