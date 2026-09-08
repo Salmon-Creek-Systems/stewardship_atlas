@@ -329,3 +329,73 @@ def test_reused_item_href_names_the_version_that_wrote_it(tmp_path):
 
     assert roads == f'{config["base_url"]}/{V1}/stac/roads/roads-{V1}.json'
     assert hydrants == f'{config["base_url"]}/{V2}/stac/hydrants/hydrants-{V2}.json'
+
+
+V3 = '2026-09-08_00-40-50'
+
+
+def test_reuse_survives_across_multiple_publishes(tmp_path):
+    """The kennedy three-publish regression.
+
+    A layer reused in V2 has no Item file in V2 — only a Collection pointing
+    back at V1. Loading history by listing V2's directory therefore lost the
+    layer entirely and rewrote it in V3, so reuse alternated on/off/on. History
+    has to follow the Collection's item links.
+    """
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+
+    # V2: hydrants edited, everything else untouched -> roads/raster reused.
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    s2 = AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+    assert s2['written_layers'] == ['hydrants']
+    assert not (v2_dir / 'stac' / 'roads' / f'roads-{V2}.json').exists()
+
+    # V3: nothing changed at all since V2. Everything must be reused.
+    v3_dir = _make_version(tmp_path, V3, hydrants='EDITED')
+    s3 = AC.publish_catalog(config, v3_dir, V3, previous_version_path=v2_dir)
+
+    assert s3['written_layers'] == [], \
+        'a publish with no edits must write no new Items'
+    assert sorted(s3['reused_layers']) == ['hydrants', 'lidar_basemap', 'roads']
+
+    # roads is still referenced all the way back at V1, two hops later.
+    version_catalog = json.loads(
+        (v3_dir / 'stac' / 'versions' / V3 / 'catalog.json').read_text())
+    roads = next(l['href'] for l in version_catalog['links']
+                 if l.get('title') == 'roads')
+    assert roads == f'{config["base_url"]}/{V1}/stac/roads/roads-{V1}.json'
+    assert _href_to_path(roads, config, tmp_path).is_file()
+
+
+def test_history_survives_a_hop_for_every_layer(tmp_path):
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    history = AC.load_history(v2_dir / 'stac', base_url=config['base_url'],
+                              atlas_root=tmp_path)
+    assert set(history) == {'hydrants', 'roads', 'lidar_basemap'}
+    assert [i['id'] for i in history['hydrants']] == [
+        f'hydrants-{V1}', f'hydrants-{V2}'], 'both versions, oldest first'
+    assert [i['id'] for i in history['roads']] == [f'roads-{V1}'], \
+        'reused layer keeps its history through the collection link'
+
+
+def test_missing_referenced_item_falls_back_to_rewriting(tmp_path):
+    """If history points at an Item that has been deleted, rewrite it."""
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    (v1_dir / 'stac' / 'roads' / f'roads-{V1}.json').unlink()
+
+    v3_dir = _make_version(tmp_path, V3, hydrants='EDITED')
+    s3 = AC.publish_catalog(config, v3_dir, V3, previous_version_path=v2_dir)
+    assert 'roads' in s3['written_layers'], \
+        'a dangling reference must mean rewrite, never a broken catalog'

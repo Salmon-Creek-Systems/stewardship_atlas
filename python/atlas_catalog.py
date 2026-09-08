@@ -104,8 +104,32 @@ def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
     return assets
 
 
-def load_history(stac_dir) -> dict:
+def _resolve_item_href(href: str, base_url: str, atlas_root):
+    """Map a catalog href back to a local path, or None if it is not ours.
+
+    All versions of an atlas are sibling directories under the atlas root, and
+    hrefs are `{base_url}/{version}/stac/{layer}/{item}.json`, so stripping the
+    base URL yields a path relative to that root.
+    """
+    if not (base_url and atlas_root):
+        return None
+    prefix = base_url.rstrip('/') + '/'
+    if not href.startswith(prefix):
+        return None
+    return Path(atlas_root) / href[len(prefix):]
+
+
+def load_history(stac_dir, base_url: str = '', atlas_root=None) -> dict:
     """Read `{layer: [Items, oldest first]}` from a previous version's catalog.
+
+    Follows each Collection's `item` links rather than listing the directory.
+    That matters because a **reused** layer has no Item file in the version
+    that reused it — only a Collection linking back to where the Item really
+    lives. Globbing the directory therefore loses the layer's history after a
+    single hop, and the layer gets needlessly rewritten on the next publish
+    (found on kennedy: three publishes with no edits rewrote every layer on the
+    third). Item files that are local to this version are still picked up, so
+    a first publish and a hop both work.
 
     Returns an empty dict for a first publish or an unreadable catalog — the
     consequence is that everything is written fresh, which is safe. A corrupt
@@ -115,23 +139,57 @@ def load_history(stac_dir) -> dict:
     if not stac_dir.is_dir():
         return {}
 
+    def _read_item(path):
+        try:
+            with open(path) as handle:
+                item = json.load(handle)
+        except (OSError, ValueError) as exc:
+            logger.warning(f"atlas_catalog: skipping unreadable Item {path}: {exc}")
+            return None
+        return item if item.get('type') == 'Feature' else None
+
     history = {}
     for layer_dir in sorted(p for p in stac_dir.iterdir() if p.is_dir()):
         if layer_dir.name == 'versions':
             continue
-        items = []
-        for item_path in sorted(layer_dir.glob('*.json')):
-            if item_path.name == 'collection.json':
-                continue
+
+        paths = []
+        collection_path = layer_dir / 'collection.json'
+        if collection_path.is_file():
             try:
-                with open(item_path) as handle:
-                    item = json.load(handle)
+                with open(collection_path) as handle:
+                    collection = json.load(handle)
             except (OSError, ValueError) as exc:
-                logger.warning(f"atlas_catalog: skipping unreadable Item "
-                               f"{item_path}: {exc}")
+                logger.warning(f"atlas_catalog: unreadable collection "
+                               f"{collection_path}: {exc}")
+                collection = {}
+            for link in collection.get('links', []):
+                if link.get('rel') != 'item':
+                    continue
+                resolved = _resolve_item_href(link.get('href', ''), base_url, atlas_root)
+                if resolved is None:
+                    resolved = layer_dir / Path(link.get('href', '')).name
+                paths.append(resolved)
+
+        # Fall back to (and top up with) Item files sitting in this directory,
+        # so a catalog written without resolvable hrefs still yields history.
+        for local in sorted(layer_dir.glob('*.json')):
+            if local.name != 'collection.json' and local not in paths:
+                paths.append(local)
+
+        items = []
+        seen = set()
+        for path in paths:
+            if not path.is_file():
+                logger.warning(f"atlas_catalog: history references a missing Item "
+                               f"{path} — that layer will be rewritten")
                 continue
-            if item.get('type') == 'Feature':
-                items.append(item)
+            item = _read_item(path)
+            if item is None or item.get('id') in seen:
+                continue
+            seen.add(item['id'])
+            items.append(item)
+
         if items:
             items.sort(key=lambda i: i.get('properties', {}).get('datetime') or '')
             history[layer_dir.name] = items
@@ -180,8 +238,11 @@ def publish_catalog(config: dict, version_path, version: str,
     data_base_url = f'{base_url}/{version}/layers/' if base_url else ''
 
     layer_assets = scan_layers(layers, version_path / 'layers', data_base_url)
-    history = load_history(Path(previous_version_path) / CATALOG_DIRNAME) \
-        if previous_version_path else {}
+    history = load_history(
+        Path(previous_version_path) / CATALOG_DIRNAME,
+        base_url=base_url,
+        atlas_root=Path(previous_version_path).parent,
+    ) if previous_version_path else {}
 
     built = federation.build_atlas_catalog(
         atlas_id=atlas_id,
