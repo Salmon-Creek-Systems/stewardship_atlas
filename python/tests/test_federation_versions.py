@@ -291,3 +291,72 @@ def test_missing_checksum_fails_closed_on_both_sides():
 def test_write_list_is_sorted_for_deterministic_publishes():
     _, write = F.select_reusable_items({}, {'zebra': 'a', 'alpha': 'b', 'middle': 'c'})
     assert write == ['alpha', 'middle', 'zebra']
+
+
+# --------------------------------------------------------------------------- #
+# Bake access checks (#177)
+# --------------------------------------------------------------------------- #
+
+LAYERS_MIXED = [
+    {'name': 'roads'},                                   # nothing declared
+    {'name': 'hydrants', 'access': ['public']},
+    {'name': 'processing_sites', 'access': ['admin']},
+    {'name': 'helilandings', 'access': ['internal', 'admin']},
+    {'name': 'secrets', 'access': ['technical']},
+]
+ALL = [l['name'] for l in LAYERS_MIXED]
+
+
+def test_public_outlet_cannot_bake_declared_protected_layers():
+    violations = dict(F.bake_access_violations(['public', 'internal', 'admin'],
+                                               LAYERS_MIXED, ALL))
+    assert set(violations) == {'processing_sites', 'helilandings', 'secrets'}
+    assert violations['processing_sites'] == ['admin']
+
+
+def test_undeclared_layers_are_not_flagged():
+    """The fail-closed default is this codebase's intent, not what configs say.
+
+    Applying it here would fail the build for every undeclared layer -- 24 of
+    kennedy's 33. That is #175's problem, not this check's.
+    """
+    violations = F.bake_access_violations(['public'], LAYERS_MIXED, ['roads'])
+    assert violations == []
+
+
+def test_a_restricted_outlet_may_bake_restricted_layers():
+    assert F.bake_access_violations(['admin'], LAYERS_MIXED,
+                                    ['processing_sites', 'helilandings']) == []
+    assert F.bake_access_violations(['technical'], LAYERS_MIXED, ALL) == []
+
+
+def test_outlet_audience_is_its_most_permissive_tier():
+    """['public','admin'] is readable by the public, so it is a public outlet."""
+    assert F.bake_access_violations(['public', 'admin'], LAYERS_MIXED,
+                                    ['processing_sites']) != []
+
+
+def test_outlet_without_declared_access_is_treated_as_public():
+    """Matches atlas.py's default -- the strict reading, which is right here."""
+    assert F.bake_access_violations(None, LAYERS_MIXED, ['processing_sites']) != []
+
+
+def test_internal_outlet_may_bake_public_and_internal_but_not_admin():
+    violations = dict(F.bake_access_violations(['internal'], LAYERS_MIXED, ALL))
+    assert 'hydrants' not in violations
+    # helilandings is ['internal', 'admin'] -- readable at internal, so an
+    # internal outlet may bake it. Only strictly-more-restricted layers fail.
+    assert 'helilandings' not in violations
+    assert set(violations) == {'processing_sites', 'secrets'}
+
+
+def test_the_real_kennedy_case():
+    """The four layers found world-readable on CloudFront in #177."""
+    kennedy_layers = [{'name': n, 'access': ['admin']} for n in
+                      ('burn_areas', 'notes', 'poi', 'processing_sites')]
+    kennedy_layers.append({'name': 'roads'})
+    violations = F.bake_access_violations(
+        ['public', 'internal', 'admin'], kennedy_layers,
+        ['roads', 'burn_areas', 'notes', 'poi', 'processing_sites'])
+    assert sorted(n for n, _ in violations) == [
+        'burn_areas', 'notes', 'poi', 'processing_sites']

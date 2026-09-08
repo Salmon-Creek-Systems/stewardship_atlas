@@ -118,9 +118,30 @@ def bake_layer_data(config, outlet_name, layer_names) -> list:
     COG rasters are skipped: they already live in their own public S3 bucket
     and are referenced absolutely, so there is nothing local to bake.
     """
+    layers = config['dataswale']['layers']
+
+    # #177: baking copies layer data into the outlet's own directory, so a
+    # public outlet that bakes an admin layer publishes admin data. Refuse the
+    # build and say so, rather than baking an empty FeatureCollection in its
+    # place: the layer HAS data, and an empty one is indistinguishable from
+    # "there is nothing here" — a config error rendered as a false statement
+    # about the world. (The empty-stub behaviour further down is for layers
+    # that genuinely have no data yet, #135, which is not the same thing.)
+    violations = federation.bake_access_violations(
+        config['assets'][outlet_name].get('access'), layers, layer_names)
+    if violations:
+        detail = ', '.join(f"{name} (access={access})" for name, access in violations)
+        raise ValueError(
+            f"outlet '{outlet_name}' bakes layer data and is readable at "
+            f"access={config['assets'][outlet_name].get('access')}, but these "
+            f"layers are declared more restricted: {detail}. Baking would "
+            f"publish them at the outlet's access level. Fix by removing them "
+            f"from the outlet's in_layers, or by correcting their access if "
+            f"they are not actually restricted. See issue #177.")
+
     data_dir = versioning.atlas_path(config, "outlets") / outlet_name / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+    layers_dict = {l['name']: l for l in layers}
 
     copied = []
     stubbed = []

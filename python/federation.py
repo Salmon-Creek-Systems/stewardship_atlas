@@ -746,3 +746,67 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
         'written': written,
         'missing': missing,
     }
+
+
+# --------------------------------------------------------------------------- #
+# Access checks for outlets that copy layer data (#177)
+# --------------------------------------------------------------------------- #
+
+# Least to most restrictive. An outlet's audience is its *most permissive*
+# tier: an outlet marked ["public", "admin"] is readable by the public.
+ACCESS_RANK = {'public': 0, 'internal': 1, 'admin': 2, 'technical': 3}
+
+
+def access_rank(tiers) -> int:
+    """How restricted a thing is: the rank of its most permissive tier."""
+    if not tiers:
+        return -1  # nothing declared — see bake_access_violations
+    ranks = [ACCESS_RANK.get(t, max(ACCESS_RANK.values())) for t in tiers]
+    return min(ranks)
+
+
+def bake_access_violations(outlet_access, layers: List[Dict[str, Any]],
+                           layer_names) -> List[Tuple[str, Any]]:
+    """Layers whose declared access is more restricted than the outlet's.
+
+    Baking copies a layer's data into an outlet's own directory, so a public
+    outlet that bakes an admin layer publishes admin data. Nothing checked
+    that until #177, where 17 explicitly-protected layers across 7 atlases were
+    found world-readable on CloudFront.
+
+    **Only explicitly declared layer tiers are checked.** A layer with no
+    `access` field is skipped rather than assumed protected: the fail-closed
+    default in `layer_access()` is this codebase's *intent*, not what its
+    configs actually say, and applying it here would fail the build for every
+    undeclared layer — 24 of kennedy's 33. Fixing the default is #175; this
+    function is about honouring declarations that already exist.
+
+    Returns [(layer_name, declared_access)] so the caller can name all of them
+    at once instead of failing on the first.
+    """
+    outlet_rank = access_rank(normalize_access_or_none(outlet_access))
+    if outlet_rank < 0:
+        outlet_rank = ACCESS_RANK['public']  # matches atlas.py's default
+
+    by_name = {l.get('name'): l for l in layers}
+    violations = []
+    for name in layer_names:
+        declared = (by_name.get(name) or {}).get('access')
+        if not declared:
+            continue
+        declared = declared if isinstance(declared, list) else [declared]
+        if access_rank(declared) > outlet_rank:
+            violations.append((name, declared))
+    return violations
+
+
+def normalize_access_or_none(access):
+    """Coerce access to a list, preserving 'not declared' as None.
+
+    `atlas_store.normalize_access` turns None into ['public'], which is the
+    fail-open default (#175). Here the difference between 'declared public'
+    and 'not declared' matters, so it is kept.
+    """
+    if access is None:
+        return None
+    return access if isinstance(access, list) else [access]
