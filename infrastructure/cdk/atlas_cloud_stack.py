@@ -321,6 +321,24 @@ class AtlasCloudStack(Stack):
         )
         public_outlets.grant_read_write(webapp_role)
         public_outlets.grant_delete(webapp_role)
+
+        # Phase 3 (#159): publish also writes *source layer data* — public-tier
+        # layers alongside the outlets above, everything else here. The box does
+        # that write for the same reason it does the one above: publish still
+        # runs on EC2 until Phase 4. Without this the push fails with
+        # AccessDenied on PutObject and, because a failed push must never fail a
+        # publish, it shows up only in the log.
+        #
+        # Read and list, not just write: the upload plan reconciles against what
+        # the bucket already holds rather than trusting the local catalog's
+        # reuse decision, so ListBucket is what stops every publish re-uploading
+        # every layer.
+        # Read + put, deliberately NOT delete: layer keys are immutable and
+        # version-stamped, and the retention decision for #159 is that versions
+        # are never deleted. Nothing in the publish path should be able to
+        # remove source data from the bucket that holds it.
+        private_data.grant_read(webapp_role)
+        private_data.grant_put(webapp_role)
         webapp_role.add_to_principal_policy(iam.PolicyStatement(
             actions=["cloudfront:CreateInvalidation"],
             resources=[
