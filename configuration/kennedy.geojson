@@ -54,6 +54,9 @@
                         "runbook"
                     ]
                 },
+                "catalog": {
+                    "pin_unchanged_layers": true
+                },
                 "layers": {
                     "regions": {
                         "layer_def": "regions"
