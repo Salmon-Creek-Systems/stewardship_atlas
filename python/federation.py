@@ -693,6 +693,17 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
                 title=layer.get('title', name),
                 size=spec.get('size'),
                 checksum=spec.get('checksum'))}
+            # Secondary files in the layer directory get their own assets,
+            # keyed by filename. A webmap asks a raster layer for
+            # `{layer}.tiff.jpg` while the primary file is `{layer}.tiff`, so
+            # an Item that records only the primary cannot answer "does this
+            # version hold the file the caller wants". Only the primary carries
+            # the checksum — it is what reuse is decided on.
+            for extra_name, extra_href in sorted(
+                    (spec.get('file_hrefs') or {}).items()):
+                if extra_href == spec['href']:
+                    continue
+                assets[extra_name] = stac_asset(extra_href, roles=['data'])
             item = build_layer_item(
                 atlas_id, name, version, bbox, assets,
                 datetime_iso=when, catalog_base_url=catalog_base_url,

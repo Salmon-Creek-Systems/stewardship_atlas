@@ -95,11 +95,19 @@ def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
         path = find_layer_file(layers_root, name)
         if path is None:
             continue
+        siblings = sorted(p.name for p in path.parent.iterdir()
+                          if p.is_file() and p.name != 'stats.json')
         assets[name] = {
             'path': path,
             'href': f'{data_base_url}{name}/{path.name}',
             'size': path.stat().st_size,
             'checksum': sha256_multihash(path),
+            # Every servable file in the layer dir, not just the primary one. A
+            # webmap asks for `basemap.tiff.jpg` while the layer's primary file
+            # is `basemap.tiff`, so recording one file per layer is not enough
+            # to answer "does this version hold what the caller wants".
+            'files': siblings,
+            'file_hrefs': {n: f'{data_base_url}{name}/{n}' for n in siblings},
         }
     return assets
 
@@ -314,7 +322,7 @@ def resolve_pinned_layers(layers, staging_layers_root, previous_stac_dir,
             continue
         version = item_version(items[-1])
         if version and item_checksum_matches(items[-1], sha256_multihash(path)):
-            pinned[name] = version
+            pinned[name] = {'version': version, 'files': item_filenames(items[-1])}
     return pinned
 
 
@@ -350,7 +358,25 @@ def layer_data_url(bake: bool, layer_name: str, filename: str,
     """
     if bake:
         return f"data/{filename}"
-    version = (pinned or {}).get(layer_name)
-    if version:
-        return f"../../../{version}/layers/{layer_name}/{filename}"
+    entry = (pinned or {}).get(layer_name)
+    if entry and filename in entry.get('files', ()):
+        return f"../../../{entry['version']}/layers/{layer_name}/{filename}"
     return f"../../layers/{layer_name}/{filename}"
+
+
+def item_filenames(item: dict) -> set:
+    """Every filename an Item records, across all of its assets.
+
+    Pinning a layer to another version is only safe for files that version
+    actually holds. Resolving the *version* from the catalog and then
+    reconstructing the filename by convention is half a mechanism: it works
+    while `{layer}.geojson` holds and fails silently when it does not — a
+    raster whose webmap wants `{layer}.tiff.jpg`, or a layer whose file is
+    named something else. Unknown filename means fall back to `../../layers/`.
+    """
+    names = set()
+    for asset in (item.get('assets') or {}).values():
+        href = asset.get('href') if isinstance(asset, dict) else None
+        if href:
+            names.add(Path(href).name)
+    return names

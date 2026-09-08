@@ -405,15 +405,45 @@ def test_missing_referenced_item_falls_back_to_rewriting(tmp_path):
 # Addressing a layer that lives in another version (slice 3)
 # --------------------------------------------------------------------------- #
 
+def _pin(version, *files):
+    return {'version': version, 'files': set(files)}
+
+
 def test_layer_data_url_modes():
+    pinned = {'roads': _pin(V1, 'roads.geojson')}
     assert AC.layer_data_url(False, 'roads', 'roads.geojson') == \
         '../../layers/roads/roads.geojson'
-    assert AC.layer_data_url(True, 'roads', 'roads.geojson', {'roads': V1}) == \
+    assert AC.layer_data_url(True, 'roads', 'roads.geojson', pinned) == \
         'data/roads.geojson', 'baking wins over pinning'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson', {'roads': V1}) == \
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson', pinned) == \
         f'../../../{V1}/layers/roads/roads.geojson'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson', {'other': V1}) == \
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
+                             {'other': _pin(V1, 'other.geojson')}) == \
         '../../layers/roads/roads.geojson', 'a layer not pinned is unaffected'
+
+
+def test_pinning_falls_back_for_a_file_the_catalog_does_not_record():
+    """The kennedy `lpss` miss, and the raster case behind it.
+
+    Pinning resolved the *version* from the catalog and then rebuilt the
+    filename by convention. That works while `{layer}.geojson` holds and fails
+    silently when it does not — a webmap asks a raster layer for
+    `{layer}.tiff.jpg`, whose primary file is `{layer}.tiff`.
+    """
+    pinned = {'basemap': _pin(V1, 'basemap.tiff')}
+    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg', pinned) == \
+        '../../layers/basemap/basemap.tiff.jpg', \
+        'a file the Item does not record must not be pinned'
+    pinned_with_jpg = {'basemap': _pin(V1, 'basemap.tiff', 'basemap.tiff.jpg')}
+    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg',
+                             pinned_with_jpg) == \
+        f'../../../{V1}/layers/basemap/basemap.tiff.jpg'
+
+
+def test_pin_entry_without_files_never_pins():
+    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
+                             {'roads': {'version': V1}}) == \
+        '../../layers/roads/roads.geojson'
 
 
 def test_pinned_url_resolves_from_staging_and_from_a_version(tmp_path):
@@ -428,7 +458,8 @@ def test_pinned_url_resolves_from_staging_and_from_a_version(tmp_path):
     data.mkdir(parents=True)
     (data / 'roads.geojson').write_text('R1')
 
-    url = AC.layer_data_url(False, 'roads', 'roads.geojson', {'roads': V1})
+    url = AC.layer_data_url(False, 'roads', 'roads.geojson',
+                            {'roads': _pin(V1, 'roads.geojson')})
 
     for outlet_dir in (atlas / 'staging' / 'outlets' / 'webmap',
                        atlas / V2 / 'outlets' / 'webmap'):
@@ -451,7 +482,9 @@ def test_resolve_pinned_layers_pins_only_unchanged_layers(tmp_path):
         LAYERS, staging / 'layers', v1_dir / 'stac',
         base_url=config['base_url'], atlas_root=tmp_path)
 
-    assert pinned == {'roads': V1, 'lidar_basemap': V1}
+    assert set(pinned) == {'roads', 'lidar_basemap'}
+    assert pinned['roads']['version'] == V1
+    assert 'roads.geojson' in pinned['roads']['files']
     assert 'hydrants' not in pinned, 'an edited layer must address the new version'
 
 
@@ -474,8 +507,8 @@ def test_pinning_follows_a_layer_back_through_hops(tmp_path):
         LAYERS, staging / 'layers', v2_dir / 'stac',
         base_url=config['base_url'], atlas_root=tmp_path)
 
-    assert pinned['roads'] == V1, 'roads data lives at V1, not V2'
-    assert pinned['hydrants'] == V2, 'hydrants was rewritten at V2'
+    assert pinned['roads']['version'] == V1, 'roads data lives at V1, not V2'
+    assert pinned['hydrants']['version'] == V2, 'hydrants was rewritten at V2'
 
 
 def test_checksum_match_fails_closed_on_missing_values(tmp_path):
@@ -486,3 +519,41 @@ def test_checksum_match_fails_closed_on_missing_values(tmp_path):
                                   {'data': F.stac_asset('x.parquet', checksum='abc')})
     assert AC.item_checksum_matches(with_sum, '') is False, 'no checksum to compare'
     assert AC.item_checksum_matches(with_sum, 'abc') is True
+
+
+def test_item_records_every_servable_file_in_the_layer_dir(tmp_path):
+    """A raster layer's Item must name the rendered image too, not just the tiff."""
+    config = _config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    # what a raster layer really looks like: source + what the webmap requests
+    (version_dir / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
+    (version_dir / 'layers' / 'lidar_basemap' / 'stats.json').write_text('{}')
+
+    AC.publish_catalog(config, version_dir, V1)
+    item = json.loads((version_dir / 'stac' / 'lidar_basemap' /
+                       f'lidar_basemap-{V1}.json').read_text())
+
+    names = AC.item_filenames(item)
+    assert 'lidar_basemap.tiff' in names
+    assert 'lidar_basemap.tiff.jpg' in names
+    assert 'stats.json' not in names, 'sidecar is not servable data'
+    assert F.item_checksum(item), 'primary asset still carries the checksum'
+
+
+def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
+    config = _config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    (v1_dir / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
+    AC.publish_catalog(config, v1_dir, V1)
+
+    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
+    (staging / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
+    pinned = AC.resolve_pinned_layers(
+        LAYERS, staging / 'layers', v1_dir / 'stac',
+        base_url=config['base_url'], atlas_root=tmp_path)
+
+    url = AC.layer_data_url(False, 'lidar_basemap', 'lidar_basemap.tiff.jpg', pinned)
+    assert url == f'../../../{V1}/layers/lidar_basemap/lidar_basemap.tiff.jpg'
+    outlet = tmp_path / V2 / 'outlets' / 'webmap'
+    outlet.mkdir(parents=True)
+    assert (outlet / url).resolve().is_file(), 'pinned raster URL must resolve'
