@@ -643,3 +643,48 @@ def test_summary_reports_the_version_holding_every_layer(tmp_path):
     assert versions['hydrants'] == V2
     assert versions['roads'] == V1, 'reused layer keyed where its data lives'
     assert versions['lidar_basemap'] == V1
+
+
+# --------------------------------------------------------------------------- #
+# What counts as a layer's servable data
+# --------------------------------------------------------------------------- #
+
+def test_credentials_and_strays_are_never_servable():
+    """kennedy's layer dirs held .htpasswd, and it was published world-readable.
+
+    The rule was 'everything except stats.json' — a denylist, so anything
+    unanticipated was published by default. It is now an allowlist by name.
+    """
+    for stray in ('.htpasswd', '.DS_Store', 'stats.json', 'biochar_summary.csv',
+                  'burns_simulation.geojson', 'notes.geojson'):
+        assert AC.is_servable_file(stray, 'processing_sites') is False, stray
+
+
+def test_the_layers_own_files_are_servable():
+    for good in ('processing_sites.geojson', 'processing_sites.tiff',
+                 'processing_sites.tiff.jpg', 'processing_sites.pmtiles'):
+        assert AC.is_servable_file(good, 'processing_sites') is True, good
+
+
+def test_scan_excludes_strays_from_the_upload_set(tmp_path):
+    version_dir = _make_version(tmp_path, V1)
+    layer_dir = version_dir / 'layers' / 'roads'
+    (layer_dir / '.htpasswd').write_text('admin:$apr1$redacted')
+    (layer_dir / 'unrelated_export.csv').write_text('a,b,c')
+    (layer_dir / 'roads.tiff.jpg').write_text('IMG')
+
+    assets = AC.scan_layers(LAYERS, version_dir / 'layers')
+    assert sorted(assets['roads']['files']) == ['roads.geojson', 'roads.tiff.jpg']
+
+
+def test_a_stray_file_never_reaches_an_item(tmp_path):
+    config = _cloud_config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    (version_dir / 'layers' / 'roads' / '.htpasswd').write_text('admin:$apr1$redacted')
+    AC.publish_catalog(config, version_dir, V1)
+
+    item = json.loads((version_dir / 'stac' / 'roads' / f'roads-{V1}.json').read_text())
+    assert '.htpasswd' not in AC.item_filenames(item)
+    for asset in item['assets'].values():
+        assert '.htpasswd' not in asset['href']
+        assert '.htpasswd' not in asset.get('alternate', {}).get('s3', {}).get('href', '')

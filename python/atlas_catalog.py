@@ -85,6 +85,26 @@ def find_layer_file(layers_root, name):
     return largest
 
 
+def is_servable_file(filename: str, layer_name: str) -> bool:
+    """Is this file part of the layer's published data?
+
+    A layer directory is not a curated set of files. Kennedy's held `.htpasswd`
+    (role credentials), plus `biochar_summary.csv` and `burns_simulation.geojson`
+    left by other work. An earlier version of this took everything except
+    `stats.json` and published all of it — including the credentials, to a
+    world-readable bucket.
+
+    So the rule is an allowlist by *name*, not a denylist by exception: a
+    layer's servable files are the ones named after it. That matches the actual
+    convention (`{layer}.geojson`, `{layer}.tiff.jpg`, `{layer}.pmtiles` — see
+    the candidates in `outlets.bake_layer_data`) and anything unexpected in the
+    directory is excluded by default rather than published by default.
+    """
+    if filename.startswith('.'):
+        return False
+    return filename == layer_name or filename.startswith(f'{layer_name}.')
+
+
 def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
     """Build the `layer_assets` mapping `build_atlas_catalog()` expects.
 
@@ -102,7 +122,7 @@ def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
         if path is None:
             continue
         siblings = sorted(p.name for p in path.parent.iterdir()
-                          if p.is_file() and p.name != 'stats.json')
+                          if p.is_file() and is_servable_file(p.name, name))
         assets[name] = {
             'path': path,
             'href': f'{data_base_url}{name}/{path.name}',
