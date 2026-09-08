@@ -621,3 +621,25 @@ def test_summary_carries_what_the_uploader_needs(tmp_path):
     assert summary['access_by_layer']['hydrants'] == ['public']
     assert summary['access_by_layer']['roads'] == ['internal']
     assert 'files' in summary['layer_assets']['roads']
+
+
+def test_summary_reports_the_version_holding_every_layer(tmp_path):
+    """Written and reused alike — the S3 push needs a key for all of them.
+
+    Reporting only the written set is what made kennedy's first push upload
+    zero layer objects: every layer was reused locally, so nothing was
+    planned, even though S3 had never held any of it.
+    """
+    config = _cloud_config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
+    summary = AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    assert summary['written_layers'] == ['hydrants']
+    versions = summary['layer_versions']
+    assert set(versions) == {'hydrants', 'roads', 'lidar_basemap'}, \
+        'every layer in the version, not just the rewritten one'
+    assert versions['hydrants'] == V2
+    assert versions['roads'] == V1, 'reused layer keyed where its data lives'
+    assert versions['lidar_basemap'] == V1

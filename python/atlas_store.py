@@ -482,27 +482,38 @@ def layer_bucket(access, settings: dict) -> str:
 
 
 def plan_layer_uploads(config: dict, version_path, version: str,
-                       layer_assets: dict, written: list,
+                       layer_assets: dict, layer_versions: dict,
                        access_by_layer: dict) -> list:
-    """Upload plan for the layers this version actually wrote.
+    """The full set of objects this version's layers *should* have in S3.
 
-    Returns ``(Path, bucket, key, content_type)`` tuples.
+    Returns ``(Path, bucket, key, content_type)`` tuples for **every** layer the
+    catalog describes, keyed at the version that actually holds it — the current
+    one for a rewrite, an older one for a reuse.
 
-    Reused layers are omitted: their object already exists at their own
-    version's key, which is the whole point of the version-stamped layout — a
-    publish with no edits uploads nothing.
+    This is deliberately a description of the desired end state rather than a
+    diff. An earlier version planned only the layers written this publish, on
+    the reasoning that a reused layer's object already exists. That reasoning
+    is wrong at the boundary: reuse is computed against the **local** catalog,
+    which knows nothing about what S3 holds. On kennedy's first push every
+    layer was "unchanged since the last local version", so every layer was
+    skipped and only the catalog documents landed. Caller reconciles this plan
+    against what is actually in the bucket.
 
     Every servable file in the layer directory is included, not just the
     primary one. A webmap asks a raster layer for ``{layer}.tiff.jpg`` while
     the primary file is ``{layer}.tiff``, and an object store holding only the
     primary cannot serve the map.
+
+    A reused layer's bytes are read from *this* version's directory: the
+    checksum matched, so the content is identical to what the older version
+    holds, and this is the copy known to be present.
     """
     atlas_name = config['name']
     settings = cloud_settings(config)
     version_path = Path(version_path)
 
     plan = []
-    for name in written:
+    for name in sorted(layer_versions):
         spec = layer_assets.get(name)
         if not spec:
             continue
@@ -518,7 +529,8 @@ def plan_layer_uploads(config: dict, version_path, version: str,
                 logger.warning(f"atlas_store: {path} named by the catalog but not "
                                f"on disk — skipping")
                 continue
-            plan.append((path, bucket, layer_key(atlas_name, name, version, filename),
+            plan.append((path, bucket,
+                         layer_key(atlas_name, name, layer_versions[name], filename),
                          content_type_for(filename)))
     return plan
 
@@ -560,22 +572,45 @@ def publish_layer_data(config: dict, version_path, version: str,
     if not (settings.get('enabled') and settings.get('layers')):
         return {'status': 'skipped', 'reason': 'cloud.layers not enabled'}
 
-    plan = plan_layer_uploads(
+    desired = plan_layer_uploads(
         config, version_path, version,
         catalog_summary.get('layer_assets') or {},
-        catalog_summary.get('written_layers') or [],
+        catalog_summary.get('layer_versions') or {},
         catalog_summary.get('access_by_layer') or {})
+
+    # Reconcile against what the bucket actually holds rather than trusting the
+    # local catalog's reuse decision — see plan_layer_uploads. Keys are
+    # immutable, so "present" means "correct" and re-uploading is never needed.
+    # This also self-heals a partial failure from an earlier publish.
+    client = _s3()
+    plan = []
+    skipped = 0
+    for bucket in sorted({b for _, b, _, _ in desired}):
+        prefix = f"{atlas_prefix(config['name'])}/layers/"
+        try:
+            present = set(list_keys(bucket, prefix, client=client))
+        except Exception as exc:
+            logger.warning(f"atlas_store: could not list s3://{bucket}/{prefix} "
+                           f"({exc}); uploading everything for that bucket")
+            present = set()
+        for entry in desired:
+            if entry[1] != bucket:
+                continue
+            if entry[2] in present:
+                skipped += 1
+            else:
+                plan.append(entry)
+
     plan += plan_catalog_upload(config, version_path, version)
 
     if not plan:
-        return {'status': 'ok', 'objects': 0, 'bytes': 0,
-                'note': 'nothing newly written this version'}
+        return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': skipped,
+                'note': 'every layer object already in place'}
 
     by_bucket = {}
     for path, bucket, key, content_type in plan:
         by_bucket.setdefault(bucket, []).append((path, key, content_type))
 
-    client = _s3()
     uploaded_bytes = 0
     errors = []
     for bucket, items in sorted(by_bucket.items()):
@@ -592,6 +627,7 @@ def publish_layer_data(config: dict, version_path, version: str,
         'status': 'error' if errors else 'ok',
         'objects': len(plan),
         'bytes': uploaded_bytes,
+        'already_present': skipped,
         'buckets': sorted(by_bucket),
         'errors': errors,
     }

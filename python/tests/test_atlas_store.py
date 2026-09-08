@@ -444,13 +444,25 @@ class TestLayerUploadPlan(unittest.TestCase):
         self.access = {'roads': ['public'], 'basemap': ['public'],
                        'notes': ['internal']}
 
-    def _plan(self, written):
+    def _plan(self, names, versions=None):
+        layer_versions = versions or {n: 'V1' for n in names}
         return atlas_store.plan_layer_uploads(
-            self.config, self.tmp, 'V1', self.layer_assets, written, self.access)
+            self.config, self.tmp, 'V1', self.layer_assets, layer_versions,
+            self.access)
 
-    def test_reused_layers_are_not_uploaded(self):
-        """A publish with no edits ships nothing — the point of stamped keys."""
-        self.assertEqual(self._plan([]), [])
+    def test_plan_describes_every_layer_not_just_the_written_ones(self):
+        """Reuse is computed against the LOCAL catalog, which knows nothing
+        about what S3 holds. Planning only written layers meant kennedy's first
+        push uploaded no layer data at all — every layer was 'unchanged since
+        the last local version'. The plan is the desired end state; the caller
+        reconciles it against the bucket."""
+        keys = [k for _, _, k, _ in self._plan(['roads', 'notes'])]
+        self.assertEqual(len(keys), 2)
+
+    def test_a_reused_layer_is_keyed_at_the_version_that_holds_it(self):
+        keys = [k for _, _, k, _ in
+                self._plan(['roads'], versions={'roads': 'V0-OLDER'})]
+        self.assertEqual(keys, ['kennedy/layers/roads/V0-OLDER/roads.geojson'])
 
     def test_every_servable_file_is_uploaded_not_just_the_primary(self):
         keys = [k for _, _, k, _ in self._plan(['basemap'])]

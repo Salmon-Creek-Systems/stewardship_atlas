@@ -288,6 +288,7 @@ def publish_catalog(config: dict, version_path, version: str,
         # layer files are scanned and checksummed exactly once per publish.
         'layer_assets': layer_assets,
         'access_by_layer': access_by_layer,
+        'layer_versions': built['versions'],
     }
     logger.info(
         f"atlas_catalog: {atlas_id} {version} — {len(built['written'])} new Item(s), "

@@ -739,6 +739,12 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
         'catalog': catalog,
         'collections': collections,
         'items': new_items,
+        # The version that actually holds each layer's data — the current one
+        # for a rewrite, an older one for a reuse. Callers that need to put the
+        # bytes somewhere (the S3 push) need this for *every* layer, not just
+        # the ones written this time.
+        'versions': {i.get('collection') or i['id']: i['properties']['version']
+                     for i in version_items},
         'version_catalog': build_version_catalog(
             atlas_id, version, version_items,
             datetime_iso=when, catalog_base_url=catalog_base_url),
