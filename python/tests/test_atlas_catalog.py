@@ -557,3 +557,67 @@ def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
     outlet = tmp_path / V2 / 'outlets' / 'webmap'
     outlet.mkdir(parents=True)
     assert (outlet / url).resolve().is_file(), 'pinned raster URL must resolve'
+
+
+# --------------------------------------------------------------------------- #
+# S3 alternates (slice 4)
+# --------------------------------------------------------------------------- #
+
+def _cloud_config(tmp_path, **cloud):
+    config = _config(tmp_path)
+    config['cloud'] = {'enabled': True, 'outlets_bucket': 'OUT',
+                       'private_bucket': 'PRIV', 'layers': True, **cloud}
+    return config
+
+
+def test_alternates_record_s3_without_moving_the_primary_href(tmp_path):
+    """The primary href must stay local: keys are deterministic, so writing
+    them as primary before the upload happens would leave the catalog naming
+    an object that may not exist."""
+    config = _cloud_config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, version_dir, V1)
+
+    item = json.loads((version_dir / 'stac' / 'hydrants' /
+                       f'hydrants-{V1}.json').read_text())
+    data = item['assets']['data']
+    assert data['href'] == f'{config["base_url"]}/{V1}/layers/hydrants/hydrants.geojson'
+    assert data['alternate']['s3']['href'] == \
+        f's3://OUT/scvfd/layers/hydrants/{V1}/hydrants.geojson'
+    assert AC.ALTERNATE_EXTENSION in item['stac_extensions']
+
+
+def test_alternates_route_protected_layers_to_the_private_bucket(tmp_path):
+    config = _cloud_config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, version_dir, V1)
+
+    # hydrants is shareable -> public; roads has no tier -> internal
+    roads = json.loads((version_dir / 'stac' / 'roads' /
+                        f'roads-{V1}.json').read_text())
+    assert roads['assets']['data']['alternate']['s3']['href'].startswith('s3://PRIV/')
+    hydrants = json.loads((version_dir / 'stac' / 'hydrants' /
+                           f'hydrants-{V1}.json').read_text())
+    assert hydrants['assets']['data']['alternate']['s3']['href'].startswith('s3://OUT/')
+
+
+def test_no_alternates_without_the_layers_opt_in(tmp_path):
+    config = _cloud_config(tmp_path, layers=False)
+    version_dir = _make_version(tmp_path, V1)
+    summary = AC.publish_catalog(config, version_dir, V1)
+
+    assert summary['alternates'] == 0
+    item = json.loads((version_dir / 'stac' / 'roads' /
+                       f'roads-{V1}.json').read_text())
+    assert 'alternate' not in item['assets']['data']
+
+
+def test_summary_carries_what_the_uploader_needs(tmp_path):
+    config = _cloud_config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    summary = AC.publish_catalog(config, version_dir, V1)
+
+    assert set(summary['layer_assets']) == {'hydrants', 'roads', 'lidar_basemap'}
+    assert summary['access_by_layer']['hydrants'] == ['public']
+    assert summary['access_by_layer']['roads'] == ['internal']
+    assert 'files' in summary['layer_assets']['roads']

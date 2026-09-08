@@ -127,7 +127,22 @@ def publish_new_version(config, version=None):
     try:
         catalog_summary = atlas_catalog.publish_catalog(
             config, version_path, version, previous_version_path)
-        logger.info(f"STAC catalog: {catalog_summary}")
+        logger.info(
+            f"STAC catalog: version={version} "
+            f"written={catalog_summary['written_layers']} "
+            f"reused={len(catalog_summary['reused_layers'])} "
+            f"missing={catalog_summary['missing_layers']} "
+            f"documents={catalog_summary['documents']}")
+
+        # Phase 3 (#159): push this version's newly written layer data, and the
+        # catalog describing it, to S3. Public-tier layers to the outlets
+        # bucket, everything else to the private one. A no-op unless the atlas
+        # sets cloud.layers, and it never raises for the same reason the outlet
+        # push does not: the box is still serving and local files are still
+        # authoritative.
+        layer_push = atlas_store.publish_layer_data(
+            config, version_path, version, catalog_summary)
+        logger.info(f"S3 layer publish: {layer_push}")
     except Exception as exc:
         logger.error(f"STAC catalog write failed for version {version} "
                      f"(publish continues): {exc}", exc_info=True)

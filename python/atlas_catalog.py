@@ -31,6 +31,12 @@ import logging
 import federation
 
 logger = logging.getLogger(__name__)
+if not logger.handlers:  # match versioning.py: visible under uvicorn
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
 CATALOG_DIRNAME = 'stac'
 
@@ -252,6 +258,9 @@ def publish_catalog(config: dict, version_path, version: str,
         atlas_root=Path(previous_version_path).parent,
     ) if previous_version_path else {}
 
+    access_by_layer = {l['name']: federation.layer_access(l)
+                       for l in layers if l.get('name')}
+
     built = federation.build_atlas_catalog(
         atlas_id=atlas_id,
         atlas_description=config.get(
@@ -264,6 +273,7 @@ def publish_catalog(config: dict, version_path, version: str,
         catalog_base_url=catalog_base_url,
     )
 
+    alternates = add_s3_alternates(built, config, version)
     paths = write_catalog(built, version_path / CATALOG_DIRNAME, version)
 
     summary = {
@@ -273,6 +283,11 @@ def publish_catalog(config: dict, version_path, version: str,
         'reused_layers': built['reused'],
         'missing_layers': built['missing'],
         'documents': len(paths),
+        'alternates': alternates,
+        # Passed through for the S3 push in versioning — computed here so the
+        # layer files are scanned and checksummed exactly once per publish.
+        'layer_assets': layer_assets,
+        'access_by_layer': access_by_layer,
     }
     logger.info(
         f"atlas_catalog: {atlas_id} {version} — {len(built['written'])} new Item(s), "
@@ -380,3 +395,40 @@ def item_filenames(item: dict) -> set:
         if href:
             names.add(Path(href).name)
     return names
+
+
+ALTERNATE_EXTENSION = "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
+
+
+def add_s3_alternates(built: dict, config: dict, version: str) -> int:
+    """Record each newly written asset's S3 location as an `alternate` href.
+
+    Deliberately *not* the primary href. The keys are deterministic, so they
+    could be written before the upload happens — but then a failed push leaves
+    the catalog pointing at an object that does not exist. As an alternate the
+    catalog stays truthful whatever the upload does, and a reader opts in.
+
+    Only newly written Items are touched; a reused Item already carries the
+    alternate it was written with, pointing at the version that holds the data.
+    """
+    import atlas_store
+    settings = atlas_store.cloud_settings(config)
+    if not (settings.get('enabled') and settings.get('layers')):
+        return 0
+
+    atlas_name = config['name']
+    touched = 0
+    for layer_name, item in built['items'].items():
+        access = (item.get('properties') or {}).get('atlas:access')
+        bucket = atlas_store.layer_bucket(access, settings)
+        if not bucket:
+            continue
+        for asset in item.get('assets', {}).values():
+            filename = Path(asset['href']).name
+            key = atlas_store.layer_key(atlas_name, layer_name, version, filename)
+            asset['alternate'] = {'s3': {'href': f's3://{bucket}/{key}'}}
+            touched += 1
+        exts = item.setdefault('stac_extensions', [])
+        if ALTERNATE_EXTENSION not in exts:
+            exts.append(ALTERNATE_EXTENSION)
+    return touched

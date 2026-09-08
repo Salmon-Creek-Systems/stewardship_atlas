@@ -360,3 +360,129 @@ class TestPublishIsSafeWhenDisabled(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 (#159): source layer data in S3
+# ---------------------------------------------------------------------------
+
+class TestLayerKeysAndBuckets(unittest.TestCase):
+
+    SETTINGS = {'outlets_bucket': 'scs-atlas-outlets-prod',
+                'private_bucket': 'scs-atlas-private-prod'}
+
+    def test_layer_key_is_version_stamped(self):
+        self.assertEqual(
+            atlas_store.layer_key('kennedy', 'roads', '2026-09-08', 'roads.geojson'),
+            'kennedy/layers/roads/2026-09-08/roads.geojson')
+
+    def test_public_layer_goes_to_the_outlets_bucket(self):
+        self.assertEqual(atlas_store.layer_bucket(['public'], self.SETTINGS),
+                         'scs-atlas-outlets-prod')
+        self.assertEqual(atlas_store.layer_bucket(['public', 'admin'], self.SETTINGS),
+                         'scs-atlas-outlets-prod')
+        self.assertEqual(atlas_store.layer_bucket('public', self.SETTINGS),
+                         'scs-atlas-outlets-prod')
+
+    def test_protected_layer_goes_to_the_private_bucket(self):
+        for access in (['internal'], ['admin'], ['technical'], ['internal', 'admin']):
+            self.assertEqual(atlas_store.layer_bucket(access, self.SETTINGS),
+                             'scs-atlas-private-prod', access)
+
+    def test_absent_tier_never_reaches_the_public_bucket(self):
+        """is_public(None) is True — that default must not decide a bucket.
+
+        normalize_access() defaults a missing tier to public, matching
+        atlas.py. It is the same fail-open default that made `sqldb`, whose
+        atlas.db holds every layer, read as public. A bucket decision has to
+        require an explicit tier.
+        """
+        for access in (None, [], ''):
+            self.assertEqual(atlas_store.layer_bucket(access, self.SETTINGS),
+                             'scs-atlas-private-prod', repr(access))
+
+    def test_cloud_settings_exposes_the_layer_opt_in(self):
+        config = {'name': 'kennedy', 'cloud': {
+            'enabled': True, 'outlets_bucket': 'out', 'private_bucket': 'priv',
+            'layers': True}}
+        settings = atlas_store.cloud_settings(config)
+        self.assertTrue(settings['layers'])
+        self.assertEqual(settings['outlets_bucket'], 'out')
+        self.assertEqual(settings['private_bucket'], 'priv')
+
+    def test_outlet_mirroring_alone_does_not_ship_layers(self):
+        """An atlas already on the Phase 2 read path must opt in separately."""
+        config = {'name': 'kennedy',
+                  'cloud': {'enabled': True, 'outlets_bucket': 'out'}}
+        self.assertFalse(atlas_store.cloud_settings(config)['layers'])
+        self.assertEqual(
+            atlas_store.publish_layer_data(config, '/tmp', 'v1', {})['status'],
+            'skipped')
+
+
+class TestLayerUploadPlan(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.config = {'name': 'kennedy', 'cloud': {
+            'enabled': True, 'outlets_bucket': 'OUT', 'private_bucket': 'PRIV',
+            'layers': True}}
+        for layer, files in (('roads', ['roads.geojson']),
+                             ('basemap', ['basemap.tiff', 'basemap.tiff.jpg']),
+                             ('notes', ['notes.geojson'])):
+            d = self.tmp / 'layers' / layer
+            d.mkdir(parents=True)
+            for f in files:
+                (d / f).write_text('x')
+        self.layer_assets = {
+            'roads': {'href': 'h/roads.geojson', 'files': ['roads.geojson']},
+            'basemap': {'href': 'h/basemap.tiff',
+                        'files': ['basemap.tiff', 'basemap.tiff.jpg']},
+            'notes': {'href': 'h/notes.geojson', 'files': ['notes.geojson']},
+        }
+        self.access = {'roads': ['public'], 'basemap': ['public'],
+                       'notes': ['internal']}
+
+    def _plan(self, written):
+        return atlas_store.plan_layer_uploads(
+            self.config, self.tmp, 'V1', self.layer_assets, written, self.access)
+
+    def test_reused_layers_are_not_uploaded(self):
+        """A publish with no edits ships nothing — the point of stamped keys."""
+        self.assertEqual(self._plan([]), [])
+
+    def test_every_servable_file_is_uploaded_not_just_the_primary(self):
+        keys = [k for _, _, k, _ in self._plan(['basemap'])]
+        self.assertIn('kennedy/layers/basemap/V1/basemap.tiff', keys)
+        self.assertIn('kennedy/layers/basemap/V1/basemap.tiff.jpg', keys,
+                      'a webmap asks a raster for the rendered image')
+
+    def test_plan_routes_each_layer_by_tier(self):
+        buckets = {k.split('/')[2]: b for _, b, k, _ in
+                   self._plan(['roads', 'notes'])}
+        self.assertEqual(buckets['roads'], 'OUT')
+        self.assertEqual(buckets['notes'], 'PRIV')
+
+    def test_content_types_are_set(self):
+        types = {Path(k).name: c for _, _, k, c in self._plan(['roads', 'basemap'])}
+        self.assertEqual(types['roads.geojson'], 'application/geo+json')
+        self.assertEqual(types['basemap.tiff'], 'image/tiff')
+        self.assertEqual(types['basemap.tiff.jpg'], 'image/jpeg')
+
+    def test_a_file_named_by_the_catalog_but_missing_on_disk_is_skipped(self):
+        self.layer_assets['roads']['files'].append('ghost.geojson')
+        keys = [Path(k).name for _, _, k, _ in self._plan(['roads'])]
+        self.assertEqual(keys, ['roads.geojson'])
+
+    def test_catalog_documents_are_planned_into_the_outlets_bucket(self):
+        stac = self.tmp / 'stac' / 'roads'
+        stac.mkdir(parents=True)
+        (stac / 'collection.json').write_text('{}')
+        (self.tmp / 'stac' / 'catalog.json').write_text('{}')
+
+        plan = atlas_store.plan_catalog_upload(self.config, self.tmp, 'V1')
+        keys = sorted(k for _, _, k, _ in plan)
+        self.assertEqual(keys, ['kennedy/catalog/V1/catalog.json',
+                                'kennedy/catalog/V1/roads/collection.json'])
+        self.assertTrue(all(b == 'OUT' for _, b, _, _ in plan))
