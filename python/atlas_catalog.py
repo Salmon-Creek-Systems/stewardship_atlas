@@ -45,6 +45,13 @@ CATALOG_DIRNAME = 'stac'
 # raster suffixes so a converted layer wins over a leftover source tiff.
 LAYER_FILE_SUFFIXES = ('.geojson', '.parquet', '.tiff', '.tif', '.pmtiles', '.gpkg')
 
+# Extensions a consumer actually reads. Covers the vector and raster sources
+# plus the rendered images a webmap requests ({layer}.tiff.jpg / .tiff.png --
+# see the candidate list in outlets.bake_layer_data). Anything else in a layer
+# directory is tooling residue: GDAL statistics sidecars, exports, lock files.
+SERVABLE_SUFFIXES = frozenset(LAYER_FILE_SUFFIXES) | {
+    '.png', '.jpg', '.jpeg', '.webp'}
+
 
 def sha256_multihash(path, chunk_size: int = 1 << 20) -> str:
     """Multihash-encoded sha2-256 of a file, as STAC's `file:` extension wants.
@@ -108,7 +115,13 @@ def is_servable_file(filename: str, layer_name: str) -> bool:
     """
     if filename.startswith('.'):
         return False
-    return filename == layer_name or filename.startswith(f'{layer_name}.')
+    if not (filename == layer_name or filename.startswith(f'{layer_name}.')):
+        return False
+    # Name-prefixing alone still admits GDAL's sidecars — basemap.tiff.aux.xml
+    # rides along beside basemap.tiff. So the extension is an allowlist too:
+    # servable means a format something actually reads, not merely a file the
+    # layer's tooling happened to leave behind.
+    return Path(filename).suffix.lower() in SERVABLE_SUFFIXES
 
 
 def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:

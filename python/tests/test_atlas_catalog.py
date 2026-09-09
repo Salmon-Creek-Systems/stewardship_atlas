@@ -735,3 +735,25 @@ def test_a_layer_with_only_strays_is_reported_missing_not_published(tmp_path):
     layers = LAYERS + [{'name': 'lpss', 'access': ['admin']}]
     assets = AC.scan_layers(layers, version_dir / 'layers')
     assert 'lpss' not in assets, 'nothing servable -> not catalogued at all'
+
+
+def test_gdal_sidecars_are_not_servable():
+    """basemap.tiff.aux.xml rides along beside basemap.tiff and is name-prefixed,
+    so the name rule alone admits it. The extension is an allowlist too."""
+    for sidecar in ('basemap.tiff.aux.xml', 'basemap.tiff.jpg.aux.xml',
+                    'basemap.lock', 'basemap.xml'):
+        assert AC.is_servable_file(sidecar, 'basemap') is False, sidecar
+    for real in ('basemap.tiff', 'basemap.tiff.jpg', 'basemap.tiff.png'):
+        assert AC.is_servable_file(real, 'basemap') is True, real
+
+
+def test_sidecars_stay_out_of_the_upload_set(tmp_path):
+    version_dir = _make_version(tmp_path, V1)
+    raster = version_dir / 'layers' / 'lidar_basemap'
+    for f in ('lidar_basemap.tiff.jpg', 'lidar_basemap.tiff.aux.xml',
+              'lidar_basemap.tiff.jpg.aux.xml'):
+        (raster / f).write_text('x')
+
+    assets = AC.scan_layers(LAYERS, version_dir / 'layers')
+    assert sorted(assets['lidar_basemap']['files']) == [
+        'lidar_basemap.tiff', 'lidar_basemap.tiff.jpg']
