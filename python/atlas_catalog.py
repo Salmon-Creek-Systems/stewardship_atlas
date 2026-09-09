@@ -76,12 +76,18 @@ def find_layer_file(layers_root, name):
         if candidate.is_file():
             return candidate
 
-    files = [p for p in layer_dir.iterdir() if p.is_file() and p.name != 'stats.json']
+    # The fallback must apply the same allowlist as the sibling scan. It did
+    # not, and kennedy's `lpss` — a layer directory holding no lpss.* file at
+    # all — selected `.htpasswd` as its primary asset and published it. A
+    # denylist filtered in one place and not the other is worse than no filter,
+    # because the gap only shows on the one layer that takes the odd path.
+    files = [p for p in layer_dir.iterdir()
+             if p.is_file() and is_servable_file(p.name, name)]
     if not files:
         return None
     largest = max(files, key=lambda p: p.stat().st_size)
     logger.info(f"atlas_catalog: layer '{name}' has no {name}.* file; "
-                f"cataloguing largest file {largest.name}")
+                f"cataloguing largest servable file {largest.name}")
     return largest
 
 

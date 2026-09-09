@@ -78,12 +78,21 @@ def test_find_layer_file_prefers_the_name_matched_file(tmp_path):
     assert AC.find_layer_file(layers, 'roads').name == 'roads.geojson'
 
 
-def test_find_layer_file_falls_back_to_largest_and_skips_stats(tmp_path):
+def test_find_layer_file_falls_back_within_the_allowlist_only(tmp_path):
+    """The fallback picks the largest *servable* file, not the largest file.
+
+    A layer directory is not curated: kennedy's held `.htpasswd`, and an
+    unfiltered fallback published it. An arbitrarily-named file is no longer a
+    candidate — only `{layer}` or `{layer}.*`.
+    """
     layers = tmp_path / 'layers'
     (layers / 'odd').mkdir(parents=True)
     (layers / 'odd' / 'stats.json').write_text('x' * 5000)
     (layers / 'odd' / 'weird_name.tiff').write_text('yy')
-    assert AC.find_layer_file(layers, 'odd').name == 'weird_name.tiff'
+    assert AC.find_layer_file(layers, 'odd') is None
+
+    (layers / 'odd' / 'odd.tiff.jpg').write_text('IMG')
+    assert AC.find_layer_file(layers, 'odd').name == 'odd.tiff.jpg'
 
 
 def test_find_layer_file_returns_none_when_absent_or_empty(tmp_path):
@@ -688,3 +697,41 @@ def test_a_stray_file_never_reaches_an_item(tmp_path):
     for asset in item['assets'].values():
         assert '.htpasswd' not in asset['href']
         assert '.htpasswd' not in asset.get('alternate', {}).get('s3', {}).get('href', '')
+
+
+def test_fallback_never_selects_a_non_servable_file(tmp_path):
+    """kennedy's `lpss`: a layer directory with no lpss.* file at all.
+
+    find_layer_file() fell through to 'largest file in the directory' without
+    applying the servable allowlist, so it chose `.htpasswd` as the layer's
+    primary asset and published it. Filtering the sibling scan but not the
+    primary selection left a gap visible only on the one layer taking the
+    odd path.
+    """
+    layers = tmp_path / 'layers'
+    (layers / 'lpss').mkdir(parents=True)
+    (layers / 'lpss' / '.htpasswd').write_text('admin:$apr1$redacted')
+    (layers / 'lpss' / 'notes_export.csv').write_text('a,b,c')
+
+    assert AC.find_layer_file(layers, 'lpss') is None, \
+        'a directory with nothing servable has no layer file'
+
+
+def test_fallback_still_finds_an_oddly_named_servable_file(tmp_path):
+    layers = tmp_path / 'layers'
+    (layers / 'basemap').mkdir(parents=True)
+    (layers / 'basemap' / '.htpasswd').write_text('x')
+    (layers / 'basemap' / 'basemap.tiff.jpg').write_text('IMAGE-DATA')
+    assert AC.find_layer_file(layers, 'basemap').name == 'basemap.tiff.jpg'
+
+
+def test_a_layer_with_only_strays_is_reported_missing_not_published(tmp_path):
+    config = _cloud_config(tmp_path)
+    version_dir = _make_version(tmp_path, V1)
+    stray_layer = version_dir / 'layers' / 'lpss'
+    stray_layer.mkdir(parents=True)
+    (stray_layer / '.htpasswd').write_text('admin:$apr1$redacted')
+
+    layers = LAYERS + [{'name': 'lpss', 'access': ['admin']}]
+    assets = AC.scan_layers(layers, version_dir / 'layers')
+    assert 'lpss' not in assets, 'nothing servable -> not catalogued at all'
