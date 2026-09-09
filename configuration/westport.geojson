@@ -40,7 +40,7 @@
             ],
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "fill_opacity": 0.2,
             "editable_columns": [
@@ -70,7 +70,7 @@
             ],
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "fill_opacity": 0.4,
             "editable_columns": [
@@ -492,8 +492,7 @@
             },
             "icon-size": 3.0,
             "access": [
-              "internal",
-              "admin"
+              "public"
             ],
             "interaction": "interface"
           },
