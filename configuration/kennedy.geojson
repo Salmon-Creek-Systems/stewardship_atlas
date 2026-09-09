@@ -46,6 +46,8 @@
                     "enabled": true,
                     "outlets_bucket": "scs-atlas-outlets-prod",
                     "distribution_id": "E1A5S5MB0K3FZG",
+                    "private_bucket": "scs-atlas-private-prod",
+                    "layers": true,
                     "outlets": [
                         "webmap",
                         "console",
@@ -53,6 +55,9 @@
                         "3dview",
                         "runbook"
                     ]
+                },
+                "catalog": {
+                    "pin_unchanged_layers": true
                 },
                 "layers": {
                     "regions": {
@@ -86,7 +91,10 @@
                         "layer_def": "lpss"
                     },
                     "poi": {
-                        "layer_def": "poi"
+                        "layer_def": "poi",
+                        "access": [
+                            "public"
+                        ]
                     },
                     "creeks": {
                         "layer_def": "creeks"
@@ -123,7 +131,10 @@
                         "layer_def": "hydrants"
                     },
                     "notes": {
-                        "layer_def": "notes"
+                        "layer_def": "notes",
+                        "access": [
+                            "public"
+                        ]
                     },
                     "roads_index": {
                         "geometry_type": "polygon",
@@ -178,7 +189,7 @@
                         "add_labels": true,
                         "interaction": "interface",
                         "access": [
-                            "admin"
+                            "public"
                         ],
                         "fill_opacity": 0.4,
                         "editable_columns": [
@@ -223,7 +234,7 @@
                         "add_labels": true,
                         "interaction": "interface",
                         "access": [
-                            "admin"
+                            "public"
                         ],
                         "editable_columns": [
                             {

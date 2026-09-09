@@ -226,7 +226,7 @@
             "add_labels": true,
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "fill_opacity": 0.4,
             "editable_columns": [
@@ -252,7 +252,7 @@
             "add_labels": true,
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "editable_columns": [
               {

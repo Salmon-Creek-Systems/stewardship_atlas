@@ -55,7 +55,7 @@
           ]
         },
         "layers": {
-          "regions": { "layer_def": "regions" },
+          "regions": { "layer_def": "regions", "access": ["public"] },
           "roads":   { "layer_def": "roads" },
           "creeks":  { "layer_def": "creeks" },
           "trails": {
@@ -68,7 +68,7 @@
             ],
             "paint": { "line-width": 3, "line-dasharray": [2, 2] }
           },
-          "landmarks": { "layer_def": "poi" },
+          "landmarks": { "layer_def": "poi", "access": ["public"] },
           "photos": {
             "geometry_type": "point",
             "conversations_enabled": true,

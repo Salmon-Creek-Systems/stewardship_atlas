@@ -19,6 +19,7 @@ import gspread
 
 import dataswale_geojson
 import federation
+import atlas_catalog
 import utils
 # from outlets_mapnik import build_region_map_mapnik
 
@@ -61,11 +62,50 @@ def _bakes_data(config, outlet_name) -> bool:
     return bool(config['assets'][outlet_name].get('bake_data', False))
 
 
-def _layer_data_url(bake: bool, layer_name: str, filename: str) -> str:
-    """URL a webmap should use for a layer file, baked or shared."""
-    if bake:
-        return f"data/{filename}"
-    return f"../../layers/{layer_name}/{filename}"
+def _layer_data_url(bake: bool, layer_name: str, filename: str,
+                    pinned: dict = None) -> str:
+    """Delegates to atlas_catalog.layer_data_url — see there for the reasoning.
+
+    Kept as a thin wrapper so the three call sites in webmap_json read the same
+    as before and the logic stays testable in the bare local env.
+    """
+    return atlas_catalog.layer_data_url(bake, layer_name, filename, pinned)
+
+
+def _pinned_layers(config, outlet_name) -> dict:
+    """Layers this outlet should address at an older version, or {}.
+
+    Off unless the atlas config sets `catalog.pin_unchanged_layers`, so every
+    atlas keeps publishing exactly as it does today until cut over one at a
+    time — the same rollout shape as `bake_data` and the Phase 2 `cloud` block.
+
+    Never raises: a failure here must degrade to today's behaviour, not break
+    a webmap build.
+    """
+    if not (config.get('catalog') or {}).get('pin_unchanged_layers'):
+        return {}
+    if _bakes_data(config, outlet_name):
+        return {}  # baked outlets carry their own copy; nothing to pin
+    try:
+        current = versioning.atlas_path(config, version='CURRENT')
+        if not current.is_symlink():
+            return {}
+        current_version_path = current.resolve()
+        pinned = atlas_catalog.resolve_pinned_layers(
+            config['dataswale']['layers'],
+            versioning.atlas_path(config, 'layers'),
+            current_version_path / atlas_catalog.CATALOG_DIRNAME,
+            base_url=config.get('base_url', ''),
+            atlas_root=current_version_path.parent,
+        )
+        if pinned:
+            logger.info(f"webmap {outlet_name}: addressing {len(pinned)} unchanged "
+                        f"layer(s) at their own version instead of ../../layers/")
+        return pinned
+    except Exception as exc:
+        logger.warning(f"webmap {outlet_name}: could not resolve pinned layers, "
+                       f"falling back to ../../layers/: {exc}")
+        return {}
 
 
 def bake_layer_data(config, outlet_name, layer_names) -> list:
@@ -78,9 +118,30 @@ def bake_layer_data(config, outlet_name, layer_names) -> list:
     COG rasters are skipped: they already live in their own public S3 bucket
     and are referenced absolutely, so there is nothing local to bake.
     """
+    layers = config['dataswale']['layers']
+
+    # #177: baking copies layer data into the outlet's own directory, so a
+    # public outlet that bakes an admin layer publishes admin data. Refuse the
+    # build and say so, rather than baking an empty FeatureCollection in its
+    # place: the layer HAS data, and an empty one is indistinguishable from
+    # "there is nothing here" — a config error rendered as a false statement
+    # about the world. (The empty-stub behaviour further down is for layers
+    # that genuinely have no data yet, #135, which is not the same thing.)
+    violations = federation.bake_access_violations(
+        config['assets'][outlet_name].get('access'), layers, layer_names)
+    if violations:
+        detail = ', '.join(f"{name} (access={access})" for name, access in violations)
+        raise ValueError(
+            f"outlet '{outlet_name}' bakes layer data and is readable at "
+            f"access={config['assets'][outlet_name].get('access')}, but these "
+            f"layers are declared more restricted: {detail}. Baking would "
+            f"publish them at the outlet's access level. Fix by removing them "
+            f"from the outlet's in_layers, or by correcting their access if "
+            f"they are not actually restricted. See issue #177.")
+
     data_dir = versioning.atlas_path(config, "outlets") / outlet_name / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    layers_dict = {l['name']: l for l in config['dataswale']['layers']}
+    layers_dict = {l['name']: l for l in layers}
 
     copied = []
     stubbed = []
@@ -164,6 +225,7 @@ def webmap_json(config, name, sprite_json=None):
     # When this outlet bakes its data, sources point at its own data/ dir
     # instead of the shared layer tree (see _layer_data_url).
     bake = _bakes_data(config, name)
+    pinned = _pinned_layers(config, name)
 
     # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
     in_layers_list = outlet_config['in_layers']
@@ -214,7 +276,7 @@ def webmap_json(config, name, sprite_json=None):
                                    else f"{layer_name}.tiff.jpg")
                 map_sources[layer_name] = {
                     'type': 'image',
-                    'url': _layer_data_url(bake, layer_name, raster_filename),
+                    'url': _layer_data_url(bake, layer_name, raster_filename, pinned),
                     'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
@@ -226,7 +288,7 @@ def webmap_json(config, name, sprite_json=None):
         else:
             map_sources[layer_name] =  {
             'type': 'geojson',
-            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson")
+            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson", pinned)
             }
         # Add Display Layer
         map_layer = {
@@ -436,7 +498,7 @@ def webmap_json(config, name, sprite_json=None):
                         # Add source for this layer if it doesn't exist
                         map_sources[layer_name] = {
                             'type': 'geojson',
-                            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson")
+                            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson", pinned)
                         }
                     
                     # Add metadata for legend display

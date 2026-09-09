@@ -57,7 +57,10 @@
         "logo_url": "",
         "layers": {
           "regions": {
-            "layer_def": "regions"
+            "layer_def": "regions",
+            "access": [
+              "public"
+            ]
           },
           "roads": {
             "layer_def": "roads"
@@ -66,7 +69,10 @@
             "layer_def": "creeks"
           },
           "landmarks": {
-            "layer_def": "poi"
+            "layer_def": "poi",
+            "access": [
+              "public"
+            ]
           },
 	  "parcels": {
             "layer_def": "parcels"

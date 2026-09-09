@@ -285,3 +285,534 @@ def fold_provenance_into_attribution(attribution: Dict[str, Any],
     existing = out.get('metadata') or ''
     out['metadata'] = (existing + ' ' + note).strip()
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3: version-aware catalog
+#
+# The catalog above describes one snapshot of the *shareable* layers. It hangs
+# each layer's asset straight off its Collection, which is fine while only
+# CURRENT exists and is exactly why it cannot express versions: there is
+# nowhere to put a second one. This section adds the missing level.
+#
+#     Catalog     {atlas}              the atlas
+#       Collection  {layer}            a layer, spanning all of its versions
+#         Item        {layer}-{ver}    one published version; holds the assets
+#
+# A version is then a thin Catalog linking to the Items that constitute it —
+# which is the "manifest" Phase 3 needs, in a format other tools already read.
+# Issue #159 records why this shape rather than Collection-per-version.
+#
+# Pure and stdlib-only like the rest of this module: these build dicts. They do
+# not touch the filesystem, S3, or the network. Wiring into publish is a
+# separate slice.
+# --------------------------------------------------------------------------- #
+
+# STAC extension schemas. `file:` carries size and checksum (what makes an Item
+# reusable across versions); `version` carries the predecessor/successor chain.
+FILE_EXTENSION = "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+VERSION_EXTENSION = "https://stac-extensions.github.io/version/v1.2.0/schema.json"
+
+
+def utc_now_iso() -> str:
+    """Current UTC time as an ISO-8601 string. Injectable so tests are stable."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def bbox_to_geometry(stac_bbox: List[float]) -> Dict[str, Any]:
+    """[west, south, east, north] -> a closed GeoJSON Polygon ring.
+
+    A STAC Item is a GeoJSON Feature and so needs a geometry. Atlas layers
+    cover the whole atlas footprint, so the bbox rectangle is the honest
+    answer; a tighter hull would imply a precision we do not have.
+    """
+    west, south, east, north = stac_bbox
+    return {
+        'type': 'Polygon',
+        'coordinates': [[
+            [west, south], [east, south], [east, north], [west, north], [west, south],
+        ]],
+    }
+
+
+def stac_asset(href: str, *, media_type: Optional[str] = None,
+               roles: Optional[List[str]] = None, title: Optional[str] = None,
+               size: Optional[int] = None,
+               checksum: Optional[str] = None) -> Dict[str, Any]:
+    """Build one STAC asset entry.
+
+    `media_type` defaults to atlas_store's table, which knows the geo formats
+    mimetypes gets wrong. `size`/`checksum` become `file:` extension fields —
+    the checksum is what lets a later version reuse this exact asset instead of
+    writing a duplicate object.
+    """
+    if media_type is None:
+        import atlas_store  # import-light (stdlib only); no cycle back to here
+        media_type = atlas_store.content_type_for(href)
+
+    asset: Dict[str, Any] = {'href': href, 'type': media_type}
+    if roles:
+        asset['roles'] = list(roles)
+    if title:
+        asset['title'] = title
+    if size is not None:
+        asset['file:size'] = size
+    if checksum:
+        asset['file:checksum'] = checksum
+    return asset
+
+
+def layer_access(layer: Dict[str, Any]) -> List[str]:
+    """Access tiers for a *layer*, defaulting fail-closed.
+
+    Deliberately the opposite of the outlet default. `atlas.py` does
+    `.get('access', ['public'])` for outlets, and that fail-open default is a
+    known trap — it is how `sqldb`, whose atlas.db holds every layer, reads as
+    public on the strength of a missing field. A layer with no explicit tier is
+    treated as internal here; publishing one is then an act of commission.
+
+    `shareable.enabled` is an explicit decision to hand a layer to another
+    atlas, so it promotes to public.
+    """
+    access = layer.get('access')
+    if access:
+        import atlas_store  # import-light (stdlib only); no cycle back to here
+        return atlas_store.normalize_access(access)
+    share = layer.get('shareable')
+    if isinstance(share, dict) and share.get('enabled'):
+        return ['public']
+    return ['internal']
+
+
+def is_public_layer(layer: Dict[str, Any]) -> bool:
+    """True if this layer may appear in a world-readable catalog."""
+    return 'public' in layer_access(layer)
+
+
+def item_id(layer_name: str, version: str) -> str:
+    """Stable Item id for one layer at one version.
+
+    Hyphen-joined rather than slash-joined: an id travels into filenames and
+    URLs, and STAC ids with path separators in them break naive resolvers.
+    """
+    return f'{layer_name}-{version}'
+
+
+def item_self_href(item: Dict[str, Any]) -> Optional[str]:
+    """The Item's own `self` link, which is where it actually lives.
+
+    Load-bearing for reuse: a reused Item lives under the version that first
+    wrote it, so a link to it must NOT be rebuilt from the *current* version's
+    base URL. Reconstructing produced hrefs like
+    `.../{new_version}/stac/roads/roads-{old_version}.json` — the new version's
+    directory with the old version's filename, pointing at nothing.
+    """
+    for link in item.get('links', []):
+        if link.get('rel') == 'self':
+            return link.get('href')
+    return None
+
+
+def build_layer_item(atlas_id: str, layer_name: str, version: str,
+                     bbox: Dict[str, float], assets: Dict[str, Dict[str, Any]],
+                     *, datetime_iso: Optional[str] = None,
+                     catalog_base_url: str = '',
+                     properties: Optional[Dict[str, Any]] = None,
+                     derived_from: Optional[List[str]] = None) -> Dict[str, Any]:
+    """A STAC Item describing one layer as published in one version.
+
+    `datetime_iso` is the *publish* time. A layer like `hydrants` is a
+    continuously-edited register rather than an observation, so publish time is
+    the honest answer to "when was this true".
+
+    `derived_from` hrefs record lineage — for an outlet Item, the layer Items it
+    was built from. That turns `in_layers` from a build-time config field into
+    a property of the published artifact.
+    """
+    stac_bbox = _bbox_to_stac(bbox)
+    iid = item_id(layer_name, version)
+    catalog_self = catalog_base_url + 'catalog.json'
+    collection_href = f'{catalog_base_url}{layer_name}/collection.json'
+
+    props = {'datetime': datetime_iso or utc_now_iso(), 'version': version}
+    if properties:
+        props.update(properties)
+
+    links = [
+        {'rel': 'root', 'href': catalog_self},
+        {'rel': 'parent', 'href': collection_href},
+        {'rel': 'collection', 'href': collection_href},
+        {'rel': 'self', 'href': f'{catalog_base_url}{layer_name}/{iid}.json'},
+    ]
+    for href in (derived_from or []):
+        links.append({'rel': 'derived_from', 'href': href})
+
+    return {
+        'stac_version': STAC_VERSION,
+        'stac_extensions': [FILE_EXTENSION, VERSION_EXTENSION],
+        'type': 'Feature',
+        'id': iid,
+        'collection': layer_name,
+        'geometry': bbox_to_geometry(stac_bbox),
+        'bbox': stac_bbox,
+        'properties': props,
+        'assets': dict(assets),
+        'links': links,
+    }
+
+
+def build_layer_collection(atlas_id: str, layer: Dict[str, Any],
+                           bbox: Dict[str, float], items: List[Dict[str, Any]],
+                           *, catalog_base_url: str = '') -> Dict[str, Any]:
+    """A Collection for one layer, spanning every version of it.
+
+    `items` are that layer's Items, oldest first. The temporal extent runs from
+    the first publish to the most recent one; the Collection's `version` member
+    names the newest, which is what `source_version_from_collection()` already
+    reads on the consumer side.
+    """
+    name = layer['name']
+    stac_bbox = _bbox_to_stac(bbox)
+    catalog_self = catalog_base_url + 'catalog.json'
+    datetimes = [i['properties']['datetime'] for i in items]
+
+    collection = {
+        'stac_version': STAC_VERSION,
+        'stac_extensions': [VERSION_EXTENSION],
+        'type': 'Collection',
+        'id': name,
+        'title': layer.get('title', name),
+        'description': layer.get('description', ''),
+        'license': layer.get('license', 'other'),
+        'extent': {
+            'spatial': {'bbox': [stac_bbox]},
+            'temporal': {'interval': [[
+                datetimes[0] if datetimes else None,
+                datetimes[-1] if datetimes else None,
+            ]]},
+        },
+        'links': [
+            {'rel': 'root', 'href': catalog_self},
+            {'rel': 'parent', 'href': '../catalog.json'},
+            {'rel': 'self', 'href': f'{catalog_base_url}{name}/collection.json'},
+        ],
+    }
+    if items:
+        collection['version'] = items[-1]['properties']['version']
+    for item in items:
+        href = item_self_href(item) or f"{catalog_base_url}{name}/{item['id']}.json"
+        collection['links'].append({'rel': 'item', 'href': href})
+    return collection
+
+
+def build_version_catalog(atlas_id: str, version: str,
+                          items: List[Dict[str, Any]],
+                          *, datetime_iso: Optional[str] = None,
+                          catalog_base_url: str = '') -> Dict[str, Any]:
+    """The thin Catalog naming everything that constitutes one version.
+
+    This is the manifest. Its links point at Items that may live under *other*
+    versions — an unchanged layer is referenced, not copied, which is what
+    keeps a version cheap. Nothing here duplicates asset bytes.
+    """
+    catalog_self = catalog_base_url + 'catalog.json'
+    catalog = {
+        'stac_version': STAC_VERSION,
+        'type': 'Catalog',
+        'id': f'{atlas_id}-{version}',
+        'description': f'Atlas {atlas_id}, published version {version}',
+        'links': [
+            {'rel': 'root', 'href': catalog_self},
+            {'rel': 'self',
+             'href': f'{catalog_base_url}versions/{version}/catalog.json'},
+        ],
+    }
+    catalog['published'] = datetime_iso or utc_now_iso()
+    for item in items:
+        layer_name = item.get('collection') or item['id']
+        href = (item_self_href(item)
+                or f"{catalog_base_url}{layer_name}/{item['id']}.json")
+        catalog['links'].append({'rel': 'item', 'href': href, 'title': layer_name})
+    return catalog
+
+
+def link_version_chain(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Add `predecessor`/`successor`/`latest-version` links across one layer's
+    Items, oldest first. Mutates and returns the list.
+
+    This is the STAC `version` extension's answer to history, and it is why the
+    catalog does not need a separate pointer file per layer: the newest Item is
+    reachable from any of them.
+    """
+    if not items:
+        return items
+    latest = items[-1]
+    for idx, item in enumerate(items):
+        links = [l for l in item.get('links', [])
+                 if l.get('rel') not in ('predecessor', 'successor', 'latest-version')]
+        self_href = next((l['href'] for l in item['links'] if l.get('rel') == 'self'), None)
+        if idx > 0:
+            prev_self = next((l['href'] for l in items[idx - 1]['links']
+                              if l.get('rel') == 'self'), None)
+            if prev_self:
+                links.append({'rel': 'predecessor', 'href': prev_self})
+        if idx < len(items) - 1:
+            next_self = next((l['href'] for l in items[idx + 1]['links']
+                              if l.get('rel') == 'self'), None)
+            if next_self:
+                links.append({'rel': 'successor', 'href': next_self})
+        latest_self = next((l['href'] for l in latest['links']
+                            if l.get('rel') == 'self'), None)
+        if latest_self and latest_self != self_href:
+            links.append({'rel': 'latest-version', 'href': latest_self})
+        item['links'] = links
+    return items
+
+
+def item_checksum(item: Dict[str, Any], asset_key: str = 'data') -> Optional[str]:
+    """The `file:checksum` of an Item's primary asset, if it carries one."""
+    asset = (item.get('assets') or {}).get(asset_key)
+    if not isinstance(asset, dict):
+        return None
+    return asset.get('file:checksum')
+
+
+def select_reusable_items(previous_items: Dict[str, Dict[str, Any]],
+                          current_checksums: Dict[str, Optional[str]],
+                          asset_key: str = 'data') -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+    """Split a new version's layers into (reuse, write).
+
+    `previous_items` maps layer name -> the Item from the previous version.
+    `current_checksums` maps layer name -> the checksum staging now holds.
+
+    A layer whose checksum matches its previous Item is **reused**: the new
+    version's catalog links to the existing Item and no new object is written.
+    That is the mechanism that stops publish duplicating a layer tree it did
+    not change.
+
+    Fail-closed on unknowns: a missing checksum on either side means write.
+    Trusting an absent checksum would silently publish a stale asset, which is
+    far worse than writing an object we did not have to.
+    """
+    reuse: Dict[str, Dict[str, Any]] = {}
+    write: List[str] = []
+    for name, checksum in current_checksums.items():
+        previous = previous_items.get(name)
+        if previous is None or not checksum:
+            write.append(name)
+            continue
+        if item_checksum(previous, asset_key) == checksum:
+            reuse[name] = previous
+        else:
+            write.append(name)
+    return reuse, sorted(write)
+
+
+# --------------------------------------------------------------------------- #
+# Assembling a whole atlas catalog for one published version
+#
+# Built from the **config's layer list**, never from directory contents. That
+# is deliberate: a catalog built by walking the filesystem would faithfully
+# preserve orphans forever (see #173, where a superseded pipeline's output sat
+# in every published version for months). Config is the declaration of intent;
+# anything on disk it does not name is, by construction, garbage.
+# --------------------------------------------------------------------------- #
+
+def classify_layer(layer: Dict[str, Any]) -> str:
+    """'raster' or 'vector' for one layer config.
+
+    Decides whether a layer is *copied* into each version (vector: measured at
+    ~5% of scvfd's layer bytes and ~0.6% of fhe's, so copying is free and keeps
+    the version prefix traversable by DuckDB/Athena) or *referenced* at its own
+    stamped key (raster and tiles: where all the duplication savings are).
+    """
+    if layer.get('cog'):
+        return 'raster'
+    return 'raster' if layer.get('geometry_type') == 'raster' else 'vector'
+
+
+def build_atlas_catalog(atlas_id: str, atlas_description: str,
+                        layers: List[Dict[str, Any]], bbox: Dict[str, float],
+                        version: str, layer_assets: Dict[str, Dict[str, Any]],
+                        *, history: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+                        catalog_base_url: str = '',
+                        datetime_iso: Optional[str] = None) -> Dict[str, Any]:
+    """Assemble every document describing one published version.
+
+    Args:
+        layers: the config's layer list — the source of truth for what exists.
+        layer_assets: {layer_name: {'href', 'size', 'checksum', 'media_type',
+            'roles'}} for layers that actually have a file in this version.
+        history: {layer_name: [Items, oldest first]} from previous versions.
+            Empty or absent for a first publish.
+
+    Returns a dict with:
+        catalog          the atlas root Catalog
+        collections      {layer_name: Collection}
+        items            {layer_name: Item} — only the *newly written* ones
+        version_catalog  the thin Catalog that is this version's manifest
+        reused           layer names referenced at an older version
+        written          layer names that got a new Item
+        missing          layers declared in config with no file in this version
+
+    Nothing here writes anything; the caller decides what to persist.
+    """
+    history = {k: list(v) for k, v in (history or {}).items()}
+    when = datetime_iso or utc_now_iso()
+    catalog_self = catalog_base_url + 'catalog.json'
+
+    previous_items = {name: items[-1] for name, items in history.items() if items}
+    current_checksums = {name: layer_assets[name].get('checksum')
+                         for name in layer_assets}
+    reuse, _ = select_reusable_items(previous_items, current_checksums)
+
+    collections: Dict[str, Dict[str, Any]] = {}
+    new_items: Dict[str, Dict[str, Any]] = {}
+    version_items: List[Dict[str, Any]] = []
+    reused: List[str] = []
+    written: List[str] = []
+    missing: List[str] = []
+
+    for layer in layers:
+        name = layer.get('name')
+        if not name:
+            continue
+        spec = layer_assets.get(name)
+        if spec is None:
+            missing.append(name)
+            continue
+
+        if name in reuse:
+            item = reuse[name]
+            reused.append(name)
+        else:
+            assets = {'data': stac_asset(
+                spec['href'],
+                media_type=spec.get('media_type'),
+                roles=spec.get('roles') or ['data'],
+                title=layer.get('title', name),
+                size=spec.get('size'),
+                checksum=spec.get('checksum'))}
+            # Secondary files in the layer directory get their own assets,
+            # keyed by filename. A webmap asks a raster layer for
+            # `{layer}.tiff.jpg` while the primary file is `{layer}.tiff`, so
+            # an Item that records only the primary cannot answer "does this
+            # version hold the file the caller wants". Only the primary carries
+            # the checksum — it is what reuse is decided on.
+            for extra_name, extra_href in sorted(
+                    (spec.get('file_hrefs') or {}).items()):
+                if extra_href == spec['href']:
+                    continue
+                assets[extra_name] = stac_asset(extra_href, roles=['data'])
+            item = build_layer_item(
+                atlas_id, name, version, bbox, assets,
+                datetime_iso=when, catalog_base_url=catalog_base_url,
+                properties={'atlas:layer_type': classify_layer(layer),
+                            'atlas:access': layer_access(layer)},
+                derived_from=spec.get('derived_from'))
+            history.setdefault(name, []).append(item)
+            new_items[name] = item
+            written.append(name)
+
+        version_items.append(item)
+        collections[name] = build_layer_collection(
+            atlas_id, layer, bbox, link_version_chain(history.get(name, [])),
+            catalog_base_url=catalog_base_url)
+
+    catalog = {
+        'stac_version': STAC_VERSION,
+        'type': 'Catalog',
+        'id': atlas_id,
+        'description': atlas_description,
+        'links': [
+            {'rel': 'root', 'href': catalog_self},
+            {'rel': 'self', 'href': catalog_self},
+        ],
+    }
+    for name in collections:
+        catalog['links'].append({'rel': 'child', 'href': f'./{name}/collection.json'})
+    catalog['links'].append(
+        {'rel': 'version-history',
+         'href': f'./versions/{version}/catalog.json', 'title': version})
+
+    return {
+        'catalog': catalog,
+        'collections': collections,
+        'items': new_items,
+        # The version that actually holds each layer's data — the current one
+        # for a rewrite, an older one for a reuse. Callers that need to put the
+        # bytes somewhere (the S3 push) need this for *every* layer, not just
+        # the ones written this time.
+        'versions': {i.get('collection') or i['id']: i['properties']['version']
+                     for i in version_items},
+        'version_catalog': build_version_catalog(
+            atlas_id, version, version_items,
+            datetime_iso=when, catalog_base_url=catalog_base_url),
+        'reused': reused,
+        'written': written,
+        'missing': missing,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Access checks for outlets that copy layer data (#177)
+# --------------------------------------------------------------------------- #
+
+# Least to most restrictive. An outlet's audience is its *most permissive*
+# tier: an outlet marked ["public", "admin"] is readable by the public.
+ACCESS_RANK = {'public': 0, 'internal': 1, 'admin': 2, 'technical': 3}
+
+
+def access_rank(tiers) -> int:
+    """How restricted a thing is: the rank of its most permissive tier."""
+    if not tiers:
+        return -1  # nothing declared — see bake_access_violations
+    ranks = [ACCESS_RANK.get(t, max(ACCESS_RANK.values())) for t in tiers]
+    return min(ranks)
+
+
+def bake_access_violations(outlet_access, layers: List[Dict[str, Any]],
+                           layer_names) -> List[Tuple[str, Any]]:
+    """Layers whose declared access is more restricted than the outlet's.
+
+    Baking copies a layer's data into an outlet's own directory, so a public
+    outlet that bakes an admin layer publishes admin data. Nothing checked
+    that until #177, where 17 explicitly-protected layers across 7 atlases were
+    found world-readable on CloudFront.
+
+    **Only explicitly declared layer tiers are checked.** A layer with no
+    `access` field is skipped rather than assumed protected: the fail-closed
+    default in `layer_access()` is this codebase's *intent*, not what its
+    configs actually say, and applying it here would fail the build for every
+    undeclared layer — 24 of kennedy's 33. Fixing the default is #175; this
+    function is about honouring declarations that already exist.
+
+    Returns [(layer_name, declared_access)] so the caller can name all of them
+    at once instead of failing on the first.
+    """
+    outlet_rank = access_rank(normalize_access_or_none(outlet_access))
+    if outlet_rank < 0:
+        outlet_rank = ACCESS_RANK['public']  # matches atlas.py's default
+
+    by_name = {l.get('name'): l for l in layers}
+    violations = []
+    for name in layer_names:
+        declared = (by_name.get(name) or {}).get('access')
+        if not declared:
+            continue
+        declared = declared if isinstance(declared, list) else [declared]
+        if access_rank(declared) > outlet_rank:
+            violations.append((name, declared))
+    return violations
+
+
+def normalize_access_or_none(access):
+    """Coerce access to a list, preserving 'not declared' as None.
+
+    `atlas_store.normalize_access` turns None into ['public'], which is the
+    fail-open default (#175). Here the difference between 'declared public'
+    and 'not declared' matters, so it is kept.
+    """
+    if access is None:
+        return None
+    return access if isinstance(access, list) else [access]

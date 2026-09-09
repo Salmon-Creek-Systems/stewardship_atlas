@@ -48,6 +48,7 @@ CONTENT_TYPES = {
     '.pmtiles': 'application/octet-stream',
     '.db':      'application/octet-stream',
     '.gpkg':    'application/geopackage+sqlite3',
+    '.parquet': 'application/vnd.apache.parquet',
     '.pdf':     'application/pdf',
     '.tif':     'image/tiff',
     '.tiff':    'image/tiff',
@@ -137,6 +138,15 @@ def cloud_settings(config: dict) -> dict:
                             or os.environ.get('ATLAS_DISTRIBUTION_ID')),
         'invalidate': cloud.get('invalidate', True),
         'outlets': cloud.get('outlets'),
+        # Phase 3 (#159). `outlets_bucket` is an alias of `bucket` so the layer
+        # planners can name the tier they mean rather than relying on which one
+        # happens to be the default. `layers` is a separate opt-in: an atlas
+        # already mirroring its outlets does not start shipping source data
+        # until it says so.
+        'outlets_bucket': bucket,
+        'private_bucket': (cloud.get('private_bucket')
+                           or os.environ.get('ATLAS_PRIVATE_BUCKET')),
+        'layers': bool(cloud.get('layers')),
     }
 
 
@@ -433,3 +443,191 @@ def publish_public_outlets(config: dict, version_path, version: str) -> dict:
     except Exception as e:
         logger.error(f"atlas_store: S3 publish failed for {atlas_name}: {e}", exc_info=True)
         return {'status': 'error', 'error': str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 (#159): source layer data in S3
+#
+# Layers are written once at an immutable, version-stamped key. A later version
+# that did not change a layer points at the same key rather than writing a
+# second copy — the same model the local catalog already uses, so the two stay
+# describable by one set of Items.
+#
+# Public-tier layers go to the outlets bucket: it already has OAC, a CloudFront
+# distribution, and the CORS rules COG/PMTiles range requests need. Splitting
+# source data into its own bucket is #174. Everything else goes to the private
+# bucket, where it has no reader until the Phase 4 protected read path.
+# ---------------------------------------------------------------------------
+
+def layer_key(atlas_name: str, layer_name: str, version: str, filename: str) -> str:
+    """Immutable key for one file of one layer at one version."""
+    return f"{atlas_prefix(atlas_name)}/layers/{layer_name}/{version}/{filename}"
+
+
+def layer_bucket(access, settings: dict) -> str:
+    """Which bucket a layer's data belongs in, from its access tiers.
+
+    Fail-closed by construction: only an explicitly public layer can reach the
+    public bucket. The tier comes from the catalog Item, where
+    ``federation.layer_access`` already defaults a layer with no ``access``
+    field to ``internal`` — deliberately the opposite of the outlet default in
+    ``atlas.py``, which is how `sqldb` came to read as public.
+    """
+    # `is_public(None)` is True — normalize_access() defaults a missing tier to
+    # public, matching atlas.py. That default must not reach a bucket decision,
+    # so an absent or empty tier is treated as private here regardless.
+    if access and is_public(access):
+        return settings.get('outlets_bucket') or ''
+    return settings.get('private_bucket') or ''
+
+
+def plan_layer_uploads(config: dict, version_path, version: str,
+                       layer_assets: dict, layer_versions: dict,
+                       access_by_layer: dict) -> list:
+    """The full set of objects this version's layers *should* have in S3.
+
+    Returns ``(Path, bucket, key, content_type)`` tuples for **every** layer the
+    catalog describes, keyed at the version that actually holds it — the current
+    one for a rewrite, an older one for a reuse.
+
+    This is deliberately a description of the desired end state rather than a
+    diff. An earlier version planned only the layers written this publish, on
+    the reasoning that a reused layer's object already exists. That reasoning
+    is wrong at the boundary: reuse is computed against the **local** catalog,
+    which knows nothing about what S3 holds. On kennedy's first push every
+    layer was "unchanged since the last local version", so every layer was
+    skipped and only the catalog documents landed. Caller reconciles this plan
+    against what is actually in the bucket.
+
+    Every servable file in the layer directory is included, not just the
+    primary one. A webmap asks a raster layer for ``{layer}.tiff.jpg`` while
+    the primary file is ``{layer}.tiff``, and an object store holding only the
+    primary cannot serve the map.
+
+    A reused layer's bytes are read from *this* version's directory: the
+    checksum matched, so the content is identical to what the older version
+    holds, and this is the copy known to be present.
+    """
+    atlas_name = config['name']
+    settings = cloud_settings(config)
+    version_path = Path(version_path)
+
+    plan = []
+    for name in sorted(layer_versions):
+        spec = layer_assets.get(name)
+        if not spec:
+            continue
+        bucket = layer_bucket(access_by_layer.get(name), settings)
+        if not bucket:
+            logger.warning(f"atlas_store: no bucket configured for layer '{name}' "
+                           f"(access={access_by_layer.get(name)}) — skipping")
+            continue
+        layer_dir = version_path / 'layers' / name
+        for filename in spec.get('files') or [Path(spec['href']).name]:
+            path = layer_dir / filename
+            if not path.is_file():
+                logger.warning(f"atlas_store: {path} named by the catalog but not "
+                               f"on disk — skipping")
+                continue
+            plan.append((path, bucket,
+                         layer_key(atlas_name, name, layer_versions[name], filename),
+                         content_type_for(filename)))
+    return plan
+
+
+def plan_catalog_upload(config: dict, version_path: str, version: str,
+                        stac_dirname: str = 'stac') -> list:
+    """Upload plan for a version's STAC documents.
+
+    The catalog is the index a remote reader needs, so it goes to the same
+    bucket as the outlets it describes. Documents are small JSON; they are
+    uploaded whole rather than diffed.
+    """
+    settings = cloud_settings(config)
+    bucket = settings.get('outlets_bucket') or ''
+    stac_dir = Path(version_path) / stac_dirname
+    if not (bucket and stac_dir.is_dir()):
+        return []
+
+    prefix = f"{atlas_prefix(config['name'])}/catalog/{version}"
+    return [(path, bucket, f"{prefix}/{path.relative_to(stac_dir).as_posix()}",
+             content_type_for(path))
+            for path in sorted(stac_dir.rglob('*.json')) if path.is_file()]
+
+
+def publish_layer_data(config: dict, version_path, version: str,
+                       catalog_summary: dict) -> dict:
+    """Push this version's newly written layers, and its catalog, to S3.
+
+    Runs after ``atlas_catalog.publish_catalog`` and reuses what it already
+    computed, so layer files are scanned and checksummed once per publish.
+
+    A no-op unless the atlas sets both ``cloud.enabled`` and ``cloud.layers``:
+    an atlas already mirroring its outlets does not start shipping source data
+    until it says so. Never raises — the caller treats a failed push exactly as
+    it treats a failed outlet push, because the box is still serving and the
+    local files are still authoritative.
+    """
+    settings = cloud_settings(config)
+    if not (settings.get('enabled') and settings.get('layers')):
+        return {'status': 'skipped', 'reason': 'cloud.layers not enabled'}
+
+    desired = plan_layer_uploads(
+        config, version_path, version,
+        catalog_summary.get('layer_assets') or {},
+        catalog_summary.get('layer_versions') or {},
+        catalog_summary.get('access_by_layer') or {})
+
+    # Reconcile against what the bucket actually holds rather than trusting the
+    # local catalog's reuse decision — see plan_layer_uploads. Keys are
+    # immutable, so "present" means "correct" and re-uploading is never needed.
+    # This also self-heals a partial failure from an earlier publish.
+    client = _s3()
+    plan = []
+    skipped = 0
+    for bucket in sorted({b for _, b, _, _ in desired}):
+        prefix = f"{atlas_prefix(config['name'])}/layers/"
+        try:
+            present = set(list_keys(bucket, prefix, client=client))
+        except Exception as exc:
+            logger.warning(f"atlas_store: could not list s3://{bucket}/{prefix} "
+                           f"({exc}); uploading everything for that bucket")
+            present = set()
+        for entry in desired:
+            if entry[1] != bucket:
+                continue
+            if entry[2] in present:
+                skipped += 1
+            else:
+                plan.append(entry)
+
+    plan += plan_catalog_upload(config, version_path, version)
+
+    if not plan:
+        return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': skipped,
+                'note': 'every layer object already in place'}
+
+    by_bucket = {}
+    for path, bucket, key, content_type in plan:
+        by_bucket.setdefault(bucket, []).append((path, key, content_type))
+
+    uploaded_bytes = 0
+    errors = []
+    for bucket, items in sorted(by_bucket.items()):
+        try:
+            uploaded_bytes += upload_plan(bucket, items, client=client)
+            logger.info(f"atlas_store: uploaded {len(items)} object(s) to "
+                        f"s3://{bucket}/")
+        except Exception as exc:
+            errors.append(f"{bucket}: {exc}")
+            logger.error(f"atlas_store: layer push to {bucket} failed: {exc}",
+                         exc_info=True)
+
+    return {
+        'status': 'error' if errors else 'ok',
+        'objects': len(plan),
+        'bytes': uploaded_bytes,
+        'already_present': skipped,
+        'buckets': sorted(by_bucket),
+        'errors': errors,
+    }

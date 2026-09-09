@@ -401,7 +401,7 @@
             "fill_opacity": 0.7,
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "vis": {
               "layout": {
@@ -447,7 +447,7 @@
             "add_labels": true,
             "interaction": "interface",
             "access": [
-              "admin"
+              "public"
             ],
             "label_minzoom": 16,
             "editable_columns": [
