@@ -1111,7 +1111,6 @@
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
-                        "bake_data": true,
                         "access": [
                             "public",
                             "internal",

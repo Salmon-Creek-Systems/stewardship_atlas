@@ -56,9 +56,6 @@
                         "runbook"
                     ]
                 },
-                "catalog": {
-                    "pin_unchanged_layers": true
-                },
                 "layers": {
                     "regions": {
                         "layer_def": "regions"
@@ -518,7 +515,6 @@
                             "potential_culverts"
                         ],
                         "config_def": "webmap",
-                        "bake_data": true,
                         "access": [
                             "public",
                             "internal",

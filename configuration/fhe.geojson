@@ -646,8 +646,7 @@
               "public",
               "internal",
               "admin"
-            ],
-            "bake_data": true
+            ]
           },
           "webedit": {
             "type": "outlet",

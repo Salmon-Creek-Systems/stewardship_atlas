@@ -311,6 +311,92 @@ def plan_publish(config: dict, version_path, outlet_names=None) -> list:
     return plan
 
 
+def outlet_layer_names(config: dict, outlet_names=None) -> list:
+    """Union of `in_layers` across the outlets that are actually published.
+
+    This is the set of layers a public reader can reach, and it is derived from
+    the same allowlist that decides which outlet directories ship — so a layer
+    becomes publicly readable only because a published outlet references it,
+    never because it happens to sit in the layer tree.
+    """
+    assets = config.get('assets') or {}
+    names = publishable_outlets(config) if outlet_names is None else outlet_names
+    wanted = set()
+    for name in names:
+        wanted.update((assets.get(name) or {}).get('in_layers') or [])
+    return sorted(wanted)
+
+
+def plan_current_layers(config: dict, version_path, stub_dir=None,
+                        outlet_names=None) -> list:
+    """Upload plan for the layer data a published outlet needs to resolve.
+
+    Published outlets live at ``{atlas}/current/outlets/{name}/`` and reference
+    their data as ``../../layers/{layer}/{file}``, which resolves to
+    ``{atlas}/current/layers/``. Mirroring the referenced layers there is what
+    makes one built artifact work unchanged from the box and from CloudFront:
+    on disk that relative URL finds the local layer tree, on S3 it finds this
+    mirror. No rewrite at publish, no second materialize, no runtime lookup.
+
+    This replaces `bake_data`, which copied the same bytes into *every* outlet
+    that referenced them. One shared copy per atlas is strictly less
+    duplication, and it removes the failure mode behind #177: there is no
+    per-outlet copy that can carry a protected layer out at the outlet's tier.
+
+    Tier filtering is fail-closed and independent of the outlet's own access —
+    `federation.layer_access` defaults an undeclared layer to `internal`, the
+    opposite of `atlas.py`'s outlet default. A protected layer referenced by a
+    public outlet is skipped with a warning rather than mirrored.
+
+    `stub_dir`, when given, receives an empty FeatureCollection for any
+    referenced layer with no data file (issue #135). Without it the webmap
+    would emit a source URL pointing at nothing; an empty collection loads
+    cleanly and keeps the layer in the map and legend.
+    """
+    import federation
+    import atlas_catalog
+
+    version_path = Path(version_path)
+    atlas_name = config['name']
+    layers = (config.get('dataswale') or {}).get('layers') or []
+    layers_dict = {l['name']: l for l in layers if l.get('name')}
+    prefix = f"{current_prefix(atlas_name)}/layers"
+
+    plan = []
+    for layer_name in outlet_layer_names(config, outlet_names):
+        layer = layers_dict.get(layer_name)
+        if layer is None:
+            logger.warning(f"atlas_store: outlet references undeclared layer "
+                           f"'{layer_name}' — not mirroring")
+            continue
+        access = federation.layer_access(layer)
+        if not is_public(access):
+            logger.warning(
+                f"atlas_store: layer '{layer_name}' is referenced by a published "
+                f"outlet but declared access={access} — not mirroring it to the "
+                f"public bucket. The outlet will not be able to load it (#177).")
+            continue
+
+        layer_dir = version_path / 'layers' / layer_name
+        found = []
+        if layer_dir.is_dir():
+            found = sorted(f for f in (p.name for p in layer_dir.iterdir()
+                                       if p.is_file())
+                           if atlas_catalog.is_servable_file(f, layer_name))
+        for filename in found:
+            plan.append((layer_dir / filename, f"{prefix}/{layer_name}/{filename}",
+                         content_type_for(filename)))
+
+        if not found and stub_dir is not None:
+            stub = Path(stub_dir) / f"{layer_name}.geojson"
+            stub.write_text(json.dumps({'type': 'FeatureCollection', 'features': []}))
+            plan.append((stub, f"{prefix}/{layer_name}/{layer_name}.geojson",
+                         content_type_for(stub.name)))
+            logger.info(f"atlas_store: layer '{layer_name}' has no data file; "
+                        f"mirroring an empty FeatureCollection (#135)")
+    return plan
+
+
 def stale_keys(existing: list, planned: list) -> list:
     """Keys present in the bucket that the new publish does not write.
 
@@ -423,47 +509,62 @@ def publish_public_outlets(config: dict, version_path, version: str) -> dict:
     bucket = settings['bucket']
     prefix = current_prefix(atlas_name)
 
+    import tempfile
     try:
         names = publishable_outlets(config)
-        plan = plan_publish(config, version_path, names)
-        if not plan:
-            logger.warning(f"atlas_store: nothing to publish for {atlas_name}")
-            return {'status': 'empty', 'outlets': names}
+        # The stub dir must outlive planning and stay alive through the upload,
+        # so it is scoped to the whole push rather than to the planner.
+        with tempfile.TemporaryDirectory() as stub_dir:
+            plan = plan_publish(config, version_path, names)
+            # Layer data the published outlets reference, mirrored to
+            # {atlas}/current/layers/ so their relative URLs resolve here the
+            # same way they resolve on the box. Part of the *same* plan, which
+            # is what makes stale-key pruning cover a layer that stops being
+            # referenced — otherwise a removed layer would linger and keep
+            # being served.
+            layer_plan = plan_current_layers(config, version_path, stub_dir, names)
+            plan += layer_plan
+            if not plan:
+                logger.warning(f"atlas_store: nothing to publish for {atlas_name}")
+                return {'status': 'empty', 'outlets': names}
 
-        client = _s3()
-        logger.info(f"atlas_store: publishing {len(plan)} files for {atlas_name} "
-                    f"({', '.join(names)}) to s3://{bucket}/{prefix}/")
+            client = _s3()
+            logger.info(f"atlas_store: publishing {len(plan)} files for {atlas_name} "
+                        f"({', '.join(names)}; {len(layer_plan)} layer object(s)) "
+                        f"to s3://{bucket}/{prefix}/")
 
-        existing = list_keys(bucket, f"{prefix}/", client=client)
-        moved = upload_plan(bucket, plan, client=client)
-        removed = delete_keys(bucket, stale_keys(existing, [key for _, key, _ in plan]),
-                              client=client)
+            existing = list_keys(bucket, f"{prefix}/", client=client)
+            moved = upload_plan(bucket, plan, client=client)
+            removed = delete_keys(bucket, stale_keys(existing, [key for _, key, _ in plan]),
+                                  client=client)
 
-        write_pointer(bucket, atlas_name, {
-            'atlas': atlas_name,
-            'version': version,
-            'published_at': datetime.datetime.now().isoformat(),
-            'outlets': names,
-            'files': len(plan),
-        }, client=client)
+            write_pointer(bucket, atlas_name, {
+                'atlas': atlas_name,
+                'version': version,
+                'published_at': datetime.datetime.now().isoformat(),
+                'outlets': names,
+                'files': len(plan),
+                'layer_objects': len(layer_plan),
+            }, client=client)
 
-        invalidation = None
-        if settings['invalidate']:
-            invalidation = invalidate_current(settings['distribution_id'], atlas_name)
+            invalidation = None
+            if settings['invalidate']:
+                invalidation = invalidate_current(settings['distribution_id'], atlas_name)
 
-        logger.info(f"atlas_store: published {len(plan)} files ({moved} bytes), "
-                    f"pruned {removed}, invalidation={invalidation}")
-        return {
-            'status': 'success',
-            'bucket': bucket,
-            'prefix': prefix,
-            'version': version,
-            'outlets': names,
-            'files': len(plan),
-            'bytes': moved,
-            'pruned': removed,
-            'invalidation': invalidation,
-        }
+            logger.info(f"atlas_store: published {len(plan)} files ({moved} bytes), "
+                        f"pruned {removed}, invalidation={invalidation}")
+            return {
+                'status': 'success',
+                'bucket': bucket,
+                'prefix': prefix,
+                'version': version,
+                'outlets': names,
+                'files': len(plan),
+                'layer_objects': len(layer_plan),
+                'bytes': moved,
+                'pruned': removed,
+                'invalidation': invalidation,
+            }
     except Exception as e:
         logger.error(f"atlas_store: S3 publish failed for {atlas_name}: {e}", exc_info=True)
         raise

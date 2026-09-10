@@ -129,7 +129,6 @@
             "name": "webmap",
             "in_layers": ["regions", "roads", "creeks", "trails", "landmarks", "photos", "inaturalist"],
             "config_def": "webmap",
-            "bake_data": true,
             "access": ["public", "internal", "admin"]
           },
           "webedit": {

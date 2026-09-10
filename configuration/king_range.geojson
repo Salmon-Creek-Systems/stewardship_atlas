@@ -395,7 +395,6 @@
             "type": "outlet",
             "name": "webmap",
             "config_def": "webmap",
-            "bake_data": true,
             "in_layers": [
               "geology",
               "faults",

@@ -241,10 +241,28 @@ map.on('load', async () => {
     if (basemapValueToLayer[initialBasemap]) {
         map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
     }
+    // The COG protocol issues HTTP range requests, so it needs a real absolute
+    // URL — but which host that is depends on where this page is being served
+    // from (the box, or CloudFront). So the generator emits a relative path and
+    // it is resolved here against the document, the same way the PMTiles
+    // sources are. An already-absolute URL is passed through untouched.
+    function resolveCogSource(sourceDef) {
+        const url = sourceDef && sourceDef.url;
+        if (typeof url !== 'string' || !url.startsWith('cog://')) return sourceDef;
+        const rest = url.slice('cog://'.length);
+        const hash = rest.indexOf('#');
+        const path = hash === -1 ? rest : rest.slice(0, hash);
+        const fragment = hash === -1 ? '' : rest.slice(hash);
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) return sourceDef;
+        return Object.assign({}, sourceDef, {
+            url: 'cog://' + new URL(path, window.location.href).href + fragment
+        });
+    }
+
     // Add COG sources and layers dynamically (protocol requires post-load addition)
     if (typeof COG_SOURCES !== 'undefined') {
         for (const [sourceId, sourceDef] of Object.entries(COG_SOURCES)) {
-            map.addSource(sourceId, sourceDef);
+            map.addSource(sourceId, resolveCogSource(sourceDef));
         }
         for (const layerDef of COG_LAYERS) {
             map.addLayer(layerDef, layerDef.before_layer_id || undefined);

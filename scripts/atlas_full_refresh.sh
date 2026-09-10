@@ -137,7 +137,7 @@ for entry in (r.get('log') or [])[-6:]:
     print('   ' + str(entry)[:220])
 " || die "publish did not finish"
 
-if [ -n "$CDN_URL" ] && [ "$CLOUD_ENABLED" = "True" ]; then
+if [ -n "$CDN_URL" ] && [ -n "$CLOUD_OUTLETS" ]; then
   step "checking the published copy"
   ok=1
   for outlet in ${CLOUD_OUTLETS//,/ }; do
@@ -157,7 +157,59 @@ if [ -n "$CDN_URL" ] && [ "$CLOUD_ENABLED" = "True" ]; then
     code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/outlets/html/$variant/")"
     [ "$code" = "200" ] && { printf '   \033[31mLEAK: html/%s is public\033[0m\n' "$variant"; ok=0; }
   done
-  [ "$ok" -eq 1 ] && echo "   public outlets served, no role variants exposed" \
+
+  # Every layer URL the published webmap actually emits, fetched. This is the
+  # check that matters: each earlier slice shipped a URL that was individually
+  # plausible and pointed at nothing, because the outlet half and the data half
+  # were only ever verified apart. Reading the URLs out of the served HTML and
+  # resolving them against the page's own location tests the join the browser
+  # will actually perform.
+  layer_urls="$(curl -s --max-time 30 "$CDN_URL/$ATLAS/current/outlets/webmap/" \
+    | python3 -c "
+import json, re, sys
+from urllib.parse import urljoin
+html = sys.stdin.read()
+m = re.search(r'const MAP_CONFIG = (\{.*?\});\s*\n', html, re.S)
+if not m:
+    sys.exit(0)
+base = '$CDN_URL/$ATLAS/current/outlets/webmap/'
+seen = set()
+for src in (json.loads(m.group(1)).get('style', {}).get('sources') or {}).values():
+    for key in ('data', 'url'):
+        val = src.get(key)
+        if isinstance(val, str) and val.startswith('../'):
+            seen.add(urljoin(base, val))
+print('\n'.join(sorted(seen)))
+" 2>/dev/null)"
+
+  if [ -n "$layer_urls" ]; then
+    n=0; bad=0
+    for u in $layer_urls; do
+      n=$((n+1))
+      code="$(curl -s -o /dev/null -w '%{http_code}' "$u")"
+      [ "$code" = "200" ] || { printf '   \033[31mBROKEN: %s -> %s\033[0m\n' "${u#$CDN_URL/}" "$code"; bad=1; }
+    done
+    [ "$bad" -eq 0 ] && printf '   %-20s %d/%d resolve\n' "layer sources" "$n" "$n" || ok=0
+  else
+    printf '   \033[33mnote: could not read layer URLs from the published webmap\033[0m\n'
+  fi
+
+  # No protected layer may be readable under the public prefix. The mirror is
+  # tier-filtered fail-closed, so this asserts that filter held in practice.
+  protected="$(python3 -c "
+import json
+cfg = json.load(open('$CONFIG'))
+for l in (cfg.get('dataswale') or {}).get('layers') or []:
+    access = l.get('access')
+    if access and 'public' not in access and 'shareable' not in access:
+        print(l['name'])
+" 2>/dev/null)"
+  for layer in $protected; do
+    code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/layers/$layer/$layer.geojson")"
+    [ "$code" = "200" ] && { printf '   \033[31mLEAK: protected layer %s is public\033[0m\n' "$layer"; ok=0; }
+  done
+
+  [ "$ok" -eq 1 ] && echo "   public outlets served, layers resolve, nothing protected exposed" \
                   || die "published copy did not verify"
 fi
 

@@ -5,6 +5,7 @@ types and upload planning have no AWS dependency, so they are testable in the
 bare local env. Everything below runs without credentials.
 """
 
+import json
 import logging
 import os
 import sys
@@ -557,3 +558,146 @@ class TestLayerUploadPlan(unittest.TestCase):
         self.assertEqual(keys, ['kennedy/catalog/V1/catalog.json',
                                 'kennedy/catalog/V1/roads/collection.json'])
         self.assertTrue(all(b == 'OUT' for _, b, _, _ in plan))
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 (#159): the served layer mirror under {atlas}/current/layers/
+#
+# This replaces `bake_data`. Fixtures here deliberately carry the things that
+# broke earlier slices: more than one outlet (so the union can be wrong), a
+# protected layer referenced by a public outlet (the #177 shape), a stray file
+# in a layer directory, and a layer with no data at all.
+# ---------------------------------------------------------------------------
+
+class TestCurrentLayerMirror(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.version = self.tmp / 'v1'
+        for layer, files in {
+            'roads':     ['roads.geojson'],
+            'hydrants':  ['hydrants.geojson'],
+            'basemap':   ['basemap.tiff', 'basemap.tiff.jpg',
+                          'basemap.tiff.aux.xml', 'stats.json'],
+            'secret':    ['secret.geojson'],
+            'unused':    ['unused.geojson'],
+            'empty':     [],
+        }.items():
+            d = self.version / 'layers' / layer
+            d.mkdir(parents=True)
+            for name in files:
+                (d / name).write_text('x')
+        (self.version / 'layers' / 'roads' / '.htpasswd').write_text('creds')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _config(self, **overrides):
+        config = {
+            'name': 'testatlas',
+            'assets': {
+                'webmap':  {'type': 'outlet', 'access': ['public'],
+                            'in_layers': ['roads', 'basemap', 'empty']},
+                'gazetteer': {'type': 'outlet', 'access': ['public'],
+                              'in_layers': ['roads', 'hydrants']},
+                'private_webmap': {'type': 'outlet', 'access': ['admin'],
+                                   'in_layers': ['secret']},
+            },
+            'dataswale': {'layers': [
+                {'name': 'roads', 'access': ['public']},
+                {'name': 'hydrants', 'access': ['public']},
+                {'name': 'basemap', 'access': ['public']},
+                {'name': 'secret', 'access': ['admin']},
+                {'name': 'unused', 'access': ['public']},
+                {'name': 'empty', 'access': ['public']},
+            ]},
+            'cloud': {'outlets': ['webmap', 'gazetteer', 'private_webmap']},
+        }
+        config.update(overrides)
+        return config
+
+    def _keys(self, **kw):
+        plan = atlas_store.plan_current_layers(self._config(), self.version, **kw)
+        return sorted(key for _, key, _ in plan)
+
+    def test_union_across_published_outlets(self):
+        names = atlas_store.outlet_layer_names(self._config())
+        # private_webmap is not publishable (admin), so `secret` is not in the
+        # union at all — the allowlist and the tier filter agree.
+        self.assertEqual(names, ['basemap', 'empty', 'hydrants', 'roads'])
+
+    def test_mirrors_referenced_public_layers(self):
+        keys = self._keys()
+        self.assertIn('testatlas/current/layers/roads/roads.geojson', keys)
+        self.assertIn('testatlas/current/layers/hydrants/hydrants.geojson', keys)
+
+    def test_a_raster_brings_its_rendered_image(self):
+        # The webmap requests basemap.tiff.jpg, not the tiff. Mirroring only the
+        # primary file would leave the map with a broken source.
+        keys = self._keys()
+        self.assertIn('testatlas/current/layers/basemap/basemap.tiff', keys)
+        self.assertIn('testatlas/current/layers/basemap/basemap.tiff.jpg', keys)
+
+    def test_strays_and_sidecars_never_mirror(self):
+        blob = '\n'.join(self._keys())
+        self.assertNotIn('.htpasswd', blob)
+        self.assertNotIn('aux.xml', blob)
+        self.assertNotIn('stats.json', blob)
+
+    def test_unreferenced_layer_is_not_published(self):
+        # `unused` is public and has data, but no published outlet names it.
+        # Being public must not be sufficient to leave the box.
+        self.assertNotIn('testatlas/current/layers/unused/unused.geojson', self._keys())
+
+    def test_protected_layer_is_never_mirrored(self):
+        """The #177 shape: a protected layer must not reach the public bucket.
+
+        Here it cannot even be reached, because the outlet referencing it is
+        not publishable — but the layer-level tier check is asserted directly
+        so the guarantee does not rest on the outlet filter alone.
+        """
+        config = self._config()
+        # Force the protected layer into a *public* outlet's in_layers.
+        config['assets']['webmap']['in_layers'].append('secret')
+        with self.assertLogs('atlas_store', level='WARNING') as captured:
+            plan = atlas_store.plan_current_layers(config, self.version)
+        keys = [key for _, key, _ in plan]
+        self.assertNotIn('testatlas/current/layers/secret/secret.geojson', keys)
+        self.assertIn("declared access=['admin']", ''.join(captured.output))
+
+    def test_layer_with_no_data_gets_an_empty_collection(self):
+        stub_dir = self.tmp / 'stubs'
+        stub_dir.mkdir()
+        plan = atlas_store.plan_current_layers(
+            self._config(), self.version, stub_dir)
+        entry = [e for e in plan if e[1].endswith('empty/empty.geojson')]
+        self.assertEqual(len(entry), 1, 'referenced empty layer needs a stub (#135)')
+        self.assertEqual(json.loads(entry[0][0].read_text()),
+                         {'type': 'FeatureCollection', 'features': []})
+
+    def test_without_a_stub_dir_an_empty_layer_is_simply_absent(self):
+        self.assertFalse([k for k in self._keys() if 'empty/' in k])
+
+    def test_keys_sit_under_the_pruned_prefix(self):
+        """Layer keys must live under current/, or stale pruning cannot reach them.
+
+        publish_public_outlets lists `{atlas}/current/` and deletes whatever the
+        new plan omits. A layer key outside that prefix would linger and keep
+        being served after the layer stopped being referenced.
+        """
+        prefix = atlas_store.current_prefix('testatlas') + '/'
+        for key in self._keys():
+            self.assertTrue(key.startswith(prefix), key)
+
+    def test_the_relative_url_a_webmap_emits_resolves_to_a_mirrored_key(self):
+        """The join that makes one artifact work on both hosts.
+
+        `{atlas}/current/outlets/webmap/` + `../../layers/roads/roads.geojson`
+        must land exactly on a key this plan writes. Asserting the two halves
+        separately is what let earlier slices ship a URL pointing at nothing.
+        """
+        import posixpath
+        import atlas_catalog
+        outlet_dir = f"{atlas_store.current_prefix('testatlas')}/outlets/webmap/"
+        url = atlas_catalog.layer_data_url('roads', 'roads.geojson')
+        resolved = posixpath.normpath(posixpath.join(outlet_dir, url))
+        self.assertIn(resolved, self._keys())

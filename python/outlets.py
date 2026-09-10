@@ -45,148 +45,30 @@ def _resolve_cog_color(config, layer_name, cog_color):
     return ','.join(parts)
 
 
-# --- Baked outlet data (Phase 2, cloud_native_plan.md 2b) -------------------
+# --- Layer data addressing (Phase 3, #159) ---------------------------------
 #
-# By default a webmap points at the shared dataswale with `../../layers/...`,
-# which means serving the outlet requires serving the raw layer tree too. For
-# an outlet published to public S3 that is the wrong default: it would put
-# every layer in the atlas — not just the ones on the map — behind a public
-# URL. With `bake_data` set, the outlet copies the layers it actually uses
-# into its own `data/` directory and references those instead, so the outlet
-# directory is self-contained and only listed layers can ever leave the box.
+# A webmap references its layers as `../../layers/{layer}/{file}` and nothing
+# else. That one relative form resolves to the local layer tree when the outlet
+# is served from the box and to `{atlas}/current/layers/` when it is served
+# from S3, so a single built artifact works from either host and publish stays
+# a pure snapshot (#131).
 #
-# Opt-in per outlet asset so atlases cut over one at a time. Also makes the
-# outlet directory genuinely portable, which is what "static-first" promised.
+# Two earlier variants are gone. `bake_data` copied a layer's bytes into every
+# outlet that referenced it — duplication proportional to outlet count, and the
+# mechanism behind #177, where a public outlet baked protected layers into its
+# own directory. Pinning addressed a sibling *version* directory, which has no
+# counterpart under the published `current/` prefix and would 404 on
+# CloudFront. `atlas_store.plan_current_layers` mirrors exactly the layers the
+# published outlets reference, tier-filtered fail-closed, which is what makes
+# the single shared form correct in both places.
 
-def _bakes_data(config, outlet_name) -> bool:
-    return bool(config['assets'][outlet_name].get('bake_data', False))
-
-
-def _layer_data_url(bake: bool, layer_name: str, filename: str,
-                    pinned: dict = None) -> str:
+def _layer_data_url(layer_name: str, filename: str) -> str:
     """Delegates to atlas_catalog.layer_data_url — see there for the reasoning.
 
-    Kept as a thin wrapper so the three call sites in webmap_json read the same
-    as before and the logic stays testable in the bare local env.
+    Kept as a thin wrapper so the call sites in webmap_json read the same as
+    before and the logic stays testable in the bare local env.
     """
-    return atlas_catalog.layer_data_url(bake, layer_name, filename, pinned)
-
-
-def _pinned_layers(config, outlet_name) -> dict:
-    """Layers this outlet should address at an older version, or {}.
-
-    Off unless the atlas config sets `catalog.pin_unchanged_layers`, so every
-    atlas keeps publishing exactly as it does today until cut over one at a
-    time — the same rollout shape as `bake_data` and the Phase 2 `cloud` block.
-
-    Never raises: a failure here must degrade to today's behaviour, not break
-    a webmap build.
-    """
-    if not (config.get('catalog') or {}).get('pin_unchanged_layers'):
-        return {}
-    if _bakes_data(config, outlet_name):
-        return {}  # baked outlets carry their own copy; nothing to pin
-    try:
-        current = versioning.atlas_path(config, version='CURRENT')
-        if not current.is_symlink():
-            return {}
-        current_version_path = current.resolve()
-        pinned = atlas_catalog.resolve_pinned_layers(
-            config['dataswale']['layers'],
-            versioning.atlas_path(config, 'layers'),
-            current_version_path / atlas_catalog.CATALOG_DIRNAME,
-            base_url=config.get('base_url', ''),
-            atlas_root=current_version_path.parent,
-        )
-        if pinned:
-            logger.info(f"webmap {outlet_name}: addressing {len(pinned)} unchanged "
-                        f"layer(s) at their own version instead of ../../layers/")
-        return pinned
-    except Exception as exc:
-        logger.warning(f"webmap {outlet_name}: could not resolve pinned layers, "
-                       f"falling back to ../../layers/: {exc}")
-        return {}
-
-
-def bake_layer_data(config, outlet_name, layer_names) -> list:
-    """Copy each layer's servable files into the outlet's own `data/` dir.
-
-    Only the layers passed in are copied — that list is the outlet's
-    `in_layers`, which is what makes this fail-closed. Returns the filenames
-    copied, for logging.
-
-    COG rasters are skipped: they already live in their own public S3 bucket
-    and are referenced absolutely, so there is nothing local to bake.
-    """
-    layers = config['dataswale']['layers']
-
-    # #177: baking copies layer data into the outlet's own directory, so a
-    # public outlet that bakes an admin layer publishes admin data. Refuse the
-    # build and say so, rather than baking an empty FeatureCollection in its
-    # place: the layer HAS data, and an empty one is indistinguishable from
-    # "there is nothing here" — a config error rendered as a false statement
-    # about the world. (The empty-stub behaviour further down is for layers
-    # that genuinely have no data yet, #135, which is not the same thing.)
-    violations = federation.bake_access_violations(
-        config['assets'][outlet_name].get('access'), layers, layer_names)
-    if violations:
-        detail = ', '.join(f"{name} (access={access})" for name, access in violations)
-        raise ValueError(
-            f"outlet '{outlet_name}' bakes layer data and is readable at "
-            f"access={config['assets'][outlet_name].get('access')}, but these "
-            f"layers are declared more restricted: {detail}. Baking would "
-            f"publish them at the outlet's access level. Fix by removing them "
-            f"from the outlet's in_layers, or by correcting their access if "
-            f"they are not actually restricted. See issue #177.")
-
-    data_dir = versioning.atlas_path(config, "outlets") / outlet_name / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    layers_dict = {l['name']: l for l in layers}
-
-    copied = []
-    stubbed = []
-    for layer_name in layer_names:
-        layer = layers_dict.get(layer_name, {})
-        if layer.get('cog'):
-            continue
-        layer_dir = versioning.atlas_path(config, "layers") / layer_name
-        # Candidate servable artifacts; whichever exist get baked.
-        found = False
-        for filename in (f"{layer_name}.geojson",
-                         f"{layer_name}.tiff.png",
-                         f"{layer_name}.tiff.jpg",
-                         f"{layer_name}.pmtiles"):
-            source = layer_dir / filename
-            if source.exists():
-                shutil.copy2(source, data_dir / filename)
-                copied.append(filename)
-                found = True
-
-        # A layer with no producing inlet has no file until something writes
-        # one (issue #135), so the webmap would emit a source URL pointing at
-        # nothing. Bake an empty FeatureCollection instead: the layer stays in
-        # the map and legend and loads cleanly, rather than erroring. Dropping
-        # the source entirely would be worse — a layer like `hydrants` is meant
-        # to exist and simply has no data yet, and silently vanishing from the
-        # legend hides that.
-        #
-        # The condition deliberately mirrors webmap_json's source-emitting
-        # branch: everything that is not 'raster' or 'documents' falls through
-        # to a geojson source there, so that is exactly the set needing a file.
-        # Keep the two in step. Rasters are left absent on purpose — an empty
-        # FeatureCollection is meaningless for an image source.
-        if not found and layer.get('geometry_type') not in ('raster', 'documents'):
-            filename = f"{layer_name}.geojson"
-            (data_dir / filename).write_text(
-                json.dumps({"type": "FeatureCollection", "features": []}))
-            copied.append(filename)
-            stubbed.append(layer_name)
-
-    logger.info(f"bake_layer_data: baked {len(copied)} file(s) into {data_dir}")
-    if stubbed:
-        logger.warning(f"bake_layer_data: no data file for {stubbed} — baked empty "
-                       f"FeatureCollections (see issue #135)")
-    return copied
+    return atlas_catalog.layer_data_url(layer_name, filename)
 
 
 def webmap_json(config, name, sprite_json=None):
@@ -222,10 +104,6 @@ def webmap_json(config, name, sprite_json=None):
     outlet_config = config['assets'][name]
     layers_dict = {x['name']: x for x in config['dataswale']['layers']}
 
-    # When this outlet bakes its data, sources point at its own data/ dir
-    # instead of the shared layer tree (see _layer_data_url).
-    bake = _bakes_data(config, name)
-    pinned = _pinned_layers(config, name)
 
     # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
     in_layers_list = outlet_config['in_layers']
@@ -245,10 +123,16 @@ def webmap_json(config, name, sprite_json=None):
         layer = layers_dict[layer_name]
         if layer['geometry_type'] == 'raster':
             if layer.get('cog'):
-                s3_bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
-                s3_region = layer.get('cog_s3_region', 'us-east-1')
-                cog_url = (f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com"
-                           f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
+                # `tiff_to_cog` writes {layer}.cog.tif into the layer directory
+                # like any other layer file, so the COG is catalogued and
+                # mirrored by the same path as everything else. It used to be
+                # addressed absolutely at a second bucket (scs-atlas-data,
+                # written by a separate `s3_upload` outlet), which meant two
+                # buckets, two key shapes and a copy the catalog knew nothing
+                # about. Relative here, made absolute in webmap.js — the COG
+                # protocol needs a real URL for its range requests, but which
+                # host that is depends on where the page is served from.
+                cog_url = _layer_data_url(layer_name, f"{layer_name}.cog.tif")
                 cog_color = layer.get('cog_color')
                 if cog_color and 'auto' in cog_color:
                     cog_color = _resolve_cog_color(config, layer_name, cog_color)
@@ -276,7 +160,7 @@ def webmap_json(config, name, sprite_json=None):
                                    else f"{layer_name}.tiff.jpg")
                 map_sources[layer_name] = {
                     'type': 'image',
-                    'url': _layer_data_url(bake, layer_name, raster_filename, pinned),
+                    'url': _layer_data_url(layer_name, raster_filename),
                     'coordinates': utils.bbox_to_corners(config['dataswale']['bbox'])}
         elif layer['geometry_type'] == 'documents':
             pass
@@ -288,7 +172,7 @@ def webmap_json(config, name, sprite_json=None):
         else:
             map_sources[layer_name] =  {
             'type': 'geojson',
-            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson", pinned)
+            'data': _layer_data_url(layer_name, f"{layer_name}.geojson")
             }
         # Add Display Layer
         map_layer = {
@@ -498,7 +382,7 @@ def webmap_json(config, name, sprite_json=None):
                         # Add source for this layer if it doesn't exist
                         map_sources[layer_name] = {
                             'type': 'geojson',
-                            'data': _layer_data_url(bake, layer_name, f"{layer_name}.geojson", pinned)
+                            'data': _layer_data_url(layer_name, f"{layer_name}.geojson")
                         }
                     
                     # Add metadata for legend display
@@ -951,8 +835,6 @@ def outlet_webmap(config, name):
     # Bake this outlet's layer data into its own data/ dir, after the raster
     # conversion above so the generated .jpg is there to copy. webmap_json
     # emits data/ URLs to match (see _layer_data_url).
-    if _bakes_data(config, name):
-        bake_layer_data(config, name, config['assets'][name]['in_layers'])
 
     # Generate base map configuration with sprite
     map_config = webmap_json(config, name, sprite_json)

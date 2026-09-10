@@ -418,123 +418,46 @@ def test_missing_referenced_item_falls_back_to_rewriting(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# Addressing a layer that lives in another version (slice 3)
+# Layer addressing
+#
+# Pinning is gone with this step. It addressed a sibling *version* directory
+# (`../../../{version}/layers/...`), which exists on the box but has no
+# counterpart under the published `current/` prefix, so those URLs would 404 on
+# CloudFront. One relative form now serves both hosts, backed by the mirror in
+# atlas_store.plan_current_layers.
 # --------------------------------------------------------------------------- #
 
-def _pin(version, *files):
-    return {'version': version, 'files': set(files)}
+def _item_filenames(item):
+    """Basenames of every file an Item's assets name — local test helper."""
+    from pathlib import Path as _P
+    return {_P(a['href']).name for a in (item.get('assets') or {}).values()
+            if isinstance(a, dict) and a.get('href')}
 
 
-def test_layer_data_url_modes():
-    pinned = {'roads': _pin(V1, 'roads.geojson')}
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson') == \
-        '../../layers/roads/roads.geojson'
-    assert AC.layer_data_url(True, 'roads', 'roads.geojson', pinned) == \
-        'data/roads.geojson', 'baking wins over pinning'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson', pinned) == \
-        f'../../../{V1}/layers/roads/roads.geojson'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
-                             {'other': _pin(V1, 'other.geojson')}) == \
-        '../../layers/roads/roads.geojson', 'a layer not pinned is unaffected'
+def test_layer_data_url_is_relative_and_host_independent():
+    """One form, resolving correctly from the box and from CloudFront.
 
-
-def test_pinning_falls_back_for_a_file_the_catalog_does_not_record():
-    """The kennedy `lpss` miss, and the raster case behind it.
-
-    Pinning resolved the *version* from the catalog and then rebuilt the
-    filename by convention. That works while `{layer}.geojson` holds and fails
-    silently when it does not — a webmap asks a raster layer for
-    `{layer}.tiff.jpg`, whose primary file is `{layer}.tiff`.
+    From `{atlas}/{version}/outlets/webmap/` it finds the local layer tree;
+    from `{atlas}/current/outlets/webmap/` on S3 it finds the mirror at
+    `{atlas}/current/layers/`. That is what lets publish stay a pure snapshot:
+    there is no URL to rewrite and no second materialize.
     """
-    pinned = {'basemap': _pin(V1, 'basemap.tiff')}
-    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg', pinned) == \
-        '../../layers/basemap/basemap.tiff.jpg', \
-        'a file the Item does not record must not be pinned'
-    pinned_with_jpg = {'basemap': _pin(V1, 'basemap.tiff', 'basemap.tiff.jpg')}
-    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg',
-                             pinned_with_jpg) == \
-        f'../../../{V1}/layers/basemap/basemap.tiff.jpg'
+    assert AC.layer_data_url('roads', 'roads.geojson') == '../../layers/roads/roads.geojson'
+    assert AC.layer_data_url('lidar_basemap', 'lidar_basemap.tiff.jpg') == \
+        '../../layers/lidar_basemap/lidar_basemap.tiff.jpg'
 
 
-def test_pin_entry_without_files_never_pins():
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
-                             {'roads': {'version': V1}}) == \
-        '../../layers/roads/roads.geojson'
+def test_layer_data_url_climbs_exactly_two_levels():
+    """Regression guard on the depth, which is what makes both hosts work.
 
-
-def test_pinned_url_resolves_from_staging_and_from_a_version(tmp_path):
-    """The property that removes the co-location assumption.
-
-    Staging and every published version are siblings under the atlas root, so
-    one relative URL has to work from both. This walks the URL from each
-    starting point and asserts it lands on the same real file.
+    An outlet directory always sits two below the version/current root, so the
+    URL must climb exactly two. Off-by-one here is invisible locally — a wrong
+    directory and a right one both resolve to *something* during a relative
+    join — and only shows up as a 404 on the served copy.
     """
-    atlas = tmp_path / 'kennedy'
-    data = atlas / V1 / 'layers' / 'roads'
-    data.mkdir(parents=True)
-    (data / 'roads.geojson').write_text('R1')
-
-    url = AC.layer_data_url(False, 'roads', 'roads.geojson',
-                            {'roads': _pin(V1, 'roads.geojson')})
-
-    for outlet_dir in (atlas / 'staging' / 'outlets' / 'webmap',
-                       atlas / V2 / 'outlets' / 'webmap'):
-        outlet_dir.mkdir(parents=True)
-        resolved = (outlet_dir / url).resolve()
-        assert resolved == (data / 'roads.geojson').resolve(), \
-            f'{url} must resolve to the real file from {outlet_dir}'
-        assert resolved.is_file()
-
-
-def test_resolve_pinned_layers_pins_only_unchanged_layers(tmp_path):
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    AC.publish_catalog(config, v1_dir, V1)
-
-    # staging: hydrants edited, roads and the raster untouched
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v1_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    assert set(pinned) == {'roads', 'lidar_basemap'}
-    assert pinned['roads']['version'] == V1
-    assert 'roads.geojson' in pinned['roads']['files']
-    assert 'hydrants' not in pinned, 'an edited layer must address the new version'
-
-
-def test_resolve_pinned_layers_is_empty_without_history(tmp_path):
-    staging = _make_version(tmp_path, 'staging')
-    assert AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', tmp_path / 'nope') == {}
-
-
-def test_pinning_follows_a_layer_back_through_hops(tmp_path):
-    """A layer reused in V2 pins to V1, where its data actually lives."""
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    AC.publish_catalog(config, v1_dir, V1)
-    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
-    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
-
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v2_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    assert pinned['roads']['version'] == V1, 'roads data lives at V1, not V2'
-    assert pinned['hydrants']['version'] == V2, 'hydrants was rewritten at V2'
-
-
-def test_checksum_match_fails_closed_on_missing_values(tmp_path):
-    item = F.build_layer_item('scvfd', 'x', V1, BBOX,
-                              {'data': F.stac_asset('x.parquet')})
-    assert AC.item_checksum_matches(item, 'abc') is False, 'no checksum on Item'
-    with_sum = F.build_layer_item('scvfd', 'x', V1, BBOX,
-                                  {'data': F.stac_asset('x.parquet', checksum='abc')})
-    assert AC.item_checksum_matches(with_sum, '') is False, 'no checksum to compare'
-    assert AC.item_checksum_matches(with_sum, 'abc') is True
+    url = AC.layer_data_url('roads', 'roads.geojson')
+    assert url.startswith('../../layers/')
+    assert not url.startswith('../../../')
 
 
 def test_item_records_every_servable_file_in_the_layer_dir(tmp_path):
@@ -549,30 +472,12 @@ def test_item_records_every_servable_file_in_the_layer_dir(tmp_path):
     item = json.loads((version_dir / 'stac' / 'lidar_basemap' /
                        f'lidar_basemap-{V1}.json').read_text())
 
-    names = AC.item_filenames(item)
+    names = _item_filenames(item)
     assert 'lidar_basemap.tiff' in names
     assert 'lidar_basemap.tiff.jpg' in names
     assert 'stats.json' not in names, 'sidecar is not servable data'
     assert F.item_checksum(item), 'primary asset still carries the checksum'
 
-
-def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    (v1_dir / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
-    AC.publish_catalog(config, v1_dir, V1)
-
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-    (staging / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v1_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    url = AC.layer_data_url(False, 'lidar_basemap', 'lidar_basemap.tiff.jpg', pinned)
-    assert url == f'../../../{V1}/layers/lidar_basemap/lidar_basemap.tiff.jpg'
-    outlet = tmp_path / V2 / 'outlets' / 'webmap'
-    outlet.mkdir(parents=True)
-    assert (outlet / url).resolve().is_file(), 'pinned raster URL must resolve'
 
 
 # --------------------------------------------------------------------------- #
@@ -740,7 +645,7 @@ def test_a_stray_file_never_reaches_an_item(tmp_path):
     AC.publish_catalog(config, version_dir, V1)
 
     item = json.loads((version_dir / 'stac' / 'roads' / f'roads-{V1}.json').read_text())
-    assert '.htpasswd' not in AC.item_filenames(item)
+    assert '.htpasswd' not in _item_filenames(item)
     for asset in item['assets'].values():
         assert '.htpasswd' not in asset['href']
         assert '.htpasswd' not in asset.get('alternate', {}).get('s3', {}).get('href', '')
