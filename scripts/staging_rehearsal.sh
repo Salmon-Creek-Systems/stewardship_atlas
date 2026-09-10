@@ -49,6 +49,25 @@ case "$ATLAS_OUTLETS_BUCKET$ATLAS_PRIVATE_BUCKET" in
   *prod*) die "environment points at production buckets ($ATLAS_OUTLETS_BUCKET / $ATLAS_PRIVATE_BUCKET)" ;;
 esac
 
+# Refuse to rehearse stale code. A worktree that silently did not pull is
+# indistinguishable in the output from one that did, right up until the
+# verification fails for a reason that was already fixed — which is exactly
+# how the first kennedy re-run was spent.
+BRANCH="$(cd "$REPO" && git rev-parse --abbrev-ref HEAD)"
+git -C "$REPO" fetch -q origin "$BRANCH" 2>/dev/null || true
+LOCAL="$(git -C "$REPO" rev-parse HEAD)"
+REMOTE="$(git -C "$REPO" rev-parse "origin/$BRANCH" 2>/dev/null || echo "$LOCAL")"
+if [ "$LOCAL" != "$REMOTE" ]; then
+  behind="$(git -C "$REPO" rev-list --count "$LOCAL..$REMOTE" 2>/dev/null || echo '?')"
+  die "worktree is $behind commit(s) behind origin/$BRANCH.
+     local  $LOCAL
+     origin $REMOTE
+     run:   git -C $REPO pull --ff-only"
+fi
+if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
+  printf '\033[33mwarning: worktree has uncommitted changes\033[0m\n'
+fi
+
 echo "atlas    : $ATLAS"
 echo "code     : $REPO  ($(cd "$REPO" && git rev-parse --abbrev-ref HEAD) @ $(cd "$REPO" && git rev-parse --short HEAD))"
 echo "data     : $SWALES_ROOT"
