@@ -106,6 +106,7 @@ class AtlasCloudStack(Stack):
         google_client_id: str = None,
         google_secret_name: str = None,
         api_image_tag: str = None,
+        callback_host_override: str = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -380,7 +381,24 @@ class AtlasCloudStack(Stack):
             )
             identity_providers.append(cognito.UserPoolClientIdentityProvider.GOOGLE)
 
-        callback_host = domain_name or distribution.distribution_domain_name
+        # Deriving this from the distribution creates a circular dependency,
+        # and it is only invisible in prod because `domain_name` is set there:
+        #
+        #   api_fn --env USER_POOL_CLIENT_ID--> WebClient
+        #          --callback_urls--> Distribution --origin--> api_fn's URL
+        #
+        # With a literal domain the middle edge does not exist. Without one
+        # CloudFormation refuses the whole stack, so the substrate could not be
+        # created from scratch in any environment that has no custom domain --
+        # which is exactly what `env_name=staging` is for.
+        #
+        # The callback host is therefore never taken from the distribution. It
+        # comes from the domain when there is one, from `-c callback_host=` when
+        # there is not, and otherwise from a placeholder. Cognito callbacks only
+        # matter once SSO is actually used (Phase 4), and the value can be
+        # corrected by a second deploy once the distribution's domain is known.
+        callback_host = (domain_name or callback_host_override
+                         or 'localhost.invalid')
         web_client = user_pool.add_client(
             "WebClient",
             user_pool_client_name=f"atlas-web-{env_name}",
