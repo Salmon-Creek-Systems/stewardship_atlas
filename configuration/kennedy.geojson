@@ -68,15 +68,27 @@
                         "layer_def": "raster"
                     },
                     "contours": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "contours"
                     },
                     "basemap": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "raster"
                     },
                     "lidar_basemap": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "raster"
                     },
                     "roads": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "roads"
                     },
                     "lpss": {
@@ -89,9 +101,15 @@
                         ]
                     },
                     "creeks": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "creeks"
                     },
                     "watertanks": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "watertanks"
                     },
                     "watertanks__shared": {
@@ -105,9 +123,15 @@
                         }
                     },
                     "ponds": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "ponds"
                     },
                     "buildings": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "buildings"
                     },
                     "gazetteer_regions": {
@@ -120,6 +144,9 @@
                         "layer_def": "parcels"
                     },
                     "hydrants": {
+                        "access": [
+                            "public"
+                        ],
                         "layer_def": "hydrants"
                     },
                     "notes": {
@@ -129,6 +156,9 @@
                         ]
                     },
                     "roads_index": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             100,
@@ -148,6 +178,9 @@
                         }
                     },
                     "creeks_index": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             50,
@@ -198,6 +231,9 @@
                         }
                     },
                     "burns_index": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             50,
@@ -242,6 +278,9 @@
                         }
                     },
                     "processing_sites_index": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             50,
@@ -261,6 +300,9 @@
                         }
                     },
                     "landfire_evc": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "raster",
                         "vis": {
                             "layout": {
@@ -272,6 +314,9 @@
                         }
                     },
                     "landfire_evt": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "raster",
                         "vis": {
                             "layout": {
@@ -283,6 +328,9 @@
                         }
                     },
                     "derelicts": {
+                        "access": [
+                            "public"
+                        ],
                         "name": "derelicts",
                         "geometry_type": "point",
                         "color": [
@@ -299,6 +347,9 @@
                         }
                     },
                     "derelict_structures": {
+                        "access": [
+                            "public"
+                        ],
                         "name": "derelict_structures",
                         "geometry_type": "point",
                         "color": [
@@ -315,6 +366,9 @@
                         }
                     },
                     "srsly_old": {
+                        "access": [
+                            "public"
+                        ],
                         "name": "srsly_old",
                         "geometry_type": "point",
                         "color": [
@@ -331,6 +385,9 @@
                         }
                     },
                     "potential_culverts": {
+                        "access": [
+                            "public"
+                        ],
                         "name": "potential_culverts",
                         "geometry_type": "point",
                         "color": [
