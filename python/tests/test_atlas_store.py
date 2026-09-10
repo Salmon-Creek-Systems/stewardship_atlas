@@ -595,12 +595,22 @@ class TestCurrentLayerMirror(unittest.TestCase):
         config = {
             'name': 'testatlas',
             'assets': {
+                # `fetch_type` lives under the resolved `config` sub-dict, as
+                # it does in a built atlas_config.json.
                 'webmap':  {'type': 'outlet', 'access': ['public'],
+                            'config': {'fetch_type': 'webmap'},
                             'in_layers': ['roads', 'basemap', 'empty']},
                 'gazetteer': {'type': 'outlet', 'access': ['public'],
+                              'config': {'fetch_type': 'webmap'},
                               'in_layers': ['roads', 'hydrants']},
                 'private_webmap': {'type': 'outlet', 'access': ['admin'],
+                                   'config': {'fetch_type': 'webmap'},
                                    'in_layers': ['secret']},
+                # A QGIS PDF: lists in_layers, but renders them into the
+                # document server-side and fetches nothing at view time.
+                'runbook': {'type': 'outlet', 'access': ['public'],
+                            'config': {'fetch_type': 'outlet_runbook_qgis_atlas'},
+                            'in_layers': ['roads', 'unused']},
             },
             'dataswale': {'layers': [
                 {'name': 'roads', 'access': ['public']},
@@ -610,7 +620,7 @@ class TestCurrentLayerMirror(unittest.TestCase):
                 {'name': 'unused', 'access': ['public']},
                 {'name': 'empty', 'access': ['public']},
             ]},
-            'cloud': {'outlets': ['webmap', 'gazetteer', 'private_webmap']},
+            'cloud': {'outlets': ['webmap', 'gazetteer', 'private_webmap', 'runbook']},
         }
         config.update(overrides)
         return config
@@ -644,9 +654,21 @@ class TestCurrentLayerMirror(unittest.TestCase):
         self.assertNotIn('stats.json', blob)
 
     def test_unreferenced_layer_is_not_published(self):
-        # `unused` is public and has data, but no published outlet names it.
+        # `unused` is public and has data, but only the PDF runbook names it.
         # Being public must not be sufficient to leave the box.
         self.assertNotIn('testatlas/current/layers/unused/unused.geojson', self._keys())
+
+    def test_a_pdf_outlet_does_not_drag_its_layers_into_the_mirror(self):
+        """A QGIS runbook renders server-side; nothing fetches its layers.
+
+        Mirroring them publishes data no page requests, and it pulls genuinely
+        protected layers into a check they do not belong in — kennedy's
+        admin-only `lpss` is referenced by the runbook and nothing else, and
+        surfaced as a spurious failure until this was fixed.
+        """
+        names = atlas_store.outlet_layer_names(self._config())
+        self.assertNotIn('unused', names)
+        self.assertIn('roads', names, 'still reached via the webmap')
 
     def test_protected_layer_is_never_mirrored(self):
         """The #177 shape: a protected layer must not reach the public bucket.

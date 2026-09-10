@@ -311,6 +311,13 @@ def plan_publish(config: dict, version_path, outlet_names=None) -> list:
     return plan
 
 
+# Outlets whose built pages request layer files over HTTP at view time, and so
+# need their data mirrored beside them. Everything else (QGIS PDFs, GeoPackage
+# and spreadsheet exports, the SQL database) consumes layers while building and
+# ships a self-contained artifact.
+CLIENT_FETCHED_OUTLETS = frozenset({'webmap', 'webedit', '3dview'})
+
+
 def outlet_layer_names(config: dict, outlet_names=None) -> list:
     """Union of `in_layers` across the outlets that are actually published.
 
@@ -323,7 +330,16 @@ def outlet_layer_names(config: dict, outlet_names=None) -> list:
     names = publishable_outlets(config) if outlet_names is None else outlet_names
     wanted = set()
     for name in names:
-        wanted.update((assets.get(name) or {}).get('in_layers') or [])
+        asset = assets.get(name) or {}
+        # Only outlets whose pages fetch layer data in a browser. A QGIS PDF
+        # runbook lists `in_layers` too, but it renders them server-side into
+        # the document — mirroring them would publish data nothing requests,
+        # and it drags genuinely protected layers (kennedy's admin-only `lpss`)
+        # into a check they have no business being in.
+        fetch_type = (asset.get('config') or {}).get('fetch_type') or ''
+        if fetch_type not in CLIENT_FETCHED_OUTLETS:
+            continue
+        wanted.update(asset.get('in_layers') or [])
     return sorted(wanted)
 
 
