@@ -103,52 +103,42 @@ def publish_new_version(config, version=None):
     except OSError as exc:
         logger.warning(f"Could not resolve CURRENT for catalog history: {exc}")
 
-    # point "production" to new version
-    # repoint symbolic link in atlas root dir to new version
-    #atlas_root = Path(config['data_root']) / config['name']
-    #atlas_root.symlink_to(atlas_path)
+    # Phase 3 (#159): write the catalog and push everything to S3 *before*
+    # CURRENT is repointed.
+    #
+    # Ordering is the whole point. Phase 2 pushed after the flip and swallowed
+    # any error, which was right while the box was authoritative and S3 was a
+    # mirror: a failed push meant a stale CloudFront copy, and failing a good
+    # publish over it would have been worse. That premise is gone. S3 now holds
+    # the source of truth, so a publish whose push failed is not a publish, and
+    # flipping first would leave the box advertising a version the world cannot
+    # read. Pushing first means a failure leaves the previous version live and
+    # the new snapshot orphaned on disk — recoverable, and visible.
+    catalog_summary = atlas_catalog.publish_catalog(
+        config, version_path, version, previous_version_path)
+    logger.info(
+        f"STAC catalog: version={version} "
+        f"written={catalog_summary['written_layers']} "
+        f"reused={len(catalog_summary['reused_layers'])} "
+        f"missing={catalog_summary['missing_layers']} "
+        f"documents={catalog_summary['documents']}")
 
+    layer_push = atlas_store.publish_layer_data(
+        config, version_path, version, catalog_summary)
+    logger.info(f"S3 layer publish: {layer_push}")
+
+    push = atlas_store.publish_public_outlets(config, version_path, version)
+    logger.info(f"S3 outlet publish: {push}")
+
+    # Only now is the new version real everywhere. The local symlink is still
+    # what the box serves from, and reset_staging() asserts is_symlink(), so it
+    # stays a symlink rather than becoming a pointer object (S3 gets its own
+    # current.json).
     current_path = atlas_path(config, version='CURRENT')
     current_path.unlink()
     current_path.symlink_to(version_path)
     logger.info(f"Linked {current_path} to {version_path}")
     print(f"Linked {current_path} to {version_path}")
-
-    # Phase 2 (cloud_native_plan.md): mirror the public outlets of this version
-    # to S3 so CloudFront can serve the read path. The local CURRENT symlink
-    # above is deliberately untouched — the box keeps serving exactly as it
-    # did, and this is additive until an atlas is cut over. A no-op unless the
-    # atlas has `cloud.enabled`, and it never raises: a failed push must not
-    # fail a good publish.
-    # Phase 3 (#159): describe this version as a STAC catalog — Collection per
-    # layer, Item per version — written into {version}/stac/. Additive: nothing
-    # reads it yet, and like the S3 push below it must never fail a good
-    # publish. A missing index is recoverable; a failed publish is an outage.
-    try:
-        catalog_summary = atlas_catalog.publish_catalog(
-            config, version_path, version, previous_version_path)
-        logger.info(
-            f"STAC catalog: version={version} "
-            f"written={catalog_summary['written_layers']} "
-            f"reused={len(catalog_summary['reused_layers'])} "
-            f"missing={catalog_summary['missing_layers']} "
-            f"documents={catalog_summary['documents']}")
-
-        # Phase 3 (#159): push this version's newly written layer data, and the
-        # catalog describing it, to S3. Public-tier layers to the outlets
-        # bucket, everything else to the private one. A no-op unless the atlas
-        # sets cloud.layers, and it never raises for the same reason the outlet
-        # push does not: the box is still serving and local files are still
-        # authoritative.
-        layer_push = atlas_store.publish_layer_data(
-            config, version_path, version, catalog_summary)
-        logger.info(f"S3 layer publish: {layer_push}")
-    except Exception as exc:
-        logger.error(f"STAC catalog write failed for version {version} "
-                     f"(publish continues): {exc}", exc_info=True)
-
-    push = atlas_store.publish_public_outlets(config, version_path, version)
-    logger.info(f"S3 outlet publish: {push}")
 
     return version_path
 

@@ -56,15 +56,17 @@ print('' if v is None else (','.join(v) if isinstance(v,list) else v))
 
 BASE_URL="$(cfg base_url)"
 CLOUD_OUTLETS="$(cfg cloud.outlets)"
-CLOUD_ENABLED="$(cfg cloud.enabled)"
 
 echo "atlas       : $ATLAS"
 echo "api         : $API_URL"
 echo "staging     : $BASE_URL/staging/outlets/webmap/"
-if [ "$CLOUD_ENABLED" = "True" ] && [ -n "$CLOUD_OUTLETS" ]; then
+# There is no `cloud.enabled` any more — S3 is the storage backend, not an
+# opt-in. `cloud.outlets` is the mandatory allowlist, and an atlas without one
+# publishes no outlets at all, which is a misconfiguration rather than a mode.
+if [ -n "$CLOUD_OUTLETS" ]; then
   echo "publishes   : $CLOUD_OUTLETS  ->  S3/CloudFront"
 else
-  echo "publishes   : local only (no cloud block — S3 push will be skipped)"
+  echo "publishes   : NOTHING — no cloud.outlets allowlist in $ATLAS.geojson"
 fi
 
 # The webapp's publish status is a single module-level global, not per-atlas,

@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import atlas_catalog as AC
 import federation as F
+import atlas_store
 
 
 BBOX = {'north': 38.6, 'south': 38.4, 'east': -122.9, 'west': -123.1}
@@ -228,16 +229,22 @@ def test_publish_catalog_writes_the_expected_tree(tmp_path):
     assert summary['missing_layers'] == ['never_materialized']
 
 
-def test_hrefs_follow_the_existing_outlet_convention(tmp_path):
+def test_the_local_href_survives_as_an_alternate(tmp_path):
+    """The old outlet-convention href is kept, demoted to `alternate.local`.
+
+    It is what lets the box resolve a layer from its own disk and what an
+    offline copy of an outlet needs, so making S3 primary must not discard it.
+    """
     config = _config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
 
     item = json.loads(
         (version_dir / 'stac' / 'roads' / f'roads-{V1}.json').read_text())
-    assert item['assets']['data']['href'] == \
+    data = item['assets']['data']
+    assert data['alternate']['local']['href'] == \
         f'https://example.org/scvfd/{V1}/layers/roads/roads.geojson'
-    assert item['assets']['data']['type'] == 'application/geo+json'
+    assert data['type'] == 'application/geo+json'
 
 
 def test_history_round_trips_through_disk(tmp_path):
@@ -574,15 +581,18 @@ def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
 
 def _cloud_config(tmp_path, **cloud):
     config = _config(tmp_path)
-    config['cloud'] = {'enabled': True, 'outlets_bucket': 'OUT',
-                       'private_bucket': 'PRIV', 'layers': True, **cloud}
+    config['cloud'] = {'outlets_bucket': 'OUT', 'private_bucket': 'PRIV',
+                       'public_base_url': 'https://cdn.example.org', **cloud}
     return config
 
 
-def test_alternates_record_s3_without_moving_the_primary_href(tmp_path):
-    """The primary href must stay local: keys are deterministic, so writing
-    them as primary before the upload happens would leave the catalog naming
-    an object that may not exist."""
+def test_public_layers_get_an_https_primary_href(tmp_path):
+    """S3 is the source of truth, so the served URL is the primary href.
+
+    Slice 4 kept the primary local because a deterministic key written before
+    a failed upload would name a missing object. The push now raises and takes
+    the publish with it, so that cannot happen.
+    """
     config = _cloud_config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
@@ -590,13 +600,20 @@ def test_alternates_record_s3_without_moving_the_primary_href(tmp_path):
     item = json.loads((version_dir / 'stac' / 'hydrants' /
                        f'hydrants-{V1}.json').read_text())
     data = item['assets']['data']
-    assert data['href'] == f'{config["base_url"]}/{V1}/layers/hydrants/hydrants.geojson'
+    assert data['href'] == \
+        f'https://cdn.example.org/scvfd/layers/hydrants/{V1}/hydrants.geojson'
     assert data['alternate']['s3']['href'] == \
         f's3://OUT/scvfd/layers/hydrants/{V1}/hydrants.geojson'
+    assert data['alternate']['local']['href'].startswith('https://example.org/')
     assert AC.ALTERNATE_EXTENSION in item['stac_extensions']
 
 
-def test_alternates_route_protected_layers_to_the_private_bucket(tmp_path):
+def test_protected_layers_keep_an_s3_primary_href(tmp_path):
+    """A protected layer has no HTTPS reader until Phase 4.
+
+    Naming a CloudFront URL that 403s would be less honest than naming the
+    bucket, and it would let a reader believe the tier split had been crossed.
+    """
     config = _cloud_config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
@@ -604,21 +621,51 @@ def test_alternates_route_protected_layers_to_the_private_bucket(tmp_path):
     # hydrants is shareable -> public; roads has no tier -> internal
     roads = json.loads((version_dir / 'stac' / 'roads' /
                         f'roads-{V1}.json').read_text())
-    assert roads['assets']['data']['alternate']['s3']['href'].startswith('s3://PRIV/')
-    hydrants = json.loads((version_dir / 'stac' / 'hydrants' /
-                           f'hydrants-{V1}.json').read_text())
-    assert hydrants['assets']['data']['alternate']['s3']['href'].startswith('s3://OUT/')
+    assert roads['assets']['data']['href'] == \
+        f's3://PRIV/scvfd/layers/roads/{V1}/roads.geojson'
+    assert 'cdn.example.org' not in json.dumps(roads)
 
 
-def test_no_alternates_without_the_layers_opt_in(tmp_path):
-    config = _cloud_config(tmp_path, layers=False)
+def test_hrefs_are_written_with_no_cloud_block_at_all(tmp_path):
+    """There is no opt-out: an atlas with no `cloud` config still resolves to
+    the code-default buckets, because S3 is the backend rather than a feature.
+    """
+    config = _config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     summary = AC.publish_catalog(config, version_dir, V1)
 
-    assert summary['alternates'] == 0
-    item = json.loads((version_dir / 'stac' / 'roads' /
-                       f'roads-{V1}.json').read_text())
-    assert 'alternate' not in item['assets']['data']
+    assert summary['asset_hrefs'] > 0
+    item = json.loads((version_dir / 'stac' / 'hydrants' /
+                       f'hydrants-{V1}.json').read_text())
+    assert item['assets']['data']['href'].startswith(
+        atlas_store.DEFAULT_PUBLIC_BASE_URL + '/scvfd/layers/hydrants/')
+
+
+def test_a_reused_item_keeps_the_version_that_holds_its_bytes(tmp_path):
+    """Regression: hrefs must never be rebuilt at the *current* version.
+
+    This is the shape of the first bug this branch hit — a reused Item's href
+    reconstructed from the new version's base, naming a key that holds nothing.
+    Only newly written Items may be rewritten.
+    """
+    config = _cloud_config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2)
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    # A reused layer writes no Item into the new version's directory at all —
+    # V2's Collection links back to where the bytes actually are.
+    assert not (v2_dir / 'stac' / 'hydrants' / f'hydrants-{V2}.json').exists()
+    item = json.loads((v1_dir / 'stac' / 'hydrants' /
+                       f'hydrants-{V1}.json').read_text())
+    assert item['assets']['data']['href'] == \
+        f'https://cdn.example.org/scvfd/layers/hydrants/{V1}/hydrants.geojson'
+    assert V2 not in item['assets']['data']['href']
+
+    collection = json.loads((v2_dir / 'stac' / 'hydrants' / 'collection.json').read_text())
+    item_links = [l['href'] for l in collection['links'] if l['rel'] == 'item']
+    assert item_links == [f'https://example.org/scvfd/{V1}/stac/hydrants/hydrants-{V1}.json']
 
 
 def test_summary_carries_what_the_uploader_needs(tmp_path):

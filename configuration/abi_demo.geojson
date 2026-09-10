@@ -16,6 +16,9 @@
                 ]
             },
             "properties": {
+                "cloud": {
+                  "outlets": []
+                },
                 "name": "abi_demo",
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data/",

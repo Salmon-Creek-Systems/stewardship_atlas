@@ -31,6 +31,13 @@
         ]
       },
       "properties": {
+        "cloud": {
+          "outlets": [
+            "webmap",
+            "3dview",
+            "html"
+          ]
+        },
         "name": "king_range_hike",
         "description": "King Range Hike",
         "app_url": "https://fireatlas.org:9000",

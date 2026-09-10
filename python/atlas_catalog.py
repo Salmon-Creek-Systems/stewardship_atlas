@@ -312,7 +312,7 @@ def publish_catalog(config: dict, version_path, version: str,
         catalog_base_url=catalog_base_url,
     )
 
-    alternates = add_s3_alternates(built, config, version)
+    hrefs = set_layer_hrefs(built, config, version)
     paths = write_catalog(built, version_path / CATALOG_DIRNAME, version)
 
     summary = {
@@ -322,7 +322,7 @@ def publish_catalog(config: dict, version_path, version: str,
         'reused_layers': built['reused'],
         'missing_layers': built['missing'],
         'documents': len(paths),
-        'alternates': alternates,
+        'asset_hrefs': hrefs,
         # Passed through for the S3 push in versioning — computed here so the
         # layer files are scanned and checksummed exactly once per publish.
         'layer_assets': layer_assets,
@@ -440,33 +440,51 @@ def item_filenames(item: dict) -> set:
 ALTERNATE_EXTENSION = "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
 
 
-def add_s3_alternates(built: dict, config: dict, version: str) -> int:
-    """Record each newly written asset's S3 location as an `alternate` href.
+def set_layer_hrefs(built: dict, config: dict, version: str) -> int:
+    """Point each Item's assets at S3, where the layer data now actually lives.
 
-    Deliberately *not* the primary href. The keys are deterministic, so they
-    could be written before the upload happens — but then a failed push leaves
-    the catalog pointing at an object that does not exist. As an alternate the
-    catalog stays truthful whatever the upload does, and a reader opts in.
+    This inverts the arrangement slice 4 shipped, which recorded S3 as an
+    `alternate` and left the repo-relative path as the primary href. That was
+    right while the push was best-effort: keys are deterministic, so writing
+    one as primary before a failed upload leaves the catalog naming an object
+    that does not exist. The premise is gone — the push now raises and takes
+    the publish with it, so the catalog cannot outlive the objects it names.
 
-    Only newly written Items are touched; a reused Item already carries the
-    alternate it was written with, pointing at the version that holds the data.
+    Primary href by tier:
+
+    * **public** — the CloudFront URL. A public layer has a reader, and an
+      HTTPS href is the one thing a STAC client, a browser and a webmap can
+      all use.
+    * **protected** — the `s3://` URI. These have no HTTPS reader until the
+      Phase 4 authenticated path exists, and naming a URL that 403s would be
+      less honest than naming the bucket.
+
+    The previous relative href is kept as a `local` alternate rather than
+    dropped: it is how the box resolves a layer from its own disk, and what an
+    offline copy of an outlet still needs.
     """
     import atlas_store
     settings = atlas_store.cloud_settings(config)
-    if not (settings.get('enabled') and settings.get('layers')):
-        return 0
-
     atlas_name = config['name']
+    base_url = settings['public_base_url']
+
     touched = 0
     for layer_name, item in built['items'].items():
         access = (item.get('properties') or {}).get('atlas:access')
         bucket = atlas_store.layer_bucket(access, settings)
         if not bucket:
             continue
+        public = bucket == settings['outlets_bucket']
         for asset in item.get('assets', {}).values():
-            filename = Path(asset['href']).name
+            local_href = asset.get('href')
+            filename = Path(local_href).name
             key = atlas_store.layer_key(atlas_name, layer_name, version, filename)
-            asset['alternate'] = {'s3': {'href': f's3://{bucket}/{key}'}}
+            s3_uri = f's3://{bucket}/{key}'
+            asset['href'] = f'{base_url}/{key}' if public else s3_uri
+            alternate = asset.setdefault('alternate', {})
+            alternate['s3'] = {'href': s3_uri}
+            if local_href:
+                alternate['local'] = {'href': local_href}
             touched += 1
         exts = item.setdefault('stac_extensions', [])
         if ALTERNATE_EXTENSION not in exts:

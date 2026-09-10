@@ -63,9 +63,19 @@ class TestAccessTiers(unittest.TestCase):
 
 
 class TestCloudSettings(unittest.TestCase):
+    """Settings resolve config -> environment -> code default, and never gate.
+
+    The `enabled` / `layers` booleans are gone. S3 is the storage backend, not
+    a feature an atlas opts into, so the only question these settings answer is
+    *which* buckets — which is what makes the staging rehearsal a set of env
+    vars rather than eleven config edits.
+    """
+
+    ENV_KEYS = ('ATLAS_OUTLETS_BUCKET', 'ATLAS_PRIVATE_BUCKET',
+                'ATLAS_DISTRIBUTION_ID', 'ATLAS_PUBLIC_BASE_URL')
+
     def setUp(self):
-        self._saved = {k: os.environ.pop(k, None)
-                       for k in ('ATLAS_OUTLETS_BUCKET', 'ATLAS_DISTRIBUTION_ID')}
+        self._saved = {k: os.environ.pop(k, None) for k in self.ENV_KEYS}
 
     def tearDown(self):
         for key, value in self._saved.items():
@@ -73,31 +83,41 @@ class TestCloudSettings(unittest.TestCase):
             if value is not None:
                 os.environ[key] = value
 
-    def test_disabled_by_default(self):
-        # Un-migrated atlases must be untouched during the strangler window.
-        self.assertFalse(atlas_store.cloud_settings({'name': 'kennedy'})['enabled'])
+    def test_defaults_need_no_config_at_all(self):
+        settings = atlas_store.cloud_settings({'name': 'kennedy'})
+        self.assertEqual(settings['bucket'], atlas_store.DEFAULT_OUTLETS_BUCKET)
+        self.assertEqual(settings['private_bucket'], atlas_store.DEFAULT_PRIVATE_BUCKET)
+        self.assertEqual(settings['public_base_url'], atlas_store.DEFAULT_PUBLIC_BASE_URL)
 
-    def test_enabled_needs_a_bucket(self):
-        settings = atlas_store.cloud_settings({'name': 'k', 'cloud': {'enabled': True}})
-        self.assertFalse(settings['enabled'])
+    def test_there_is_no_enabled_flag_any_more(self):
+        # Guards the collapse: a stray `enabled` key must not resurrect a gate.
+        settings = atlas_store.cloud_settings(
+            {'name': 'k', 'cloud': {'enabled': False, 'layers': False}})
+        self.assertNotIn('enabled', settings)
+        self.assertNotIn('layers', settings)
+        self.assertEqual(settings['bucket'], atlas_store.DEFAULT_OUTLETS_BUCKET)
 
-    def test_enabled_with_bucket(self):
-        settings = atlas_store.cloud_settings({
-            'name': 'k',
-            'cloud': {'enabled': True, 'outlets_bucket': 'scs-atlas-outlets-prod'},
-        })
-        self.assertTrue(settings['enabled'])
-        self.assertEqual(settings['bucket'], 'scs-atlas-outlets-prod')
+    def test_env_overrides_the_default(self):
+        os.environ['ATLAS_OUTLETS_BUCKET'] = 'staging-outlets'
+        os.environ['ATLAS_PRIVATE_BUCKET'] = 'staging-private'
+        os.environ['ATLAS_PUBLIC_BASE_URL'] = 'https://d123.cloudfront.net'
+        settings = atlas_store.cloud_settings({'name': 'k'})
+        self.assertEqual(settings['bucket'], 'staging-outlets')
+        self.assertEqual(settings['private_bucket'], 'staging-private')
+        self.assertEqual(settings['public_base_url'], 'https://d123.cloudfront.net')
 
-    def test_env_supplies_bucket(self):
+    def test_config_overrides_env(self):
         os.environ['ATLAS_OUTLETS_BUCKET'] = 'from-env'
-        settings = atlas_store.cloud_settings({'name': 'k', 'cloud': {'enabled': True}})
-        self.assertTrue(settings['enabled'])
-        self.assertEqual(settings['bucket'], 'from-env')
+        settings = atlas_store.cloud_settings(
+            {'name': 'k', 'cloud': {'outlets_bucket': 'from-config'}})
+        self.assertEqual(settings['bucket'], 'from-config')
 
-    def test_flag_still_gates_env_bucket(self):
-        os.environ['ATLAS_OUTLETS_BUCKET'] = 'from-env'
-        self.assertFalse(atlas_store.cloud_settings({'name': 'k'})['enabled'])
+    def test_public_base_url_loses_its_trailing_slash(self):
+        # It is concatenated with a key that already starts with the atlas name;
+        # a trailing slash here yields '//kennedy/...' in every emitted URL.
+        os.environ['ATLAS_PUBLIC_BASE_URL'] = 'https://next.fireatlas.org/'
+        settings = atlas_store.cloud_settings({'name': 'k'})
+        self.assertEqual(settings['public_base_url'], 'https://next.fireatlas.org')
 
 
 def _config(assets, versioned=None, cloud=None):
@@ -105,8 +125,10 @@ def _config(assets, versioned=None, cloud=None):
     if versioned is not None:
         dataswale['versioned_outlets'] = versioned
     config = {'name': 'testatlas', 'assets': assets, 'dataswale': dataswale}
-    if cloud is not None:
-        config['cloud'] = cloud
+    # `cloud.outlets` is mandatory, so tests aimed at the *other* filters get a
+    # permissive allowlist by default. Tests about the allowlist itself pass
+    # `cloud` explicitly, and TestMandatoryAllowlist omits it on purpose.
+    config['cloud'] = cloud if cloud is not None else {'outlets': sorted(assets)}
     return config
 
 
@@ -175,20 +197,55 @@ class TestOutletAllowlist(unittest.TestCase):
         }, cloud={'outlets': ['roads']})
         self.assertEqual(atlas_store.publishable_outlets(config), [])
 
-    def test_without_allowlist_default_public_is_warned(self):
-        config = _config({'sqldb': {'type': 'outlet'}})
+    def test_allowlisted_but_untiered_outlet_is_warned(self):
+        # It passes the tier check only by atlas.py's fail-open default (#175),
+        # so it publishes, but never silently.
+        config = _config({'webmap': {'type': 'outlet'}}, cloud={'outlets': ['webmap']})
         with self.assertLogs('atlas_store', level='WARNING') as captured:
             names = atlas_store.publishable_outlets(config)
-        self.assertEqual(names, ['sqldb'])
-        self.assertIn('no explicit access level', ''.join(captured.output))
+        self.assertEqual(names, ['webmap'])
+        self.assertIn('fail-open default', ''.join(captured.output))
 
     def test_explicit_public_is_not_warned(self):
-        config = _config({'webmap': {'type': 'outlet', 'access': ['public']}})
+        config = _config({'webmap': {'type': 'outlet', 'access': ['public']}},
+                         cloud={'outlets': ['webmap']})
         with self.assertLogs('atlas_store', level='WARNING') as captured:
             logging.getLogger('atlas_store').warning('sentinel')
             names = atlas_store.publishable_outlets(config)
         self.assertEqual(names, ['webmap'])
         self.assertEqual(len(captured.output), 1)  # only the sentinel
+
+
+class TestMandatoryAllowlist(unittest.TestCase):
+    """No `cloud.outlets` means no outlets published, not "publish the defaults".
+
+    While `cloud.enabled` existed, an un-migrated atlas was protected by being
+    switched off. S3 is now unconditional, so the allowlist is the only thing
+    between `access`-defaults-to-public and a world-readable bucket. This is
+    the failure that put 17 protected layers on CloudFront (#177); it is not
+    being left to a default a second time.
+    """
+
+    def test_no_allowlist_publishes_nothing(self):
+        config = {'name': 'unmigrated',
+                  'assets': {'webmap': {'type': 'outlet', 'access': ['public']},
+                             'sqldb': {'type': 'outlet'}},
+                  'dataswale': {'layers': []}}
+        with self.assertLogs('atlas_store', level='WARNING') as captured:
+            self.assertEqual(atlas_store.publishable_outlets(config), [])
+        self.assertIn('no `cloud.outlets` allowlist', ''.join(captured.output))
+
+    def test_empty_allowlist_publishes_nothing_without_warning(self):
+        # An explicit [] is a decision, not an omission.
+        config = _config({'webmap': {'type': 'outlet', 'access': ['public']}},
+                         cloud={'outlets': []})
+        self.assertEqual(atlas_store.publishable_outlets(config), [])
+
+    def test_a_cloud_block_without_outlets_is_still_an_omission(self):
+        config = _config({'webmap': {'type': 'outlet', 'access': ['public']}},
+                         cloud={'private_bucket': 'p'})
+        with self.assertLogs('atlas_store', level='WARNING'):
+            self.assertEqual(atlas_store.publishable_outlets(config), [])
 
 
 class TestKeys(unittest.TestCase):
@@ -348,14 +405,15 @@ class TestPlanPublish(unittest.TestCase):
         self.assertEqual(keys, ['testatlas/current/outlets/runbook/index.html'])
 
 
-class TestPublishIsSafeWhenDisabled(unittest.TestCase):
-    def test_disabled_atlas_is_a_noop(self):
-        # No boto3 import, no credentials, no exception — this is what makes it
-        # safe to leave in publish_new_version for every atlas.
+class TestPublishWithNothingAllowlisted(unittest.TestCase):
+    def test_no_allowlist_still_reaches_no_network(self):
+        # An atlas with no `cloud.outlets` produces an empty plan, so publish
+        # returns before importing boto3 or needing credentials. That is what
+        # keeps this callable in publish_new_version for every atlas now that
+        # there is no `enabled` flag to switch it off.
         result = atlas_store.publish_public_outlets(
             {'name': 'kennedy', 'assets': {}, 'dataswale': {}}, '/nonexistent', 'v1')
-        self.assertEqual(result['status'], 'skipped')
-        self.assertEqual(result['reason'], 'disabled')
+        self.assertEqual(result['status'], 'empty')
 
 
 if __name__ == '__main__':
@@ -401,23 +459,24 @@ class TestLayerKeysAndBuckets(unittest.TestCase):
             self.assertEqual(atlas_store.layer_bucket(access, self.SETTINGS),
                              'scs-atlas-private-prod', repr(access))
 
-    def test_cloud_settings_exposes_the_layer_opt_in(self):
+    def test_cloud_settings_names_both_buckets(self):
         config = {'name': 'kennedy', 'cloud': {
-            'enabled': True, 'outlets_bucket': 'out', 'private_bucket': 'priv',
-            'layers': True}}
+            'outlets_bucket': 'out', 'private_bucket': 'priv'}}
         settings = atlas_store.cloud_settings(config)
-        self.assertTrue(settings['layers'])
         self.assertEqual(settings['outlets_bucket'], 'out')
         self.assertEqual(settings['private_bucket'], 'priv')
 
-    def test_outlet_mirroring_alone_does_not_ship_layers(self):
-        """An atlas already on the Phase 2 read path must opt in separately."""
+    def test_layer_push_no_longer_has_an_opt_out(self):
+        """There is no `cloud.layers` flag: source data always goes to S3.
+
+        An empty catalog summary means nothing to upload, so this still makes
+        no network call — but the reason is "no layers", not "switched off".
+        """
         config = {'name': 'kennedy',
-                  'cloud': {'enabled': True, 'outlets_bucket': 'out'}}
-        self.assertFalse(atlas_store.cloud_settings(config)['layers'])
-        self.assertEqual(
-            atlas_store.publish_layer_data(config, '/tmp', 'v1', {})['status'],
-            'skipped')
+                  'cloud': {'outlets_bucket': 'out', 'private_bucket': 'priv'}}
+        result = atlas_store.publish_layer_data(config, '/tmp', 'v1', {})
+        self.assertNotEqual(result.get('status'), 'skipped')
+        self.assertEqual(result['objects'], 0)
 
 
 class TestLayerUploadPlan(unittest.TestCase):

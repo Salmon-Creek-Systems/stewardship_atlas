@@ -118,35 +118,52 @@ def is_public(access) -> bool:
     return 'public' in normalize_access(access)
 
 
+# Bucket and distribution names describe the deployed substrate, not any one
+# atlas, so they default in code and are overridden by environment. That is
+# what lets `-c env_name=staging` run the entire system against a parallel set
+# of buckets without editing a single atlas config — the rehearsal substrate
+# is an env var, not eleven config edits.
+DEFAULT_OUTLETS_BUCKET = 'scs-atlas-outlets-prod'
+DEFAULT_PRIVATE_BUCKET = 'scs-atlas-private-prod'
+DEFAULT_DISTRIBUTION_ID = 'E1A5S5MB0K3FZG'
+DEFAULT_PUBLIC_BASE_URL = 'https://next.fireatlas.org'
+
+
 def cloud_settings(config: dict) -> dict:
-    """Resolve this atlas's cloud publishing settings.
+    """Resolve the cloud storage settings in force for this atlas.
 
-    Read from ``config['cloud']`` — which arrives via the atlas GeoJSON
-    properties like every other config field — with environment fallbacks so a
-    whole deployment can be pointed at one bucket without editing every atlas.
+    Resolution order is per-atlas config, then environment, then the code
+    default. There is no longer an `enabled` flag: S3 is the source of truth,
+    so every publish writes there and an atlas cannot opt out of its own
+    storage backend.
 
-    Disabled unless a bucket is resolvable *and* ``enabled`` is true, so
-    un-migrated atlases are untouched. That flag is the per-atlas cutover
-    switch for the strangler window.
+    What *is* still per-atlas is `cloud.outlets` — the explicit allowlist of
+    outlet directories that may be served publicly. That is the surviving
+    guardrail, and it is deliberately the fail-closed one: `access` defaults to
+    public in `atlas.py`, so an atlas with no allowlist would otherwise publish
+    whatever happens to read as public, `sqldb` and its every-layer `atlas.db`
+    included. Replacing a boolean gate with an explicit allowlist means one
+    mechanism instead of two, and the one that survives is the one that fails
+    safe.
     """
     cloud = config.get('cloud') or {}
-    bucket = cloud.get('outlets_bucket') or os.environ.get('ATLAS_OUTLETS_BUCKET')
+    bucket = (cloud.get('outlets_bucket')
+              or os.environ.get('ATLAS_OUTLETS_BUCKET')
+              or DEFAULT_OUTLETS_BUCKET)
     return {
-        'enabled': bool(cloud.get('enabled')) and bool(bucket),
         'bucket': bucket,
-        'distribution_id': (cloud.get('distribution_id')
-                            or os.environ.get('ATLAS_DISTRIBUTION_ID')),
-        'invalidate': cloud.get('invalidate', True),
-        'outlets': cloud.get('outlets'),
-        # Phase 3 (#159). `outlets_bucket` is an alias of `bucket` so the layer
-        # planners can name the tier they mean rather than relying on which one
-        # happens to be the default. `layers` is a separate opt-in: an atlas
-        # already mirroring its outlets does not start shipping source data
-        # until it says so.
         'outlets_bucket': bucket,
         'private_bucket': (cloud.get('private_bucket')
-                           or os.environ.get('ATLAS_PRIVATE_BUCKET')),
-        'layers': bool(cloud.get('layers')),
+                           or os.environ.get('ATLAS_PRIVATE_BUCKET')
+                           or DEFAULT_PRIVATE_BUCKET),
+        'distribution_id': (cloud.get('distribution_id')
+                            or os.environ.get('ATLAS_DISTRIBUTION_ID')
+                            or DEFAULT_DISTRIBUTION_ID),
+        'public_base_url': (cloud.get('public_base_url')
+                            or os.environ.get('ATLAS_PUBLIC_BASE_URL')
+                            or DEFAULT_PUBLIC_BASE_URL).rstrip('/'),
+        'invalidate': cloud.get('invalidate', True),
+        'outlets': cloud.get('outlets'),
     }
 
 
@@ -158,25 +175,35 @@ def publishable_outlets(config: dict) -> list:
     1. ``type == 'outlet'`` — inlets and eddies produce layers, not served dirs.
     2. Public tier — the Phase 2 scope decision. Protected outlets keep being
        served from the box until the API moves in Phase 4.
-    3. ``cloud.outlets`` when set — an explicit allowlist, and the recommended
-       way to cut an atlas over. See the warning below for why.
+    3. ``cloud.outlets`` — a **required** explicit allowlist. An atlas without
+       one publishes no outlets at all.
     4. ``dataswale.versioned_outlets`` when set — already the publish snapshot
        filter (issue #131, C9). An outlet excluded from the snapshot has no
        directory in the version to upload.
 
-    **On the public default:** ``access`` is optional and absent means public
-    (``atlas.py`` does ``.get('access', ['public'])``). That default predates
-    anything actually being world-readable, and it sweeps in outlets that
-    should not be: ``sqldb`` builds an ``atlas.db`` containing *every* layer,
-    including ones only referenced by an admin-only webmap. So an outlet
-    published on the strength of a missing ``access`` field is logged as a
-    warning, and ``cloud.outlets`` exists to make the set explicit instead.
+    **Why the allowlist is required.** ``access`` is optional and absent means
+    public (``atlas.py`` does ``.get('access', ['public'])``). That default
+    predates anything actually being world-readable and it sweeps in outlets
+    that should not be: ``sqldb`` builds an ``atlas.db`` containing *every*
+    layer, admin-only ones included. While `cloud.enabled` existed, an
+    un-migrated atlas was protected by being switched off; now that S3 is
+    unconditional, the allowlist is the only thing standing between a
+    fail-open default and a public bucket. So it is mandatory rather than
+    advisory — this is the same failure that put 17 protected layers on
+    CloudFront (#177), and it is not being left to a default a second time.
 
     Returns names sorted for stable, diffable logs.
     """
     assets = config.get('assets') or {}
     versioned = set((config.get('dataswale') or {}).get('versioned_outlets') or [])
     allowlist = (config.get('cloud') or {}).get('outlets')
+
+    if allowlist is None:
+        logger.warning(
+            f"atlas_store: atlas '{config.get('name')}' has no `cloud.outlets` "
+            f"allowlist — publishing no outlets. Add the list of outlet names "
+            f"that may be served publicly to its config.")
+        return []
 
     names = []
     for name, asset in assets.items():
@@ -186,15 +213,15 @@ def publishable_outlets(config: dict) -> list:
         # to push an admin outlet into a public bucket.
         if not is_public(asset.get('access')):
             continue
-        if allowlist is not None and name not in allowlist:
+        if name not in allowlist:
             continue
         if versioned and name not in versioned:
             continue
-        if allowlist is None and asset.get('access') is None:
+        if asset.get('access') is None:
             logger.warning(
-                f"atlas_store: outlet '{name}' has no explicit access level and is "
-                f"being treated as public. Set `access` on the asset, or list the "
-                f"outlets you mean to publish in `cloud.outlets`.")
+                f"atlas_store: outlet '{name}' is allowlisted but has no explicit "
+                f"access level, so it passes the tier check only by the fail-open "
+                f"default. Set `access` on the asset (#175).")
         names.append(name)
     return sorted(names)
 
@@ -381,21 +408,18 @@ def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> st
 def publish_public_outlets(config: dict, version_path, version: str) -> dict:
     """Mirror a published version's public outlets to S3.
 
-    Called by ``versioning.publish_new_version`` after the local snapshot
-    exists. A no-op unless the atlas has cloud publishing enabled, so this is
-    safe to leave in the path for every atlas during the cutover.
+    Called by ``versioning.publish_new_version`` before ``CURRENT`` is moved.
 
-    Never raises: a failed push must not fail an otherwise good publish. The
-    box is still serving, so the worst case is a stale CloudFront copy and a
-    logged error. Returns a summary dict for the publish log.
+    **Raises on failure**, which reverses the Phase 2 policy. That policy —
+    swallow the error, because the box is still serving and local files are
+    still authoritative — was correct exactly as long as its premise held. Now
+    that S3 is the source of truth, a publish whose push failed is not a
+    publish, and returning success for it would leave the box advertising a
+    version the world cannot read. Failing here leaves the previous version
+    live, which is the safe outcome.
     """
     settings = cloud_settings(config)
     atlas_name = config['name']
-
-    if not settings['enabled']:
-        logger.info(f"atlas_store: cloud publishing disabled for {atlas_name} — skipping S3 push")
-        return {'status': 'skipped', 'reason': 'disabled'}
-
     bucket = settings['bucket']
     prefix = current_prefix(atlas_name)
 
@@ -442,7 +466,7 @@ def publish_public_outlets(config: dict, version_path, version: str) -> dict:
         }
     except Exception as e:
         logger.error(f"atlas_store: S3 publish failed for {atlas_name}: {e}", exc_info=True)
-        return {'status': 'error', 'error': str(e)}
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -562,21 +586,28 @@ def publish_layer_data(config: dict, version_path, version: str,
     Runs after ``atlas_catalog.publish_catalog`` and reuses what it already
     computed, so layer files are scanned and checksummed once per publish.
 
-    A no-op unless the atlas sets both ``cloud.enabled`` and ``cloud.layers``:
-    an atlas already mirroring its outlets does not start shipping source data
-    until it says so. Never raises — the caller treats a failed push exactly as
-    it treats a failed outlet push, because the box is still serving and the
-    local files are still authoritative.
-    """
-    settings = cloud_settings(config)
-    if not (settings.get('enabled') and settings.get('layers')):
-        return {'status': 'skipped', 'reason': 'cloud.layers not enabled'}
+    Unconditional: layer data is the source of truth, and an atlas does not
+    get to opt out of writing it. Tier routing still decides *which* bucket,
+    and ``layer_bucket`` fails closed, so a layer reaches the public bucket
+    only by explicit declaration.
 
+    Raises on failure, for the same reason ``publish_public_outlets`` now does.
+    """
     desired = plan_layer_uploads(
         config, version_path, version,
         catalog_summary.get('layer_assets') or {},
         catalog_summary.get('layer_versions') or {},
         catalog_summary.get('access_by_layer') or {})
+
+    catalog_plan = plan_catalog_upload(config, version_path, version)
+    if not (desired or catalog_plan):
+        # Nothing to do, and nothing to do it with: return before touching
+        # boto3. With the `cloud.layers` gate gone this is the only early exit,
+        # and without it a publish with no layer data would demand credentials
+        # to discover it had no work — which also made the path untestable in
+        # the bare local env.
+        return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': 0,
+                'note': 'no layer or catalog objects to publish'}
 
     # Reconcile against what the bucket actually holds rather than trusting the
     # local catalog's reuse decision — see plan_layer_uploads. Keys are
@@ -601,7 +632,7 @@ def publish_layer_data(config: dict, version_path, version: str,
             else:
                 plan.append(entry)
 
-    plan += plan_catalog_upload(config, version_path, version)
+    plan += catalog_plan
 
     if not plan:
         return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': skipped,
