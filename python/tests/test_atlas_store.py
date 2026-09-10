@@ -701,3 +701,42 @@ class TestCurrentLayerMirror(unittest.TestCase):
         url = atlas_catalog.layer_data_url('roads', 'roads.geojson')
         resolved = posixpath.normpath(posixpath.join(outlet_dir, url))
         self.assertIn(resolved, self._keys())
+
+
+class TestShippedConfigsPinNoSubstrate(unittest.TestCase):
+    """No atlas config may name a bucket, distribution, or on/off flag.
+
+    Those describe the deployed substrate, not an atlas, and `cloud_settings`
+    resolves config *before* environment. So a config that pins
+    `outlets_bucket: scs-atlas-outlets-prod` silently wins over
+    ATLAS_OUTLETS_BUCKET — which would point a staging rehearsal at the
+    production buckets while appearing to work. The whole reason the staging
+    substrate is a set of env vars rather than eleven config edits is that this
+    stays empty.
+
+    `outlets` is the exception and belongs here: which outlets an atlas
+    publishes is a property of the atlas.
+    """
+
+    FORBIDDEN = {'enabled', 'layers', 'outlets_bucket', 'private_bucket',
+                 'distribution_id', 'public_base_url'}
+
+    def test_no_config_pins_substrate(self):
+        import glob
+        root = Path(__file__).resolve().parent.parent.parent / 'configuration'
+        checked = 0
+        for path in sorted(glob.glob(str(root / '*.geojson'))):
+            with open(path) as handle:
+                doc = json.load(handle)
+            props = (doc['features'][0]['properties']
+                     if 'features' in doc else doc)
+            cloud = props.get('cloud') or {}
+            if not cloud:
+                continue
+            checked += 1
+            offending = self.FORBIDDEN & set(cloud)
+            self.assertEqual(
+                offending, set(),
+                f"{Path(path).name} pins {sorted(offending)} in its cloud block; "
+                f"those belong in the environment, not the atlas")
+        self.assertGreater(checked, 0, 'no cloud blocks found — test is vacuous')

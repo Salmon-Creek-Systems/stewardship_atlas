@@ -39,9 +39,6 @@
           "webmap"
         ],
         "cloud": {
-          "enabled": true,
-          "outlets_bucket": "scs-atlas-outlets-prod",
-          "distribution_id": "E1A5S5MB0K3FZG",
           "outlets": [
             "webmap",
             "html"
