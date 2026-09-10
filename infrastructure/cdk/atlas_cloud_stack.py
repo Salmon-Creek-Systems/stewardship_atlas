@@ -315,8 +315,20 @@ class AtlasCloudStack(Stack):
         # ListBucket matters as much as the writes: pruning stale keys is what
         # keeps the current/ prefix a true mirror of the published version
         # rather than an accumulating pile of removed layers.
+        # The EC2 role is *shared* — one box, imported by every environment's
+        # stack. A mutable imported role gets an inline AWS::IAM::Policy whose
+        # PolicyName is derived from the construct path, and CDK's hash is
+        # relative to the stack root, so every environment produced the same
+        # name on the same role: "already managed by another stack".
+        #
+        # The construct id therefore carries the environment for everything but
+        # prod. Prod keeps the original id deliberately, so its existing policy
+        # is neither renamed nor replaced — this role is attached to the live
+        # box, and a policy swap there is not worth the tidier code.
+        role_scope_id = ("WebappEc2Role" if env_name == "prod"
+                         else f"WebappEc2Role{env_name.capitalize()}")
         webapp_role = iam.Role.from_role_arn(
-            self, "WebappEc2Role",
+            self, role_scope_id,
             f"arn:aws:iam::{self.account}:role/{WEBAPP_EC2_ROLE_NAME}",
             mutable=True,
         )
