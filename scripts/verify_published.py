@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urljoin
 from urllib.request import urlopen, Request
@@ -35,15 +36,37 @@ REPO = Path(__file__).resolve().parent.parent
 RED, GREEN, YELLOW, BOLD, OFF = '\033[31m', '\033[32m', '\033[33m', '\033[1m', '\033[0m'
 
 
-def status(url, timeout=30):
-    """HTTP status for a URL, or 0 if it could not be reached."""
-    try:
-        with urlopen(Request(url, method='GET'), timeout=timeout) as response:
-            return response.status
-    except HTTPError as exc:
-        return exc.code
-    except (URLError, OSError):
-        return 0
+# Publish creates a CloudFront invalidation but does not wait for it, and this
+# runs immediately afterwards. A path that legitimately 403'd on a previous
+# publish can still be serving that cached 403 for a short while — which would
+# report a real fix as a failure. So a *failing* check is retried; a passing one
+# is never retried, so this can only turn a false negative into a pass, never
+# hide a real break.
+RETRY_DELAYS = (5, 15, 30)
+
+
+def status(url, timeout=30, retries=0):
+    """HTTP status for a URL, or 0 if it could not be reached.
+
+    With `retries`, a non-200 is re-checked after a delay, for edge caches that
+    have not caught up with the invalidation this publish just issued.
+    """
+    def once():
+        try:
+            with urlopen(Request(url, method='GET'), timeout=timeout) as response:
+                return response.status
+        except HTTPError as exc:
+            return exc.code
+        except (URLError, OSError):
+            return 0
+
+    code = once()
+    for delay in RETRY_DELAYS[:retries]:
+        if code == 200:
+            return code
+        time.sleep(delay)
+        code = once()
+    return code
 
 
 def fetch(url, timeout=30):
@@ -110,7 +133,7 @@ def main():
         # html and console emit all four role variants as subdirectories and
         # have no root index, so the public entry point is public/.
         entry = f"{outlet}/public" if outlet in ('html', 'console') else outlet
-        code = status(f"{root}/outlets/{entry}/")
+        code = status(f"{root}/outlets/{entry}/", retries=len(RETRY_DELAYS))
         mark = GREEN if code == 200 else RED
         print(f"  {mark}{code}{OFF}  outlets/{entry}/")
         ok &= code == 200
@@ -134,7 +157,7 @@ def main():
         elif not urls:
             print(f"  {YELLOW}note{OFF}  webmap emits no relative layer URLs")
         else:
-            bad = [(u, status(u)) for u in urls]
+            bad = [(u, status(u, retries=len(RETRY_DELAYS))) for u in urls]
             bad = [(u, c) for u, c in bad if c != 200]
             for url, code in bad:
                 print(f"  {RED}{code}{OFF}  BROKEN {url[len(cdn) + 1:]}")
