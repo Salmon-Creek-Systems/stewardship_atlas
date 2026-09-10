@@ -709,3 +709,45 @@ def test_sidecars_stay_out_of_the_upload_set(tmp_path):
     assets = AC.scan_layers(LAYERS, version_dir / 'layers')
     assert sorted(assets['lidar_basemap']['files']) == [
         'lidar_basemap.tiff', 'lidar_basemap.tiff.jpg']
+
+
+# --------------------------------------------------------------------------- #
+# Rendered raster selection
+# --------------------------------------------------------------------------- #
+
+def test_prefers_png_over_jpg(tmp_path):
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff.jpg').write_text('J')
+    (d / 'basemap.tiff.png').write_text('P')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') == 'basemap.tiff.png'
+
+
+def test_falls_back_to_jpg(tmp_path):
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff.jpg').write_text('J')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') == 'basemap.tiff.jpg'
+
+
+def test_no_rendered_image_is_none_not_a_guess(tmp_path):
+    """The regression: an unchecked fallback named a file that isn't there.
+
+    kennedy's lidar_basemap has the source layer declared but no rendered
+    image, and the webmap emitted `lidar_basemap.tiff.jpg` regardless — a
+    source URL guaranteed to 404, which is how it surfaced on CloudFront.
+    """
+    (tmp_path / 'lidar_basemap').mkdir()
+    assert AC.rendered_raster_filename(tmp_path, 'lidar_basemap') is None
+
+
+def test_source_tiff_alone_is_not_a_rendered_image(tmp_path):
+    # The GeoTIFF is the source, not something a browser can show.
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff').write_text('T')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') is None
+
+
+def test_missing_layer_directory_is_none(tmp_path):
+    assert AC.rendered_raster_filename(tmp_path, 'never_created') is None

@@ -343,6 +343,31 @@ def item_version(item: dict):
     return (item.get('properties') or {}).get('version')
 
 
+# A webmap shows a non-COG raster as an `image` source pointing at a rendered
+# picture of it, not at the source GeoTIFF. `.tiff.png` is preferred when it
+# exists (transparency), otherwise `.tiff.jpg`.
+RENDERED_RASTER_SUFFIXES = ('.tiff.png', '.tiff.jpg')
+
+
+def rendered_raster_filename(layers_root, layer_name: str):
+    """The rendered image a webmap should request for a raster layer, or None.
+
+    None means the layer has no picture to show. Returning a filename anyway —
+    which is what an unchecked `.tiff.jpg` fallback amounts to — produces a
+    source URL that is guaranteed to 404, and the failure surfaces as a broken
+    map rather than as anything pointing at the missing data.
+
+    This is not the same case as a vector layer with no features. An empty
+    FeatureCollection is a truthful statement that renders cleanly (#135); an
+    empty raster is not a thing, so the layer is dropped instead.
+    """
+    layer_dir = Path(layers_root) / layer_name
+    for suffix in RENDERED_RASTER_SUFFIXES:
+        if (layer_dir / f'{layer_name}{suffix}').is_file():
+            return f'{layer_name}{suffix}'
+    return None
+
+
 def layer_data_url(layer_name: str, filename: str) -> str:
     """URL a webmap should use for one of its layer files.
 

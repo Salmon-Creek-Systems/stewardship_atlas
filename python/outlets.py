@@ -154,10 +154,19 @@ def webmap_json(config, name, sprite_json=None):
                 cog_layers.append(cog_layer_def)
                 continue  # source and layer added dynamically after load
             else:
-                layer_dir = versioning.atlas_path(config, "layers") / layer_name
-                raster_filename = (f"{layer_name}.tiff.png"
-                                   if (layer_dir / f"{layer_name}.tiff.png").exists()
-                                   else f"{layer_name}.tiff.jpg")
+                # The fallback here used to be unchecked: with neither rendered
+                # image present it still emitted `{layer}.tiff.jpg`, so a raster
+                # layer with no data produced a source URL guaranteed to 404.
+                # kennedy's lidar_basemap is exactly that, and the map has been
+                # carrying the broken source ever since.
+                raster_filename = atlas_catalog.rendered_raster_filename(
+                    versioning.atlas_path(config, "layers"), layer_name)
+                if raster_filename is None:
+                    logger.warning(
+                        f"webmap {name}: raster layer '{layer_name}' has no rendered "
+                        f"image, omitting it from the map rather than pointing at a "
+                        f"file that does not exist")
+                    continue
                 map_sources[layer_name] = {
                     'type': 'image',
                     'url': _layer_data_url(layer_name, raster_filename),
