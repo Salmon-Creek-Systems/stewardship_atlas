@@ -103,12 +103,24 @@ def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> st
     (p.parent / 'work').mkdir(exist_ok=True)
     return p
 
+def delta_relpath(layer_name: str, delta_action: str, asset_name: str = 'assetless',
+                  data_type: str = 'geojson') -> str:
+    """Staging-relative path of a new delta file.
+
+    Split out so a delta can be written straight to S3 with no workspace at all
+    — webapp's /delta_upload does that, because an edit must never queue behind
+    a long job (#159). The naming convention has to live in one place either
+    way: apply_deltas parses these names back into (asset, timestamp, action).
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"deltas/{layer_name}/{asset_name}__{timestamp}__{delta_action}.{data_type}"
+
+
 def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action: str) -> str:
     """
     Return the path to the delta file for a given layer and delta action.
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    p =  versioning.atlas_path(config,"deltas") / layer_name / f"assetless__{timestamp}__{delta_action}.geojson"
+    p = versioning.atlas_path(config, delta_relpath(layer_name, delta_action))
     p.parent.mkdir(parents=True, exist_ok=True)
     (p.parent / 'work').mkdir(exist_ok=True)
     return p

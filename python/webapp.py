@@ -31,6 +31,10 @@ import sys, os, subprocess, time, json, string, random, math
 
 # our Imports|
 import atlas
+import atlas_lock
+import atlas_session
+import atlas_store
+import atlas_workspace
 import dataswale_geojson
 import outlets
 import versioning
@@ -42,6 +46,63 @@ import atlas_logs
 from biochar_routes import biochar_router
 app = FastAPI()
 logger.logger.setLevel(0)
+
+
+# --- S3-backed sessions (Phase 3 Step 3, #159) -------------------------------
+#
+# Handlers no longer read atlas_config.json from a local path. They open a
+# session, which takes the atlas's lease, hydrates a workspace from S3, hands
+# over the config with data_root repointed at it, and writes back what changed
+# when the body returns.
+#
+# wait=0 throughout: a busy atlas answers "busy" at once rather than holding a
+# request open behind a five-minute render. Contention is per atlas now, so a
+# job on kennedy no longer blocks scvfd.
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+def write_session(swalename: str, purpose: str, **kwargs):
+    """A session that may modify the atlas: lease held, changes written back."""
+    return atlas_session.open_session(swalename, purpose=purpose, **kwargs)
+
+
+def read_session(swalename: str, purpose: str, **kwargs):
+    """A session for queries and status: no lease, nothing written back."""
+    return atlas_session.open_session(swalename, purpose=purpose, read_only=True, **kwargs)
+
+
+# Handlers here mostly end in `except Exception -> 500`, which would turn a
+# perfectly ordinary "the atlas is busy" into a server error and bury the
+# holder's name. Converted handlers re-raise these first, so the exception
+# handlers above map them to 409/404/503.
+SESSION_ERRORS = (atlas_lock.AtlasLocked, atlas_lock.LeaseLost,
+                  atlas_session.AtlasNotSeeded, atlas_workspace.WritebackConflict)
+
+
+@app.exception_handler(atlas_lock.AtlasLocked)
+async def _atlas_locked_handler(request: Request, exc: atlas_lock.AtlasLocked):
+    # 409 rather than 500: nothing went wrong, the atlas is busy. The holder is
+    # named so the UI can say what is running.
+    return JSONResponse(status_code=409, content={
+        "status": "busy", "atlas": exc.atlas_name,
+        "holder": exc.holder.get("owner"), "purpose": exc.holder.get("purpose"),
+        "detail": str(exc)})
+
+
+@app.exception_handler(atlas_session.AtlasNotSeeded)
+async def _atlas_not_seeded_handler(request: Request, exc: atlas_session.AtlasNotSeeded):
+    return JSONResponse(status_code=404, content={"status": "error", "detail": str(exc)})
+
+
+@app.exception_handler(atlas_workspace.WritebackConflict)
+async def _writeback_conflict_handler(request: Request, exc: atlas_workspace.WritebackConflict):
+    return JSONResponse(status_code=409, content={"status": "conflict", "detail": str(exc)})
+
+
+@app.exception_handler(atlas_lock.LeaseLost)
+async def _lease_lost_handler(request: Request, exc: atlas_lock.LeaseLost):
+    return JSONResponse(status_code=503, content={"status": "error", "detail": str(exc)})
 
 # CORS middleware configuration
 app.add_middleware(
@@ -218,46 +279,48 @@ async def dereference_url(payload: dict):
 @app.post("/import_gsheet/{swalename}/{layer_name}")
 async def import_gsheet(swalename: str, layer_name: str):
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        layer_fc = outlets.import_gsheet(ac, 'spreadsheet_import', layer_name)
+        with write_session(swalename, f"import_gsheet {layer_name}") as session:
+            ac = session.config
+            layer_fc = outlets.import_gsheet(ac, 'spreadsheet_import', layer_name)
 
+            # store the geojson
+            outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
+            with open(outpath, "w") as f:
+                json.dump(layer_fc, f)
 
-        # store the geojson
-        outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
-        with open(outpath, "w") as f:
-            json.dump(layer_fc, f)
-
-        res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
+            res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
         return {
             "status": "success",
             "message": f"Data stored successfully, refreshed: {res}",
             "filename": os.path.basename(outpath),
-            "path": outpath}
+            "path": str(outpath)}
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/export_gsheet/{swalename}/{layer_name}")
 async def export_gsheet(swalename: str, layer_name: str):
-    print("HIIYYEEEEEEE")
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        ac['assets']['spreadsheet_export']['in_layers'] = [layer_name]
-        layer_fc = outlets.gsheet_export(ac, 'spreadsheet_export', layer_name)
+        # A write session: the export stamps spreadsheet URLs back into the
+        # config, and that edit has to reach S3.
+        with write_session(swalename, f"export_gsheet {layer_name}") as session:
+            ac = session.config
+            ac['assets']['spreadsheet_export']['in_layers'] = [layer_name]
+            outlets.gsheet_export(ac, 'spreadsheet_export', layer_name)
 
-
-        # store the config since we may have updated spreadsheet URLs
-        #outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
-        with open(config_path, "w") as f:
-            json.dump(ac, f)
-
+            config_path = session.staging_dir / "atlas_config.json"
+            with open(config_path, "w") as f:
+                json.dump(ac, f)
+            spreadsheets = ac['spreadsheets']
 
         return {
             "status": "success",
-            "message": f"Data stored successfully, refreshed: {ac['spreadsheets']}",
+            "message": f"Data stored successfully, refreshed: {spreadsheets}",
             "filename": os.path.basename(config_path),
-            "path": config_path}
+            "path": str(config_path)}
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -267,21 +330,23 @@ async def export_gsheet(swalename: str, layer_name: str):
 async def import_sheet_endpoint(swalename: str, layer_name: str):
     """Import data from Google Sheet and refresh the layer."""
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        
-        # Call vector_inlets.import_sheet to get delta paths
-        delta_paths = vector_inlets.import_sheet(ac, layer_name)
-        
-        # Refresh the layer to overwrite with new data
-        res = dataswale_geojson.refresh_vector_layer(ac, layer_name, deltas_geojson.apply_deltas_overwrite)
-        
+        with write_session(swalename, f"import_sheet {layer_name}") as session:
+            ac = session.config
+
+            # Call vector_inlets.import_sheet to get delta paths
+            delta_paths = vector_inlets.import_sheet(ac, layer_name)
+
+            # Refresh the layer to overwrite with new data
+            res = dataswale_geojson.refresh_vector_layer(ac, layer_name, deltas_geojson.apply_deltas_overwrite)
+
         return {
             "status": "success",
             "message": f"Sheet imported and layer refreshed: {res}",
-            "delta_paths": delta_paths,
+            "delta_paths": [str(p) for p in delta_paths],
             "layer": layer_name
         }
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         logging.error(f"Error importing sheet for {layer_name}: {str(e)}")
         logging.error(traceback.format_exc())
@@ -291,28 +356,30 @@ async def import_sheet_endpoint(swalename: str, layer_name: str):
 @app.get("/clear_layer/{swalename}/{layer_name}")
 async def clear_layer(swalename: str, layer_name: str):
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        dataswale_geojson.clear_vector_layer(ac, layer_name)
+        with write_session(swalename, f"clear_layer {layer_name}") as session:
+            dataswale_geojson.clear_vector_layer(session.config, layer_name)
         return {
             "status": "success",
             "message": f"Layer cleared successfully",
             "layer_name": layer_name}
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/copy_layer/{swalename}/{layer_name}")
 async def copy_layer(swalename: str, layer_name: str, new_name: str):
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        atlas.copy_layer(ac, layer_name, new_name)
+        with write_session(swalename, f"copy_layer {layer_name} -> {new_name}") as session:
+            atlas.copy_layer(session.config, layer_name, new_name)
         return {
             "status": "success",
             "message": (f"Layer '{layer_name}' copied to '{new_name}'. "
                         f"Rematerialize webmap/webedit/html on the server for it to appear."),
             "old_name": layer_name,
             "new_name": new_name}
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except (ValueError, FileExistsError, FileNotFoundError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -338,14 +405,15 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
                 s3_key = key
             else:
                 s3_key = s3_url
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        atlas.add_layer(ac, layer_name, s3_key=s3_key, s3_bucket=s3_bucket,
-                        color=color, geometry_type=geometry)
+        with write_session(swalename, f"add_layer {layer_name}") as session:
+            atlas.add_layer(session.config, layer_name, s3_key=s3_key, s3_bucket=s3_bucket,
+                            color=color, geometry_type=geometry)
         return {
             "status": "success",
             "message": f"Layer '{layer_name}' added and materialized.",
             "layer": layer_name}
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except (ValueError, FileExistsError, FileNotFoundError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -356,6 +424,17 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
 
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
+    """Store a delta, and apply it when the atlas is free.
+
+    The delta goes straight to S3 without taking the lease (#159). A field edit
+    must never queue behind a five-minute render, and a delta file is new,
+    uniquely named and append-only, so writing one races with nothing.
+
+    Applying it does need the lease. If the atlas is busy the delta simply
+    stays pending and the next refresh of that layer picks it up — which is
+    exactly what `apply: false` already meant. #179 covers showing "pending"
+    in the UI, since until then the editor sees no confirmation on the map.
+    """
     try:
         delta_package = payload.data
         fc = delta_package #['features']
@@ -365,29 +444,39 @@ async def json_upload(payload: JSONPayload, swalename: str):
         # sources default to immediate apply; bulk sources send apply=False
         # to accumulate. Transport flag only — not persisted in the delta.
         apply_now = bool(delta_package.pop('apply', True))
-        print(f"delta_upoad.=: {action} for {layer}: delta_package (apply={apply_now})")
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        print(f"loading config from {config_path}")
-        ac = json.load(open(config_path))
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer, action)
-        with open(delta_path, "w") as f:
-            json.dump(fc, f)
 
+        rel = deltas_geojson.delta_relpath(layer, action)
+        bucket = atlas_store.cloud_settings({})['private_bucket']
+        key = atlas_workspace.put_staging_object(
+            atlas_store._s3(), bucket, swalename, rel, json.dumps(fc).encode('utf-8'))
+        print(f"delta_upload: {action} for {layer} -> s3://{bucket}/{key} (apply={apply_now})")
+
+        applied = False
+        message = "Data stored successfully, apply deferred"
         if apply_now:
-            # Cheap update-refresh of the target layer only, no cascade.
-            print(f"refreshing {layer} after {action}")
-            res = dataswale_geojson.refresh_vector_layer(ac, layer)
-            message = f"Data stored successfully, refreshed: {res}"
-        else:
-            print(f"stored delta for {layer} ({action}); apply deferred")
-            message = "Data stored successfully, apply deferred"
+            try:
+                # Cheap update-refresh of the target layer only, no cascade.
+                with write_session(swalename, f"apply delta {layer}") as session:
+                    res = dataswale_geojson.refresh_vector_layer(session.config, layer)
+                applied = True
+                message = f"Data stored successfully, refreshed: {res}"
+            except atlas_lock.AtlasLocked as exc:
+                # Stored, not lost: the next refresh of this layer applies it.
+                logging.info(f"delta for {swalename}/{layer} stored but not applied: {exc}")
+                message = "Data stored successfully; atlas busy, apply deferred"
 
         return {
             "status": "success",
             "message": message,
-            "applied": apply_now,
-            "filename": os.path.basename(delta_path),
-            "path": delta_path}
+            "applied": applied,
+            "filename": os.path.basename(rel),
+            "key": key,
+            "path": rel}
+    except atlas_workspace.StagingObjectExists as e:
+        # Two edits to one layer within the same second (#180).
+        raise HTTPException(status_code=409, detail=str(e))
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -398,34 +487,32 @@ async def json_upload(payload: JSONPayload, swalename: str):
 @app.post("/move_features/{swalename}")
 async def move_features(payload: MovePayload, swalename: str):
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
+        purpose = f"move_features {payload.source_layer} -> {payload.target_layer}"
+        with write_session(swalename, purpose) as session:
+            ac = session.config
 
-        source_path = versioning.atlas_path(ac, "layers") / payload.source_layer / f"{payload.source_layer}.geojson"
-        target_path = versioning.atlas_path(ac, "layers") / payload.target_layer / f"{payload.target_layer}.geojson"
+            source_path = versioning.atlas_path(ac, "layers") / payload.source_layer / f"{payload.source_layer}.geojson"
 
-        source_snapshot = source_path.read_text()
-        target_snapshot = target_path.read_text() if target_path.exists() else None
+            sel = payload.selection
+            if sel.get("type") == "Feature":
+                sel_fc = {"type": "FeatureCollection", "features": [sel]}
+            elif sel.get("type") == "FeatureCollection":
+                sel_fc = sel
+            else:
+                raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
 
-        sel = payload.selection
-        if sel.get("type") == "Feature":
-            sel_fc = {"type": "FeatureCollection", "features": [sel]}
-        elif sel.get("type") == "FeatureCollection":
-            sel_fc = sel
-        else:
-            raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+            moved = deltas_geojson.extract_intersecting_features(source_path, sel_fc)
+            if not moved:
+                return {"moved": 0,
+                        "source_remaining": len(json.loads(source_path.read_text())["features"])}
 
-        moved = deltas_geojson.extract_intersecting_features(source_path, sel_fc)
-        if not moved:
-            return {"moved": 0, "source_remaining": len(json.loads(source_snapshot)["features"])}
-
-        delta_files_written = []
-        try:
+            # The hand-written rollback is gone: a session writes nothing back
+            # when the body raises, so a half-done move is discarded with the
+            # workspace rather than unwound file by file (#159).
             create_fc = {"type": "FeatureCollection", "layer": payload.target_layer, "action": "create", "features": [dict(f) for f in moved]}
             target_delta = deltas_geojson.delta_path_from_layer(ac, payload.target_layer, "create")
             with open(target_delta, "w") as f:
                 json.dump(create_fc, f, default=utils.json_serial)
-            delta_files_written.append(Path(target_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.target_layer)
 
             delete_fc = dict(sel_fc)
@@ -434,22 +521,13 @@ async def move_features(payload: MovePayload, swalename: str):
             source_delta = deltas_geojson.delta_path_from_layer(ac, payload.source_layer, "delete")
             with open(source_delta, "w") as f:
                 json.dump(delete_fc, f, default=utils.json_serial)
-            delta_files_written.append(Path(source_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.source_layer)
 
             source_remaining = len(json.loads(source_path.read_text())["features"])
-            return {"moved": len(moved), "source_remaining": source_remaining}
 
-        except Exception as e:
-            for p in delta_files_written:
-                if p.exists():
-                    p.unlink()
-            source_path.write_text(source_snapshot)
-            if target_snapshot is not None:
-                target_path.write_text(target_snapshot)
-            raise HTTPException(status_code=500, detail=str(e))
+        return {"moved": len(moved), "source_remaining": source_remaining}
 
-    except HTTPException:
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -460,9 +538,6 @@ async def move_features(payload: MovePayload, swalename: str):
 @app.post("/comment/{swalename}/{layer_name}")
 async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
     try:
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-
         existing = payload.existing_conversations
         if isinstance(existing, str):
             try:
@@ -490,14 +565,16 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
                 }
             }]
         }
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "match")
-        with open(delta_path, "w") as f:
-            json.dump(delta_fc, f)
+        with write_session(swalename, f"comment {layer_name}") as session:
+            ac = session.config
+            delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "match")
+            with open(delta_path, "w") as f:
+                json.dump(delta_fc, f)
 
-        dataswale_geojson.refresh_vector_layer(ac, layer_name)
+            dataswale_geojson.refresh_vector_layer(ac, layer_name)
 
         return {"status": "success", "conversations": updated}
-    except HTTPException:
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -520,27 +597,17 @@ async def store_json(swalename: str, payload: JSONPayload):
         #outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
         #outpath = outpath_template.format(layer=layer, version=version)
 
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        print(f"loading config from {config_path}")
-        ac = json.load(open(config_path))
-        outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create")
-        print(f"writing delta to  {outpath}")
-        
-        #outpath = versioning.atlas_path(swalename, "deltas") / layer / f"data_{version}.json"
-        # Ensure directory exists
-        #os.makedirs(os.path.dirname(outpath), exist_ok=True)
-        #logger.logger.debug(f"Created directory: {os.path.dirname(outpath)}")
-        
-        # Store the JSON data
-        with open(outpath, 'w') as f:
-            json.dump(payload.data, f, indent=2)
-        logger.logger.info(f"Successfully stored JSON data at: {outpath}")
-        print(f"Successfully stored JSON data at: {outpath}")
-        
+        with write_session(swalename, f"store {layer}") as session:
+            ac = session.config
+            outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create")
+            print(f"writing delta to  {outpath}")
 
-        #dc = json.load(open(versioning.atlas_path(swalename, "dataswale_config.json")))
-        #res = atlas.asset_materialize(ac,  ac['assets'][layer])
-        res = dataswale_geojson.refresh_vector_layer(ac, layer)
+            # Store the JSON data
+            with open(outpath, 'w') as f:
+                json.dump(payload.data, f, indent=2)
+            logger.logger.info(f"Successfully stored JSON data at: {outpath}")
+
+            res = dataswale_geojson.refresh_vector_layer(ac, layer)
 
         # Refresh parent layer if it exists
         #res2 = "No Res2"
@@ -556,6 +623,8 @@ async def store_json(swalename: str, payload: JSONPayload):
             "filename": os.path.basename(outpath),
             "path": outpath
         }
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         # logger.error(f"Error storing JSON data: {str(e)}")
         print(f"Error storing JSON data: {str(e)}")
@@ -574,9 +643,10 @@ async def list_files():
 @app.get("/refresh")
 async def refresh(swale: str, asset: str):
     try:
-        config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
-        res = atlas.materialize(ac, asset)
+        # Synchronous, and a QGIS outlet can take minutes — the lease heartbeat
+        # keeps it held for as long as the materialize actually runs.
+        with write_session(swale, f"refresh {asset}") as session:
+            res = atlas.materialize(session.config, asset)
         res_json = {
             "status": "success",
             "message": f"Refreshed asset {asset}: {res}",
@@ -584,6 +654,8 @@ async def refresh(swale: str, asset: str):
         }
         print(res_json)
         return res_json
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         print(f"ERROR refreshing. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -625,12 +697,11 @@ async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: Backg
             "started_at": refresh_layer_status["started_at"],
         }
 
-    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
-    try:
-        ac = json.load(open(config_path))
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
-    layer_names = [l.get('name') for l in ac.get('dataswale', {}).get('layers', [])]
+    # Validate against the real config before promising to run. A read session
+    # takes no lease, and it warms the workspace the background job is about to
+    # use anyway.
+    with read_session(swale, f"validate refresh_layer {layer}") as session:
+        layer_names = [l.get('name') for l in session.config.get('dataswale', {}).get('layers', [])]
     if layer not in layer_names:
         raise HTTPException(status_code=400, detail=f"No layer '{layer}' in atlas '{swale}'")
 
@@ -642,8 +713,17 @@ async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: Backg
         # Lazy import: keeps webapp importable where dagster isn't installed.
         import atlas_dagster
         try:
-            result = atlas_dagster.refresh_layer(ac, layer, mode=mode, cascade=cascade)
-            refresh_layer_status["success"] = bool(result.success)
+            # The whole cascade is one session: hydrate once, write back once.
+            # The response has already gone out, so a busy atlas is recorded in
+            # the status rather than raised.
+            with write_session(swale, f"refresh_layer {layer} ({mode})") as session:
+                result = atlas_dagster.refresh_layer(session.config, layer,
+                                                     mode=mode, cascade=cascade)
+                refresh_layer_status["success"] = bool(result.success)
+        except atlas_lock.AtlasLocked as e:
+            logging.info(f"refresh_layer for {swale}/{layer} skipped: {e}")
+            refresh_layer_status["success"] = False
+            refresh_layer_status["error"] = f"atlas busy: {e}"
         except Exception as e:
             logging.error(f"refresh_layer failed for {swale}/{layer}: {e}")
             logging.error(traceback.format_exc())
@@ -698,12 +778,11 @@ async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: B
             "started_at": materialize_status["started_at"],
         }
 
-    config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
-    try:
-        ac = json.load(open(config_path))
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No atlas config for '{swale}'")
-    if asset not in ac.get('assets', {}):
+    # Validate against the real config before promising to build; a read
+    # session takes no lease and warms the workspace the job will use.
+    with read_session(swale, f"validate materialize {asset}") as session:
+        known_assets = session.config.get('assets', {})
+    if asset not in known_assets:
         raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
 
     materialize_status.update(
@@ -714,8 +793,15 @@ async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: B
         # Lazy import: keeps webapp importable where dagster isn't installed.
         import atlas_dagster
         try:
-            result = atlas_dagster.materialize_asset(ac, asset)
-            materialize_status["success"] = bool(result.success)
+            # The response has already gone out, so a busy atlas is recorded in
+            # the status rather than raised.
+            with write_session(swale, f"materialize {asset}") as session:
+                result = atlas_dagster.materialize_asset(session.config, asset)
+                materialize_status["success"] = bool(result.success)
+        except atlas_lock.AtlasLocked as e:
+            logging.info(f"materialize_asset for {swale}/{asset} skipped: {e}")
+            materialize_status["success"] = False
+            materialize_status["error"] = f"atlas busy: {e}"
         except Exception as e:
             logging.error(f"materialize_asset failed for {swale}/{asset}: {e}")
             logging.error(traceback.format_exc())
@@ -763,13 +849,12 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
                 "started_at": publish_status["started_at"]
             }
 
-        config_path = Path(SWALES_ROOT) / swale / "staging" / "atlas_config.json"
-        logging.info(f"publish loading config from {config_path}")
-        ac = {}
-        with open(config_path, 'r') as f:
-            ac = json.load(f)
-        # ac = json.load(open(config_path))
-        print(f"publish loaded config: {ac}")
+        # Fail fast on an unknown atlas: a read session takes no lease and
+        # raises AtlasNotSeeded (404) when S3 holds no staging config for it.
+        # The publish itself runs under a write session in the task below.
+        with read_session(swale, "validate publish") as session:
+            logging.info(f"publish requested for {session.config['name']}")
+
         # Start new publishing task
         publish_status["publishing"] = True
         publish_status["started_at"] = datetime.now().isoformat()
@@ -788,12 +873,15 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         def finish_publishing():
             # Publish is a pure snapshot (issue #131, C8): no inlet, eddy, or
             # outlet materialization here. Outlets are kept current by refresh
-            # cascades before publish. Plain def so the copytree runs in the
+            # cascades before publish. Plain def so the work runs in the
             # threadpool and /publish-status stays responsive.
             try:
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
 
-                res = versioning.publish_new_version(ac)
+                # Under the lease: publish reads the whole staging tree and
+                # writes a version, so nothing may edit the atlas underneath it.
+                with write_session(swale, "publish") as session:
+                    res = versioning.publish_new_version(session.config)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
                 publish_status["finished_at"] = datetime.now().isoformat()
                 publish_status["publishing"] = False
@@ -812,6 +900,10 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
         background_tasks.add_task(finish_publishing)
         
         return response
+    except (HTTPException, *SESSION_ERRORS):
+        publish_status["publishing"] = False
+        publish_status["finished_at"] = datetime.now().isoformat()
+        raise
     except Exception as e:
         # Reset status on error
         publish_status["publishing"] = False
@@ -1067,26 +1159,24 @@ async def create_status_check(atlas_slug: str):
 
 @app.post("/sql_query/{swalename}")
 async def execute_sql_query(swalename: str, payload: SQLQueryPayload):
-    print("HELLLLO")
     try:
         print(f"SQL Query [{swalename}]: {payload.query}")
-        # Load config
-        ac = json.load(open(Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"))
-        #config_path = versioning.atlas_path(ac, "atlas_config.json")
-        #ac = json.load(open(config_path))
+        # A read session: a query takes no lease, so it never queues behind a
+        # render, and nothing it touches is written back.
+        with read_session(swalename, "sql_query") as session:
+            result = outlets.sql_query(
+                config=session.config,
+                outlet_name='sqlquery',
+                query=payload.query,
+                return_format=payload.return_format
+            )
 
-        # Execute query using outlets.sql_query
-        result = outlets.sql_query(
-            config=ac,
-            outlet_name='sqlquery',
-            query=payload.query,
-            return_format=payload.return_format
-        )
-        
         return {
             "status": "success",
             "result": result
         }
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         print(f"ERROR executing SQL query. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -1100,27 +1190,29 @@ async def generate_sql_from_nl(swalename: str, payload: NLSQLPayload):
     if not api_key:
         raise HTTPException(status_code=503, detail="NL SQL generation not configured")
     try:
-        ac = json.load(open(Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"))
+        # Read session: this only inspects the database's schema.
+        with read_session(swalename, "sql_generate") as session:
+            ac = session.config
 
-        # Find the db used by the sqlquery outlet (mirrors outlets.outlet_sqlquery logic)
-        sqlquery_cfg = ac.get('assets', {}).get('sqlquery', {})
-        db_outlet_name = sqlquery_cfg.get('config', sqlquery_cfg).get('db_outlet', 'sqldb')
-        db_path = versioning.atlas_path(ac, "outlets") / db_outlet_name / "atlas.db"
+            # Find the db used by the sqlquery outlet (mirrors outlets.outlet_sqlquery logic)
+            sqlquery_cfg = ac.get('assets', {}).get('sqlquery', {})
+            db_outlet_name = sqlquery_cfg.get('config', sqlquery_cfg).get('db_outlet', 'sqldb')
+            db_path = versioning.atlas_path(ac, "outlets") / db_outlet_name / "atlas.db"
 
-        # Build schema description for the prompt
-        schema_lines = []
-        if db_path.exists():
-            import duckdb as _duckdb
-            with _duckdb.connect(str(db_path), read_only=True) as conn:
-                tables = [r[0] for r in conn.execute(
-                    "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
-                ).fetchall()]
-                for table in sorted(tables):
-                    cols = [r[0] for r in conn.execute(
-                        f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+            # Build schema description for the prompt
+            schema_lines = []
+            if db_path.exists():
+                import duckdb as _duckdb
+                with _duckdb.connect(str(db_path), read_only=True) as conn:
+                    tables = [r[0] for r in conn.execute(
+                        "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
                     ).fetchall()]
-                    schema_lines.append(f"  {table}({', '.join(cols)})")
-        schema_text = '\n'.join(schema_lines) if schema_lines else '  (schema unavailable)'
+                    for table in sorted(tables):
+                        cols = [r[0] for r in conn.execute(
+                            f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}'"
+                        ).fetchall()]
+                        schema_lines.append(f"  {table}({', '.join(cols)})")
+            schema_text = '\n'.join(schema_lines) if schema_lines else '  (schema unavailable)'
 
         prompt = f"""You are a SQL assistant for a geospatial fire atlas database (DuckDB with spatial extension).
 
@@ -1141,7 +1233,7 @@ Request: {payload.natural_language}"""
         sql = message.content[0].text.strip()
 
         return {"sql": sql, "original_nl": payload.natural_language}
-    except HTTPException:
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         print(f"ERROR generating SQL: {e}")
@@ -1162,27 +1254,30 @@ async def save_config(swalename: str, payload: JSONPayload):
         if not config_data.get('dataswale'):
             raise ValueError("Configuration must have a 'dataswale' property")
         
-        # Construct config path
-        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
-        
-        # Create backup of existing config
-        if config_path.exists():
-            backup_path = config_path.parent / f"atlas_config.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            shutil.copy(config_path, backup_path)
-            logging.info(f"Created backup at {backup_path}")
-        
-        # Save the new configuration
-        with open(config_path, 'w') as f:
-            json.dump(config_data, f, indent=2)
-        
-        logging.info(f"Saved configuration to {config_path}")
-        
+        with write_session(swalename, "save_config") as session:
+            config_path = session.staging_dir / "atlas_config.json"
+
+            # Create backup of existing config. It sits in staging, so it is
+            # written back to S3 alongside the config it backs up.
+            if config_path.exists():
+                backup_path = config_path.parent / f"atlas_config.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                shutil.copy(config_path, backup_path)
+                logging.info(f"Created backup at {backup_path}")
+
+            # Save the new configuration
+            with open(config_path, 'w') as f:
+                json.dump(config_data, f, indent=2)
+
+            logging.info(f"Saved configuration to {config_path}")
+
         return {
             "status": "success",
             "message": "Configuration saved successfully",
             "path": str(config_path)
         }
-        
+
+    except (HTTPException, *SESSION_ERRORS):
+        raise
     except Exception as e:
         logging.error(f"Error saving configuration: {str(e)}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -1335,8 +1430,11 @@ async def get_log(swalename: str, n: int = 3):
 @app.post("/ingest/email_photo")
 async def ingest_email_photo(payload: EmailPhotoPayload):
     try:
-        config_path = Path(SWALES_ROOT) / payload.atlas_name / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
+        # Config without a lease: everything up to the delta write is parsing
+        # and an S3 photo upload, and the atlas need not be held for that. The
+        # write below takes the lease just for itself.
+        with read_session(payload.atlas_name, "ingest email_photo (config)") as session:
+            ac = session.config
 
         # No sender restriction — anyone can submit photos via email.
         # See issue #61 for splitting photo-submission auth from admin_emails.
@@ -1426,10 +1524,11 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=layer_name)
-
-        # Refresh layer
-        dataswale_geojson.refresh_vector_layer(ac, layer_name)
+        with write_session(payload.atlas_name, f"ingest email_photo {layer_name}") as session:
+            deltas_geojson.add_deltas_from_features(session.config, None, fc, "create",
+                                                    layer_name=layer_name)
+            # Refresh layer
+            dataswale_geojson.refresh_vector_layer(session.config, layer_name)
 
         return {
             "status": "ok",
@@ -1440,7 +1539,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             "content_type": content_type,
         }
 
-    except HTTPException:
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         logging.error(f"Error in ingest_email_photo: {e}")
@@ -1452,8 +1551,9 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
 @app.post("/ingest/web_photo")
 async def ingest_web_photo(payload: WebPhotoPayload):
     try:
-        config_path = Path(SWALES_ROOT) / payload.atlas_name / "staging" / "atlas_config.json"
-        ac = json.load(open(config_path))
+        # Config without a lease; the write below takes it just for itself.
+        with read_session(payload.atlas_name, "ingest web_photo (config)") as session:
+            ac = session.config
 
         # Validate layer exists
         layer_names = [l["name"] for l in ac["dataswale"]["layers"]]
@@ -1500,8 +1600,10 @@ async def ingest_web_photo(payload: WebPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=payload.layer_name)
-        dataswale_geojson.refresh_vector_layer(ac, payload.layer_name)
+        with write_session(payload.atlas_name, f"ingest web_photo {payload.layer_name}") as session:
+            deltas_geojson.add_deltas_from_features(session.config, None, fc, "create",
+                                                    layer_name=payload.layer_name)
+            dataswale_geojson.refresh_vector_layer(session.config, payload.layer_name)
 
         return {
             "status": "ok",
@@ -1511,7 +1613,7 @@ async def ingest_web_photo(payload: WebPhotoPayload):
             "image_url": image_url,
         }
 
-    except HTTPException:
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         logging.error(f"Error in ingest_web_photo: {e}")
