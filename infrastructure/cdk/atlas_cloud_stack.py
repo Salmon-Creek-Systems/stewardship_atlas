@@ -106,6 +106,7 @@ class AtlasCloudStack(Stack):
         google_client_id: str = None,
         google_secret_name: str = None,
         api_image_tag: str = None,
+        callback_host_override: str = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -314,8 +315,20 @@ class AtlasCloudStack(Stack):
         # ListBucket matters as much as the writes: pruning stale keys is what
         # keeps the current/ prefix a true mirror of the published version
         # rather than an accumulating pile of removed layers.
+        # The EC2 role is *shared* — one box, imported by every environment's
+        # stack. A mutable imported role gets an inline AWS::IAM::Policy whose
+        # PolicyName is derived from the construct path, and CDK's hash is
+        # relative to the stack root, so every environment produced the same
+        # name on the same role: "already managed by another stack".
+        #
+        # The construct id therefore carries the environment for everything but
+        # prod. Prod keeps the original id deliberately, so its existing policy
+        # is neither renamed nor replaced — this role is attached to the live
+        # box, and a policy swap there is not worth the tidier code.
+        role_scope_id = ("WebappEc2Role" if env_name == "prod"
+                         else f"WebappEc2Role{env_name.capitalize()}")
         webapp_role = iam.Role.from_role_arn(
-            self, "WebappEc2Role",
+            self, role_scope_id,
             f"arn:aws:iam::{self.account}:role/{WEBAPP_EC2_ROLE_NAME}",
             mutable=True,
         )
@@ -380,7 +393,24 @@ class AtlasCloudStack(Stack):
             )
             identity_providers.append(cognito.UserPoolClientIdentityProvider.GOOGLE)
 
-        callback_host = domain_name or distribution.distribution_domain_name
+        # Deriving this from the distribution creates a circular dependency,
+        # and it is only invisible in prod because `domain_name` is set there:
+        #
+        #   api_fn --env USER_POOL_CLIENT_ID--> WebClient
+        #          --callback_urls--> Distribution --origin--> api_fn's URL
+        #
+        # With a literal domain the middle edge does not exist. Without one
+        # CloudFormation refuses the whole stack, so the substrate could not be
+        # created from scratch in any environment that has no custom domain --
+        # which is exactly what `env_name=staging` is for.
+        #
+        # The callback host is therefore never taken from the distribution. It
+        # comes from the domain when there is one, from `-c callback_host=` when
+        # there is not, and otherwise from a placeholder. Cognito callbacks only
+        # matter once SSO is actually used (Phase 4), and the value can be
+        # corrected by a second deploy once the distribution's domain is known.
+        callback_host = (domain_name or callback_host_override
+                         or 'localhost.invalid')
         web_client = user_pool.add_client(
             "WebClient",
             user_pool_client_name=f"atlas-web-{env_name}",

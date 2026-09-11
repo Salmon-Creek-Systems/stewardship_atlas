@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 import shutil
 import tempfile
@@ -86,10 +87,23 @@ def make_atlas(root: Path, versioned_outlets=None):
         (staging / 'outlets' / outlet).mkdir(parents=True)
         (staging / 'outlets' / outlet / 'index.html').write_text(outlet)
 
-    dataswale = {'versions': []}
+    # Shaped like a *built* atlas_config.json, not like a source geojson.
+    # `bbox` and `layers` are written by atlas.create_config() at build time
+    # (atlas.py:190), so every config publish_new_version actually receives has
+    # them. A fixture without them is simpler than production in precisely the
+    # dimension the catalog cares about, which is how this file used to pass
+    # while publish_catalog raised KeyError underneath a bare except.
+    dataswale = {
+        'versions': [],
+        'layers': [],
+        'bbox': {'north': 39.5, 'south': 39.4, 'east': -123.7, 'west': -123.8},
+    }
     if versioned_outlets is not None:
         dataswale['versioned_outlets'] = versioned_outlets
-    config = {'name': 'testatlas', 'data_root': str(root), 'dataswale': dataswale}
+    config = {'name': 'testatlas', 'data_root': str(root), 'dataswale': dataswale,
+              # No outlets are allowlisted, so the S3 push is an empty plan and
+              # never reaches boto3 — see TestMandatoryAllowlist.
+              'cloud': {'outlets': []}}
     (staging / 'atlas_config.json').write_text(json.dumps(config))
 
     prior = root / 'testatlas' / '0000-00-00'
@@ -106,14 +120,46 @@ class TestPublishNewVersion(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        # The S3 pushes are patched out, not stubbed into sys.modules: these
+        # tests are about the snapshot and the symlink, and a module-level stub
+        # would leak into every suite that runs after this one and make their
+        # assertions pass vacuously (#153). mock.patch restores on exit.
+        self._pushes = [
+            mock.patch('atlas_store.publish_layer_data',
+                       return_value={'status': 'ok', 'objects': 0}),
+            mock.patch('atlas_store.publish_public_outlets',
+                       return_value={'status': 'empty', 'outlets': []}),
+        ]
+        self.push_mocks = [p.start() for p in self._pushes]
 
     def tearDown(self):
+        for patcher in self._pushes:
+            patcher.stop()
         self.tmp.cleanup()
 
     def publish(self, versioned_outlets=None, version='v1'):
         config = make_atlas(self.root, versioned_outlets)
         version_path = publish_new_version(config, version=version)
         return config, Path(version_path)
+
+    def test_a_failed_s3_push_leaves_current_where_it_was(self):
+        """Ordering contract: push first, flip CURRENT only on success.
+
+        S3 holds the source of truth, so a publish whose push failed is not a
+        publish. Flipping first and swallowing the error — the Phase 2
+        behaviour — would leave the box advertising a version the world cannot
+        read. Failing here keeps the previous version live.
+        """
+        self.push_mocks[1].side_effect = RuntimeError('bucket unreachable')
+        config = make_atlas(self.root)
+        current = self.root / 'testatlas' / 'CURRENT'
+        before = current.resolve()
+
+        with self.assertRaises(RuntimeError):
+            publish_new_version(config, version='v1')
+
+        self.assertEqual(current.resolve(), before)
+        self.assertTrue(current.is_symlink())
 
     def test_no_filter_copies_all_outlets(self):
         _, vp = self.publish(versioned_outlets=None)

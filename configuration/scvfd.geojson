@@ -16,9 +16,6 @@
                     "gazetteer"
                 ],
                 "cloud": {
-                    "enabled": true,
-                    "outlets_bucket": "scs-atlas-outlets-prod",
-                    "distribution_id": "E1A5S5MB0K3FZG",
                     "outlets": [
                         "webmap",
                         "html",
@@ -60,6 +57,9 @@
                         "geometry_type": "raster"
                     },
                     "contours": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "linestring",
                         "color": [
                             240,
@@ -76,6 +76,9 @@
                         }
                     },
                     "basemap": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "raster"
                     },
                     "lidar_basemap": {
@@ -91,6 +94,9 @@
                         "opacity": 0.5
                     },
                     "roads": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "linestring",
                         "color": [
                             20,
@@ -364,6 +370,9 @@
                         "qgis_width_scale": 12.0
                     },
                     "mileage_markers": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "point",
                         "color": [
                             255,
@@ -450,6 +459,9 @@
                         "interaction": "interface"
                     },
                     "creeks": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "linestring",
                         "add_labels": true,
                         "color": [
@@ -463,6 +475,9 @@
                         "qgis_opacity": 0.25
                     },
                     "watertanks": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "point",
                         "add_labels": true,
                         "color": [
@@ -575,6 +590,9 @@
                         "qgis_icon_scale": 2.0
                     },
                     "ponds": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             50,
@@ -648,6 +666,9 @@
                         ]
                     },
                     "buildings": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "polygon",
                         "color": [
                             240,
@@ -699,6 +720,9 @@
                         ]
                     },
                     "hydrants": {
+                        "access": [
+                            "public"
+                        ],
                         "geometry_type": "point",
                         "color": [
                             255,
@@ -1111,7 +1135,6 @@
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
-                        "bake_data": true,
                         "access": [
                             "public",
                             "internal",

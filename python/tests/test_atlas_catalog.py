@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import atlas_catalog as AC
 import federation as F
+import atlas_store
 
 
 BBOX = {'north': 38.6, 'south': 38.4, 'east': -122.9, 'west': -123.1}
@@ -228,16 +229,22 @@ def test_publish_catalog_writes_the_expected_tree(tmp_path):
     assert summary['missing_layers'] == ['never_materialized']
 
 
-def test_hrefs_follow_the_existing_outlet_convention(tmp_path):
+def test_the_local_href_survives_as_an_alternate(tmp_path):
+    """The old outlet-convention href is kept, demoted to `alternate.local`.
+
+    It is what lets the box resolve a layer from its own disk and what an
+    offline copy of an outlet needs, so making S3 primary must not discard it.
+    """
     config = _config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
 
     item = json.loads(
         (version_dir / 'stac' / 'roads' / f'roads-{V1}.json').read_text())
-    assert item['assets']['data']['href'] == \
+    data = item['assets']['data']
+    assert data['alternate']['local']['href'] == \
         f'https://example.org/scvfd/{V1}/layers/roads/roads.geojson'
-    assert item['assets']['data']['type'] == 'application/geo+json'
+    assert data['type'] == 'application/geo+json'
 
 
 def test_history_round_trips_through_disk(tmp_path):
@@ -411,123 +418,46 @@ def test_missing_referenced_item_falls_back_to_rewriting(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# Addressing a layer that lives in another version (slice 3)
+# Layer addressing
+#
+# Pinning is gone with this step. It addressed a sibling *version* directory
+# (`../../../{version}/layers/...`), which exists on the box but has no
+# counterpart under the published `current/` prefix, so those URLs would 404 on
+# CloudFront. One relative form now serves both hosts, backed by the mirror in
+# atlas_store.plan_current_layers.
 # --------------------------------------------------------------------------- #
 
-def _pin(version, *files):
-    return {'version': version, 'files': set(files)}
+def _item_filenames(item):
+    """Basenames of every file an Item's assets name — local test helper."""
+    from pathlib import Path as _P
+    return {_P(a['href']).name for a in (item.get('assets') or {}).values()
+            if isinstance(a, dict) and a.get('href')}
 
 
-def test_layer_data_url_modes():
-    pinned = {'roads': _pin(V1, 'roads.geojson')}
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson') == \
-        '../../layers/roads/roads.geojson'
-    assert AC.layer_data_url(True, 'roads', 'roads.geojson', pinned) == \
-        'data/roads.geojson', 'baking wins over pinning'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson', pinned) == \
-        f'../../../{V1}/layers/roads/roads.geojson'
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
-                             {'other': _pin(V1, 'other.geojson')}) == \
-        '../../layers/roads/roads.geojson', 'a layer not pinned is unaffected'
+def test_layer_data_url_is_relative_and_host_independent():
+    """One form, resolving correctly from the box and from CloudFront.
 
-
-def test_pinning_falls_back_for_a_file_the_catalog_does_not_record():
-    """The kennedy `lpss` miss, and the raster case behind it.
-
-    Pinning resolved the *version* from the catalog and then rebuilt the
-    filename by convention. That works while `{layer}.geojson` holds and fails
-    silently when it does not — a webmap asks a raster layer for
-    `{layer}.tiff.jpg`, whose primary file is `{layer}.tiff`.
+    From `{atlas}/{version}/outlets/webmap/` it finds the local layer tree;
+    from `{atlas}/current/outlets/webmap/` on S3 it finds the mirror at
+    `{atlas}/current/layers/`. That is what lets publish stay a pure snapshot:
+    there is no URL to rewrite and no second materialize.
     """
-    pinned = {'basemap': _pin(V1, 'basemap.tiff')}
-    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg', pinned) == \
-        '../../layers/basemap/basemap.tiff.jpg', \
-        'a file the Item does not record must not be pinned'
-    pinned_with_jpg = {'basemap': _pin(V1, 'basemap.tiff', 'basemap.tiff.jpg')}
-    assert AC.layer_data_url(False, 'basemap', 'basemap.tiff.jpg',
-                             pinned_with_jpg) == \
-        f'../../../{V1}/layers/basemap/basemap.tiff.jpg'
+    assert AC.layer_data_url('roads', 'roads.geojson') == '../../layers/roads/roads.geojson'
+    assert AC.layer_data_url('lidar_basemap', 'lidar_basemap.tiff.jpg') == \
+        '../../layers/lidar_basemap/lidar_basemap.tiff.jpg'
 
 
-def test_pin_entry_without_files_never_pins():
-    assert AC.layer_data_url(False, 'roads', 'roads.geojson',
-                             {'roads': {'version': V1}}) == \
-        '../../layers/roads/roads.geojson'
+def test_layer_data_url_climbs_exactly_two_levels():
+    """Regression guard on the depth, which is what makes both hosts work.
 
-
-def test_pinned_url_resolves_from_staging_and_from_a_version(tmp_path):
-    """The property that removes the co-location assumption.
-
-    Staging and every published version are siblings under the atlas root, so
-    one relative URL has to work from both. This walks the URL from each
-    starting point and asserts it lands on the same real file.
+    An outlet directory always sits two below the version/current root, so the
+    URL must climb exactly two. Off-by-one here is invisible locally — a wrong
+    directory and a right one both resolve to *something* during a relative
+    join — and only shows up as a 404 on the served copy.
     """
-    atlas = tmp_path / 'kennedy'
-    data = atlas / V1 / 'layers' / 'roads'
-    data.mkdir(parents=True)
-    (data / 'roads.geojson').write_text('R1')
-
-    url = AC.layer_data_url(False, 'roads', 'roads.geojson',
-                            {'roads': _pin(V1, 'roads.geojson')})
-
-    for outlet_dir in (atlas / 'staging' / 'outlets' / 'webmap',
-                       atlas / V2 / 'outlets' / 'webmap'):
-        outlet_dir.mkdir(parents=True)
-        resolved = (outlet_dir / url).resolve()
-        assert resolved == (data / 'roads.geojson').resolve(), \
-            f'{url} must resolve to the real file from {outlet_dir}'
-        assert resolved.is_file()
-
-
-def test_resolve_pinned_layers_pins_only_unchanged_layers(tmp_path):
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    AC.publish_catalog(config, v1_dir, V1)
-
-    # staging: hydrants edited, roads and the raster untouched
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v1_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    assert set(pinned) == {'roads', 'lidar_basemap'}
-    assert pinned['roads']['version'] == V1
-    assert 'roads.geojson' in pinned['roads']['files']
-    assert 'hydrants' not in pinned, 'an edited layer must address the new version'
-
-
-def test_resolve_pinned_layers_is_empty_without_history(tmp_path):
-    staging = _make_version(tmp_path, 'staging')
-    assert AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', tmp_path / 'nope') == {}
-
-
-def test_pinning_follows_a_layer_back_through_hops(tmp_path):
-    """A layer reused in V2 pins to V1, where its data actually lives."""
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    AC.publish_catalog(config, v1_dir, V1)
-    v2_dir = _make_version(tmp_path, V2, hydrants='EDITED')
-    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
-
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v2_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    assert pinned['roads']['version'] == V1, 'roads data lives at V1, not V2'
-    assert pinned['hydrants']['version'] == V2, 'hydrants was rewritten at V2'
-
-
-def test_checksum_match_fails_closed_on_missing_values(tmp_path):
-    item = F.build_layer_item('scvfd', 'x', V1, BBOX,
-                              {'data': F.stac_asset('x.parquet')})
-    assert AC.item_checksum_matches(item, 'abc') is False, 'no checksum on Item'
-    with_sum = F.build_layer_item('scvfd', 'x', V1, BBOX,
-                                  {'data': F.stac_asset('x.parquet', checksum='abc')})
-    assert AC.item_checksum_matches(with_sum, '') is False, 'no checksum to compare'
-    assert AC.item_checksum_matches(with_sum, 'abc') is True
+    url = AC.layer_data_url('roads', 'roads.geojson')
+    assert url.startswith('../../layers/')
+    assert not url.startswith('../../../')
 
 
 def test_item_records_every_servable_file_in_the_layer_dir(tmp_path):
@@ -542,30 +472,12 @@ def test_item_records_every_servable_file_in_the_layer_dir(tmp_path):
     item = json.loads((version_dir / 'stac' / 'lidar_basemap' /
                        f'lidar_basemap-{V1}.json').read_text())
 
-    names = AC.item_filenames(item)
+    names = _item_filenames(item)
     assert 'lidar_basemap.tiff' in names
     assert 'lidar_basemap.tiff.jpg' in names
     assert 'stats.json' not in names, 'sidecar is not servable data'
     assert F.item_checksum(item), 'primary asset still carries the checksum'
 
-
-def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
-    config = _config(tmp_path)
-    v1_dir = _make_version(tmp_path, V1)
-    (v1_dir / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
-    AC.publish_catalog(config, v1_dir, V1)
-
-    staging = _make_version(tmp_path, 'staging', hydrants='EDITED')
-    (staging / 'layers' / 'lidar_basemap' / 'lidar_basemap.tiff.jpg').write_text('JPG')
-    pinned = AC.resolve_pinned_layers(
-        LAYERS, staging / 'layers', v1_dir / 'stac',
-        base_url=config['base_url'], atlas_root=tmp_path)
-
-    url = AC.layer_data_url(False, 'lidar_basemap', 'lidar_basemap.tiff.jpg', pinned)
-    assert url == f'../../../{V1}/layers/lidar_basemap/lidar_basemap.tiff.jpg'
-    outlet = tmp_path / V2 / 'outlets' / 'webmap'
-    outlet.mkdir(parents=True)
-    assert (outlet / url).resolve().is_file(), 'pinned raster URL must resolve'
 
 
 # --------------------------------------------------------------------------- #
@@ -574,15 +486,18 @@ def test_pinning_a_raster_resolves_the_rendered_image(tmp_path):
 
 def _cloud_config(tmp_path, **cloud):
     config = _config(tmp_path)
-    config['cloud'] = {'enabled': True, 'outlets_bucket': 'OUT',
-                       'private_bucket': 'PRIV', 'layers': True, **cloud}
+    config['cloud'] = {'outlets_bucket': 'OUT', 'private_bucket': 'PRIV',
+                       'public_base_url': 'https://cdn.example.org', **cloud}
     return config
 
 
-def test_alternates_record_s3_without_moving_the_primary_href(tmp_path):
-    """The primary href must stay local: keys are deterministic, so writing
-    them as primary before the upload happens would leave the catalog naming
-    an object that may not exist."""
+def test_public_layers_get_an_https_primary_href(tmp_path):
+    """S3 is the source of truth, so the served URL is the primary href.
+
+    Slice 4 kept the primary local because a deterministic key written before
+    a failed upload would name a missing object. The push now raises and takes
+    the publish with it, so that cannot happen.
+    """
     config = _cloud_config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
@@ -590,13 +505,20 @@ def test_alternates_record_s3_without_moving_the_primary_href(tmp_path):
     item = json.loads((version_dir / 'stac' / 'hydrants' /
                        f'hydrants-{V1}.json').read_text())
     data = item['assets']['data']
-    assert data['href'] == f'{config["base_url"]}/{V1}/layers/hydrants/hydrants.geojson'
+    assert data['href'] == \
+        f'https://cdn.example.org/scvfd/layers/hydrants/{V1}/hydrants.geojson'
     assert data['alternate']['s3']['href'] == \
         f's3://OUT/scvfd/layers/hydrants/{V1}/hydrants.geojson'
+    assert data['alternate']['local']['href'].startswith('https://example.org/')
     assert AC.ALTERNATE_EXTENSION in item['stac_extensions']
 
 
-def test_alternates_route_protected_layers_to_the_private_bucket(tmp_path):
+def test_protected_layers_keep_an_s3_primary_href(tmp_path):
+    """A protected layer has no HTTPS reader until Phase 4.
+
+    Naming a CloudFront URL that 403s would be less honest than naming the
+    bucket, and it would let a reader believe the tier split had been crossed.
+    """
     config = _cloud_config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     AC.publish_catalog(config, version_dir, V1)
@@ -604,21 +526,51 @@ def test_alternates_route_protected_layers_to_the_private_bucket(tmp_path):
     # hydrants is shareable -> public; roads has no tier -> internal
     roads = json.loads((version_dir / 'stac' / 'roads' /
                         f'roads-{V1}.json').read_text())
-    assert roads['assets']['data']['alternate']['s3']['href'].startswith('s3://PRIV/')
-    hydrants = json.loads((version_dir / 'stac' / 'hydrants' /
-                           f'hydrants-{V1}.json').read_text())
-    assert hydrants['assets']['data']['alternate']['s3']['href'].startswith('s3://OUT/')
+    assert roads['assets']['data']['href'] == \
+        f's3://PRIV/scvfd/layers/roads/{V1}/roads.geojson'
+    assert 'cdn.example.org' not in json.dumps(roads)
 
 
-def test_no_alternates_without_the_layers_opt_in(tmp_path):
-    config = _cloud_config(tmp_path, layers=False)
+def test_hrefs_are_written_with_no_cloud_block_at_all(tmp_path):
+    """There is no opt-out: an atlas with no `cloud` config still resolves to
+    the code-default buckets, because S3 is the backend rather than a feature.
+    """
+    config = _config(tmp_path)
     version_dir = _make_version(tmp_path, V1)
     summary = AC.publish_catalog(config, version_dir, V1)
 
-    assert summary['alternates'] == 0
-    item = json.loads((version_dir / 'stac' / 'roads' /
-                       f'roads-{V1}.json').read_text())
-    assert 'alternate' not in item['assets']['data']
+    assert summary['asset_hrefs'] > 0
+    item = json.loads((version_dir / 'stac' / 'hydrants' /
+                       f'hydrants-{V1}.json').read_text())
+    assert item['assets']['data']['href'].startswith(
+        atlas_store.DEFAULT_PUBLIC_BASE_URL + '/scvfd/layers/hydrants/')
+
+
+def test_a_reused_item_keeps_the_version_that_holds_its_bytes(tmp_path):
+    """Regression: hrefs must never be rebuilt at the *current* version.
+
+    This is the shape of the first bug this branch hit — a reused Item's href
+    reconstructed from the new version's base, naming a key that holds nothing.
+    Only newly written Items may be rewritten.
+    """
+    config = _cloud_config(tmp_path)
+    v1_dir = _make_version(tmp_path, V1)
+    AC.publish_catalog(config, v1_dir, V1)
+    v2_dir = _make_version(tmp_path, V2)
+    AC.publish_catalog(config, v2_dir, V2, previous_version_path=v1_dir)
+
+    # A reused layer writes no Item into the new version's directory at all —
+    # V2's Collection links back to where the bytes actually are.
+    assert not (v2_dir / 'stac' / 'hydrants' / f'hydrants-{V2}.json').exists()
+    item = json.loads((v1_dir / 'stac' / 'hydrants' /
+                       f'hydrants-{V1}.json').read_text())
+    assert item['assets']['data']['href'] == \
+        f'https://cdn.example.org/scvfd/layers/hydrants/{V1}/hydrants.geojson'
+    assert V2 not in item['assets']['data']['href']
+
+    collection = json.loads((v2_dir / 'stac' / 'hydrants' / 'collection.json').read_text())
+    item_links = [l['href'] for l in collection['links'] if l['rel'] == 'item']
+    assert item_links == [f'https://example.org/scvfd/{V1}/stac/hydrants/hydrants-{V1}.json']
 
 
 def test_summary_carries_what_the_uploader_needs(tmp_path):
@@ -693,7 +645,7 @@ def test_a_stray_file_never_reaches_an_item(tmp_path):
     AC.publish_catalog(config, version_dir, V1)
 
     item = json.loads((version_dir / 'stac' / 'roads' / f'roads-{V1}.json').read_text())
-    assert '.htpasswd' not in AC.item_filenames(item)
+    assert '.htpasswd' not in _item_filenames(item)
     for asset in item['assets'].values():
         assert '.htpasswd' not in asset['href']
         assert '.htpasswd' not in asset.get('alternate', {}).get('s3', {}).get('href', '')
@@ -757,3 +709,45 @@ def test_sidecars_stay_out_of_the_upload_set(tmp_path):
     assets = AC.scan_layers(LAYERS, version_dir / 'layers')
     assert sorted(assets['lidar_basemap']['files']) == [
         'lidar_basemap.tiff', 'lidar_basemap.tiff.jpg']
+
+
+# --------------------------------------------------------------------------- #
+# Rendered raster selection
+# --------------------------------------------------------------------------- #
+
+def test_prefers_png_over_jpg(tmp_path):
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff.jpg').write_text('J')
+    (d / 'basemap.tiff.png').write_text('P')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') == 'basemap.tiff.png'
+
+
+def test_falls_back_to_jpg(tmp_path):
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff.jpg').write_text('J')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') == 'basemap.tiff.jpg'
+
+
+def test_no_rendered_image_is_none_not_a_guess(tmp_path):
+    """The regression: an unchecked fallback named a file that isn't there.
+
+    kennedy's lidar_basemap has the source layer declared but no rendered
+    image, and the webmap emitted `lidar_basemap.tiff.jpg` regardless — a
+    source URL guaranteed to 404, which is how it surfaced on CloudFront.
+    """
+    (tmp_path / 'lidar_basemap').mkdir()
+    assert AC.rendered_raster_filename(tmp_path, 'lidar_basemap') is None
+
+
+def test_source_tiff_alone_is_not_a_rendered_image(tmp_path):
+    # The GeoTIFF is the source, not something a browser can show.
+    d = tmp_path / 'basemap'
+    d.mkdir()
+    (d / 'basemap.tiff').write_text('T')
+    assert AC.rendered_raster_filename(tmp_path, 'basemap') is None
+
+
+def test_missing_layer_directory_is_none(tmp_path):
+    assert AC.rendered_raster_filename(tmp_path, 'never_created') is None

@@ -84,6 +84,10 @@ google_secret_name = app.node.try_get_context("google_secret_name")
 # API Lambda deploys as an inline placeholder so a laptop with no Docker can
 # still bring the stack up.
 api_image_tag = app.node.try_get_context("api_image_tag")
+# Cognito callback host, for an environment with no custom domain. It cannot be
+# derived from the distribution without making the stack circular — see the
+# comment at `callback_host` in atlas_cloud_stack.py.
+callback_host_override = app.node.try_get_context("callback_host")
 
 AtlasCertStack(
     app, f"AtlasCert-{env_name}",
@@ -100,6 +104,7 @@ AtlasCloudStack(
     google_client_id=google_client_id,
     google_secret_name=google_secret_name,
     api_image_tag=api_image_tag,
+    callback_host_override=callback_host_override,
     env=CLOUD_ENV,
 )
 

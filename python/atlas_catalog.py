@@ -47,7 +47,7 @@ LAYER_FILE_SUFFIXES = ('.geojson', '.parquet', '.tiff', '.tif', '.pmtiles', '.gp
 
 # Extensions a consumer actually reads. Covers the vector and raster sources
 # plus the rendered images a webmap requests ({layer}.tiff.jpg / .tiff.png --
-# see the candidate list in outlets.bake_layer_data). Anything else in a layer
+# see the candidate list in atlas_store.plan_current_layers). Anything else in a layer
 # directory is tooling residue: GDAL statistics sidecars, exports, lock files.
 SERVABLE_SUFFIXES = frozenset(LAYER_FILE_SUFFIXES) | {
     '.png', '.jpg', '.jpeg', '.webp'}
@@ -110,7 +110,7 @@ def is_servable_file(filename: str, layer_name: str) -> bool:
     So the rule is an allowlist by *name*, not a denylist by exception: a
     layer's servable files are the ones named after it. That matches the actual
     convention (`{layer}.geojson`, `{layer}.tiff.jpg`, `{layer}.pmtiles` — see
-    the candidates in `outlets.bake_layer_data`) and anything unexpected in the
+    the candidates in `atlas_store.plan_current_layers`) and anything unexpected in
     directory is excluded by default rather than published by default.
     """
     if filename.startswith('.'):
@@ -312,7 +312,7 @@ def publish_catalog(config: dict, version_path, version: str,
         catalog_base_url=catalog_base_url,
     )
 
-    alternates = add_s3_alternates(built, config, version)
+    hrefs = set_layer_hrefs(built, config, version)
     paths = write_catalog(built, version_path / CATALOG_DIRNAME, version)
 
     summary = {
@@ -322,7 +322,7 @@ def publish_catalog(config: dict, version_path, version: str,
         'reused_layers': built['reused'],
         'missing_layers': built['missing'],
         'documents': len(paths),
-        'alternates': alternates,
+        'asset_hrefs': hrefs,
         # Passed through for the S3 push in versioning — computed here so the
         # layer files are scanned and checksummed exactly once per publish.
         'layer_assets': layer_assets,
@@ -343,130 +343,106 @@ def item_version(item: dict):
     return (item.get('properties') or {}).get('version')
 
 
-def resolve_pinned_layers(layers, staging_layers_root, previous_stac_dir,
-                          base_url: str = '', atlas_root=None) -> dict:
-    """`{layer_name: version}` for layers a publish would *not* rewrite.
+# A webmap shows a non-COG raster as an `image` source pointing at a rendered
+# picture of it, not at the source GeoTIFF. `.tiff.png` is preferred when it
+# exists (transparency), otherwise `.tiff.jpg`.
+RENDERED_RASTER_SUFFIXES = ('.tiff.png', '.tiff.jpg')
 
-    A layer whose staging bytes match the newest Item in the previous version's
-    catalog will be reused rather than re-stamped, so an outlet built now should
-    address it at the version that actually holds it — not at `../../layers/`,
-    which assumes every layer is copied into every version. Removing that
-    assumption is the point: it has no counterpart in an object store, and
-    propping it up with hard/symlinks would be work to undo at the S3 cutover.
 
-    Layers absent from the result are changed (or new), will be written into the
-    version being built, and keep addressing it locally.
+def rendered_raster_filename(layers_root, layer_name: str):
+    """The rendered image a webmap should request for a raster layer, or None.
 
-    Costs one sha256 per layer file, so callers should only ask when the feature
-    is on — see `outlets._pinned_layers()`.
+    None means the layer has no picture to show. Returning a filename anyway —
+    which is what an unchecked `.tiff.jpg` fallback amounts to — produces a
+    source URL that is guaranteed to 404, and the failure surfaces as a broken
+    map rather than as anything pointing at the missing data.
+
+    This is not the same case as a vector layer with no features. An empty
+    FeatureCollection is a truthful statement that renders cleanly (#135); an
+    empty raster is not a thing, so the layer is dropped instead.
     """
-    history = load_history(previous_stac_dir, base_url=base_url,
-                           atlas_root=atlas_root)
-    if not history:
-        return {}
-
-    staging_layers_root = Path(staging_layers_root)
-    pinned = {}
-    for layer in layers:
-        name = layer.get('name')
-        items = history.get(name) if name else None
-        if not items:
-            continue
-        path = find_layer_file(staging_layers_root, name)
-        if path is None:
-            continue
-        version = item_version(items[-1])
-        if version and item_checksum_matches(items[-1], sha256_multihash(path)):
-            pinned[name] = {'version': version, 'files': item_filenames(items[-1])}
-    return pinned
+    layer_dir = Path(layers_root) / layer_name
+    for suffix in RENDERED_RASTER_SUFFIXES:
+        if (layer_dir / f'{layer_name}{suffix}').is_file():
+            return f'{layer_name}{suffix}'
+    return None
 
 
-def item_checksum_matches(item: dict, checksum: str) -> bool:
-    """True only on a real match — an absent checksum on either side is False.
+def layer_data_url(layer_name: str, filename: str) -> str:
+    """URL a webmap should use for one of its layer files.
 
-    Fail-closed: treating 'unknown' as 'unchanged' would pin an outlet at a
-    version whose bytes we never verified.
+    Always relative, and deliberately so. A published outlet lives at
+    ``{atlas}/current/outlets/{name}/`` on S3 and at
+    ``{atlas}/{version}/outlets/{name}/`` on the box, and in both places
+    ``../../layers/{layer}/{file}`` lands on the layer data that belongs to
+    that copy — the S3 mirror in one case, the local layer tree in the other.
+    One built artifact therefore works unchanged from either host, which is
+    what lets publish stay a pure snapshot (#131): there is no URL to rewrite
+    at publish time and no second materialize.
+
+    This replaces three earlier variants — baked (``data/{file}``), pinned
+    (``../../../{version}/layers/...``) and shared. Baking copied the same
+    bytes into every outlet that referenced them and was the mechanism behind
+    #177; pinning addressed a sibling *version* directory, which has no
+    counterpart under the published ``current/`` prefix and would 404 on
+    CloudFront. The mirror in ``atlas_store.plan_current_layers`` is what makes
+    the single shared form correct everywhere.
+
+    Absolute URLs are still required for range-read formats (PMTiles, COG), but
+    those are resolved in the browser against ``window.location.href`` rather
+    than baked in — same reason, one artifact, many hosts.
     """
-    if not checksum:
-        return False
-    import federation
-    return federation.item_checksum(item) == checksum
-
-
-def layer_data_url(bake: bool, layer_name: str, filename: str,
-                   pinned: dict = None) -> str:
-    """URL a webmap should use for a layer file: baked, pinned, or shared.
-
-    Lives here rather than in `outlets` because `outlets` imports duckdb and
-    cannot be imported in the bare local env — the same reason `federation`
-    holds the federation logic. `outlets._layer_data_url` delegates.
-
-    `pinned` maps layer name -> the version that actually holds the data, for
-    layers a publish would reuse rather than copy. Staging and every published
-    version are sibling directories under the atlas root, so
-    `../../../{version}/...` resolves identically from a staging outlet and
-    from a published one. That is what lets an outlet stop assuming its layers
-    were copied alongside it — an assumption with no counterpart in an object
-    store.
-
-    Empty `pinned` reproduces the previous behaviour exactly.
-    """
-    if bake:
-        return f"data/{filename}"
-    entry = (pinned or {}).get(layer_name)
-    if entry and filename in entry.get('files', ()):
-        return f"../../../{entry['version']}/layers/{layer_name}/{filename}"
     return f"../../layers/{layer_name}/{filename}"
-
-
-def item_filenames(item: dict) -> set:
-    """Every filename an Item records, across all of its assets.
-
-    Pinning a layer to another version is only safe for files that version
-    actually holds. Resolving the *version* from the catalog and then
-    reconstructing the filename by convention is half a mechanism: it works
-    while `{layer}.geojson` holds and fails silently when it does not — a
-    raster whose webmap wants `{layer}.tiff.jpg`, or a layer whose file is
-    named something else. Unknown filename means fall back to `../../layers/`.
-    """
-    names = set()
-    for asset in (item.get('assets') or {}).values():
-        href = asset.get('href') if isinstance(asset, dict) else None
-        if href:
-            names.add(Path(href).name)
-    return names
 
 
 ALTERNATE_EXTENSION = "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
 
 
-def add_s3_alternates(built: dict, config: dict, version: str) -> int:
-    """Record each newly written asset's S3 location as an `alternate` href.
+def set_layer_hrefs(built: dict, config: dict, version: str) -> int:
+    """Point each Item's assets at S3, where the layer data now actually lives.
 
-    Deliberately *not* the primary href. The keys are deterministic, so they
-    could be written before the upload happens — but then a failed push leaves
-    the catalog pointing at an object that does not exist. As an alternate the
-    catalog stays truthful whatever the upload does, and a reader opts in.
+    This inverts the arrangement slice 4 shipped, which recorded S3 as an
+    `alternate` and left the repo-relative path as the primary href. That was
+    right while the push was best-effort: keys are deterministic, so writing
+    one as primary before a failed upload leaves the catalog naming an object
+    that does not exist. The premise is gone — the push now raises and takes
+    the publish with it, so the catalog cannot outlive the objects it names.
 
-    Only newly written Items are touched; a reused Item already carries the
-    alternate it was written with, pointing at the version that holds the data.
+    Primary href by tier:
+
+    * **public** — the CloudFront URL. A public layer has a reader, and an
+      HTTPS href is the one thing a STAC client, a browser and a webmap can
+      all use.
+    * **protected** — the `s3://` URI. These have no HTTPS reader until the
+      Phase 4 authenticated path exists, and naming a URL that 403s would be
+      less honest than naming the bucket.
+
+    The previous relative href is kept as a `local` alternate rather than
+    dropped: it is how the box resolves a layer from its own disk, and what an
+    offline copy of an outlet still needs.
     """
     import atlas_store
     settings = atlas_store.cloud_settings(config)
-    if not (settings.get('enabled') and settings.get('layers')):
-        return 0
-
     atlas_name = config['name']
+    base_url = settings['public_base_url']
+
     touched = 0
     for layer_name, item in built['items'].items():
         access = (item.get('properties') or {}).get('atlas:access')
         bucket = atlas_store.layer_bucket(access, settings)
         if not bucket:
             continue
+        public = bucket == settings['outlets_bucket']
         for asset in item.get('assets', {}).values():
-            filename = Path(asset['href']).name
+            local_href = asset.get('href')
+            filename = Path(local_href).name
             key = atlas_store.layer_key(atlas_name, layer_name, version, filename)
-            asset['alternate'] = {'s3': {'href': f's3://{bucket}/{key}'}}
+            s3_uri = f's3://{bucket}/{key}'
+            asset['href'] = f'{base_url}/{key}' if public else s3_uri
+            alternate = asset.setdefault('alternate', {})
+            alternate['s3'] = {'href': s3_uri}
+            if local_href:
+                alternate['local'] = {'href': local_href}
             touched += 1
         exts = item.setdefault('stac_extensions', [])
         if ALTERNATE_EXTENSION not in exts:

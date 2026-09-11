@@ -39,9 +39,6 @@
           "webmap"
         ],
         "cloud": {
-          "enabled": true,
-          "outlets_bucket": "scs-atlas-outlets-prod",
-          "distribution_id": "E1A5S5MB0K3FZG",
           "outlets": [
             "webmap",
             "html"
@@ -81,6 +78,9 @@
             }
           },
           "roads": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               20,
@@ -127,6 +127,9 @@
             ]
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "add_labels": true,
             "color": [
@@ -145,6 +148,9 @@
             ]
           },
           "landmarks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               20,
@@ -174,6 +180,9 @@
             "geometry_type": "raster"
           },
           "roads_index": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [
               100,
@@ -373,8 +382,7 @@
               "public",
               "internal",
               "admin"
-            ],
-            "bake_data": true
+            ]
           },
           "webedit": {
             "type": "outlet",

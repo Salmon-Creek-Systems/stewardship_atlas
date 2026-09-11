@@ -30,6 +30,15 @@
         "type": "Polygon"
       },
     "properties": {
+      "cloud": {
+        "outlets": [
+          "webmap",
+          "3dview",
+          "runbook",
+          "html",
+          "gazetteer"
+        ]
+      },
       "name": "samuelsloop",
       "data_root": "/root/swales_dev",
       "shared_dir": "/root/data",

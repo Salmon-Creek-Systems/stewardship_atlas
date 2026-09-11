@@ -39,9 +39,6 @@
           "webmap"
         ],
         "cloud": {
-          "enabled": true,
-          "outlets_bucket": "scs-atlas-outlets-prod",
-          "distribution_id": "E1A5S5MB0K3FZG",
           "outlets": [
             "webmap",
             "html"
@@ -125,6 +122,9 @@
             ]
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "add_labels": true,
             "color": [
@@ -160,6 +160,9 @@
             ]
           },
           "inaturalist": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -179,6 +182,9 @@
             "label_minzoom": 16
           },
           "canopy_density": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "cog": true,
             "cog_color": "BrewerBuGn9,0,50,c",
@@ -192,6 +198,9 @@
             }
           },
           "ladder_fuel_density": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "cog": true,
             "cog_color": "BrewerOrRd9,0,20,c",
@@ -205,6 +214,9 @@
             }
           },
           "landfire_evc": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "vis": {
               "layout": {
@@ -216,6 +228,9 @@
             }
           },
           "landfire_evt": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "vis": {
               "layout": {
@@ -227,6 +242,9 @@
             }
           },
           "flow_accumulation": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "cog": true,
             "cog_color": "BrewerPuBu9,auto,auto,c",
@@ -354,6 +372,9 @@
             ]
           },
           "h3_grid_r9": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [
               150,
@@ -646,8 +667,7 @@
               "public",
               "internal",
               "admin"
-            ],
-            "bake_data": true
+            ]
           },
           "webedit": {
             "type": "outlet",

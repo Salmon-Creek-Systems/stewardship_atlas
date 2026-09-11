@@ -39,9 +39,6 @@
           "webmap"
         ],
         "cloud": {
-          "enabled": true,
-          "outlets_bucket": "scs-atlas-outlets-prod",
-          "distribution_id": "E1A5S5MB0K3FZG",
           "outlets": [
             "webmap",
             "html"
@@ -63,9 +60,15 @@
             ]
           },
           "roads": {
+            "access": [
+              "public"
+            ],
             "layer_def": "roads"
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "layer_def": "creeks"
           },
           "landmarks": {
@@ -75,9 +78,15 @@
             ]
           },
 	  "parcels": {
+            "access": [
+                     "public"
+            ],
             "layer_def": "parcels"
           },
           "buildings": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [
               240,
@@ -94,6 +103,9 @@
             "interaction": "interface"
           },
           "hydrants": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               255,
@@ -114,6 +126,9 @@
             "icon-size": 1.5
           },
           "watertanks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "add_labels": true,
             "color": [
@@ -247,6 +262,9 @@
             "interaction": "interface"
           },
           "landfire_evc": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "vis": {
               "layout": {
@@ -258,6 +276,9 @@
             }
           },
           "landfire_evt": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster",
             "vis": {
               "layout": {
@@ -486,7 +507,6 @@
             "type": "outlet",
             "name": "webmap",
             "config_def": "webmap",
-            "bake_data": true,
             "in_layers": [
               "regions",
 	      "parcels",

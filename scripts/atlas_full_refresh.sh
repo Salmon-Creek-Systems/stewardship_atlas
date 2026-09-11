@@ -56,15 +56,17 @@ print('' if v is None else (','.join(v) if isinstance(v,list) else v))
 
 BASE_URL="$(cfg base_url)"
 CLOUD_OUTLETS="$(cfg cloud.outlets)"
-CLOUD_ENABLED="$(cfg cloud.enabled)"
 
 echo "atlas       : $ATLAS"
 echo "api         : $API_URL"
 echo "staging     : $BASE_URL/staging/outlets/webmap/"
-if [ "$CLOUD_ENABLED" = "True" ] && [ -n "$CLOUD_OUTLETS" ]; then
+# There is no `cloud.enabled` any more — S3 is the storage backend, not an
+# opt-in. `cloud.outlets` is the mandatory allowlist, and an atlas without one
+# publishes no outlets at all, which is a misconfiguration rather than a mode.
+if [ -n "$CLOUD_OUTLETS" ]; then
   echo "publishes   : $CLOUD_OUTLETS  ->  S3/CloudFront"
 else
-  echo "publishes   : local only (no cloud block — S3 push will be skipped)"
+  echo "publishes   : NOTHING — no cloud.outlets allowlist in $ATLAS.geojson"
 fi
 
 # The webapp's publish status is a single module-level global, not per-atlas,
@@ -135,28 +137,14 @@ for entry in (r.get('log') or [])[-6:]:
     print('   ' + str(entry)[:220])
 " || die "publish did not finish"
 
-if [ -n "$CDN_URL" ] && [ "$CLOUD_ENABLED" = "True" ]; then
+if [ -n "$CDN_URL" ] && [ -n "$CLOUD_OUTLETS" ]; then
   step "checking the published copy"
-  ok=1
-  for outlet in ${CLOUD_OUTLETS//,/ }; do
-    # `html` and `console` generate all four role variants into subdirectories
-    # and have no root index of their own, so the public entry point is the
-    # public/ variant. Checking the outlet root would always 403.
-    case "$outlet" in
-      html|console) entry="$outlet/public" ;;
-      *)            entry="$outlet" ;;
-    esac
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/outlets/$entry/")"
-    printf '   %-20s %s\n' "$entry" "$code"
-    [ "$code" = "200" ] || ok=0
-  done
-  # Role variants live inside html/ and console/ and must never be public.
-  for variant in admin internal technical; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$CDN_URL/$ATLAS/current/outlets/html/$variant/")"
-    [ "$code" = "200" ] && { printf '   \033[31mLEAK: html/%s is public\033[0m\n' "$variant"; ok=0; }
-  done
-  [ "$ok" -eq 1 ] && echo "   public outlets served, no role variants exposed" \
-                  || die "published copy did not verify"
+  # One implementation of this check, shared with staging_rehearsal.sh. It
+  # verifies the outlets serve, no role variant is public, every layer URL the
+  # published webmap actually emits resolves, and no protected layer is
+  # readable.
+  ATLAS_CDN_URL="$CDN_URL" python3 "$REPO/scripts/verify_published.py" "$ATLAS" \
+    || die "published copy did not verify"
 fi
 
 printf '\n\033[1mdone: %s\033[0m\n' "$ATLAS"
