@@ -352,6 +352,26 @@ class AtlasCloudStack(Stack):
         # remove source data from the bucket that holds it.
         private_data.grant_read(webapp_role)
         private_data.grant_put(webapp_role)
+
+        # Step 3 (#159) adds the one thing publish never needed: delete, and
+        # only under two prefixes.
+        #
+        #   {atlas}/staging/*  — staging is a working tree, not an archive. A
+        #       consumed delta leaves the pending queue, and an output a run
+        #       removed has to leave S3 too, or the next hydrate downloads it
+        #       back. Without this every write-back that consumed a delta fails
+        #       with AccessDenied *after* its uploads, which is precisely the
+        #       half-finished state the resume path exists to repair.
+        #   {atlas}/lock       — how a session releases the atlas. A lease that
+        #       can only expire would make every session wait out the TTL.
+        #
+        # The immutable {atlas}/layers/{layer}/{version}/ keys and the catalog
+        # stay undeletable, so the retention decision above is untouched: no
+        # published version can be removed from the box. Staging deletes are
+        # recoverable anyway — the bucket is versioned, so a delete leaves a
+        # marker and keeps the previous version.
+        private_data.grant_delete(webapp_role, objects_key_pattern="*/staging/*")
+        private_data.grant_delete(webapp_role, objects_key_pattern="*/lock")
         webapp_role.add_to_principal_policy(iam.PolicyStatement(
             actions=["cloudfront:CreateInvalidation"],
             resources=[
