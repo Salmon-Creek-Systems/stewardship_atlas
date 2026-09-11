@@ -42,11 +42,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TTL_SECONDS = 300
 
-# S3 answers a failed condition with 412 PreconditionFailed, and with 409
-# ConditionalRequestConflict when another conditional write on the key is in
-# flight. For our purposes both mean "someone else got there".
-PRECONDITION_CODES = frozenset({'PreconditionFailed', 'ConditionalRequestConflict'})
-MISSING_CODES = frozenset({'NoSuchKey', 'NotFound', '404'})
+PRECONDITION_CODES = atlas_store.PRECONDITION_ERROR_CODES
+MISSING_CODES = atlas_store.MISSING_ERROR_CODES
 
 
 class AtlasLocked(Exception):
@@ -87,10 +84,7 @@ def default_owner() -> str:
     return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
 
 
-def _error_code(exc) -> str:
-    """The S3 error code of a botocore ClientError, or '' for anything else."""
-    response = getattr(exc, 'response', None) or {}
-    return str((response.get('Error') or {}).get('Code', ''))
+_error_code = atlas_store.s3_error_code
 
 
 def _document(owner, purpose, acquired_at, now, ttl) -> bytes:

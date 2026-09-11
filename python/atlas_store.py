@@ -432,6 +432,23 @@ def _s3(region: str = None):
     return boto3.client('s3', region_name=region) if region else boto3.client('s3')
 
 
+# S3 answers a failed condition with 412 PreconditionFailed, and with 409
+# ConditionalRequestConflict when another conditional write to the same key is
+# in flight. Callers treat both as "someone else got there first".
+PRECONDITION_ERROR_CODES = frozenset({'PreconditionFailed', 'ConditionalRequestConflict'})
+MISSING_ERROR_CODES = frozenset({'NoSuchKey', 'NotFound', '404'})
+
+
+def s3_error_code(exc) -> str:
+    """The S3 error code a botocore ClientError carries, or '' for any other exception.
+
+    Read off ``exc.response`` rather than by importing botocore, so callers and
+    their tests stay boto3-free.
+    """
+    response = getattr(exc, 'response', None) or {}
+    return str((response.get('Error') or {}).get('Code', ''))
+
+
 def list_keys(bucket: str, prefix: str, client=None) -> list:
     """Every key under a prefix, paginated."""
     client = client or _s3()

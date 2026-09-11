@@ -44,7 +44,8 @@ class FakeS3:
     def _etag(self, body: bytes) -> str:
         return '"' + hashlib.md5(body).hexdigest() + '"'
 
-    def put_object(self, Bucket, Key, Body=b'', IfMatch=None, IfNoneMatch=None, **_extra):
+    def put_object(self, Bucket, Key, Body=b'', IfMatch=None, IfNoneMatch=None,
+                   Metadata=None, **_extra):
         self.calls.append(('put_object', Key))
         body = _bytes(Body)
         existing = self.objects.get((Bucket, Key))
@@ -57,7 +58,8 @@ class FakeS3:
                 raise FakeClientError('PreconditionFailed', 412, 'PutObject')
         # Like S3, identical bytes get an identical ETag.
         etag = self._etag(body)
-        self.objects[(Bucket, Key)] = {'body': body, 'etag': etag}
+        self.objects[(Bucket, Key)] = {'body': body, 'etag': etag,
+                                       'metadata': dict(Metadata or {})}
         return {'ETag': etag}
 
     def get_object(self, Bucket, Key):
@@ -66,7 +68,16 @@ class FakeS3:
         if obj is None:
             raise FakeClientError('NoSuchKey', 404, 'GetObject')
         return {'Body': io.BytesIO(obj['body']), 'ETag': obj['etag'],
-                'ContentLength': len(obj['body'])}
+                'ContentLength': len(obj['body']), 'Metadata': obj.get('metadata', {})}
+
+    def head_object(self, Bucket, Key):
+        self.calls.append(('head_object', Key))
+        obj = self.objects.get((Bucket, Key))
+        if obj is None:
+            # HEAD has no body to carry an error code, so S3's is the bare status.
+            raise FakeClientError('404', 404, 'HeadObject')
+        return {'ETag': obj['etag'], 'ContentLength': len(obj['body']),
+                'Metadata': obj.get('metadata', {})}
 
     def delete_object(self, Bucket, Key):
         self.calls.append(('delete_object', Key))

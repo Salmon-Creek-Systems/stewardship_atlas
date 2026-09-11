@@ -291,3 +291,148 @@ def list_staging(client, bucket: str, atlas_name: str) -> dict:
         if not response.get('IsTruncated'):
             return listing_from_objects(objects, prefix)
         token = response.get('NextContinuationToken')
+
+
+class WritebackConflict(Exception):
+    """An object changed in S3 after this workspace hydrated it."""
+
+
+def _key(atlas_name: str, rel: str) -> str:
+    return staging_prefix(atlas_name) + rel
+
+
+def _entry(path, etag: str, sha256: str) -> dict:
+    st = Path(path).stat()
+    return {'etag': etag, 'size': st.st_size, 'mtime_ns': st.st_mtime_ns, 'sha256': sha256}
+
+
+def partial_dir(workspace_root, atlas_name: str) -> Path:
+    """Where downloads are written before being renamed into place.
+
+    Beside staging/, never inside it: a half-written file inside staging would
+    look like something a run created, and be written back.
+    """
+    return Path(workspace_root) / atlas_name / '.downloading'
+
+
+def download_object(client, bucket: str, key: str, dest, partial_root,
+                    chunk_size: int = 1 << 20) -> tuple:
+    """Stream one object to ``dest``, hashing as it goes. Returns ``(etag, sha256)``."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    partial_root = Path(partial_root)
+    partial_root.mkdir(parents=True, exist_ok=True)
+    partial = partial_root / (dest.name + '.part')
+
+    response = client.get_object(Bucket=bucket, Key=key)
+    body = response['Body']
+    digest = hashlib.sha256()
+    with open(partial, 'wb') as f:
+        for chunk in iter(lambda: body.read(chunk_size), b''):
+            digest.update(chunk)
+            f.write(chunk)
+    os.replace(partial, dest)
+    return response['ETag'], digest.hexdigest()
+
+
+def execute_hydrate(client, bucket: str, atlas_name: str, workspace_root,
+                    plan: dict, manifest: dict) -> dict:
+    """Carry out a hydrate plan. Saves and returns the manifest that now describes the workspace.
+
+    The manifest is saved once, at the end. A crash part-way is still safe:
+    it leaves files the old manifest does not vouch for, and the next hydrate
+    downloads those again.
+    """
+    root = staging_dir(workspace_root, atlas_name)
+    old = manifest.get('files') or {}
+    files = {rel: old[rel] for rel in plan['unchanged']}
+
+    for rel in plan['remove']:
+        try:
+            (root / rel).unlink()
+        except FileNotFoundError:
+            pass
+
+    partial_root = partial_dir(workspace_root, atlas_name)
+    for rel in plan['download']:
+        path = root / rel
+        etag, digest = download_object(client, bucket, _key(atlas_name, rel), path, partial_root)
+        files[rel] = _entry(path, etag, digest)
+
+    updated = {'format': MANIFEST_FORMAT, 'files': files}
+    save_manifest(manifest_path(workspace_root, atlas_name), updated)
+    return updated
+
+
+def _already_uploaded(client, bucket: str, key: str, sha256: str):
+    """The object's ETag if S3 already holds exactly these bytes, else None.
+
+    Covers a crash between S3 accepting an upload and the manifest recording
+    it: resuming would otherwise fail its own condition and report a conflict
+    with itself. Uploads carry their sha256 as object metadata for this.
+    """
+    try:
+        head = client.head_object(Bucket=bucket, Key=key)
+    except Exception as exc:
+        if atlas_store.s3_error_code(exc) in atlas_store.MISSING_ERROR_CODES:
+            return None
+        raise
+    if (head.get('Metadata') or {}).get('sha256') == sha256:
+        return head['ETag']
+    return None
+
+
+def execute_writeback(client, bucket: str, atlas_name: str, workspace_root,
+                      plan: dict, manifest: dict) -> dict:
+    """Carry out a write-back plan: uploads first, then deletes.
+
+    The manifest is saved after every operation, so an interrupted write-back
+    is resumed by planning again — completed uploads then read as unchanged.
+
+    Uploads are conditional: ``If-Match`` on the ETag the workspace hydrated,
+    or ``If-None-Match: *`` for a new file. A failed condition means S3 changed
+    underneath a session that held the lock. That should be impossible, so it
+    stops the write-back with ``WritebackConflict`` rather than overwriting.
+    """
+    root = staging_dir(workspace_root, atlas_name)
+    manifest_file = manifest_path(workspace_root, atlas_name)
+    files = dict(manifest.get('files') or {})
+    updated = {'format': MANIFEST_FORMAT, 'files': files}
+
+    for rel in plan['restat']:
+        files[rel] = _entry(root / rel, files[rel]['etag'], files[rel]['sha256'])
+    if plan['restat']:
+        save_manifest(manifest_file, updated)
+
+    for op in plan['upload']:
+        rel = op['rel']
+        key = _key(atlas_name, rel)
+        path = root / rel
+        if op['if_match']:
+            condition = {'IfMatch': op['if_match']}
+        else:
+            condition = {'IfNoneMatch': '*'}
+        try:
+            with open(path, 'rb') as f:
+                etag = client.put_object(
+                    Bucket=bucket, Key=key, Body=f,
+                    ContentType=atlas_store.content_type_for(rel),
+                    Metadata={'sha256': op['sha256']}, **condition)['ETag']
+        except Exception as exc:
+            code = atlas_store.s3_error_code(exc)
+            if code not in atlas_store.PRECONDITION_ERROR_CODES | atlas_store.MISSING_ERROR_CODES:
+                raise
+            etag = _already_uploaded(client, bucket, key, op['sha256'])
+            if etag is None:
+                raise WritebackConflict(
+                    f"s3://{bucket}/{key} changed since this workspace hydrated it "
+                    f"({code}); not overwriting") from exc
+        files[rel] = _entry(path, etag, op['sha256'])
+        save_manifest(manifest_file, updated)
+
+    for op in plan['delete']:
+        client.delete_object(Bucket=bucket, Key=_key(atlas_name, op['rel']))
+        files.pop(op['rel'], None)
+        save_manifest(manifest_file, updated)
+
+    return updated
