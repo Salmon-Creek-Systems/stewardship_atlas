@@ -60,9 +60,15 @@
             ]
           },
           "roads": {
+            "access": [
+              "public"
+            ],
             "layer_def": "roads"
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "layer_def": "creeks"
           },
           "landmarks": {
@@ -72,6 +78,9 @@
             ]
           },
           "photos": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "conversations_enabled": true,
             "color": [
@@ -101,6 +110,9 @@
             ]
           },
           "inaturalist": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               60,
@@ -154,6 +166,9 @@
             ]
           },
           "geology": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [90, 70, 50],
             "fill_color": [200, 190, 170],
@@ -173,6 +188,9 @@
             }
           },
           "faults": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [200, 30, 30],
             "show_attributes": true,
@@ -194,6 +212,9 @@
             }
           },
           "trails": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [153, 91, 40],
             "add_labels": true,
@@ -204,6 +225,9 @@
             "paint": { "line-color": "#995b28", "line-width": 1.5, "line-dasharray": [1, 2] }
           },
           "hike": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [165, 90, 20],
             "add_labels": true,

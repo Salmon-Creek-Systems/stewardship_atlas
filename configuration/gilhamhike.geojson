@@ -53,9 +53,12 @@
         },
         "layers": {
           "regions": { "layer_def": "regions", "access": ["public"] },
-          "roads":   { "layer_def": "roads" },
-          "creeks":  { "layer_def": "creeks" },
+          "roads":   { "access": ["public"], "layer_def": "roads" },
+          "creeks":  { "access": ["public"], "layer_def": "creeks" },
           "trails": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [165, 90, 20],
             "add_labels": true,
@@ -67,6 +70,9 @@
           },
           "landmarks": { "layer_def": "poi", "access": ["public"] },
           "photos": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "conversations_enabled": true,
             "color": [255, 100, 0],
@@ -81,6 +87,9 @@
             ]
           },
           "inaturalist": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [60, 160, 60],
             "add_labels": true,

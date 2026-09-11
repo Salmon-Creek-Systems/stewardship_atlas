@@ -78,6 +78,9 @@
             }
           },
           "roads": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               20,
@@ -124,6 +127,9 @@
             ]
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "add_labels": true,
             "color": [
@@ -142,6 +148,9 @@
             ]
           },
           "landmarks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               20,
@@ -171,6 +180,9 @@
             "geometry_type": "raster"
           },
           "roads_index": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [
               100,
