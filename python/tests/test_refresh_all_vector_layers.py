@@ -190,5 +190,46 @@ class TestRefreshAllVectorLayers(unittest.TestCase):
         self.assertEqual(self.layer_features('roads'), [])
 
 
+class TestConsumedDeltasWithoutWorkDir(unittest.TestCase):
+    """Raster and document refreshes on a workspace hydrated from S3 (#159).
+
+    S3 keeps no empty directories, so deltas/{layer}/work/ does not exist until
+    something creates it. On the box it always had, which hid that these two
+    refreshes renamed into it without making it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.config = {
+            'name': 'testatlas',
+            'data_root': self.tmp.name,
+            'dataswale': {'layers': [], 'bbox': {'north': 1, 'south': 0, 'east': 1, 'west': 0}},
+        }
+        self.staging = Path(self.tmp.name) / 'testatlas' / 'staging'
+
+    def test_raster_refresh_creates_work_dir(self):
+        deltas = self.staging / 'deltas' / 'terrain_dem'
+        deltas.mkdir(parents=True)
+        (deltas / 'terrain_dem__20260911_120000__create.tiff').write_bytes(b'tiff')
+
+        dataswale_geojson.refresh_raster_layer(self.config, 'terrain_dem')
+
+        self.assertEqual((self.staging / 'layers' / 'terrain_dem' / 'terrain_dem.tiff').read_bytes(),
+                         b'tiff')
+        self.assertTrue((deltas / 'work' / 'terrain_dem.tiff').is_file())
+        self.assertEqual(list(deltas.glob('*.tiff')), [])
+
+    def test_document_refresh_creates_work_dir(self):
+        deltas = self.staging / 'deltas' / 'notes'
+        deltas.mkdir(parents=True)
+        (deltas / 'plan.pdf').write_bytes(b'pdf')
+
+        dataswale_geojson.refresh_document_layer(self.config, 'notes')
+
+        self.assertTrue((self.staging / 'layers' / 'notes' / 'plan.pdf').is_file())
+        self.assertTrue((deltas / 'work' / 'plan.pdf').is_file())
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -228,6 +228,9 @@ def refresh_raster_layer(config, name, delta_queue_builder=DQB):
     for inpath in deltas_dir.glob("*.tiff"):
         logger.info(f"refreshing raster layer [{name}]: {inpath} -> {layer_path} -> {work_path}")
         shutil.copy(inpath, layer_path)
+        # work/ may not exist yet: S3 keeps no empty directories, so a
+        # workspace hydrated from it has none (#159).
+        work_dir.mkdir(parents=True, exist_ok=True)
         inpath.replace(work_path)
         
     return layer_path
@@ -251,6 +254,8 @@ def refresh_document_layer(config, name, delta_queue_builder=DQB):
         doc_name = inpath.stem
         logger.info(f"refreshing document layer [{name}]: {inpath} {doc_name} -> {layer_dir} -> {work_dir}")
         shutil.copy(inpath, layer_dir / inpath.name)
+        # See refresh_raster_layer: work/ may not exist in a hydrated workspace.
+        work_dir.mkdir(parents=True, exist_ok=True)
         inpath.replace(work_dir / inpath.name)
 
         doc_data = {
