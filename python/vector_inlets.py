@@ -4,6 +4,7 @@ import geojson
 from shapely.geometry import shape
 
 import versioning
+import atlas_shared
 import utils
 import federation
 import deltas_geojson as deltas
@@ -82,7 +83,10 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
     # Get input path from template
     inlet_config = config['assets'][name]['config']
 
-    inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
+    # Fetched from the shared store on demand when running in a workspace (#159);
+    # required, because ogr2ogr on a missing path fails obscurely.
+    inpath = atlas_shared.local_path(
+        config, inlet_config['inpath_template'].format(**config), required=True)
     outpath = delta_queue.delta_path(config, name, 'create')
 
     # Extract data using ogr2ogr and CLI args

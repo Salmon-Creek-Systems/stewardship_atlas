@@ -41,6 +41,7 @@ import threading
 import time
 
 import atlas_lock
+import atlas_shared
 import atlas_store
 import atlas_workspace as ws
 
@@ -213,6 +214,10 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
                           staging_dir=ws.staging_dir(root, atlas_name),
                           bucket=bucket, lease=lease)
         session.hydrated = _hydrate(client, bucket, atlas_name, root, wanted)
+        # staging/local points at the workspace's shared cache, so the file
+        # inlets and icon loaders resolve through it exactly as on the box —
+        # and so a hydrate never treats shared data as this atlas's own.
+        atlas_shared.link_into_workspace(root, session.staging_dir)
         session.config = _load_config(session, require_config)
 
         yield session

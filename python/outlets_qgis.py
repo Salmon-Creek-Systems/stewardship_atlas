@@ -68,9 +68,11 @@ from qgis.PyQt.QtCore import QSizeF, Qt
 try:
     from . import versioning
     from . import utils
+    from . import atlas_shared
 except ImportError:
     import versioning
     import utils
+    import atlas_shared
 
 #logger = logging.getLogger(__name__)
 
@@ -347,8 +349,7 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             # Try to load custom PNG icon
             try:
                 from qgis.core import QgsRasterMarkerSymbolLayer
-                local_path = versioning.atlas_path(config, "local")
-                icon_path = local_path / png_icon
+                icon_path = atlas_shared.local_path(config, png_icon)
 
                 # Fall back to repo-bundled icons (templates/icons/) when the icon
                 # isn't in the atlas's local/ data dir. version='app' resolves to the

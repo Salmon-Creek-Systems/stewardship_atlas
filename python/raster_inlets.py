@@ -1,6 +1,7 @@
 import logging, subprocess, requests
 import os, shutil, zipfile, io
 import versioning
+import atlas_shared
 import utils
 import deltas_geojson as deltas
 from pathlib import Path
@@ -21,7 +22,9 @@ def local_raster(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch data from local file and save to versioned outpath.
     Do some CRS and rescaling if needed."""
     inlet_config = config['assets'][name]['config']
-    inpath = versioning.atlas_path(config, "local") / inlet_config['inpath_template'].format(**config)
+    # Fetched from the shared store on demand when running in a workspace (#159).
+    inpath = atlas_shared.local_path(
+        config, inlet_config['inpath_template'].format(**config), required=True)
     outpath = delta_queue.delta_path(config, name, 'create')
     logger.info(f"Delta raster in {outpath}")   
     return utils.canonicalize_raster(inpath, 
