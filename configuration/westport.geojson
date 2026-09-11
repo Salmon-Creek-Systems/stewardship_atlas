@@ -124,6 +124,9 @@
             "fill_opacity": 0.15
           },
           "tsunami": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "fill_color": [
               0,
@@ -136,6 +139,9 @@
             "geometry_type": "raster"
           },
           "contours": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               50,
@@ -148,6 +154,9 @@
             }
           },
           "basemap": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "raster"
           },
           "terrain_dem": {
@@ -163,6 +172,9 @@
             "geometry_type": "raster"
           },
           "roads_primary": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               219,
@@ -207,6 +219,9 @@
             ]
           },
           "roads_secondary": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               224,
@@ -251,6 +266,9 @@
             ]
           },
           "roads_tertiary": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "color": [
               196,
@@ -339,6 +357,9 @@
             ]
           },
           "creeks": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "add_labels": true,
             "color": [
@@ -362,6 +383,9 @@
             ]
           },
           "campgrounds": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -388,6 +412,9 @@
             ]
           },
           "milemarkers": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -408,6 +435,9 @@
             "icon-anchor": "bottom"
           },
           "bridges": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -428,6 +458,9 @@
             "icon-anchor": "bottom"
           },
           "private_bridges": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -448,6 +481,9 @@
             "icon-anchor": "bottom"
           },
           "powerlines": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "linestring",
             "add_labels": true,
             "constant_width": 5,
@@ -520,6 +556,9 @@
             "interaction": "interface"
           },
           "hydrants": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -546,6 +585,9 @@
             ]
           },
           "natural": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "point",
             "color": [
               0,
@@ -557,6 +599,9 @@
             "interaction": "interface"
           },
           "buildings": {
+            "access": [
+              "public"
+            ],
             "geometry_type": "polygon",
             "color": [
               0,
