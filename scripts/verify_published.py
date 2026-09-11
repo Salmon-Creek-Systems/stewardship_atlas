@@ -83,31 +83,57 @@ def load_config(atlas):
     return doc['features'][0]['properties'] if 'features' in doc else doc
 
 
+def _js_const(html, name):
+    """Parse one `const <name> = <json>;` value out of the generated page."""
+    match = re.search(r'const %s = (\{.*?\});\s*\n' % re.escape(name), html, re.S)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
+def _source_url(value, base):
+    """Resolve one source's URL if it is a relative reference, else None."""
+    if not isinstance(value, str):
+        return None
+    # COG sources carry a cog:// prefix and a #color: fragment; webmap.js
+    # resolves the middle against the document, so resolve it the same way.
+    if value.startswith('cog://'):
+        value = value[len('cog://'):].split('#', 1)[0]
+    if value.startswith('../'):
+        return urljoin(base, value)
+    return None
+
+
 def layer_urls_from(html, base):
     """The layer URLs a published webmap emits, resolved against its own page.
 
     Read out of the served HTML rather than reconstructed, because the point is
     to test what the browser will actually request.
+
+    **Both** source collections are read. The generated page carries two: the
+    MapLibre style's `sources` inside MAP_CONFIG, and COG_SOURCES beside it,
+    which the COG protocol requires be added after load. Parsing only the first
+    checked 7 of fhe's 10 layers and reported success — silently skipping the
+    three COG rasters, which were the entire reason for rehearsing that atlas.
     """
-    match = re.search(r'const MAP_CONFIG = (\{.*?\});\s*\n', html, re.S)
-    if not match:
+    config = _js_const(html, 'MAP_CONFIG')
+    cogs = _js_const(html, 'COG_SOURCES')
+    if config is None and cogs is None:
         return None
-    try:
-        config = json.loads(match.group(1))
-    except json.JSONDecodeError:
-        return None
+
     found = set()
-    for source in (config.get('style', {}).get('sources') or {}).values():
+    collections = list((config or {}).get('style', {}).get('sources', {}).values())
+    collections += list((cogs or {}).values())
+    for source in collections:
         if not isinstance(source, dict):
             continue
         for key in ('data', 'url'):
-            value = source.get(key)
-            if isinstance(value, str) and value.startswith('../'):
-                found.add(urljoin(base, value))
-            # COG sources carry a cog:// prefix and a #color: fragment.
-            elif isinstance(value, str) and value.startswith('cog://../'):
-                rest = value[len('cog://'):].split('#', 1)[0]
-                found.add(urljoin(base, rest))
+            resolved = _source_url(source.get(key), base)
+            if resolved:
+                found.add(resolved)
     return sorted(found)
 
 
