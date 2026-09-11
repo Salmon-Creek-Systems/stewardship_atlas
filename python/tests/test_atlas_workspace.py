@@ -267,5 +267,34 @@ class TestPlanWriteback(unittest.TestCase):
         self.assertEqual(plan['delete'], [])
 
 
+class TestPutStagingObject(unittest.TestCase):
+    """The one write that does not wait on the lock: a delta."""
+
+    def setUp(self):
+        self.s3 = FakeS3()
+
+    def test_writes_into_the_atlas_staging_prefix(self):
+        rel = 'deltas/roads/assetless__20260911_120000__create.geojson'
+        key = ws.put_staging_object(self.s3, 'b', 'kennedy', rel, b'{"features": []}')
+        self.assertEqual(key, 'kennedy/staging/' + rel)
+        self.assertEqual(self.s3.objects[('b', key)]['body'], b'{"features": []}')
+
+    def test_create_only_refuses_to_overwrite(self):
+        # Delta filenames are second-resolution, so two edits in one second
+        # collide (#180). Loud beats silent.
+        rel = 'deltas/roads/assetless__20260911_120000__create.geojson'
+        ws.put_staging_object(self.s3, 'b', 'kennedy', rel, b'first')
+        with self.assertRaises(ws.StagingObjectExists):
+            ws.put_staging_object(self.s3, 'b', 'kennedy', rel, b'second')
+        self.assertEqual(self.s3.objects[('b', 'kennedy/staging/' + rel)]['body'], b'first')
+
+    def test_overwrite_when_asked(self):
+        ws.put_staging_object(self.s3, 'b', 'kennedy', 'atlas_config.json', b'first')
+        ws.put_staging_object(self.s3, 'b', 'kennedy', 'atlas_config.json', b'second',
+                              create_only=False)
+        self.assertEqual(self.s3.objects[('b', 'kennedy/staging/atlas_config.json')]['body'],
+                         b'second')
+
+
 if __name__ == '__main__':
     unittest.main()

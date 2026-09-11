@@ -296,6 +296,39 @@ class TestHeartbeat(SessionTestCase):
         self.assertIsNone(self.lock_holder())
 
 
+class TestReadOnly(SessionTestCase):
+    def test_no_lease_is_taken(self):
+        with self.session(read_only=True) as session:
+            self.assertIsNone(session.lease)
+            self.assertIsNone(self.lock_holder())
+            # A writer can work on the atlas while a reader reads.
+            writer = atlas_lock.acquire(self.s3, BUCKET, ATLAS, owner='writer')
+            atlas_lock.release(self.s3, writer)
+        self.assertEqual(session.hydrated['download'], 5)
+
+    def test_nothing_is_written_back(self):
+        with self.session(read_only=True) as session:
+            (session.staging_dir / ROADS).write_text('scratch work by a query')
+        self.assertEqual(self.remote(ROADS), SEED[ROADS])
+        self.assertIsNone(session.written)
+
+    def test_a_pending_write_back_is_left_for_its_owner(self):
+        # Hydrating here would reset the workspace and discard changes that
+        # never reached S3, so a reader serves what is already there.
+        with self.session():
+            pass
+        self.local(ROADS).write_text('half-written by the interrupted run')
+        self.marker().write_text('interrupted')
+
+        with self.assertLogs('atlas_session', level='WARNING'):
+            with self.session(read_only=True) as session:
+                self.assertEqual(session.hydrated['download'], 0)
+                self.assertEqual(self.local(ROADS).read_text(),
+                                 'half-written by the interrupted run')
+        self.assertTrue(self.marker().exists())
+        self.assertEqual(self.remote(ROADS), SEED[ROADS])
+
+
 class TestSharedData(SessionTestCase):
     def test_local_is_linked_to_the_shared_cache(self):
         with self.session() as session:

@@ -180,7 +180,8 @@ def _load_config(session: Session, require_config: bool):
 def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str = None,
                  workspace_root=None, wait: float = 0.0,
                  ttl: float = atlas_lock.DEFAULT_TTL_SECONDS, heartbeat_interval: float = None,
-                 wanted=None, require_config: bool = True, clock=time.time):
+                 wanted=None, require_config: bool = True, read_only: bool = False,
+                 clock=time.time):
     """Lock, hydrate and yield a ``Session``; write back and release on exit.
 
     ``wait``: seconds to wait for a busy atlas before raising ``AtlasLocked``.
@@ -190,6 +191,10 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
     ``atlas_workspace.plan_hydrate``.
     ``require_config``: ``False`` for creating an atlas, which starts with
     nothing in S3; ``session.config`` is then ``None``.
+    ``read_only``: take no lease and write nothing back. For queries and status
+    pages, which must not queue behind a five-minute render, and which cannot
+    corrupt anything by reading a moment-old state. Anything such a body writes
+    into the workspace is discarded by the next hydrate.
     """
     client = client or atlas_store._s3()
     bucket = bucket or atlas_store.cloud_settings({})['private_bucket']
@@ -197,23 +202,32 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
     if heartbeat_interval is None:
         heartbeat_interval = ttl / 3
 
-    lease = atlas_lock.acquire(client, bucket, atlas_name, purpose=purpose,
-                               ttl=ttl, wait=wait, clock=clock)
+    lease = None if read_only else atlas_lock.acquire(
+        client, bucket, atlas_name, purpose=purpose, ttl=ttl, wait=wait, clock=clock)
     heartbeat = None
     try:
-        if heartbeat_interval > 0:
+        if lease is not None and heartbeat_interval > 0:
             heartbeat = Heartbeat(client, lease, heartbeat_interval, clock).start()
 
-        if marker_path(root, atlas_name).exists():
+        marker = marker_path(root, atlas_name)
+        if marker.exists() and lease is not None:
             logger.warning(f"atlas_session: finishing an interrupted write-back for "
                            f"'{atlas_name}' before hydrating. If it conflicts, delete "
-                           f"{marker_path(root, atlas_name)} to discard those changes.")
+                           f"{marker} to discard those changes.")
             _write_back(client, bucket, atlas_name, root)
 
         session = Session(atlas_name=atlas_name, workspace_root=root,
                           staging_dir=ws.staging_dir(root, atlas_name),
                           bucket=bucket, lease=lease)
-        session.hydrated = _hydrate(client, bucket, atlas_name, root, wanted)
+        if marker.exists() and lease is None:
+            # A writer was interrupted and only it may finish the job. Hydrating
+            # would reset the workspace and discard changes that never reached
+            # S3, so a reader serves what is already there instead.
+            logger.warning(f"atlas_session: read-only session on '{atlas_name}' is using the "
+                           f"workspace as-is; a write-back is still pending")
+            session.hydrated = {'download': 0, 'remove': 0, 'unchanged': 0}
+        else:
+            session.hydrated = _hydrate(client, bucket, atlas_name, root, wanted)
         # staging/local points at the workspace's shared cache, so the file
         # inlets and icon loaders resolve through it exactly as on the box —
         # and so a hydrate never treats shared data as this atlas's own.
@@ -222,6 +236,10 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
 
         yield session
 
+        if lease is None:
+            # Nothing is written back, so anything the body changed in the
+            # workspace is discarded by the next hydrate — same as a failure.
+            return
         if heartbeat is not None:
             heartbeat.stop()
             heartbeat = None
@@ -232,8 +250,9 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
     finally:
         if heartbeat is not None:
             heartbeat.stop()
-        try:
-            atlas_lock.release(client, lease, clock=clock)
-        except Exception as exc:
-            # Never mask the exception that brought us here.
-            logger.error(f"atlas_session: could not release lease on '{atlas_name}': {exc}")
+        if lease is not None:
+            try:
+                atlas_lock.release(client, lease, clock=clock)
+            except Exception as exc:
+                # Never mask the exception that brought us here.
+                logger.error(f"atlas_session: could not release lease on '{atlas_name}': {exc}")

@@ -297,6 +297,37 @@ class WritebackConflict(Exception):
     """An object changed in S3 after this workspace hydrated it."""
 
 
+class StagingObjectExists(Exception):
+    """A create-only staging write found the key already taken."""
+
+
+def put_staging_object(client, bucket: str, atlas_name: str, rel: str, body: bytes,
+                       create_only: bool = True) -> str:
+    """Write one object into an atlas's staging prefix without a session.
+
+    For the one write that must not wait on the lock: a delta. Delta files are
+    new, uniquely named and append-only, so writing one races with nothing —
+    and making an edit queue behind a five-minute render is how edits get lost
+    instead. Applying it still happens under the lock; until then it simply
+    stays pending, which the delta system already supports.
+
+    ``create_only`` sends ``If-None-Match: *``, so a name collision raises
+    instead of overwriting. Delta filenames are second-resolution, so two edits
+    to one layer in the same second collide (#180); this at least makes that
+    loud rather than silent.
+    """
+    key = _key(atlas_name, rel)
+    kwargs = {'IfNoneMatch': '*'} if create_only else {}
+    try:
+        client.put_object(Bucket=bucket, Key=key, Body=body,
+                          ContentType=atlas_store.content_type_for(rel), **kwargs)
+    except Exception as exc:
+        if atlas_store.s3_error_code(exc) in atlas_store.PRECONDITION_ERROR_CODES:
+            raise StagingObjectExists(f"s3://{bucket}/{key} already exists") from exc
+        raise
+    return key
+
+
 def _key(atlas_name: str, rel: str) -> str:
     return staging_prefix(atlas_name) + rel
 
