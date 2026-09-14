@@ -16,6 +16,10 @@ documents/development/federation-claude-code-handoff.md.
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 STAC_VERSION = "1.1.0"
 
@@ -577,23 +581,116 @@ def item_checksum(item: Dict[str, Any], asset_key: str = 'data') -> Optional[str
     return asset.get('file:checksum')
 
 
+# --------------------------------------------------------------------------- #
+# Outlets as Items
+#
+# Settled in #159: a version is a Catalog and everything in it is an Item,
+# outlets included. An outlet Item names where the outlet starts and what it
+# was built from; it does not enumerate the outlet's files.
+# --------------------------------------------------------------------------- #
+
+CONTENT_CHECKSUM_PROP = 'atlas:content_checksum'
+PREFIX_PROP = 'atlas:prefix'
+ITEM_TYPE_PROP = 'atlas:item_type'
+
+
+def content_checksum(file_hashes: Dict[str, str]) -> str:
+    """One multihash over a set of files — the whole of a directory as a value.
+
+    An outlet is a directory, not a file, so reuse cannot be decided on its
+    entry point: a webmap whose ``index.html`` is byte-identical can still have
+    different data beside it. Hashing sorted ``relpath\0hash\n`` lines gives a
+    value that moves if any file's *name* or *content* moves, and sorting is
+    what keeps it independent of directory walk order.
+
+    Same encoding as `atlas_catalog.sha256_multihash` so the two are comparable
+    at a glance: '1220' (sha2-256, 32 bytes) then the digest.
+    """
+    digest = hashlib.sha256()
+    for name in sorted(file_hashes):
+        digest.update(name.encode('utf-8'))
+        digest.update(b'\0')
+        digest.update(file_hashes[name].encode('utf-8'))
+        digest.update(b'\n')
+    return '1220' + digest.hexdigest()
+
+
+def build_outlet_item(atlas_id: str, outlet_name: str, version: str,
+                      bbox: Dict[str, float], *, entry_href: str, prefix: str,
+                      access: Optional[List[str]] = None,
+                      checksum: Optional[str] = None,
+                      entry_size: Optional[int] = None,
+                      file_count: Optional[int] = None,
+                      title: Optional[str] = None,
+                      datetime_iso: Optional[str] = None,
+                      catalog_base_url: str = '',
+                      derived_from: Optional[List[str]] = None) -> Dict[str, Any]:
+    """A STAC Item describing one built outlet as published in one version.
+
+    The Item carries the outlet's **entry point** as its asset and the prefix
+    the rest of it lives under as a property. Listing a webmap's ~300 files
+    would turn the Item into a directory listing, which is the object store's
+    job; what a reader needs from the catalog is where to start, what tier it
+    is, and what it was built from.
+
+    ``checksum`` is `content_checksum()` over the whole outlet directory, kept
+    in a property rather than on the entry asset — it is not that file's
+    checksum, and writing it there would be a lie that `file:checksum` readers
+    would act on.
+    """
+    assets = {'index': stac_asset(entry_href, roles=['outlet', 'entry'],
+                                  title=title or outlet_name, size=entry_size)}
+    props: Dict[str, Any] = {
+        ITEM_TYPE_PROP: 'outlet',
+        PREFIX_PROP: prefix,
+        'atlas:access': list(access or []),
+    }
+    if checksum:
+        props[CONTENT_CHECKSUM_PROP] = checksum
+    if file_count is not None:
+        props['atlas:file_count'] = file_count
+    return build_layer_item(
+        atlas_id, outlet_name, version, bbox, assets,
+        datetime_iso=datetime_iso, catalog_base_url=catalog_base_url,
+        properties=props, derived_from=derived_from)
+
+
+def item_content_checksum(item: Dict[str, Any]) -> Optional[str]:
+    """The directory checksum an outlet Item was written with."""
+    return (item.get('properties') or {}).get(CONTENT_CHECKSUM_PROP)
+
+
+def is_outlet_item(item: Dict[str, Any]) -> bool:
+    return (item.get('properties') or {}).get(ITEM_TYPE_PROP) == 'outlet'
+
+
 def select_reusable_items(previous_items: Dict[str, Dict[str, Any]],
                           current_checksums: Dict[str, Optional[str]],
-                          asset_key: str = 'data') -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
-    """Split a new version's layers into (reuse, write).
+                          asset_key: str = 'data',
+                          checksum_of=None) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+    """Split a new version's entries into (reuse, write).
 
-    `previous_items` maps layer name -> the Item from the previous version.
-    `current_checksums` maps layer name -> the checksum staging now holds.
+    `previous_items` maps name -> the Item from the previous version.
+    `current_checksums` maps name -> the checksum staging now holds.
 
-    A layer whose checksum matches its previous Item is **reused**: the new
+    An entry whose checksum matches its previous Item is **reused**: the new
     version's catalog links to the existing Item and no new object is written.
-    That is the mechanism that stops publish duplicating a layer tree it did
-    not change.
+    That is the mechanism that stops publish duplicating a layer tree — or an
+    outlet's several hundred files — that it did not change.
+
+    `checksum_of` extracts the comparable checksum from a previous Item, and
+    defaults to the primary asset's `file:checksum`. Outlets pass
+    `item_content_checksum`, because a directory's identity lives in a property
+    rather than on one of its files.
 
     Fail-closed on unknowns: a missing checksum on either side means write.
     Trusting an absent checksum would silently publish a stale asset, which is
     far worse than writing an object we did not have to.
     """
+    if checksum_of is None:
+        def checksum_of(item):
+            return item_checksum(item, asset_key)
+
     reuse: Dict[str, Dict[str, Any]] = {}
     write: List[str] = []
     for name, checksum in current_checksums.items():
@@ -601,7 +698,7 @@ def select_reusable_items(previous_items: Dict[str, Dict[str, Any]],
         if previous is None or not checksum:
             write.append(name)
             continue
-        if item_checksum(previous, asset_key) == checksum:
+        if checksum_of(previous) == checksum:
             reuse[name] = previous
         else:
             write.append(name)
@@ -636,24 +733,31 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
                         version: str, layer_assets: Dict[str, Dict[str, Any]],
                         *, history: Optional[Dict[str, List[Dict[str, Any]]]] = None,
                         catalog_base_url: str = '',
-                        datetime_iso: Optional[str] = None) -> Dict[str, Any]:
+                        datetime_iso: Optional[str] = None,
+                        outlet_assets: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Assemble every document describing one published version.
 
     Args:
         layers: the config's layer list — the source of truth for what exists.
         layer_assets: {layer_name: {'href', 'size', 'checksum', 'media_type',
             'roles'}} for layers that actually have a file in this version.
-        history: {layer_name: [Items, oldest first]} from previous versions.
+        outlet_assets: {outlet_name: {'entry_href', 'prefix', 'access',
+            'checksum', 'entry_size', 'file_count', 'title', 'in_layers'}} for
+            the outlets built into this version. `in_layers` is resolved here
+            into `derived_from` links, because only this function knows which
+            *version* each layer Item ended up at.
+        history: {name: [Items, oldest first]} from previous versions.
             Empty or absent for a first publish.
 
     Returns a dict with:
         catalog          the atlas root Catalog
-        collections      {layer_name: Collection}
-        items            {layer_name: Item} — only the *newly written* ones
+        collections      {name: Collection} — layers and outlets alike
+        items            {name: Item} — only the *newly written* ones
         version_catalog  the thin Catalog that is this version's manifest
-        reused           layer names referenced at an older version
-        written          layer names that got a new Item
-        missing          layers declared in config with no file in this version
+        reused/written/missing            layer names
+        outlets_reused/written/missing    outlet names
+        versions         {layer: version holding its data}
+        outlet_versions  {outlet: version holding its files}
 
     Nothing here writes anything; the caller decides what to persist.
     """
@@ -669,9 +773,18 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
     collections: Dict[str, Dict[str, Any]] = {}
     new_items: Dict[str, Dict[str, Any]] = {}
     version_items: List[Dict[str, Any]] = []
+    layer_items: Dict[str, Dict[str, Any]] = {}
     reused: List[str] = []
     written: List[str] = []
     missing: List[str] = []
+
+    def _record(name: str, layer_like: Dict[str, Any], item: Dict[str, Any]):
+        """Shared tail: the Item joins the version, and its Collection spans
+        every version of it."""
+        version_items.append(item)
+        collections[name] = build_layer_collection(
+            atlas_id, layer_like, bbox, link_version_chain(history.get(name, [])),
+            catalog_base_url=catalog_base_url)
 
     for layer in layers:
         name = layer.get('name')
@@ -714,10 +827,70 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
             new_items[name] = item
             written.append(name)
 
-        version_items.append(item)
-        collections[name] = build_layer_collection(
-            atlas_id, layer, bbox, link_version_chain(history.get(name, [])),
-            catalog_base_url=catalog_base_url)
+        layer_items[name] = item
+        _record(name, layer, item)
+
+    # Outlets, after the layers: `derived_from` has to name the layer Item this
+    # version actually holds, which for a reused layer lives under an older
+    # version and is only known once the loop above has run.
+    outlet_assets = outlet_assets or {}
+    outlet_previous = {name: items[-1] for name, items in history.items()
+                       if items and is_outlet_item(items[-1])}
+    outlet_checksums = {name: spec.get('checksum')
+                        for name, spec in outlet_assets.items()}
+    outlet_reuse, _ = select_reusable_items(
+        outlet_previous, outlet_checksums, checksum_of=item_content_checksum)
+
+    outlets_reused: List[str] = []
+    outlets_written: List[str] = []
+    outlets_missing: List[str] = []
+
+    for name in sorted(outlet_assets):
+        spec = outlet_assets[name]
+        if name in collections:
+            # One namespace holds both, so a name used twice would give an
+            # outlet a layer's Collection (or the reverse) and the version
+            # Catalog would describe one of them wrongly. Skipping is the
+            # conservative half: the layer is the thing with data.
+            logger.warning(
+                f"federation: outlet '{name}' shares its name with a layer — "
+                f"not cataloguing the outlet")
+            outlets_missing.append(name)
+            continue
+        if not spec.get('entry_href'):
+            outlets_missing.append(name)
+            continue
+
+        if name in outlet_reuse:
+            item = outlet_reuse[name]
+            outlets_reused.append(name)
+        else:
+            derived = []
+            for layer_name in spec.get('in_layers') or []:
+                source = layer_items.get(layer_name)
+                if source is None:
+                    continue
+                href = item_self_href(source)
+                if href:
+                    derived.append(href)
+            item = build_outlet_item(
+                atlas_id, name, version, bbox,
+                entry_href=spec['entry_href'],
+                prefix=spec.get('prefix', ''),
+                access=spec.get('access'),
+                checksum=spec.get('checksum'),
+                entry_size=spec.get('entry_size'),
+                file_count=spec.get('file_count'),
+                title=spec.get('title'),
+                datetime_iso=when,
+                catalog_base_url=catalog_base_url,
+                derived_from=derived)
+            history.setdefault(name, []).append(item)
+            new_items[name] = item
+            outlets_written.append(name)
+
+        _record(name, {'name': name, 'title': spec.get('title', name),
+                       'description': spec.get('description', '')}, item)
 
     catalog = {
         'stac_version': STAC_VERSION,
@@ -735,6 +908,7 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
         {'rel': 'version-history',
          'href': f'./versions/{version}/catalog.json', 'title': version})
 
+    outlet_names = set(outlet_assets)
     return {
         'catalog': catalog,
         'collections': collections,
@@ -742,15 +916,23 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
         # The version that actually holds each layer's data — the current one
         # for a rewrite, an older one for a reuse. Callers that need to put the
         # bytes somewhere (the S3 push) need this for *every* layer, not just
-        # the ones written this time.
+        # the ones written this time. Outlets are kept separate because they
+        # are pushed to a different key space.
         'versions': {i.get('collection') or i['id']: i['properties']['version']
-                     for i in version_items},
+                     for i in version_items
+                     if (i.get('collection') or i['id']) not in outlet_names},
+        'outlet_versions': {i.get('collection') or i['id']: i['properties']['version']
+                            for i in version_items
+                            if (i.get('collection') or i['id']) in outlet_names},
         'version_catalog': build_version_catalog(
             atlas_id, version, version_items,
             datetime_iso=when, catalog_base_url=catalog_base_url),
         'reused': reused,
         'written': written,
         'missing': missing,
+        'outlets_reused': outlets_reused,
+        'outlets_written': outlets_written,
+        'outlets_missing': outlets_missing,
     }
 
 

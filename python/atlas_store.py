@@ -693,6 +693,86 @@ def plan_layer_uploads(config: dict, version_path, version: str,
     return plan
 
 
+# ---------------------------------------------------------------------------
+# Versioned outlet archive (#159, task 6)
+#
+# The built outlets of every published version, stored the way layers are:
+# immutable, version-stamped keys, and an unchanged outlet reuses the previous
+# version's prefix rather than writing several hundred objects again.
+#
+# **Always the private bucket, whatever the outlet's tier.** One outlet
+# directory can hold more than one access tier — `html` and `console` emit
+# public/, internal/, admin/ and technical/ side by side — so an archive
+# routed by the outlet's own `access` would put the admin console in a public
+# bucket on the strength of its public variant. That is #177 exactly. The
+# public copy is the pruned `current/` mirror, which already handles the split;
+# the archive has no public reader and does not need one.
+# ---------------------------------------------------------------------------
+
+def archivable_outlets(config: dict) -> list:
+    """Outlet assets whose built directory belongs in the version archive.
+
+    Deliberately wider than `publishable_outlets`: no tier filter and no
+    `cloud.outlets` allowlist, because nothing here is world-readable. The one
+    filter kept is `dataswale.versioned_outlets` — the existing, explicit
+    statement of what a version snapshot contains (#131, C9).
+    """
+    assets = config.get('assets') or {}
+    versioned = set((config.get('dataswale') or {}).get('versioned_outlets') or [])
+    names = [name for name, asset in assets.items()
+             if asset.get('type') == 'outlet'
+             and not (versioned and name not in versioned)]
+    return sorted(names)
+
+
+def outlet_prefix(atlas_name: str, outlet_name: str, version: str) -> str:
+    """Immutable prefix holding one outlet as built for one version."""
+    return f"{atlas_prefix(atlas_name)}/outlets/{outlet_name}/{version}"
+
+
+def outlet_key(atlas_name: str, outlet_name: str, version: str, relative: str) -> str:
+    """Immutable key for one file of one outlet at one version."""
+    return f"{outlet_prefix(atlas_name, outlet_name, version)}/{relative}"
+
+
+def plan_outlet_uploads(config: dict, outlets_root, outlet_specs: dict,
+                        outlet_versions: dict) -> list:
+    """`(Path, bucket, key, content_type)` for every file of every archived outlet.
+
+    Like `plan_layer_uploads`, this describes the desired end state rather than
+    a diff: an outlet reused from an older version is planned at *that*
+    version's keys, and the caller reconciles against what the bucket holds.
+    Reuse is decided on the local catalog, which knows nothing about S3, so
+    planning only what changed would skip everything on a first push.
+    """
+    settings = cloud_settings(config)
+    bucket = settings.get('private_bucket') or ''
+    atlas_name = config['name']
+    outlets_root = Path(outlets_root)
+
+    if not bucket:
+        logger.warning(f"atlas_store: no private bucket configured — not "
+                       f"archiving outlets for {atlas_name}")
+        return []
+
+    plan = []
+    for name in sorted(outlet_versions):
+        spec = outlet_specs.get(name)
+        if not spec:
+            continue
+        outlet_dir = outlets_root / name
+        for relative in sorted(spec.get('files') or {}):
+            path = outlet_dir / relative
+            if not path.is_file():
+                logger.warning(f"atlas_store: {path} named by the catalog but not "
+                               f"on disk — skipping")
+                continue
+            plan.append((path, bucket,
+                         outlet_key(atlas_name, name, outlet_versions[name], relative),
+                         content_type_for(relative)))
+    return plan
+
+
 def plan_catalog_upload(config: dict, version_path: str, version: str,
                         stac_dirname: str = 'stac') -> list:
     """Upload plan for a version's STAC documents.
