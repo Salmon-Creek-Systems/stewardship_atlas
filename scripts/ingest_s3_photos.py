@@ -10,7 +10,9 @@ Usage:
     python3 scripts/ingest_s3_photos.py <atlas_name> s3://<bucket>/<prefix> [options]
     python3 scripts/ingest_s3_photos.py <atlas_name> s3://<bucket>/<path/to/batch.zip> [options]
 
-    SWALES_ROOT env var must be set (same as running the webapp).
+    ATLAS_WORKSPACE_ROOT env var must be set (same as running the webapp):
+    the import runs in a session, so the atlas is hydrated from S3 into that
+    workspace and written back.
 
 Options:
     --layer LAYER       target layer name (default: config's email_photo_default_layer, then "poi")
@@ -19,7 +21,7 @@ Options:
     --profile PROFILE   AWS profile name (default: atlas)
 
 Example:
-    SWALES_ROOT=/root/swales_dev \\
+    ATLAS_WORKSPACE_ROOT=/root/atlas_workspace \\
     python3 scripts/ingest_s3_photos.py scvfd s3://my-bucket/field-photos/2026-04/ --dry-run
 """
 import argparse
@@ -37,6 +39,8 @@ import boto3
 # Allow importing from python/
 sys.path.insert(0, str(Path(__file__).parent.parent / 'python'))
 
+import atlas_lock
+import atlas_session
 import dataswale_geojson
 import deltas_geojson
 import email_inlet
@@ -175,31 +179,35 @@ def main():
     parser.add_argument('--profile', default='atlas', help='AWS profile name (default: atlas)')
     args = parser.parse_args()
 
-    # Load atlas config
-    swales_root = os.environ.get('SWALES_ROOT')
-    if not swales_root:
-        print('ERROR: SWALES_ROOT environment variable is not set', file=sys.stderr)
+    # Parse S3 URL before taking the lock: a typo should not lock the atlas.
+    try:
+        bucket, prefix = parse_s3_url(args.s3_url)
+    except ValueError as e:
+        print(f'ERROR: {e}', file=sys.stderr)
         sys.exit(1)
 
-    config_path = Path(swales_root) / args.atlas_name / 'staging' / 'atlas_config.json'
-    if not config_path.exists():
-        print(f'ERROR: Atlas config not found at {config_path}', file=sys.stderr)
+    # The whole import runs under one session (issue #159): the atlas is
+    # locked, hydrated from S3 into the workspace, and written back. The scan
+    # is inside it rather than before it because this genuinely is a write to
+    # the atlas, and a batch that half-lands is worse than one that waits.
+    try:
+        with atlas_session.open_session(
+                args.atlas_name, purpose=f"ingest_s3_photos {args.s3_url}") as sess:
+            _run(args, sess.config, bucket, prefix)
+    except atlas_session.AtlasNotSeeded as e:
+        print(f'ERROR: {e}', file=sys.stderr)
+        sys.exit(1)
+    except atlas_lock.AtlasLocked as e:
+        print(f'ERROR: {e}', file=sys.stderr)
         sys.exit(1)
 
-    config = json.load(open(config_path))
 
+def _run(args, config, bucket, prefix):
     # Resolve layer name
     layer_name = args.layer or config.get('email_photo_default_layer', 'poi')
     layer_names = {l['name'] for l in config['dataswale'].get('layers', [])}
     if layer_name not in layer_names:
         print(f"ERROR: Layer '{layer_name}' not found in atlas. Available: {sorted(layer_names)}", file=sys.stderr)
-        sys.exit(1)
-
-    # Parse S3 URL
-    try:
-        bucket, prefix = parse_s3_url(args.s3_url)
-    except ValueError as e:
-        print(f'ERROR: {e}', file=sys.stderr)
         sys.exit(1)
 
     print(f"Atlas:   {args.atlas_name}")
@@ -210,8 +218,7 @@ def main():
         print("Mode:    dry-run (no writes)")
     print()
 
-    session = boto3.Session(profile_name=args.profile)
-    s3 = session.client('s3')
+    s3 = boto3.Session(profile_name=args.profile).client('s3')
 
     if prefix.endswith('.zip'):
         features, n_skip = _ingest_zip(s3, bucket, prefix, args)

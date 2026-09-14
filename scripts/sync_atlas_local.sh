@@ -1,57 +1,55 @@
 #!/bin/bash
-# Sync an atlas from the production server to a local directory for offline/demo use.
+# Sync an atlas from S3 to a local directory for offline/demo use.
 #
 # Usage:
-#   scripts/sync_atlas_local.sh <atlas_name> <local_dir> [server]
+#   scripts/sync_atlas_local.sh <atlas_name> <local_dir>
 #
 # Examples:
 #   scripts/sync_atlas_local.sh scvfd ~/atlas_demo
-#   scripts/sync_atlas_local.sh scvfd ~/atlas_demo root@myserver.example.com
 #
-# Default server is read from ATLAS_SERVER env var, then falls back to
-# root@fireatlas.org. Override on the command line as the third argument.
+# Pulls from the atlas's staging prefix in the private bucket, which is the
+# source of truth (#159). This used to rsync /root/swales_dev/{atlas}/staging
+# off the box — a copy of one machine's disk, which stops being the truth at
+# the cutover and is already not where compute reads from.
+#
+# Env:
+#   ATLAS_PRIVATE_BUCKET  default scs-atlas-private-prod
+#   AWS_PROFILE           default atlas
 
-set -e
+set -euo pipefail
 
-ATLAS="${1:?Usage: $0 <atlas_name> <local_dir> [server]}"
-LOCAL_DIR="${2:?Usage: $0 <atlas_name> <local_dir> [server]}"
-SERVER="${3:-${ATLAS_SERVER:-root@fireatlas.org}}"
+ATLAS="${1:?Usage: $0 <atlas_name> <local_dir>}"
+LOCAL_DIR="${2:?Usage: $0 <atlas_name> <local_dir>}"
+BUCKET="${ATLAS_PRIVATE_BUCKET:-scs-atlas-private-prod}"
+export AWS_PROFILE="${AWS_PROFILE:-atlas}"
 
-REMOTE_BASE="/root/swales_dev/${ATLAS}/staging"
+REMOTE="s3://${BUCKET}/${ATLAS}/staging"
 LOCAL_ATLAS="${LOCAL_DIR}/${ATLAS}"
 
-echo "==> Syncing ${ATLAS} from ${SERVER}:${REMOTE_BASE}"
+echo "==> Syncing ${ATLAS} from ${REMOTE}"
 echo "    → ${LOCAL_ATLAS}"
 echo ""
 
 mkdir -p "${LOCAL_ATLAS}/staging"
 
-# Sync outlets — all generated outputs (webmap, PDFs, HTML, PMTiles)
+# Outlets — all generated outputs (webmap, PDFs, HTML, PMTiles).
 echo "--- outlets/"
-rsync -az --info=progress2 --copy-links \
-    "${SERVER}:${REMOTE_BASE}/outlets/" \
-    "${LOCAL_ATLAS}/staging/outlets/"
+aws s3 sync "${REMOTE}/outlets/" "${LOCAL_ATLAS}/staging/outlets/" --no-progress
 
-# Sync layers — GeoJSON files only (skip large rasters)
+# Layers — GeoJSON only, skipping the large rasters.
 echo "--- layers/ (GeoJSON only)"
-rsync -az --info=progress2 --copy-links \
-    --include="*/" \
-    --include="*.geojson" \
-    --exclude="*" \
-    "${SERVER}:${REMOTE_BASE}/layers/" \
-    "${LOCAL_ATLAS}/staging/layers/"
+aws s3 sync "${REMOTE}/layers/" "${LOCAL_ATLAS}/staging/layers/" \
+    --exclude "*" --include "*.geojson" --no-progress
 
-# Sync atlas config
+# The config.
 echo "--- atlas_config.json"
-rsync -az --copy-links \
-    "${SERVER}:${REMOTE_BASE}/atlas_config.json" \
-    "${LOCAL_ATLAS}/staging/"
+aws s3 cp "${REMOTE}/atlas_config.json" "${LOCAL_ATLAS}/staging/" --no-progress
 
-# Sync local/ (CSS, logo, documents) — resolve symlink on the remote side
+# Shared web assets (css, logo, docs). These live under the `shared/` prefix
+# rather than inside the atlas — `local/` is a symlink on the box and a
+# symlink into the session's shared cache in a workspace, and S3 has neither.
 echo "--- local/ (css, logo, docs)"
-rsync -az --info=progress2 --copy-links \
-    "${SERVER}:${REMOTE_BASE}/local/" \
-    "${LOCAL_ATLAS}/staging/local/"
+aws s3 sync "s3://${BUCKET}/shared/" "${LOCAL_ATLAS}/staging/local/" --no-progress
 
 echo ""
 echo "==> Done. Start the local server with:"

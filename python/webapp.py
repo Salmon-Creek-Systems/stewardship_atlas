@@ -977,7 +977,12 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
     slug = payload.slug.strip()
     if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', slug):
         raise HTTPException(status_code=400, detail="slug must start with a letter and contain only letters, numbers, and underscores")
-    if (Path(SWALES_ROOT) / slug).exists():
+    # Existence is a question about S3, not about this machine's disk: a
+    # leftover workspace directory would refuse a name that is genuinely free,
+    # and an atlas created elsewhere would not be seen at all.
+    if atlas_workspace.is_seeded(atlas_store._s3(),
+                                 atlas_store.cloud_settings({})['private_bucket'],
+                                 slug):
         raise HTTPException(status_code=409, detail=f"Atlas '{slug}' already exists")
 
     starter = _load_starter(payload.starter)
@@ -1036,104 +1041,122 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
         }]
     }
 
-    async def finish_creating():
+    def finish_creating():
+        """Create the atlas inside one session, then seed S3 with it.
+
+        A plain def so the work runs in the threadpool and /create-status stays
+        responsive, matching finish_publishing. The session is opened *here*
+        rather than in the request: the response has already been sent, so a
+        busy atlas has to be recorded in the job status rather than returned.
+
+        `require_config=False` is what this endpoint was the reason for — the
+        atlas starts with nothing in S3, so there is no staging config to load
+        and `session.config` comes back None. Everything the create writes
+        lands in the workspace and the write-back is what seeds
+        `{atlas}/staging/`.
+        """
         try:
-            create_statuses[slug]["log"].append([f"Creating atlas structure (starter: {payload.starter})", datetime.now().isoformat()])
-            await asyncio.to_thread(atlas.create,
-                layers=starter_layers_list,
-                assets=starter_assets,
-                data_root=SWALES_ROOT,
-                shared_dir=Path(ATLAS_SHARED_DIR),
-                feature_collection=feature_collection
-            )
-            create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
+            with atlas_session.open_session(slug, purpose="create_atlas",
+                                            require_config=False) as session:
+                create_statuses[slug]["log"].append([f"Creating atlas structure (starter: {payload.starter})", datetime.now().isoformat()])
+                ac = atlas.create(
+                    layers=starter_layers_list,
+                    assets=starter_assets,
+                    data_root=str(session.workspace_root),
+                    feature_collection=feature_collection
+                )
+                create_statuses[slug]["log"].append(["Atlas structure created", datetime.now().isoformat()])
 
-            # Register email ingest address in SES receipt rule
-            try:
-                email_addr = f"{slug}@fireatlas.org"
-                ses = boto3.client('ses', region_name='us-east-1')
-                rule_set = ses.describe_receipt_rule_set(RuleSetName='atlas-email-inlet')
-                for rule in rule_set['Rules']:
-                    if any('S3Action' in a for a in rule['Actions']):
-                        recipients = rule.get('Recipients', [])
-                        if email_addr not in recipients:
-                            rule['Recipients'] = recipients + [email_addr]
-                            ses.update_receipt_rule(RuleSetName='atlas-email-inlet', Rule=rule)
-                        break
-                create_statuses[slug]["log"].append([f"Email ingest configured for {email_addr}", datetime.now().isoformat()])
-            except Exception as ses_err:
-                logging.warning(f"Could not configure SES for {slug}: {ses_err}")
-                create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
-
-            # Write a self-contained single-file atlas.geojson: the starter's
-            # layers/assets are embedded inline so future config rebuilds
-            # (build_atlas_from_geojson) don't depend on the starter file.
-            atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
-            atlas_geojson = json.loads(json.dumps(feature_collection))
-            atlas_geojson['features'][0]['properties'].update({
-                "data_root": SWALES_ROOT,
-                "shared_dir": ATLAS_SHARED_DIR,
-                "base_url": f"https://fireatlas.org/{slug}",
-                "port": 9000,
-                "admin_emails": [],
-                "logo_url": "",
-                "layers": starter_layers,
-                "assets": starter_assets,
-            })
-            with open(atlas_geojson_path, 'w') as f:
-                json.dump(atlas_geojson, f, indent=2)
-
-            ac = json.load(open(Path(SWALES_ROOT) / slug / "staging" / "atlas_config.json"))
-            assets = ac['assets']
-            raster_layers = {l['name'] for l in ac['dataswale']['layers']
-                             if l.get('geometry_type') == 'raster'}
-
-            # Materialize the starter's inlets to populate base layers. Eddies
-            # are intentionally skipped at create time (DEM/hillshade/H3/sim can
-            # be slow and run on layers that start empty) — run them later.
-            inlet_names = [n for n, a in assets.items() if a.get('type') == 'inlet']
-            for inlet_name in inlet_names:
-                create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
+                # Register email ingest address in SES receipt rule
                 try:
-                    await asyncio.to_thread(atlas.materialize, ac, inlet_name)
-                    out_layer = assets[inlet_name].get('out_layer')
-                    if out_layer in raster_layers:
-                        await asyncio.to_thread(dataswale_geojson.refresh_raster_layer, ac, out_layer)
-                    create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
-                except Exception as inlet_err:
-                    logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
-                    create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
+                    email_addr = f"{slug}@fireatlas.org"
+                    ses = boto3.client('ses', region_name='us-east-1')
+                    rule_set = ses.describe_receipt_rule_set(RuleSetName='atlas-email-inlet')
+                    for rule in rule_set['Rules']:
+                        if any('S3Action' in a for a in rule['Actions']):
+                            recipients = rule.get('Recipients', [])
+                            if email_addr not in recipients:
+                                rule['Recipients'] = recipients + [email_addr]
+                                ses.update_receipt_rule(RuleSetName='atlas-email-inlet', Rule=rule)
+                            break
+                    create_statuses[slug]["log"].append([f"Email ingest configured for {email_addr}", datetime.now().isoformat()])
+                except Exception as ses_err:
+                    logging.warning(f"Could not configure SES for {slug}: {ses_err}")
+                    create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
 
-            # Inlets only wrote deltas; apply them so the layers actually hold
-            # data, and give inlet-less layers an empty FeatureCollection so the
-            # webmap doesn't 404 on a missing file. Must precede the outlets,
-            # which read these files at materialize time.
-            for layer_name, action in await asyncio.to_thread(
-                    dataswale_geojson.refresh_all_vector_layers, ac):
-                if action.startswith('failed'):
-                    logging.warning(f"Layer {layer_name} for {slug}: {action}")
-                    create_statuses[slug]["log"].append([f"Warning: layer {layer_name} {action}", datetime.now().isoformat()])
-                else:
-                    create_statuses[slug]["log"].append([f"Layer {layer_name} {action}", datetime.now().isoformat()])
+                # Write a self-contained single-file atlas.geojson: the starter's
+                # layers/assets are embedded inline so future config rebuilds
+                # (build_atlas_from_geojson) don't depend on the starter file.
+                # It lives inside staging, so it is seeded to S3 with everything
+                # else and a later rebuild finds it in the workspace.
+                atlas_geojson = json.loads(json.dumps(feature_collection))
+                atlas_geojson['features'][0]['properties'].update({
+                    "data_root": SWALES_ROOT,
+                    "shared_dir": ATLAS_SHARED_DIR,
+                    "base_url": f"https://fireatlas.org/{slug}",
+                    "port": 9000,
+                    "admin_emails": [],
+                    "logo_url": "",
+                    "layers": starter_layers,
+                    "assets": starter_assets,
+                })
+                with open(session.staging_dir / "atlas.geojson", 'w') as f:
+                    json.dump(atlas_geojson, f, indent=2)
 
-            # Outlets: webmap must precede html (console HTML checks for the
-            # webmap output); notebook first, html last.
-            _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
-            outlet_names = sorted(
-                (n for n, a in assets.items() if a.get('type') == 'outlet'),
-                key=lambda n: _outlet_order.get(n, 5)
-            )
-            for outlet_name in outlet_names:
-                create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
-                try:
-                    await asyncio.to_thread(atlas.materialize, ac, outlet_name)
-                    create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
-                except Exception as outlet_err:
-                    logging.error(f"Outlet {outlet_name} failed for {slug}: {outlet_err}")
-                    logging.error(traceback.format_exc())
-                    create_statuses[slug]["log"].append([f"Warning: {outlet_name} failed ({outlet_err}) — skipped", datetime.now().isoformat()])
+                assets = ac['assets']
+                raster_layers = {l['name'] for l in ac['dataswale']['layers']
+                                 if l.get('geometry_type') == 'raster'}
+
+                # Materialize the starter's inlets to populate base layers. Eddies
+                # are intentionally skipped at create time (DEM/hillshade/H3/sim can
+                # be slow and run on layers that start empty) — run them later.
+                inlet_names = [n for n, a in assets.items() if a.get('type') == 'inlet']
+                for inlet_name in inlet_names:
+                    create_statuses[slug]["log"].append([f"Fetching {inlet_name}", datetime.now().isoformat()])
+                    try:
+                        atlas.materialize(ac, inlet_name)
+                        out_layer = assets[inlet_name].get('out_layer')
+                        if out_layer in raster_layers:
+                            dataswale_geojson.refresh_raster_layer(ac, out_layer)
+                        create_statuses[slug]["log"].append([f"Finished {inlet_name}", datetime.now().isoformat()])
+                    except Exception as inlet_err:
+                        logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
+                        create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
+
+                # Inlets only wrote deltas; apply them so the layers actually hold
+                # data, and give inlet-less layers an empty FeatureCollection so the
+                # webmap doesn't 404 on a missing file. Must precede the outlets,
+                # which read these files at materialize time.
+                for layer_name, action in dataswale_geojson.refresh_all_vector_layers(ac):
+                    if action.startswith('failed'):
+                        logging.warning(f"Layer {layer_name} for {slug}: {action}")
+                        create_statuses[slug]["log"].append([f"Warning: layer {layer_name} {action}", datetime.now().isoformat()])
+                    else:
+                        create_statuses[slug]["log"].append([f"Layer {layer_name} {action}", datetime.now().isoformat()])
+
+                # Outlets: webmap must precede html (console HTML checks for the
+                # webmap output); notebook first, html last.
+                _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
+                outlet_names = sorted(
+                    (n for n, a in assets.items() if a.get('type') == 'outlet'),
+                    key=lambda n: _outlet_order.get(n, 5)
+                )
+                for outlet_name in outlet_names:
+                    create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
+                    try:
+                        atlas.materialize(ac, outlet_name)
+                        create_statuses[slug]["log"].append([f"Finished {outlet_name}", datetime.now().isoformat()])
+                    except Exception as outlet_err:
+                        logging.error(f"Outlet {outlet_name} failed for {slug}: {outlet_err}")
+                        logging.error(traceback.format_exc())
+                        create_statuses[slug]["log"].append([f"Warning: {outlet_name} failed ({outlet_err}) — skipped", datetime.now().isoformat()])
 
             create_statuses[slug]["log"].append(["Done", datetime.now().isoformat()])
+            create_statuses[slug]["creating"] = False
+            create_statuses[slug]["finished_at"] = datetime.now().isoformat()
+        except SESSION_ERRORS as e:
+            logging.warning(f"Could not create atlas {slug}: {e}")
+            create_statuses[slug]["log"].append([f"Atlas busy or unavailable: {e}", datetime.now().isoformat()])
             create_statuses[slug]["creating"] = False
             create_statuses[slug]["finished_at"] = datetime.now().isoformat()
         except Exception as e:

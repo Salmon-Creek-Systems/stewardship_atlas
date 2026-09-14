@@ -14,7 +14,9 @@ The layer is styled dark green with thick lines / big dots by default. The
 inlet clips to the atlas bounding box, so features outside the atlas area are
 dropped.
 
-Run on the server, from the app checkout:
+Runs inside a session (issue #159): the atlas is locked, hydrated from S3 into
+the workspace, edited there, and written back. `ATLAS_WORKSPACE_ROOT` must name
+a local directory to hydrate into.
 
     python scripts/add_layer.py scvfd trailheads
     python scripts/add_layer.py scvfd fireline --geometry linestring
@@ -26,13 +28,12 @@ attributes in the map popup, add `show_attributes` + `editable_columns` to the
 layer in the source geojson once you know its fields.
 """
 import argparse
-import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 import atlas
+import atlas_session
 
 
 def main():
@@ -50,25 +51,20 @@ def main():
     ap.add_argument("--consumers",
                     help="comma-separated consumer asset names "
                          "(default: webmap,webedit,sqldb)")
-    ap.add_argument("--swales-root",
-                    default=os.environ.get("SWALES_ROOT", "/root/swales_dev"))
     ap.add_argument("--no-rebuild", action="store_true",
                     help="skip build_atlas config_only (for inspection)")
     ap.add_argument("--no-materialize", action="store_true",
                     help="edit config + rebuild but don't materialize")
     args = ap.parse_args()
 
-    config_path = Path(args.swales_root) / args.atlas / "staging" / "atlas_config.json"
-    if not config_path.exists():
-        sys.exit(f"No atlas config at {config_path}")
-    config = json.load(open(config_path))
-
     consumers = [c.strip() for c in args.consumers.split(",")] if args.consumers else None
-    atlas.add_layer(
-        config, args.layer,
-        s3_key=args.s3_key, s3_bucket=args.s3_bucket,
-        geometry_type=args.geometry, color=args.color, consumers=consumers,
-        rebuild=not args.no_rebuild, run_materialize=not args.no_materialize)
+    with atlas_session.open_session(args.atlas,
+                                    purpose=f"add_layer {args.layer}") as session:
+        atlas.add_layer(
+            session.config, args.layer,
+            s3_key=args.s3_key, s3_bucket=args.s3_bucket,
+            geometry_type=args.geometry, color=args.color, consumers=consumers,
+            rebuild=not args.no_rebuild, run_materialize=not args.no_materialize)
 
 
 if __name__ == "__main__":

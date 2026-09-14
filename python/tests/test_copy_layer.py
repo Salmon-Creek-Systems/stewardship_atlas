@@ -10,6 +10,13 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Stub heavy server-side dependencies so atlas / dataswale_geojson import cleanly.
+#
+# These are deliberately NOT removed afterwards, and that is a known problem
+# (#153): test_dataswale_geojson, test_vector_inlets and
+# test_refresh_all_vector_layers cannot import without them and are only
+# running because this file leaked them. Cleaning up here breaks those three,
+# so the leak has to be unwound together with giving each suite its own stubs
+# — not as a side effect of an unrelated change.
 for _mod in ('outlets', 'outlets_qgis_atlas', 'vector_inlets', 'raster_inlets',
              'eddies', 'versioning', 'deltas_geojson', 'utils',
              'duckdb', 'osgeo', 'osgeo.gdal', 'osgeo.ogr', 'shapely',

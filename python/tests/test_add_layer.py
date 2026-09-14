@@ -121,12 +121,14 @@ class TestAddLayerExecutor(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.name = 'testatlas'
-        app_cfg = root / self.name / 'app' / 'configuration'
-        app_cfg.mkdir(parents=True)
-        (root / self.name / 'staging').mkdir(parents=True)
+        staging = root / self.name / 'staging'
+        staging.mkdir(parents=True)
 
-        # Single-file seed geojson with inline layers/assets.
-        self.seed = app_cfg / f'{self.name}.geojson'
+        # Single-file seed geojson with inline layers/assets. It lives *in
+        # staging* (#159 task 7): the source travels with the atlas, so a
+        # session hydrates it and writes an edit to it back, where a file in a
+        # per-atlas `app/` checkout could do neither.
+        self.seed = staging / 'atlas.geojson'
         self.seed.write_text(json.dumps({
             "type": "FeatureCollection",
             "features": [{"type": "Feature", "geometry": None, "properties": {

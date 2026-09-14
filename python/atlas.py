@@ -60,6 +60,20 @@ DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
 DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods 
 
 
+def shared_config_directory():
+    """`configuration/` in the running code checkout.
+
+    The shared_*.json templates and the hand-maintained per-atlas GeoJSONs live
+    in the repo, and the repo is code. Resolving them through the running
+    process rather than through a per-atlas `app/` symlink means one answer per
+    process instead of one per atlas directory.
+
+    Computed from this file's own location — the same thing
+    `versioning.atlas_path(version='app')` does, without the indirection.
+    """
+    return Path(__file__).parent.parent / 'configuration'
+
+
 def discover_versions(config, client=None) -> List[str]:
     """Published versions of an atlas, newest first.
 
@@ -200,14 +214,17 @@ def create_config(config: Dict[str, Any] = None,
     
     config['spreadsheets'] = {}
 
-    # In unified mode there is one shared app/ checkout at {data_root}/app/.
-    # Create the symlink now so shared config JSONs can be found below.
     p.mkdir(parents=True, exist_ok=True)
-    if not (p / 'app').exists() and (Path(data_root) / 'app').exists():
-        (p / 'app').symlink_to(Path(data_root) / 'app', target_is_directory=True)
 
-    # Load asset and layer core/shared definitions
-    shared_config_dir = p / 'app' / 'configuration'
+    # Shared definitions come from the *running code*, not from a per-atlas
+    # `app/` symlink into a checkout on one machine (#159 task 7). A workspace
+    # has no `app/` and cannot be given one — S3 has no symlinks, and the code
+    # tree belongs in the image rather than in the data. `version='app'` has
+    # always meant "the repo this file is in", which is the honest answer to
+    # where a shared template lives, and it is what removes the class of bug
+    # where a stale per-atlas checkout silently supplied a different template
+    # from the one the process was running.
+    shared_config_dir = shared_config_directory()
     inlets_config = json.load(open(shared_config_dir / "shared_inlets_config.json"))
     eddies_config = json.load(open(shared_config_dir / "shared_eddies_config.json"))
     outlets_config = json.load(open(shared_config_dir / "shared_outlets_config.json"))
@@ -270,7 +287,6 @@ def create(config: Dict[str, Any] = None,
            assets: Dict[str, Any] = None, 
            assets_path: str = None,
            data_root: str = None,
-           shared_dir: Path = None,
            name: str = "Nameless",
            admin_emails: List[str] = None,
            bbox: Dict[str, Any] = None,
@@ -281,10 +297,9 @@ def create(config: Dict[str, Any] = None,
     This function:
     1. Builds the config using create_config()
     2. Creates directory structure (staging/, layers/, outlets/, deltas/)
-    3. Creates symlinks to shared_dir
-    4. Adds htpasswd files for protected directories
-    5. Stores initial feature collection in layers/regions
-    6. Writes atlas_config.json
+    3. Adds htpasswd files for protected directories
+    4. Stores initial feature collection in layers/regions
+    5. Writes atlas_config.json
     
     Args:
         config: Base config dict to start from (defaults to DEFAULT_CONFIG copy)
@@ -292,8 +307,7 @@ def create(config: Dict[str, Any] = None,
         layers_path: Path to layers JSON file
         assets: Dict of asset definitions (alternative to assets_path)
         assets_path: Path to assets JSON file
-        data_root: Root directory for atlas data
-        shared_dir: Path to shared resources directory
+        data_root: Root directory for atlas data — the session's workspace
         name: Atlas name
         admin_emails: List of admin email addresses
         bbox: Bounding box dict (alternative to feature_collection)
@@ -319,23 +333,21 @@ def create(config: Dict[str, Any] = None,
         feature_collection=feature_collection
     )
     
-    # Now create directory structure
+    # Now create directory structure.
+    #
+    # Nothing here makes a symlink any more (#159 task 7). `create` runs inside
+    # a session, whose workspace already has `staging/local` pointed at the
+    # managed shared cache by `atlas_shared.link_into_workspace` — pointing it
+    # at `shared_dir` here would clobber that and send every shared-data read
+    # back at the box's /root/data. `CURRENT` is gone with the version
+    # directories. Neither could survive a write-back regardless: S3 has no
+    # symlinks.
     p = Path(data_root) / config['name']
     p.mkdir(parents=True, exist_ok=True)
-
-    if not (p / 'local').is_symlink():
-        (p / 'local').symlink_to(shared_dir, target_is_directory=True)
-
-    if not (p / 'CURRENT').is_symlink():
-        (p / 'CURRENT').symlink_to(p / 'staging', target_is_directory=True)
-
 
     (p / 'staging').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'outlets').mkdir(parents=True, exist_ok=True)
     (p / 'staging' / 'layers').mkdir(parents=True, exist_ok=True)
-    
-    if not (p / 'staging' / 'local').is_symlink():
-        (p / 'staging' / 'local').symlink_to(shared_dir, target_is_directory=True)
     
     # Create directories and htpasswds for assets
     for asset_name, asset in config['assets'].items():
@@ -464,8 +476,9 @@ def build_atlas(
         raise FileNotFoundError(f"Layers file not found: {layers_path}")
     if not Path(data_root).exists():
         raise FileNotFoundError(f"Data root not found: {data_root}")
-    if not Path(shared_dir).exists():
-        raise FileNotFoundError(f"Shared dir not found: {shared_dir}")
+    # `shared_dir` is no longer checked or used. Shared data is fetched on
+    # demand into the session's managed cache (atlas_shared), so the property
+    # names a directory that need not exist on the machine doing the build.
 
     feature_collection = {
         "type": "FeatureCollection",
@@ -489,12 +502,10 @@ def build_atlas(
     setup_role_htpasswds(data_root, name)
 
     if config_only:
-        if config_path.exists():
-            timestamp = _dt.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = config_path.parent / f"atlas_config-BACKUP-{timestamp}.json"
-            config_path.rename(backup_path)
-            logger.info(f"Backed up existing config to: {backup_path}")
-
+        # No atlas_config-BACKUP-{timestamp}.json. Under a session that backup
+        # would be written back to S3, re-hydrated by every later session, and
+        # accumulate without limit — and it is redundant besides: the private
+        # bucket keeps the previous object version of the config already.
         config = create_config(
             layers_path=layers_path,
             layers=layers,
@@ -513,7 +524,6 @@ def build_atlas(
             assets_path=assets_path,
             assets=assets,
             data_root=data_root,
-            shared_dir=Path(shared_dir),
             feature_collection=feature_collection,
         )
         materialize(config, 'notebook')
@@ -522,12 +532,19 @@ def build_atlas(
     return config, config_path
 
 
-def build_atlas_from_geojson(geojson_path, config_only: bool = False):
+def build_atlas_from_geojson(geojson_path, config_only: bool = False,
+                             data_root=None):
     """Build or regenerate an atlas from its GeoJSON config file.
 
     Equivalent to: python scripts/build_atlas.py [config_only] <geojson_path>
 
     Returns (atlas_config dict, Path to written atlas_config.json).
+
+    `data_root` overrides the `data_root` property in the GeoJSON. A source
+    file names the box's tree (`/root/swales_dev`), which is exactly where a
+    build must NOT write once compute runs in a session workspace — so the
+    caller passes `session.workspace_root` and the property becomes what it
+    always really was: a default for running outside a session.
 
     Accepts two source formats:
     - Inline: 'assets' (dict) and 'layers' (dict keyed by name) embedded as
@@ -571,7 +588,7 @@ def build_atlas_from_geojson(geojson_path, config_only: bool = False):
 
     common = dict(
         name=props['name'],
-        data_root=props['data_root'],
+        data_root=str(data_root) if data_root is not None else props['data_root'],
         shared_dir=props['shared_dir'],
         admin_emails=props['admin_emails'],
         base_url=props['base_url'],
@@ -610,7 +627,7 @@ def rename_layer(config, old_name, new_name, dry_run=False):
 
     name = config['name']
     staging_path = Path(config['data_root']) / name / 'staging'
-    config_dir = Path(config['data_root']) / name / 'app' / 'configuration'
+    config_dir = shared_config_directory()
 
     layer_names = [l['name'] for l in config['dataswale']['layers']]
     if old_name not in layer_names:
@@ -706,8 +723,8 @@ def copy_layer(config, old_name, new_name, rebuild=True):
 
     name = config['name']
     staging_path = Path(config['data_root']) / name / 'staging'
-    config_dir = Path(config['data_root']) / name / 'app' / 'configuration'
-    geojson_path = config_dir / f'{name}.geojson'
+    config_dir = shared_config_directory()
+    geojson_path = source_geojson_path(config)
 
     layer_names = [l['name'] for l in config['dataswale']['layers']]
     if old_name not in layer_names:
@@ -866,6 +883,29 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
             "consumer_edits": consumer_edits}
 
 
+def source_geojson_path(config):
+    """The single-file GeoJSON an atlas is built from, or None.
+
+    Two locations, in order:
+
+    1. ``staging/atlas.geojson`` — inside the atlas, so it travels with it.
+       `/create_atlas` has written this since the starter work, and it is the
+       only form that works once compute runs in a session: it is hydrated with
+       everything else and an edit to it is written back.
+    2. ``configuration/{name}.geojson`` in the running code checkout — where
+       the hand-maintained atlases still keep theirs. Editing a file in a git
+       checkout from the server is the tension this is on its way out of; it
+       stays until the seed carries every atlas's source into staging.
+    """
+    in_staging = (Path(config['data_root']) / config['name'] / 'staging'
+                  / 'atlas.geojson')
+    if in_staging.is_file():
+        return in_staging
+
+    in_repo = shared_config_directory() / f"{config['name']}.geojson"
+    return in_repo if in_repo.is_file() else None
+
+
 def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
               geometry_type='point', color=None, consumers=None,
               rebuild=True, run_materialize=True):
@@ -884,13 +924,13 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
     name = config['name']
     data_root = config['data_root']
     staging_path = Path(data_root) / name / 'staging'
-    config_dir = Path(data_root) / name / 'app' / 'configuration'
-    geojson_path = config_dir / f'{name}.geojson'
+    geojson_path = source_geojson_path(config)
 
-    if not geojson_path.exists():
+    if geojson_path is None:
         raise FileNotFoundError(
-            f"Source GeoJSON not found: {geojson_path}. add_layer supports the "
-            f"single-file GeoJSON config format only.")
+            f"No source GeoJSON for '{name}' in staging/atlas.geojson or "
+            f"configuration/{name}.geojson. add_layer supports the single-file "
+            f"GeoJSON config format only.")
 
     s3_key = s3_key or f"{name}/imports/{layer_name}.geojson"
     plan = plan_add_layer(config['assets'], layer_name, geometry_type=geometry_type,

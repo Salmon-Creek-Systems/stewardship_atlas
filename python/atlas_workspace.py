@@ -302,6 +302,23 @@ class StagingObjectExists(Exception):
     """A create-only staging write found the key already taken."""
 
 
+def is_seeded(client, bucket: str, atlas_name: str) -> bool:
+    """Does S3 hold a staging config for this atlas?
+
+    The existence test that replaces `(SWALES_ROOT / slug).exists()`. A
+    directory on one machine says nothing about whether an atlas exists now
+    that S3 is the source of truth — and a leftover workspace directory would
+    have made `/create_atlas` refuse a name that is genuinely free.
+    """
+    try:
+        client.head_object(Bucket=bucket, Key=_key(atlas_name, 'atlas_config.json'))
+        return True
+    except Exception as exc:
+        if atlas_store.s3_error_code(exc) in atlas_store.MISSING_ERROR_CODES:
+            return False
+        raise
+
+
 def put_staging_object(client, bucket: str, atlas_name: str, rel: str, body: bytes,
                        create_only: bool = True) -> str:
     """Write one object into an atlas's staging prefix without a session.

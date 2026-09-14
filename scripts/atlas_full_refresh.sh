@@ -8,11 +8,15 @@
 #   ./scripts/atlas_full_refresh.sh -y <atlas>       # no pause
 #
 # Env:
-#   ATLAS_API_URL   webapp API base  (default https://fireatlas.org:9000)
-#   ATLAS_CDN_URL   CloudFront base for the post-publish check
-#                   (default https://next.fireatlas.org; set empty to skip)
+#   ATLAS_API_URL         webapp API base  (default https://fireatlas.org:9000)
+#   ATLAS_CDN_URL         CloudFront base for the post-publish check
+#                         (default https://next.fireatlas.org; set empty to skip)
+#   ATLAS_WORKSPACE_ROOT  local directory to hydrate into — required, because
+#                         the config rebuild step now runs inside a session
+#                         (#159) rather than writing to a local swales tree.
 #
-# Run from anywhere; paths resolve relative to the repo.
+# Run from anywhere; paths resolve relative to the repo. AWS credentials are
+# needed for the config rebuild, which locks the atlas and writes back to S3.
 
 set -euo pipefail
 

@@ -7,7 +7,13 @@ Attributions layer. Layers with identical attribution data are grouped
 into single features.
 
 Usage:
+    python generate_attributions.py <atlas> [output_path]
     python generate_attributions.py /path/to/atlas_config.json [output_path]
+
+Given an atlas name, the work runs inside a session (issue #159): the atlas is
+locked, hydrated from S3 into `ATLAS_WORKSPACE_ROOT`, written, and written
+back. Given a path, it operates on that file in place — for a workspace you
+already have, or an offline copy.
 
 If output_path is not specified, outputs to the layers/attributions directory
 in the atlas staging area.
@@ -229,13 +235,17 @@ def main():
         print(f"Usage: {sys.argv[0]} <atlas_config.json> [output_path]", file=sys.stderr)
         sys.exit(1)
     
-    config_path = sys.argv[1]
+    target = sys.argv[1]
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
-    
+
     try:
-        result_path = generate_attributions(config_path, output_path)
-        # Print only the path on success
-        print(result_path)
+        if Path(target).is_file():
+            print(generate_attributions(target, output_path))
+            return
+        import atlas_session
+        with atlas_session.open_session(target, purpose="generate_attributions") as s:
+            print(generate_attributions(str(s.staging_dir / 'atlas_config.json'),
+                                        output_path))
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
