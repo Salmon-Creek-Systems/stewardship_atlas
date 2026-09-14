@@ -52,6 +52,62 @@ SIDECAR_SUFFIXES = {
 _verified = set()
 
 
+# Inlets whose `inpath_template` names a file in the shared store rather than a
+# remote query. Everything else (overture_duckdb, s3_geojson, fetch_osm, …)
+# reaches its source over the network and needs nothing seeded.
+FILE_INLET_FETCH_TYPES = frozenset({'local_ogr', 'local_raster'})
+
+
+def with_sidecars(rels) -> list:
+    """The given files plus the sidecars each format needs, sorted."""
+    wanted = set()
+    for rel in rels:
+        wanted.add(str(rel))
+        for suffix in SIDECAR_SUFFIXES.get(Path(rel).suffix.lower(), ()):
+            wanted.add(str(Path(rel).with_suffix(suffix)))
+    return sorted(wanted)
+
+
+def referenced_files(config: dict) -> list:
+    """Every shared file an atlas's config names, sidecars included.
+
+    The inverse of `local_path`, and what the seed needs: only ~20 of the
+    files in `/root/data` are referenced by any config, and one unreferenced
+    file there is 4.9 GB. Reading the references rather than the directory is
+    what keeps the seed to what the system actually opens.
+
+    Derived from config, never from a listing — same rule as the catalog
+    (#173). A file on the shared disk that no config names is not part of the
+    system; it is somebody's leftover.
+    """
+    wanted = set()
+
+    for asset in (config.get('assets') or {}).values():
+        asset_config = asset.get('config') or {}
+        if asset_config.get('fetch_type') not in FILE_INLET_FETCH_TYPES:
+            continue
+        template = asset_config.get('inpath_template')
+        if not template:
+            continue
+        try:
+            wanted.add(template.format(**config))
+        except (KeyError, IndexError, ValueError):
+            # A template naming a field this config lacks is a config bug, not
+            # a reason to seed nothing — carry the literal and let the report
+            # show it as missing.
+            wanted.add(template)
+
+    # Icons, from both the webmap sprite sheet and the QGIS renderer. Both fall
+    # back to the repo's templates/icons/, so a missing one is reportable
+    # rather than fatal.
+    for layer in (config.get('dataswale') or {}).get('layers') or []:
+        png = (layer.get('symbol') or {}).get('png')
+        if png:
+            wanted.add(png)
+
+    return with_sidecars(wanted)
+
+
 def shared_key(rel: str) -> str:
     return SHARED_PREFIX + str(rel).lstrip('/')
 
