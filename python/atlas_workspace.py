@@ -47,7 +47,7 @@ MANIFEST_FORMAT = 1
 MANIFEST_FILENAME = '.workspace_manifest.json'
 
 # Where apply_deltas and refresh_raster_layer move a consumed delta.
-ARCHIVE_DIRNAMES = ('work', 'processed')
+ARCHIVE_DIRNAMES = ('work', 'processed', 'discarded')
 
 
 def staging_prefix(atlas_name: str) -> str:
@@ -65,7 +65,8 @@ def manifest_path(workspace_root, atlas_name: str) -> Path:
 
 
 def is_archive_path(rel: str) -> bool:
-    """True for a consumed delta: ``deltas/{layer}/work/...`` (or ``processed/``).
+    """True for a delta that is done with: ``deltas/{layer}/work/...`` (also
+    ``processed/``, and ``discarded/`` for one a staging reset threw away).
 
     The archive is never hydrated. Nothing reads it during a run — a rebuild
     does not replay it (see ``atlas_dagster.refresh_layer``) — and it is the

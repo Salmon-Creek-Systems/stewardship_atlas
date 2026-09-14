@@ -582,6 +582,141 @@ def write_pointer(bucket: str, atlas_name: str, payload: dict, client=None) -> s
     return key
 
 
+def read_pointer(config: dict, client=None):
+    """What `{atlas}/current.json` says is published, or None.
+
+    Replaces resolving the local `CURRENT ->` symlink. The box no longer holds
+    a published version, so the pointer object is the only answer to "which
+    version is live".
+    """
+    settings = cloud_settings(config)
+    bucket = settings.get('outlets_bucket') or ''
+    if not bucket:
+        return None
+    try:
+        return get_json(bucket, pointer_key(config['name']), client=client)
+    except Exception as exc:
+        logger.warning(f"atlas_store: could not read the current pointer for "
+                       f"'{config.get('name')}': {exc}")
+        return None
+
+
+def copy_objects(pairs: list, client=None) -> int:
+    """Server-side copy of `(src_bucket, src_key, dst_bucket, dst_key)` tuples.
+
+    Used to re-point the served mirror at an already-archived version: the
+    bytes are in S3 already, so a rollback should never download and re-upload
+    them.
+    """
+    client = client or _s3()
+    for src_bucket, src_key, dst_bucket, dst_key in pairs:
+        client.copy_object(Bucket=dst_bucket, Key=dst_key,
+                           CopySource={'Bucket': src_bucket, 'Key': src_key})
+    return len(pairs)
+
+
+def plan_mirror_from_archive(config: dict, items: list, client=None) -> list:
+    """`(src_bucket, src_key, dst_bucket, dst_key)` to serve a version from its archive.
+
+    Rebuilds exactly what a publish's mirror holds — the allowlisted public
+    outlets and the public layers they reference — but from objects already in
+    S3 rather than from a local tree. That is what makes a rollback cheap and
+    what makes it possible at all now that the box keeps no version directories.
+
+    The two filters that matter are applied here as well as at publish, because
+    a rollback is a publish of an older version as far as the public bucket is
+    concerned: protected role-variant subdirectories are pruned
+    (`PROTECTED_OUTLET_SUBDIRS`, #177) and a layer reaches the public bucket
+    only from the public bucket — a protected layer's archived object is never
+    copied across the tier boundary.
+    """
+    import atlas_catalog
+    import federation
+
+    settings = cloud_settings(config)
+    atlas_name = config['name']
+    public_bucket = settings.get('outlets_bucket') or ''
+    prefix = current_prefix(atlas_name)
+
+    outlets = set(publishable_outlets(config))
+    wanted_layers = set(outlet_layer_names(config))
+    by_name = {item.get('collection') or item.get('id'): item for item in items}
+
+    plan = []
+    for name, item in sorted(by_name.items()):
+        if federation.is_outlet_item(item):
+            if name not in outlets:
+                continue
+            archive_prefix = (item.get('properties') or {}).get(
+                federation.PREFIX_PROP)
+            if not archive_prefix:
+                continue
+            private_bucket = settings.get('private_bucket') or ''
+            for key in list_keys(private_bucket, f"{archive_prefix.rstrip('/')}/",
+                                 client=client):
+                relative = key[len(archive_prefix.rstrip('/')) + 1:]
+                if is_protected_path(relative):
+                    continue
+                plan.append((private_bucket, key, public_bucket,
+                             f"{prefix}/outlets/{name}/{relative}"))
+            continue
+
+        if name not in wanted_layers:
+            continue
+        for src_bucket, key, filename in atlas_catalog.item_source_keys(item):
+            if src_bucket != public_bucket:
+                logger.warning(
+                    f"atlas_store: layer '{name}' is referenced by a published "
+                    f"outlet but its data is in the private bucket — not "
+                    f"mirroring it (#177).")
+                continue
+            plan.append((src_bucket, key, public_bucket,
+                         f"{prefix}/layers/{name}/{filename}"))
+    return plan
+
+
+def serve_version(config: dict, version: str, items: list, client=None) -> dict:
+    """Make an already-published version the one being served.
+
+    Copies its archived objects into `{atlas}/current/`, prunes what the older
+    version does not have, and moves the pointer last — the same order a
+    publish uses, for the same reason.
+    """
+    settings = cloud_settings(config)
+    atlas_name = config['name']
+    bucket = settings['outlets_bucket']
+    prefix = current_prefix(atlas_name)
+
+    client = client or _s3()
+    plan = plan_mirror_from_archive(config, items, client=client)
+    if not plan:
+        raise ValueError(f"version {version} of '{atlas_name}' has nothing "
+                         f"publicly servable to roll back to")
+
+    existing = list_keys(bucket, f"{prefix}/", client=client)
+    copy_objects(plan, client=client)
+    removed = delete_keys(bucket, stale_keys(existing, [dst for _, _, _, dst in plan]),
+                          client=client)
+
+    write_pointer(bucket, atlas_name, {
+        'atlas': atlas_name,
+        'version': version,
+        'published_at': datetime.datetime.now().isoformat(),
+        'outlets': publishable_outlets(config),
+        'files': len(plan),
+        'rolled_back': True,
+    }, client=client)
+
+    invalidation = None
+    if settings['invalidate']:
+        invalidation = invalidate_current(settings['distribution_id'], atlas_name)
+
+    logger.info(f"atlas_store: now serving {atlas_name} version {version} "
+                f"({len(plan)} objects, pruned {removed})")
+    return {'status': 'success', 'version': version, 'files': len(plan),
+            'pruned': removed, 'invalidation': invalidation}
+
+
 def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> str:
     """Invalidate the atlas's current prefix in CloudFront.
 

@@ -336,6 +336,54 @@ def load_history_from_s3(client, bucket: str, atlas_name: str,
     return history, known_versions(root)
 
 
+def read_version_items(client, bucket: str, atlas_name: str, version: str,
+                       base_url: str) -> list:
+    """The Items constituting one published version, or [] if there is no such
+    version.
+
+    This is what "a version is a Catalog" buys: the manifest is read once and
+    names every layer and outlet in it, each at whichever version actually
+    holds its bytes. Nothing has to be derived from a directory listing or from
+    the current config.
+    """
+    import atlas_store
+
+    prefix = atlas_store.catalog_prefix(atlas_name)
+    catalog = atlas_store.get_json(
+        bucket, f'{prefix}/versions/{version}/catalog.json', client=client)
+    if not catalog:
+        return []
+
+    items = []
+    for href in _read_links(catalog, 'item'):
+        key = atlas_store.key_from_href(href, base_url, prefix)
+        if not key:
+            continue
+        item = atlas_store.get_json(bucket, key, client=client)
+        if item and item.get('type') == 'Feature':
+            items.append(item)
+    return items
+
+
+def item_source_keys(item: dict) -> list:
+    """`(bucket, key, filename)` for every asset of a layer Item.
+
+    Read off the `alternate.s3` href the catalog already records, rather than
+    rebuilt from `layer_key()`. Rebuilding would have to know which version
+    holds the bytes, and getting that wrong is the exact bug this branch hit
+    twice — the Item already carries the answer.
+    """
+    found = []
+    for asset in (item.get('assets') or {}).values():
+        href = ((asset.get('alternate') or {}).get('s3') or {}).get('href', '')
+        if not href.startswith('s3://'):
+            continue
+        bucket, _, key = href[len('s3://'):].partition('/')
+        if bucket and key:
+            found.append((bucket, key, Path(key).name))
+    return found
+
+
 def catalog_documents(built: dict, atlas_name: str, version: str) -> dict:
     """`{s3 key: document}` for everything this publish should write.
 

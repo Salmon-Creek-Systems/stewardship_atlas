@@ -60,32 +60,26 @@ DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
 DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods 
 
 
-def discover_versions(swale_path: Path) -> List[str]:
-    """Discover published versions in a swale directory.
+def discover_versions(config, client=None) -> List[str]:
+    """Published versions of an atlas, newest first.
 
-    Versions are subdirectories that contain an atlas_config.json file,
-    excluding 'staging' (the editable copy) and 'CURRENT' (a symlink to a
-    published version) — neither is a version in its own right.
+    Read from the atlas's STAC root Catalog, which is the index of what has
+    been published. It replaces listing the swale directory for subdirectories
+    holding an `atlas_config.json` — there are no version directories any more,
+    and a listing could only ever have described one machine's disk.
 
-    Args:
-        swale_path: Path to the swale directory
-
-    Returns:
-        List of version names (directory names), newest first
-        (timestamp-named dirs sort chronologically).
+    Fails soft: an unreachable or absent catalog reads as "no versions", which
+    is the correct answer for an atlas that has never been published and a
+    harmless one for a config build that cannot reach S3.
     """
-    versions = []
-    if not swale_path.exists():
-        return versions
+    import versioning
 
-    for item in swale_path.iterdir():
-        if item.name in ('staging', 'CURRENT'):
-            continue
-        if item.is_dir() and (item / 'atlas_config.json').exists():
-            versions.append(item.name)
-
-    logger.debug(f"Discovered versions in {swale_path}: {versions}")
-    return sorted(versions, reverse=True)
+    try:
+        return versioning.published_versions(config, client=client)
+    except Exception as exc:
+        logger.warning(f"Could not read published versions for "
+                       f"'{config.get('name')}': {exc}")
+        return []
 
 
 def add_htpasswds(config, path, access):
@@ -190,8 +184,8 @@ def create_config(config: Dict[str, Any] = None,
     config['dataswale']['bbox'] = bbox
     config['admin_emails'] = admin_emails
     
-    # Discover existing versions in the swale directory
-    config['dataswale']['versions'] = discover_versions(p)
+    # Published versions come from the catalog, not from the filesystem.
+    config['dataswale']['versions'] = discover_versions(config)
 
     # Load layers and assets definitions
     if layers_path is not None:

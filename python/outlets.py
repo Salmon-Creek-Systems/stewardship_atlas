@@ -2223,15 +2223,16 @@ def make_console_html(config,
     with open(template_path, 'r') as f:
         template = f.read()
 
-    # Which published version CURRENT points at (None if no publish yet) —
-    # used by consoles to label the live version in the versions list.
+    # Which version is being served (None if no publish yet) — used by consoles
+    # to label the live version in the versions list. Read from
+    # `{atlas}/current.json`, since the box no longer holds a CURRENT symlink
+    # pointing at a version directory.
     current_version = None
     try:
-        current_path = Path(config['data_root']) / config['name'] / 'CURRENT'
-        if current_path.is_symlink():
-            current_version = current_path.resolve().name
-    except OSError:
-        pass
+        current_version = versioning.current_version(config)
+    except Exception as exc:
+        logger.warning(f"Could not read the current version for "
+                       f"'{config.get('name')}': {exc}")
 
     # Prepare the data for the template
     data = {

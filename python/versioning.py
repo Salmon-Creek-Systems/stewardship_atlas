@@ -1,11 +1,11 @@
 from pathlib import Path
 import datetime
 import logging
-import shutil
-import json
 
-import atlas_store
 import atlas_catalog
+import atlas_store
+import atlas_workspace
+import federation
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -117,40 +117,172 @@ def publish_new_version(config, version=None, *, client=None):
     }
 
 
-def reset_staging(config):
+DISCARDED_DELTAS_DIRNAME = 'discarded'
+
+
+def discard_pending_deltas(staging_path) -> list:
+    """Move every unapplied delta into ``deltas/{layer}/discarded/``.
+
+    A staging reset throws away edits, and a pending delta *is* an edit — left
+    in place it would simply be re-applied by the next refresh, quietly undoing
+    the reset. Deleting it outright is the other obvious answer and it is the
+    wrong one: the delta system's whole premise is that an edit is a record,
+    not a mutation, so a discarded edit is archived rather than erased.
+
+    Not ``work/``, which means applied. Saying an edit was applied when it was
+    thrown away would put a false statement in the only audit trail there is.
     """
-    Reset staging to match CURRENT version.
-    Backs up existing staging before replacing.
-    
-    Returns dict with status and paths.
+    staging_path = Path(staging_path)
+    deltas_root = staging_path / 'deltas'
+    if not deltas_root.is_dir():
+        return []
+
+    moved = []
+    for layer_dir in sorted(p for p in deltas_root.iterdir() if p.is_dir()):
+        for delta in sorted(layer_dir.glob('*.geojson')):
+            target = layer_dir / DISCARDED_DELTAS_DIRNAME / delta.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            delta.rename(target)
+            moved.append(str(target.relative_to(staging_path)))
+    if moved:
+        logger.info(f"Discarded {len(moved)} pending delta(s) to "
+                    f"{DISCARDED_DELTAS_DIRNAME}/")
+    return moved
+
+
+def _version_files(config, items, client=None) -> dict:
+    """``{staging-relative path: (bucket, key)}`` for everything a version holds.
+
+    Layer keys come off each Item's ``alternate.s3`` href and outlet keys from
+    the archive prefix its Item records, so nothing here has to guess which
+    version holds which bytes — the catalog already answers that.
     """
+    settings = atlas_store.cloud_settings(config)
+    private = settings.get('private_bucket') or ''
+
+    wanted = {}
+    for item in items:
+        name = item.get('collection') or item.get('id')
+        if federation.is_outlet_item(item):
+            prefix = (item.get('properties') or {}).get(federation.PREFIX_PROP)
+            if not (prefix and private):
+                continue
+            prefix = prefix.rstrip('/')
+            for key in atlas_store.list_keys(private, f'{prefix}/', client=client):
+                wanted[f'outlets/{name}/{key[len(prefix) + 1:]}'] = (private, key)
+        else:
+            for src_bucket, key, filename in atlas_catalog.item_source_keys(item):
+                wanted[f'layers/{name}/{filename}'] = (src_bucket, key)
+    return wanted
+
+
+def current_version(config, client=None):
+    """The version being served, from ``{atlas}/current.json``."""
+    pointer = atlas_store.read_pointer(config, client=client)
+    return (pointer or {}).get('version')
+
+
+def published_versions(config, client=None) -> list:
+    """Every published version, newest first, from the atlas's root Catalog."""
+    bucket = atlas_store.catalog_bucket(config)
+    if not bucket:
+        return []
+    root = atlas_store.get_json(
+        bucket, f"{atlas_store.catalog_prefix(config['name'])}/catalog.json",
+        client=client)
+    return sorted(atlas_catalog.known_versions(root), reverse=True)
+
+
+def set_current_version(config, version=None, client=None) -> dict:
+    """Serve an already-published version — rollback, by default to the previous one.
+
+    The published objects are already in S3, so this is a server-side copy into
+    ``{atlas}/current/`` and a moved pointer. It replaces repointing the local
+    `CURRENT` symlink, which described nothing once the box stopped holding
+    version directories.
+    """
+    client = client or atlas_store._s3()
+    versions = published_versions(config, client=client)
+    if version is None:
+        live = current_version(config, client=client)
+        candidates = [v for v in versions if v != live]
+        if not candidates:
+            raise ValueError(
+                f"Not enough versions to roll back: found {len(versions)}, "
+                f"need at least 2.")
+        version = candidates[0]
+    elif version not in versions:
+        raise ValueError(f"'{config['name']}' has no published version {version}")
+
+    items = atlas_catalog.read_version_items(
+        client, atlas_store.catalog_bucket(config), config['name'], version,
+        atlas_store.catalog_base_url(config))
+    if not items:
+        raise ValueError(f"version {version} has no catalog to serve from")
+
+    logger.info(f"Serving {config['name']} version {version}")
+    return atlas_store.serve_version(config, version, items, client=client)
+
+
+def reset_staging(config, client=None) -> dict:
+    """Reset staging to the version currently being served.
+
+    Restores the layer and outlet files that version holds, removes the ones it
+    does not, and archives any unapplied delta. Runs against the *workspace*:
+    the session's write-back is what carries the result to S3, which is also
+    what makes it recoverable — the private bucket is versioned.
+
+    There is no ``staging-backup-{timestamp}`` copy any more. It was a local
+    directory nothing would have written back, and it existed to make a
+    `copytree` reversible; the bucket's own versioning does that job properly.
+
+    Every file is downloaded rather than diffed. A reset is rare and rarely
+    cheap — it is the operation that throws work away — so the simple, obviously
+    correct version is the right one.
+    """
+    client = client or atlas_store._s3()
+    version = current_version(config, client=client)
+    if not version:
+        raise ValueError(f"'{config['name']}' has no published version to reset to")
+
+    items = atlas_catalog.read_version_items(
+        client, atlas_store.catalog_bucket(config), config['name'], version,
+        atlas_store.catalog_base_url(config))
+    if not items:
+        raise ValueError(f"version {version} has no catalog to reset from")
+
     staging_path = atlas_path(config, version='staging')
-    current_path = atlas_path(config, version='CURRENT')
-    
-    # Resolve CURRENT symlink to get actual version
-    if not current_path.is_symlink():
-        raise ValueError("CURRENT is not a symlink - cannot determine current version")
-    
-    current_target = current_path.resolve()
-    current_version = current_target.name
-    logger.info(f"Resetting staging from CURRENT ({current_version})")
-    
-    # Backup staging
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    backup_path = staging_path.parent / f"staging-backup-{timestamp}"
-    
-    logger.info(f"Backing up staging to {backup_path}")
-    shutil.move(str(staging_path), str(backup_path))
-    
-    # Copy CURRENT to staging
-    logger.info(f"Copying {current_target} to {staging_path}")
-    shutil.copytree(current_target, staging_path, symlinks=True)
-    
-    logger.info(f"Staging reset complete")
-    
+    wanted = _version_files(config, items, client=client)
+    logger.info(f"Resetting staging for {config['name']} to {version} "
+                f"({len(wanted)} file(s))")
+
+    removed = []
+    for subdir in ('layers', 'outlets'):
+        root = staging_path / subdir
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob('*')):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(staging_path).as_posix()
+            if relative not in wanted:
+                path.unlink()
+                removed.append(relative)
+
+    partial_root = atlas_workspace.partial_dir(config['data_root'], config['name'])
+    for relative, (bucket, key) in sorted(wanted.items()):
+        atlas_workspace.download_object(
+            client, bucket, key, staging_path / relative, partial_root)
+
+    discarded = discard_pending_deltas(staging_path)
+    logger.info(f"Staging reset complete: {len(wanted)} restored, "
+                f"{len(removed)} removed, {len(discarded)} delta(s) discarded")
+
     return {
-        "status": "success",
-        "source_version": current_version,
-        "backup_path": str(backup_path),
-        "staging_path": str(staging_path)
+        'status': 'success',
+        'source_version': version,
+        'restored': len(wanted),
+        'removed': removed,
+        'discarded_deltas': discarded,
+        'staging_path': str(staging_path),
     }

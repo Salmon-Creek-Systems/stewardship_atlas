@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import atlas_store
+import atlas_workspace
 import versioning
 from versioning import atlas_path, atlas_file, publish_new_version
 from fake_s3 import FakeS3
@@ -334,6 +335,184 @@ class TestPublishNewVersion(unittest.TestCase):
         before = set(self.client.objects)
         publish_new_version(config, version='v1', client=self.client)
         self.assertEqual(set(self.client.objects), before)
+
+
+class TestVersionListAndRollback(unittest.TestCase):
+    """What replaces `config['dataswale']['versions']` and the CURRENT symlink.
+
+    The catalog is the index of what has been published, and `current.json` is
+    the record of what is being served. Neither can be answered from a
+    directory listing any more.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.client = FakeS3()
+        self.addCleanup(self.tmp.cleanup)
+        self.config = make_atlas(self.root)
+
+    def publish(self, version, edit=None):
+        if edit is not None:
+            (self.root / 'testatlas' / 'staging' / 'layers' / 'roads' /
+             'roads.geojson').write_text(edit)
+        return publish_new_version(self.config, version=version, client=self.client)
+
+    def keys(self, bucket, prefix=''):
+        return sorted(k for (b, k) in self.client.objects
+                      if b == bucket and k.startswith(prefix))
+
+    def test_published_versions_come_back_newest_first(self):
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+        self.assertEqual(
+            versioning.published_versions(self.config, client=self.client),
+            ['v2', 'v1'])
+
+    def test_an_unpublished_atlas_has_no_versions(self):
+        self.assertEqual(
+            versioning.published_versions(self.config, client=self.client), [])
+
+    def test_current_version_reads_the_pointer(self):
+        self.publish('v1')
+        self.assertEqual(versioning.current_version(self.config, client=self.client),
+                         'v1')
+
+    def test_rollback_serves_the_previous_version(self):
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+
+        result = versioning.set_current_version(self.config, client=self.client)
+
+        self.assertEqual(result['version'], 'v1')
+        self.assertEqual(versioning.current_version(self.config, client=self.client),
+                         'v1')
+        mirrored = atlas_store.get_json(
+            OUT, 'testatlas/current/layers/roads/roads.geojson', client=self.client)
+        self.assertEqual(mirrored, {'features': []}, 'v1 bytes are being served')
+
+    def test_rollback_needs_two_versions(self):
+        self.publish('v1')
+        with self.assertRaises(ValueError):
+            versioning.set_current_version(self.config, client=self.client)
+
+    def test_an_unknown_version_is_refused(self):
+        self.publish('v1')
+        with self.assertRaises(ValueError):
+            versioning.set_current_version(self.config, version='nope',
+                                           client=self.client)
+
+    def test_rollback_can_name_a_version_explicitly(self):
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+        self.publish('v3', edit='{"features": [1, 2]}')
+
+        versioning.set_current_version(self.config, version='v1', client=self.client)
+        self.assertEqual(versioning.current_version(self.config, client=self.client),
+                         'v1')
+
+    def test_rollback_keeps_protected_outlets_out_of_the_public_bucket(self):
+        """A rollback is a publish of an older version as far as the public
+        bucket is concerned, so the tier filters apply here too (#177)."""
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+        versioning.set_current_version(self.config, client=self.client)
+
+        served = self.keys(OUT, 'testatlas/current/')
+        self.assertNotIn('testatlas/current/outlets/runbook/index.html', served)
+        self.assertIn('testatlas/current/outlets/webmap/index.html', served)
+
+    def test_rollback_copies_rather_than_re_uploads(self):
+        """The bytes are already in S3; a rollback must not move them through
+        this process."""
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+        before = len([c for c in self.client.calls if c[0] == 'upload_file'])
+
+        versioning.set_current_version(self.config, client=self.client)
+
+        after = len([c for c in self.client.calls if c[0] == 'upload_file'])
+        self.assertEqual(after, before, 'no file uploads during a rollback')
+        self.assertTrue(any(c[0] == 'copy_object' for c in self.client.calls))
+
+
+class TestResetStaging(unittest.TestCase):
+    """Reset staging to the served version, in the workspace.
+
+    The session's write-back is what carries the result to S3, and the private
+    bucket's own object versioning is what makes it recoverable — which is why
+    the `staging-backup-{timestamp}` copytree is gone.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.client = FakeS3()
+        self.addCleanup(self.tmp.cleanup)
+        self.config = make_atlas(self.root)
+        self.staging = self.root / 'testatlas' / 'staging'
+        publish_new_version(self.config, version='v1', client=self.client)
+
+    def reset(self):
+        return versioning.reset_staging(self.config, client=self.client)
+
+    def test_an_edited_layer_is_restored(self):
+        roads = self.staging / 'layers' / 'roads' / 'roads.geojson'
+        roads.write_text('{"features": ["EDITED"]}')
+
+        self.reset()
+
+        self.assertEqual(roads.read_text(), '{"features": []}')
+
+    def test_a_layer_added_since_the_publish_is_removed(self):
+        stray = self.staging / 'layers' / 'roads' / 'roads.tiff.jpg'
+        stray.write_text('IMG')
+
+        result = self.reset()
+
+        self.assertFalse(stray.exists())
+        self.assertIn('layers/roads/roads.tiff.jpg', result['removed'])
+
+    def test_outlets_are_restored_from_the_archive(self):
+        index = self.staging / 'outlets' / 'webmap' / 'index.html'
+        index.write_text('STALE')
+
+        self.reset()
+
+        self.assertEqual(index.read_text(), 'webmap')
+
+    def test_a_pending_delta_is_archived_not_left_to_reapply(self):
+        """Left in place it would be re-applied by the next refresh, quietly
+        undoing the reset. Deleted outright it would vanish from the only audit
+        trail there is."""
+        pending = (self.staging / 'deltas' / 'roads' /
+                   'pending__1__create.geojson')
+        self.assertTrue(pending.exists())
+
+        result = self.reset()
+
+        self.assertFalse(pending.exists())
+        self.assertTrue((self.staging / 'deltas' / 'roads' / 'discarded' /
+                         'pending__1__create.geojson').exists())
+        self.assertEqual(result['discarded_deltas'],
+                         ['deltas/roads/discarded/pending__1__create.geojson'])
+
+    def test_the_applied_delta_archive_is_untouched(self):
+        self.reset()
+        self.assertTrue((self.staging / 'deltas' / 'roads' / 'work' /
+                         'applied__0__create.geojson').exists())
+
+    def test_the_discard_directory_is_never_hydrated_back(self):
+        """`discarded/` is an archive path, so the next session does not
+        download it and a run cannot re-apply it."""
+        self.reset()
+        self.assertTrue(atlas_workspace.is_archive_path(
+            'deltas/roads/discarded/pending__1__create.geojson'))
+
+    def test_an_unpublished_atlas_cannot_be_reset(self):
+        fresh = dict(self.config, name='never_published')
+        with self.assertRaises(ValueError):
+            versioning.reset_staging(fresh, client=self.client)
 
 
 if __name__ == '__main__':

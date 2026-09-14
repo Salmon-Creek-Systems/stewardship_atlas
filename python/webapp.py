@@ -1285,89 +1285,46 @@ async def save_config(swalename: str, payload: JSONPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/set-current-version/{swalename}")
-async def set_current_version(swalename: str):
-    """
-    Update the CURRENT symlink to point to the second most recent version (rollback).
-    
-    Returns information about the version that was set as current.
+async def set_current_version(swalename: str, version: str = None):
+    """Serve an already-published version — rollback, by default to the previous one.
+
+    Was: repoint the local CURRENT symlink at a sibling version directory.
+    There are no version directories now, so this is a server-side copy of the
+    target version's archived objects into `{atlas}/current/` and a moved
+    pointer. Runs under a write session because it changes what the atlas
+    publishes.
     """
     try:
-        # Load config from staging
-        
-        config_path = f"{SWALES_ROOT}/{swalename}/CURRENT/atlas_config.json"
-        with open(config_path) as f:
-            config = json.load(f)
-        print(f"Webapp config from: {config_path}")
-        # Get versions list, excluding 'staging'
-        versions = [v for v in config['dataswale']['versions'] if v != 'staging']
-        
-        if len(versions) < 2:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Not enough versions to rollback. Found {len(versions)} version(s), need at least 2."
-            )
-        
-        # Get second most recent version (rollback target)
-        rollback_version = versions[-2]
-        
-        # Get paths using versioning.atlas_path
-        current_path = versioning.atlas_path(config, version='CURRENT')
-        rollback_path = versioning.atlas_path(config, version=rollback_version)
-
-
-        print(f"Rolling back. Current: {current_path} Selected: {rollback_path} from {rollback_version} in  {versions}")
-        # Remove existing CURRENT symlink if it exists
-        # Check is_symlink() first because broken symlinks return False for exists()
-        if current_path.is_symlink() or current_path.exists():
-            current_path.unlink()
-            logging.info(f"Removed existing CURRENT symlink at {current_path}")
-        
-        # Create new symlink with absolute path
-        current_path.symlink_to(rollback_path, target_is_directory=True)
-        logging.info(f"Created CURRENT symlink: {current_path} -> {rollback_path}")
-        
-        return {
-            "status": "success",
-            "current_version": rollback_version,
-            "current_path": str(current_path),
-            "target_path": str(rollback_path),
-            "message": f"CURRENT now points to {rollback_version}"
-        }
-        
-    except HTTPException:
+        with write_session(swalename, "set current version") as session:
+            return versioning.set_current_version(session.config, version=version)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         logging.error(f"Error setting current version: {str(e)}")
-        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
-        logging.error(traceback_str)
+        logging.error(''.join(traceback.format_tb(e.__traceback__)))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/reset-staging/{swalename}")
 async def reset_staging(swalename: str):
-    """
-    Reset staging to match CURRENT version.
-    Backs up existing staging before replacing.
+    """Reset staging to the version currently being served.
+
+    The restore happens in the session's workspace and the write-back carries
+    it to S3, so the previous staging state is recoverable from the private
+    bucket's own object versions rather than from a local backup directory.
     """
     try:
-        # Load config from CURRENT
-        config_path = f"{SWALES_ROOT}/{swalename}/CURRENT/atlas_config.json"
-        with open(config_path) as f:
-            config = json.load(f)
-        
-        print(f"Resetting staging for {swalename}")
-        
-        # Call versioning function
-        result = versioning.reset_staging(config)
-        
-        return result
-        
-    except HTTPException:
+        with write_session(swalename, "reset staging") as session:
+            return versioning.reset_staging(session.config)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:
         logging.error(f"Error resetting staging: {str(e)}")
-        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
-        logging.error(traceback_str)
+        logging.error(''.join(traceback.format_tb(e.__traceback__)))
         raise HTTPException(status_code=500, detail=str(e))
 
 
