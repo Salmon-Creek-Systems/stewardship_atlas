@@ -547,17 +547,35 @@ class TestLayerUploadPlan(unittest.TestCase):
         keys = [Path(k).name for _, _, k, _ in self._plan(['roads'])]
         self.assertEqual(keys, ['roads.geojson'])
 
-    def test_catalog_documents_are_planned_into_the_outlets_bucket(self):
-        stac = self.tmp / 'stac' / 'roads'
-        stac.mkdir(parents=True)
-        (stac / 'collection.json').write_text('{}')
-        (self.tmp / 'stac' / 'catalog.json').write_text('{}')
+    def test_catalog_documents_go_to_one_stable_prefix(self):
+        """Not `catalog/{version}/` any more. Documents are kilobytes, so the
+        per-version copy never cost storage — it cost addressability: there was
+        no fixed URL at which to ask what versions exist, and every href was
+        version-scoped, so a reused Item could not be linked."""
+        self.assertEqual(atlas_store.catalog_prefix('kennedy'), 'kennedy/catalog')
+        self.assertEqual(atlas_store.catalog_bucket(self.config), 'OUT')
+        self.assertEqual(
+            atlas_store.catalog_base_url(self.config),
+            f'{atlas_store.DEFAULT_PUBLIC_BASE_URL}/kennedy/catalog/')
 
-        plan = atlas_store.plan_catalog_upload(self.config, self.tmp, 'V1')
-        keys = sorted(k for _, _, k, _ in plan)
-        self.assertEqual(keys, ['kennedy/catalog/V1/catalog.json',
-                                'kennedy/catalog/V1/roads/collection.json'])
-        self.assertTrue(all(b == 'OUT' for _, b, _, _ in plan))
+    def test_a_catalog_href_maps_back_to_its_key(self):
+        base = atlas_store.catalog_base_url(self.config)
+        prefix = atlas_store.catalog_prefix('kennedy')
+        self.assertEqual(
+            atlas_store.key_from_href(f'{base}roads/roads-V1.json', base, prefix),
+            'kennedy/catalog/roads/roads-V1.json')
+        self.assertEqual(
+            atlas_store.key_from_href('./roads/collection.json', base, prefix),
+            'kennedy/catalog/roads/collection.json')
+
+    def test_a_foreign_href_maps_to_no_key(self):
+        """A federated catalog links to other atlases; resolving one of those
+        to a key in *our* bucket would read the wrong object."""
+        base = atlas_store.catalog_base_url(self.config)
+        prefix = atlas_store.catalog_prefix('kennedy')
+        for href in ('https://elsewhere.example/x.json', 's3://other/x.json',
+                     '/absolute/x.json', '../escape/x.json', ''):
+            self.assertEqual(atlas_store.key_from_href(href, base, prefix), '', href)
 
 
 # ---------------------------------------------------------------------------

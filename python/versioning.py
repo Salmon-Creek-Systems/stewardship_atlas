@@ -40,107 +40,81 @@ def atlas_file(p, mode='rt'):
 
 
     
-def publish_new_version(config, version=None):
-    """
-    Publish a new version of the atlas
+def publish_new_version(config, version=None, *, client=None):
+    """Publish a new version of the atlas.
+
+    A version is no longer a copy of staging. It is a STAC Catalog naming the
+    immutable objects that constitute it — most of which the previous version
+    already put in S3 — so publishing writes only what changed and links to the
+    rest. The `shutil.copytree` this replaces duplicated the whole tree every
+    time, which is what made westport's ten versions cost 6 GB of layers and
+    outlets that were mostly identical.
+
+    Nothing is written to the local disk and the `CURRENT` symlink is not
+    moved: compute runs in a workspace that the next session re-hydrates from
+    S3, so a local snapshot would be an unreferenced copy that write-back never
+    sends anywhere. What used to be "which directory does CURRENT point at" is
+    now `{atlas}/current.json` plus the mirror under `{atlas}/current/`.
+
+    **Order is the whole point, and it is unchanged from Phase 3:** the objects
+    go first, then the documents that name them, then the pointer that makes
+    the version live. A catalog can never outlive the bytes it describes, and a
+    failure at any step leaves the previous version serving. Raises rather than
+    logging — a publish whose push failed is not a publish.
     """
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    logger.info(f"Publishing NEW VERSION: {version}")
     staging_path = atlas_path(config, version='staging')
-    version_path = atlas_path(config, version=version)
-    logger.info(f"Publishing NEW VERSION: {version} from {staging_path} to {version_path}")
+    logger.info(f"Publishing NEW VERSION: {version} from {staging_path}")
 
-    # add version to config
-    config['dataswale']['versions'].append(version)
-    atlas_config_path = atlas_path(config, version='staging', local_path="atlas_config.json")
-    logger.info(f"Adding version {version} to config at {atlas_config_path}")
-    with open(atlas_config_path, 'w') as f:
-        json.dump(config, f, indent=2)
-    logger.info(f"Added version {version} to config")
+    client = client or atlas_store._s3()
+    catalog_bucket = atlas_store.catalog_bucket(config)
 
-    # make sure not already published
-    if version_path.exists():
-        logger.error(f"Version {version} already exists")
-        raise ValueError(f"Version {version} already exists")
-    # make sure parent exists
-    logger.info(f"Making sure parent exists for {version_path}")
-    version_path.parent.mkdir(parents=True, exist_ok=True)
-    #logger.info(f"Parent exists for {version_path}")
-    logger.info(f"Copying from {staging_path} to {version_path}")
-
- 
-   
-
-
-    # Copy staging to the new version. 'versioned_outlets' is a copy filter
-    # (issue #131, C9): which staging/outlets/<name> dirs are included in
-    # the snapshot. Missing or empty means all. It is not a build list —
-    # publish materializes nothing. The full deltas tree (pending + work/
-    # archive) is always copied: versions keep their edit history (C10).
-    versioned = config.get('dataswale', {}).get('versioned_outlets') or []
-    outlets_path = staging_path / 'outlets'
-
-    def _ignore_unversioned(dirpath, names):
-        if versioned and Path(dirpath) == outlets_path:
-            excluded = set(names) - set(versioned)
-            if excluded:
-                logger.info(f"Snapshot excludes non-versioned outlets: {sorted(excluded)}")
-            return excluded
-        return set()
-
-    logger.info(f"About to `shutil.copytree` from '{staging_path}' to '{version_path}'...")
-    shutil.copytree(staging_path, version_path, symlinks=True, ignore=_ignore_unversioned)
-
-    # Phase 3 (#159): note what CURRENT points at *before* it is repointed. The
-    # new version's catalog needs the previous version's Items so a layer whose
-    # bytes did not change can be referenced there instead of re-stamped.
-    previous_version_path = None
-    _current_probe = atlas_path(config, version='CURRENT')
-    try:
-        if _current_probe.is_symlink():
-            previous_version_path = _current_probe.resolve()
-    except OSError as exc:
-        logger.warning(f"Could not resolve CURRENT for catalog history: {exc}")
-
-    # Phase 3 (#159): write the catalog and push everything to S3 *before*
-    # CURRENT is repointed.
-    #
-    # Ordering is the whole point. Phase 2 pushed after the flip and swallowed
-    # any error, which was right while the box was authoritative and S3 was a
-    # mirror: a failed push meant a stale CloudFront copy, and failing a good
-    # publish over it would have been worse. That premise is gone. S3 now holds
-    # the source of truth, so a publish whose push failed is not a publish, and
-    # flipping first would leave the box advertising a version the world cannot
-    # read. Pushing first means a failure leaves the previous version live and
-    # the new snapshot orphaned on disk — recoverable, and visible.
+    # 1. Describe the version. Reads staging, reads the previous catalog from
+    #    S3 for reuse, and writes nothing.
     catalog_summary = atlas_catalog.publish_catalog(
-        config, version_path, version, previous_version_path)
+        config, staging_path, version, client=client, bucket=catalog_bucket)
     logger.info(
         f"STAC catalog: version={version} "
-        f"written={catalog_summary['written_layers']} "
+        f"layers written={len(catalog_summary['written_layers'])} "
         f"reused={len(catalog_summary['reused_layers'])} "
-        f"missing={catalog_summary['missing_layers']} "
-        f"documents={catalog_summary['documents']}")
+        f"missing={len(catalog_summary['missing_layers'])} "
+        f"outlets written={len(catalog_summary['written_outlets'])} "
+        f"reused={len(catalog_summary['reused_outlets'])}")
 
+    # 2. The objects the documents will name.
     layer_push = atlas_store.publish_layer_data(
-        config, version_path, version, catalog_summary)
+        config, staging_path, version, catalog_summary, client=client)
     logger.info(f"S3 layer publish: {layer_push}")
+    if layer_push.get('status') == 'error':
+        raise RuntimeError(f"layer publish failed: {layer_push.get('errors')}")
 
-    push = atlas_store.publish_public_outlets(config, version_path, version)
+    outlet_push = atlas_store.publish_outlet_archive(
+        config, staging_path, catalog_summary, client=client)
+    logger.info(f"S3 outlet archive: {outlet_push}")
+
+    # 3. The documents. Only now can they name nothing but objects that exist.
+    documents = catalog_summary['documents']
+    atlas_store.upload_documents(catalog_bucket, documents, client=client)
+    logger.info(f"STAC documents: {len(documents)} written to "
+                f"s3://{catalog_bucket}/{atlas_store.catalog_prefix(config['name'])}/")
+
+    # 4. The serving mirror and the pointer that makes this version current.
+    #    Last, because until it moves the previous version is still the one
+    #    being served — which is the safe outcome of any failure above.
+    push = atlas_store.publish_public_outlets(
+        config, staging_path, version, client=client)
     logger.info(f"S3 outlet publish: {push}")
 
-    # Only now is the new version real everywhere. The local symlink is still
-    # what the box serves from, and reset_staging() asserts is_symlink(), so it
-    # stays a symlink rather than becoming a pointer object (S3 gets its own
-    # current.json).
-    current_path = atlas_path(config, version='CURRENT')
-    current_path.unlink()
-    current_path.symlink_to(version_path)
-    logger.info(f"Linked {current_path} to {version_path}")
-    print(f"Linked {current_path} to {version_path}")
-
-    return version_path
+    return {
+        'version': version,
+        'catalog': {k: catalog_summary[k] for k in (
+            'written_layers', 'reused_layers', 'missing_layers',
+            'written_outlets', 'reused_outlets', 'missing_outlets', 'versions')},
+        'layers': layer_push,
+        'outlet_archive': outlet_push,
+        'published': push,
+    }
 
 
 def reset_staging(config):

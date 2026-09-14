@@ -257,6 +257,54 @@ def pointer_key(atlas_name: str) -> str:
     return f"{atlas_prefix(atlas_name)}/current.json"
 
 
+def catalog_prefix(atlas_name: str) -> str:
+    """Where an atlas's STAC documents live — one stable place, not per version.
+
+    Phase 2 wrote the whole ``stac/`` tree under ``catalog/{version}/``, which
+    made every href version-scoped and left no fixed URL at which to ask "what
+    versions are there". Documents are kilobytes, so the copy was never the
+    expensive part; the addressability was. With one prefix, an Item written
+    once keeps its URL forever and later version Catalogs link to it.
+    """
+    return f"{atlas_prefix(atlas_name)}/catalog"
+
+
+def catalog_base_url(config: dict) -> str:
+    """Absolute URL of the catalog directory, with trailing slash."""
+    settings = cloud_settings(config)
+    return f"{settings['public_base_url']}/{catalog_prefix(config['name'])}/"
+
+
+def catalog_bucket(config: dict) -> str:
+    """The catalog goes with the outlets it describes, so a reader that can
+    reach a published webmap can reach its provenance."""
+    return cloud_settings(config).get('outlets_bucket') or ''
+
+
+def key_from_href(href: str, base_url: str, default_prefix: str = '') -> str:
+    """Map a catalog href back to the S3 key holding it, or '' if it is foreign.
+
+    Handles both shapes the documents carry: absolute hrefs built from
+    ``catalog_base_url`` (Items, Collections, version Catalogs) and the
+    ``./{name}/collection.json`` relatives the root Catalog uses for its
+    children.
+    """
+    if not href:
+        return ''
+    prefix = base_url.rstrip('/') + '/'
+    if href.startswith(prefix):
+        relative = href[len(prefix):]
+    elif href.startswith(('http://', 'https://', 's3://')):
+        return ''
+    else:
+        relative = href[2:] if href.startswith('./') else href
+    # Both shapes are relative to the catalog directory — `base_url` addresses
+    # that same directory over HTTPS — so the key is the prefix plus the rest.
+    if not relative or relative.startswith('/') or '..' in relative.split('/'):
+        return ''
+    return f"{default_prefix.rstrip('/')}/{relative}" if default_prefix else relative
+
+
 def plan_upload(local_dir, key_prefix: str) -> list:
     """Walk a directory into a list of ``(Path, key, content_type)`` tuples.
 
@@ -488,6 +536,41 @@ def delete_keys(bucket: str, keys: list, client=None) -> int:
     return len(keys)
 
 
+def get_json(bucket: str, key: str, client=None):
+    """Read one JSON object, or None if it is not there.
+
+    A missing document is an ordinary answer here — a first publish has no
+    catalog to read — so it is not an error. Unreadable JSON is logged and
+    treated the same way: a corrupt previous catalog must never take a publish
+    down, it only costs the reuse it would have enabled.
+    """
+    client = client or _s3()
+    try:
+        response = client.get_object(Bucket=bucket, Key=key)
+    except Exception as exc:
+        if s3_error_code(exc) in MISSING_ERROR_CODES:
+            return None
+        raise
+    try:
+        return json.loads(response['Body'].read().decode('utf-8'))
+    except (ValueError, UnicodeDecodeError) as exc:
+        logger.warning(f"atlas_store: s3://{bucket}/{key} is not readable JSON "
+                       f"({exc}) — treating it as absent")
+        return None
+
+
+def upload_documents(bucket: str, documents: dict, client=None) -> int:
+    """Put a ``{key: json-serializable}`` mapping. Returns the byte count."""
+    client = client or _s3()
+    total = 0
+    for key in sorted(documents):
+        body = json.dumps(documents[key], indent=2).encode('utf-8')
+        client.put_object(Bucket=bucket, Key=key, Body=body,
+                          ContentType='application/json')
+        total += len(body)
+    return total
+
+
 def write_pointer(bucket: str, atlas_name: str, payload: dict, client=None) -> str:
     """Write the small JSON object describing the published version."""
     client = client or _s3()
@@ -524,7 +607,7 @@ def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> st
 # Orchestration — the only entry point callers should need
 # ---------------------------------------------------------------------------
 
-def publish_public_outlets(config: dict, version_path, version: str) -> dict:
+def publish_public_outlets(config: dict, source_path, version: str, client=None) -> dict:
     """Mirror a published version's public outlets to S3.
 
     Called by ``versioning.publish_new_version`` before ``CURRENT`` is moved.
@@ -548,20 +631,20 @@ def publish_public_outlets(config: dict, version_path, version: str) -> dict:
         # The stub dir must outlive planning and stay alive through the upload,
         # so it is scoped to the whole push rather than to the planner.
         with tempfile.TemporaryDirectory() as stub_dir:
-            plan = plan_publish(config, version_path, names)
+            plan = plan_publish(config, source_path, names)
             # Layer data the published outlets reference, mirrored to
             # {atlas}/current/layers/ so their relative URLs resolve here the
             # same way they resolve on the box. Part of the *same* plan, which
             # is what makes stale-key pruning cover a layer that stops being
             # referenced — otherwise a removed layer would linger and keep
             # being served.
-            layer_plan = plan_current_layers(config, version_path, stub_dir, names)
+            layer_plan = plan_current_layers(config, source_path, stub_dir, names)
             plan += layer_plan
             if not plan:
                 logger.warning(f"atlas_store: nothing to publish for {atlas_name}")
                 return {'status': 'empty', 'outlets': names}
 
-            client = _s3()
+            client = client or _s3()
             logger.info(f"atlas_store: publishing {len(plan)} files for {atlas_name} "
                         f"({', '.join(names)}; {len(layer_plan)} layer object(s)) "
                         f"to s3://{bucket}/{prefix}/")
@@ -773,28 +856,53 @@ def plan_outlet_uploads(config: dict, outlets_root, outlet_specs: dict,
     return plan
 
 
-def plan_catalog_upload(config: dict, version_path: str, version: str,
-                        stac_dirname: str = 'stac') -> list:
-    """Upload plan for a version's STAC documents.
+def publish_outlet_archive(config: dict, source_path, catalog_summary: dict,
+                           client=None) -> dict:
+    """Push this version's built outlets to the private archive.
 
-    The catalog is the index a remote reader needs, so it goes to the same
-    bucket as the outlets it describes. Documents are small JSON; they are
-    uploaded whole rather than diffed.
+    Reconciled against what the bucket holds rather than against the catalog's
+    reuse decision, for the same reason `publish_layer_data` is: reuse is
+    computed from the catalog, which knows nothing about S3, so on a first push
+    every outlet reads as "unchanged since the last version" and nothing would
+    be uploaded. It also self-heals a partially failed earlier publish.
+
+    Keys are immutable and version-stamped, so "present" means "correct" and a
+    re-upload is never needed.
     """
-    settings = cloud_settings(config)
-    bucket = settings.get('outlets_bucket') or ''
-    stac_dir = Path(version_path) / stac_dirname
-    if not (bucket and stac_dir.is_dir()):
-        return []
+    desired = plan_outlet_uploads(
+        config, Path(source_path) / 'outlets',
+        catalog_summary.get('outlet_specs') or {},
+        catalog_summary.get('outlet_versions') or {})
+    if not desired:
+        return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': 0,
+                'note': 'no built outlets to archive'}
 
-    prefix = f"{atlas_prefix(config['name'])}/catalog/{version}"
-    return [(path, bucket, f"{prefix}/{path.relative_to(stac_dir).as_posix()}",
-             content_type_for(path))
-            for path in sorted(stac_dir.rglob('*.json')) if path.is_file()]
+    client = client or _s3()
+    bucket = desired[0][1]
+    prefix = f"{atlas_prefix(config['name'])}/outlets/"
+    try:
+        present = set(list_keys(bucket, prefix, client=client))
+    except Exception as exc:
+        logger.warning(f"atlas_store: could not list s3://{bucket}/{prefix} "
+                       f"({exc}); uploading everything")
+        present = set()
+
+    plan = [(path, key, content_type) for path, _, key, content_type in desired
+            if key not in present]
+    skipped = len(desired) - len(plan)
+    if not plan:
+        return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': skipped,
+                'note': 'every outlet object already in place'}
+
+    moved = upload_plan(bucket, plan, client=client)
+    logger.info(f"atlas_store: archived {len(plan)} outlet object(s) to "
+                f"s3://{bucket}/{prefix} ({skipped} already present)")
+    return {'status': 'ok', 'objects': len(plan), 'bytes': moved,
+            'already_present': skipped, 'bucket': bucket}
 
 
-def publish_layer_data(config: dict, version_path, version: str,
-                       catalog_summary: dict) -> dict:
+def publish_layer_data(config: dict, source_path, version: str,
+                       catalog_summary: dict, client=None) -> dict:
     """Push this version's newly written layers, and its catalog, to S3.
 
     Runs after ``atlas_catalog.publish_catalog`` and reuses what it already
@@ -808,26 +916,25 @@ def publish_layer_data(config: dict, version_path, version: str,
     Raises on failure, for the same reason ``publish_public_outlets`` now does.
     """
     desired = plan_layer_uploads(
-        config, version_path, version,
+        config, source_path, version,
         catalog_summary.get('layer_assets') or {},
         catalog_summary.get('layer_versions') or {},
         catalog_summary.get('access_by_layer') or {})
 
-    catalog_plan = plan_catalog_upload(config, version_path, version)
-    if not (desired or catalog_plan):
+    if not desired:
         # Nothing to do, and nothing to do it with: return before touching
         # boto3. With the `cloud.layers` gate gone this is the only early exit,
         # and without it a publish with no layer data would demand credentials
         # to discover it had no work — which also made the path untestable in
         # the bare local env.
         return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': 0,
-                'note': 'no layer or catalog objects to publish'}
+                'note': 'no layer objects to publish'}
 
     # Reconcile against what the bucket actually holds rather than trusting the
     # local catalog's reuse decision — see plan_layer_uploads. Keys are
     # immutable, so "present" means "correct" and re-uploading is never needed.
     # This also self-heals a partial failure from an earlier publish.
-    client = _s3()
+    client = client or _s3()
     plan = []
     skipped = 0
     for bucket in sorted({b for _, b, _, _ in desired}):
@@ -845,8 +952,6 @@ def publish_layer_data(config: dict, version_path, version: str,
                 skipped += 1
             else:
                 plan.append(entry)
-
-    plan += catalog_plan
 
     if not plan:
         return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': skipped,

@@ -734,7 +734,8 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
                         *, history: Optional[Dict[str, List[Dict[str, Any]]]] = None,
                         catalog_base_url: str = '',
                         datetime_iso: Optional[str] = None,
-                        outlet_assets: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
+                        outlet_assets: Optional[Dict[str, Dict[str, Any]]] = None,
+                        known_versions: Optional[List[str]] = None) -> Dict[str, Any]:
     """Assemble every document describing one published version.
 
     Args:
@@ -748,6 +749,8 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
             *version* each layer Item ended up at.
         history: {name: [Items, oldest first]} from previous versions.
             Empty or absent for a first publish.
+        known_versions: versions already published, so the root Catalog keeps
+            linking to all of them rather than only the newest.
 
     Returns a dict with:
         catalog          the atlas root Catalog
@@ -904,9 +907,17 @@ def build_atlas_catalog(atlas_id: str, atlas_description: str,
     }
     for name in collections:
         catalog['links'].append({'rel': 'child', 'href': f'./{name}/collection.json'})
-    catalog['links'].append(
-        {'rel': 'version-history',
-         'href': f'./versions/{version}/catalog.json', 'title': version})
+    # One `version-history` link per version, not just this one: the root
+    # Catalog is the index that answers "what versions exist", and a link that
+    # named only the newest would make every earlier version unreachable from
+    # it. `known_versions` comes from the previous root Catalog, so the list
+    # accumulates. It is still rebuildable from a listing of the `versions/`
+    # prefix, which is what keeps this mutable document from being a single
+    # point of loss.
+    for known in sorted(set(known_versions or []) | {version}):
+        catalog['links'].append(
+            {'rel': 'version-history',
+             'href': f'./versions/{known}/catalog.json', 'title': known})
 
     outlet_names = set(outlet_assets)
     return {

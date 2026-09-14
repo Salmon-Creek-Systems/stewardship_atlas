@@ -16,6 +16,7 @@ past the unit tests:
 
 import hashlib
 import io
+import pathlib
 
 
 class FakeClientError(Exception):
@@ -78,6 +79,34 @@ class FakeS3:
             raise FakeClientError('404', 404, 'HeadObject')
         return {'ETag': obj['etag'], 'ContentLength': len(obj['body']),
                 'Metadata': obj.get('metadata', {})}
+
+    def upload_file(self, Filename, Bucket, Key, ExtraArgs=None):
+        self.calls.append(('upload_file', Key))
+        body = pathlib.Path(Filename).read_bytes()
+        self.objects[(Bucket, Key)] = {'body': body, 'etag': self._etag(body),
+                                       'metadata': {},
+                                       'content_type': (ExtraArgs or {}).get('ContentType')}
+        return None
+
+    def copy_object(self, Bucket, Key, CopySource, **_extra):
+        self.calls.append(('copy_object', Key))
+        if isinstance(CopySource, dict):
+            source = (CopySource['Bucket'], CopySource['Key'])
+        else:
+            bucket, _, key = str(CopySource).partition('/')
+            source = (bucket, key)
+        obj = self.objects.get(source)
+        if obj is None:
+            raise FakeClientError('NoSuchKey', 404, 'CopyObject')
+        self.objects[(Bucket, Key)] = dict(obj)
+        return {'CopyObjectResult': {'ETag': obj['etag']}}
+
+    def delete_objects(self, Bucket, Delete):
+        keys = [entry['Key'] for entry in Delete.get('Objects', [])]
+        self.calls.append(('delete_objects', len(keys)))
+        for key in keys:
+            self.objects.pop((Bucket, key), None)
+        return {'Deleted': [{'Key': k} for k in keys]}
 
     def delete_object(self, Bucket, Key):
         self.calls.append(('delete_object', Key))

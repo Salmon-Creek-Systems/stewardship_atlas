@@ -10,17 +10,20 @@ the bare local env (issue #153 / the "local test env is bare" constraint). It
 does not import duckdb, GDAL, boto3 or anything else heavy, and it must not
 grow to.
 
-**Additive by design.** Publishing a catalog changes nothing about what nginx
-or CloudFront serves; it writes a new `stac/` directory inside the version
-snapshot and nothing reads it yet. Wiring the catalog into the *copy* decision
-(so unchanged rasters stop being duplicated) is the slice after this one.
+There is no version directory any more (task 6). A publish reads **staging**
+and the previous versions come back from the catalog in S3, so the catalog is
+not a description of a snapshot — it *is* the version.
 
-On-disk layout inside a published version:
+Layout in the bucket, one stable prefix rather than a copy per version:
 
-    {version}/stac/catalog.json
-    {version}/stac/{layer}/collection.json
-    {version}/stac/{layer}/{layer}-{version}.json      <- the Item
-    {version}/stac/versions/{version}/catalog.json     <- the manifest
+    {atlas}/catalog/catalog.json                     <- the version index
+    {atlas}/catalog/{name}/collection.json           <- layers and outlets alike
+    {atlas}/catalog/{name}/{name}-{version}.json     <- the Item, written once
+    {atlas}/catalog/versions/{version}/catalog.json  <- the manifest
+
+The root `catalog.json` is the one mutable document: every publish rewrites it
+so it keeps naming every version. It is rebuildable from a listing of the
+`versions/` prefix, which is what stops it being a single point of loss.
 """
 
 from pathlib import Path
@@ -248,145 +251,191 @@ def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
     return assets
 
 
-def _resolve_item_href(href: str, base_url: str, atlas_root):
-    """Map a catalog href back to a local path, or None if it is not ours.
+def _read_links(document, rel: str):
+    """Hrefs of one link relation, in document order."""
+    return [link.get('href', '') for link in (document or {}).get('links', [])
+            if link.get('rel') == rel]
 
-    All versions of an atlas are sibling directories under the atlas root, and
-    hrefs are `{base_url}/{version}/stac/{layer}/{item}.json`, so stripping the
-    base URL yields a path relative to that root.
+
+def known_versions(root_catalog) -> list:
+    """Versions a root Catalog names, sorted. Empty for a first publish.
+
+    This is what replaces `config['dataswale']['versions']` and the directory
+    listing behind `atlas.discover_versions()`: the catalog is the index, so
+    asking it is asking the one thing that knows.
     """
-    if not (base_url and atlas_root):
-        return None
-    prefix = base_url.rstrip('/') + '/'
-    if not href.startswith(prefix):
-        return None
-    return Path(atlas_root) / href[len(prefix):]
+    found = set()
+    for link in (root_catalog or {}).get('links', []):
+        if link.get('rel') != 'version-history':
+            continue
+        title = link.get('title')
+        if not title:
+            parts = [p for p in link.get('href', '').split('/') if p]
+            title = parts[-2] if len(parts) >= 2 else None
+        if title:
+            found.add(title)
+    return sorted(found)
 
 
-def load_history(stac_dir, base_url: str = '', atlas_root=None) -> dict:
-    """Read `{layer: [Items, oldest first]}` from a previous version's catalog.
+def load_history_from_s3(client, bucket: str, atlas_name: str,
+                         base_url: str) -> tuple:
+    """Read `({name: [Items, oldest first]}, known_versions)` from the catalog.
 
-    Follows each Collection's `item` links rather than listing the directory.
-    That matters because a **reused** layer has no Item file in the version
-    that reused it — only a Collection linking back to where the Item really
-    lives. Globbing the directory therefore loses the layer's history after a
-    single hop, and the layer gets needlessly rewritten on the next publish
-    (found on kennedy: three publishes with no edits rewrote every layer on the
-    third). Item files that are local to this version are still picked up, so
-    a first publish and a hop both work.
+    Follows each Collection's `item` links rather than listing the prefix.
+    That is load-bearing for the same reason it was on disk: a **reused** entry
+    gets no new Item, only a Collection link back to where its Item really
+    lives, so a listing loses its history after one hop and the layer is
+    needlessly rewritten on the next publish (found on kennedy — three
+    publishes with no edits rewrote every layer on the third).
 
-    Returns an empty dict for a first publish or an unreadable catalog — the
-    consequence is that everything is written fresh, which is safe. A corrupt
-    previous catalog must never take a publish down.
+    Returns empty history for a first publish or an unreadable catalog. The
+    consequence is that everything is written fresh, which is safe; a corrupt
+    previous catalog must never take a publish down, it only costs the reuse
+    it would have enabled.
     """
-    stac_dir = Path(stac_dir)
-    if not stac_dir.is_dir():
-        return {}
+    import atlas_store
 
-    def _read_item(path):
-        try:
-            with open(path) as handle:
-                item = json.load(handle)
-        except (OSError, ValueError) as exc:
-            logger.warning(f"atlas_catalog: skipping unreadable Item {path}: {exc}")
-            return None
-        return item if item.get('type') == 'Feature' else None
+    prefix = atlas_store.catalog_prefix(atlas_name)
+    root = atlas_store.get_json(bucket, f'{prefix}/catalog.json', client=client)
+    if not root:
+        return {}, []
 
     history = {}
-    for layer_dir in sorted(p for p in stac_dir.iterdir() if p.is_dir()):
-        if layer_dir.name == 'versions':
+    for child_href in _read_links(root, 'child'):
+        collection_key = atlas_store.key_from_href(child_href, base_url, prefix)
+        if not collection_key:
             continue
-
-        paths = []
-        collection_path = layer_dir / 'collection.json'
-        if collection_path.is_file():
-            try:
-                with open(collection_path) as handle:
-                    collection = json.load(handle)
-            except (OSError, ValueError) as exc:
-                logger.warning(f"atlas_catalog: unreadable collection "
-                               f"{collection_path}: {exc}")
-                collection = {}
-            for link in collection.get('links', []):
-                if link.get('rel') != 'item':
-                    continue
-                resolved = _resolve_item_href(link.get('href', ''), base_url, atlas_root)
-                if resolved is None:
-                    resolved = layer_dir / Path(link.get('href', '')).name
-                paths.append(resolved)
-
-        # Fall back to (and top up with) Item files sitting in this directory,
-        # so a catalog written without resolvable hrefs still yields history.
-        for local in sorted(layer_dir.glob('*.json')):
-            if local.name != 'collection.json' and local not in paths:
-                paths.append(local)
+        collection = atlas_store.get_json(bucket, collection_key, client=client)
+        if not collection:
+            logger.warning(f"atlas_catalog: s3://{bucket}/{collection_key} is "
+                           f"missing or unreadable — its entries will be rewritten")
+            continue
+        name = collection.get('id') or Path(collection_key).parent.name
 
         items = []
         seen = set()
-        for path in paths:
-            if not path.is_file():
-                logger.warning(f"atlas_catalog: history references a missing Item "
-                               f"{path} — that layer will be rewritten")
+        for item_href in _read_links(collection, 'item'):
+            item_key = atlas_store.key_from_href(item_href, base_url, prefix)
+            if not item_key:
                 continue
-            item = _read_item(path)
-            if item is None or item.get('id') in seen:
+            item = atlas_store.get_json(bucket, item_key, client=client)
+            if item is None:
+                logger.warning(f"atlas_catalog: collection '{name}' references a "
+                               f"missing Item {item_key} — that entry will be "
+                               f"rewritten")
+                continue
+            if item.get('type') != 'Feature' or item.get('id') in seen:
                 continue
             seen.add(item['id'])
             items.append(item)
 
         if items:
             items.sort(key=lambda i: i.get('properties', {}).get('datetime') or '')
-            history[layer_dir.name] = items
-    return history
+            history[name] = items
+
+    return history, known_versions(root)
 
 
-def write_catalog(built: dict, stac_dir, version: str) -> list:
-    """Serialize the documents from `build_atlas_catalog()`. Returns paths written."""
-    stac_dir = Path(stac_dir)
-    stac_dir.mkdir(parents=True, exist_ok=True)
-    written = []
+def catalog_documents(built: dict, atlas_name: str, version: str) -> dict:
+    """`{s3 key: document}` for everything this publish should write.
 
-    def _dump(obj, path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w') as handle:
-            json.dump(obj, handle, indent=2)
-        written.append(path)
-
-    _dump(built['catalog'], stac_dir / 'catalog.json')
-    for name, collection in built['collections'].items():
-        _dump(collection, stac_dir / name / 'collection.json')
-    for name, item in built['items'].items():
-        _dump(item, stac_dir / name / f"{item['id']}.json")
-    _dump(built['version_catalog'], stac_dir / 'versions' / version / 'catalog.json')
-    return written
-
-
-def publish_catalog(config: dict, version_path, version: str,
-                    previous_version_path=None) -> dict:
-    """Write the STAC catalog for a just-created version snapshot.
-
-    Called from `versioning.publish_new_version()` after the snapshot exists.
-    Returns a summary dict; raises nothing the caller has to handle — see the
-    call site, which treats a catalog failure as non-fatal exactly as
-    `publish_public_outlets` does. A missing catalog is a missing index; a
-    failed publish is a customer-visible outage.
+    **Reused Items are not included.** They already exist at their own keys and
+    are immutable; re-uploading them is the duplication the catalog exists to
+    avoid. The cost is that `link_version_chain` cannot retro-fit
+    successor/latest-version links onto already-published Items, so those go
+    stale — which is why a layer's history is authoritative in its *Collection*
+    (rewritten every publish) and the chain links are a convenience.
     """
-    version_path = Path(version_path)
+    import atlas_store
+
+    prefix = atlas_store.catalog_prefix(atlas_name)
+    documents = {f'{prefix}/catalog.json': built['catalog']}
+    for name, collection in built['collections'].items():
+        documents[f'{prefix}/{name}/collection.json'] = collection
+    for name, item in built['items'].items():
+        documents[f'{prefix}/{name}/{item["id"]}.json'] = item
+    documents[f'{prefix}/versions/{version}/catalog.json'] = built['version_catalog']
+    return documents
+
+
+def build_outlet_assets(config: dict, outlet_specs: dict, version: str) -> dict:
+    """Turn scanned outlet directories into the spec `build_atlas_catalog` wants.
+
+    The entry href names the **archive** — `s3://{private}/…` — rather than a
+    public URL. The archive is where this version's copy of the outlet actually
+    and permanently lives; the public URL belongs to whichever version is
+    current, and baking "current" into an immutable Item would make it a lie
+    the moment the next publish lands. `current.json` is what answers that.
+    """
+    import atlas_store
+
+    settings = atlas_store.cloud_settings(config)
+    private = settings.get('private_bucket') or ''
+    assets = config.get('assets') or {}
+    atlas_name = config['name']
+
+    out = {}
+    for name, spec in outlet_specs.items():
+        asset = assets.get(name) or {}
+        prefix = atlas_store.outlet_prefix(atlas_name, name, version)
+        entry = spec['entry']
+        out[name] = {
+            'entry_href': (f's3://{private}/{prefix}/{entry}' if private
+                           else f'{prefix}/{entry}'),
+            'prefix': prefix,
+            'access': atlas_store.normalize_access(asset.get('access')),
+            'checksum': spec['checksum'],
+            'entry_size': spec['entry_size'],
+            'file_count': spec['file_count'],
+            'title': asset.get('title', name),
+            'description': asset.get('description', ''),
+            # Declared inputs only. Outlets also read things they do not
+            # declare (html checks that webmap exists; sqldb reads every
+            # layer), and pretending otherwise would put a guess in the
+            # published record. The rehearsal's file-open logging is what will
+            # replace the guess with a measurement.
+            'in_layers': asset.get('in_layers') or [],
+        }
+    return out
+
+
+def publish_catalog(config: dict, source_path, version: str, *,
+                    client=None, bucket: str = None) -> dict:
+    """Build the STAC documents describing a new version of an atlas.
+
+    `source_path` is the **staging** tree — there is no version directory any
+    more. A version is not a copy of staging; it is a Catalog naming the
+    immutable objects that constitute it, most of which the previous version
+    already put in S3.
+
+    Nothing is uploaded here. The caller writes the objects the documents name
+    *first*, then the documents, so a catalog can never outlive the bytes it
+    describes.
+    """
+    import atlas_store
+
+    source_path = Path(source_path)
     layers = config.get('dataswale', {}).get('layers', [])
     bbox = config['dataswale']['bbox']
     atlas_id = config['name']
 
-    # Mirrors the href convention already used by outlet_stac_catalog().
-    base_url = config.get('base_url', '')
-    catalog_base_url = f'{base_url}/{version}/{CATALOG_DIRNAME}/' if base_url else ''
-    data_base_url = f'{base_url}/{version}/layers/' if base_url else ''
+    settings = atlas_store.cloud_settings(config)
+    bucket = bucket or settings.get('outlets_bucket') or ''
+    base_url = atlas_store.catalog_base_url(config)
 
-    layer_assets = scan_layers(layers, version_path / 'layers', data_base_url)
-    history = load_history(
-        Path(previous_version_path) / CATALOG_DIRNAME,
-        base_url=base_url,
-        atlas_root=Path(previous_version_path).parent,
-    ) if previous_version_path else {}
+    # Relative within the layer tree. `set_layer_hrefs` promotes each asset to
+    # its absolute S3/CloudFront URL and keeps this as `alternate.local`, which
+    # is how a workspace — or an offline copy — resolves the same layer.
+    layer_assets = scan_layers(layers, source_path / 'layers')
+
+    outlet_specs = scan_outlets(source_path / 'outlets',
+                                atlas_store.archivable_outlets(config))
+    outlet_assets = build_outlet_assets(config, outlet_specs, version)
+
+    history, previous_versions = ({}, [])
+    if bucket and client is not None:
+        history, previous_versions = load_history_from_s3(
+            client, bucket, atlas_id, base_url)
 
     access_by_layer = {l['name']: federation.layer_access(l)
                        for l in layers if l.get('name')}
@@ -400,11 +449,12 @@ def publish_catalog(config: dict, version_path, version: str,
         version=version,
         layer_assets=layer_assets,
         history=history,
-        catalog_base_url=catalog_base_url,
+        catalog_base_url=base_url,
+        outlet_assets=outlet_assets,
+        known_versions=previous_versions,
     )
 
     hrefs = set_layer_hrefs(built, config, version)
-    paths = write_catalog(built, version_path / CATALOG_DIRNAME, version)
 
     summary = {
         'status': 'ok',
@@ -412,26 +462,30 @@ def publish_catalog(config: dict, version_path, version: str,
         'written_layers': built['written'],
         'reused_layers': built['reused'],
         'missing_layers': built['missing'],
-        'documents': len(paths),
+        'written_outlets': built['outlets_written'],
+        'reused_outlets': built['outlets_reused'],
+        'missing_outlets': built['outlets_missing'],
         'asset_hrefs': hrefs,
-        # Passed through for the S3 push in versioning — computed here so the
-        # layer files are scanned and checksummed exactly once per publish.
+        # Passed through for the S3 push — computed here so every file is
+        # scanned and checksummed exactly once per publish.
         'layer_assets': layer_assets,
         'access_by_layer': access_by_layer,
         'layer_versions': built['versions'],
+        'outlet_specs': outlet_specs,
+        'outlet_versions': built['outlet_versions'],
+        'documents': catalog_documents(built, atlas_id, version),
+        'versions': sorted(set(previous_versions) | {version}),
     }
     logger.info(
-        f"atlas_catalog: {atlas_id} {version} — {len(built['written'])} new Item(s), "
-        f"{len(built['reused'])} reused, {len(built['missing'])} layer(s) with no data, "
-        f"{len(paths)} document(s)")
+        f"atlas_catalog: {atlas_id} {version} — "
+        f"layers {len(built['written'])} new / {len(built['reused'])} reused / "
+        f"{len(built['missing'])} with no data; "
+        f"outlets {len(built['outlets_written'])} new / "
+        f"{len(built['outlets_reused'])} reused; "
+        f"{len(summary['documents'])} document(s)")
     if built['missing']:
         logger.info(f"atlas_catalog: no data file for {built['missing']}")
     return summary
-
-
-def item_version(item: dict):
-    """The version an Item describes, from the `version` extension property."""
-    return (item.get('properties') or {}).get('version')
 
 
 # A webmap shows a non-COG raster as an `image` source pointing at a rendered
@@ -519,6 +573,14 @@ def set_layer_hrefs(built: dict, config: dict, version: str) -> int:
 
     touched = 0
     for layer_name, item in built['items'].items():
+        if federation.is_outlet_item(item):
+            # An outlet Item's asset is its entry page in the archive, which is
+            # already an absolute s3:// URI at the outlet key space. Running it
+            # through layer_key() rewrote it to `…/layers/webmap/{version}/
+            # index.html` — a key nothing will ever hold — and routed a public
+            # outlet's href at the public bucket on the strength of its
+            # `atlas:access`, which is exactly the tier confusion #177 was.
+            continue
         access = (item.get('properties') or {}).get('atlas:access')
         bucket = atlas_store.layer_bucket(access, settings)
         if not bucket:
