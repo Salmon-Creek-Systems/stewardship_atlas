@@ -172,6 +172,44 @@ class TestWriteBack(SessionTestCase):
         self.assertEqual(calls[-2:], [('put_object', PREFIX + CONSUMED),
                                       ('delete_object', PREFIX + PENDING)])
 
+    def test_an_object_that_appeared_after_hydrate_is_left_alone(self):
+        """The safety property that makes lock-free delta writes safe.
+
+        `delta_upload` writes straight to S3 without the lock, so an edit never
+        queues behind a five-minute render. A session already running knows
+        nothing about that object — it is not in the manifest and not in the
+        workspace — and the write-back must therefore not read "absent locally"
+        as "deleted". If it did, every edit made during a render would be
+        silently destroyed by that render's write-back.
+        """
+        late = 'deltas/roads/assetless__20260911_130000__create.geojson'
+        with self.session():
+            ws.put_staging_object(self.s3, BUCKET, ATLAS, late, b'{"features": []}')
+
+        self.assertEqual(self.remote(late), '{"features": []}')
+
+        # And it is pending for the next session, so the edit still applies.
+        with self.session():
+            self.assertTrue(self.local(late).is_file())
+
+    def test_a_clean_run_that_wiped_everything_does_wipe_s3(self):
+        """Documented, not desired. Failure discards; *success* is obeyed.
+
+        A run that deletes a layer and returns normally is indistinguishable
+        from one that meant to, so write-back propagates it. Recovery is the
+        bucket's object versioning rather than anything here — which is why
+        the private bucket being versioned is a cutover prerequisite and why
+        scripts/session_race.py proves it against the real bucket.
+        """
+        with self.session():
+            for rel in (ROADS, CREEKS):
+                self.local(rel).unlink()
+
+        self.assertIsNone(self.remote(ROADS))
+        self.assertIsNone(self.remote(CREEKS))
+        # The archive is the exception: nothing a run does can erase it.
+        self.assertEqual(self.remote(ARCHIVED), SEED[ARCHIVED])
+
     def test_warm_session_with_no_changes_transfers_nothing(self):
         with self.session():
             pass
