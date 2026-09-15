@@ -185,12 +185,19 @@ def upload(client, bucket: str, plan, key_for, *, dry_run: bool = False,
     """
     uploaded = skipped = moved = 0
     for path, rel in plan:
-        key = key_for(rel)
-        digest = ws.sha256_file(path)
+        # Before hashing: the digest is only used to skip an object S3 already
+        # holds and to stamp the upload, and a dry run does neither. Hashing
+        # first made a dry run read every byte it would have uploaded — 794 MB
+        # for fhe, 700 for westport — which is most of the cost of the real
+        # thing, for a command whose whole point is to be cheap enough to run
+        # before deciding.
         if dry_run:
             uploaded += 1
             moved += path.stat().st_size
             continue
+
+        key = key_for(rel)
+        digest = ws.sha256_file(path)
         if skip_present and ws._already_uploaded(client, bucket, key, digest):
             skipped += 1
             continue

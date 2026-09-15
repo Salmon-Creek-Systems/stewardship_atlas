@@ -249,6 +249,22 @@ class TestUpload(unittest.TestCase):
         self.assertEqual(result['uploaded'], len(self.plan))
         self.assertEqual(self.client.objects, {})
 
+    def test_a_dry_run_does_not_read_file_contents(self):
+        """The digest is only used to skip an object S3 already holds and to
+        stamp the upload, so a dry run needs none of it. Hashing anyway made
+        the dry run read every byte it would have uploaded — 794 MB for fhe —
+        which is most of the cost of the real thing, for the command whose
+        whole point is to be cheap enough to run before deciding."""
+        def explode(path):
+            raise AssertionError(f"dry run hashed {path}")
+
+        original = atlas_seed.ws.sha256_file
+        atlas_seed.ws.sha256_file = explode
+        self.addCleanup(setattr, atlas_seed.ws, 'sha256_file', original)
+
+        result = self.run_upload(dry_run=True)
+        self.assertEqual(result['uploaded'], len(self.plan))
+
     def test_the_seeded_atlas_reads_as_seeded(self):
         self.assertFalse(ws.is_seeded(self.client, 'PRIV', 'scvfd'))
         self.run_upload()
