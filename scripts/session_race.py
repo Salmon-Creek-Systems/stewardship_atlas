@@ -204,17 +204,29 @@ class Rehearsal:
 
     def check_a_second_worker_is_refused_for_the_whole_long_run(self):
         """The other half of the same claim: while the heartbeat holds it, a
-        second worker keeps being refused rather than eventually winning."""
+        second worker keeps being refused rather than eventually winning.
+
+        The hammer is stopped **and joined inside the holder's session**. Doing
+        either after it is the difference between this check and a broken one:
+        the holder's exit does the write-back and only then releases, so a
+        hammer still looping at that point can acquire legitimately — the
+        atlas really is free — and the check would report a mid-run takeover
+        that never happened. That misfire cost a round trip to the box to
+        diagnose, which is also why the failure message below reports offsets
+        into the hold rather than bare epochs.
+        """
+        hold = 8.0
         refusals, wins, errors = [], [], []
         done = threading.Event()
+        started = time.time()
 
         def hammer():
             while not done.is_set():
                 try:
                     with self.session('race hammer', wait=0, heartbeat_interval=0):
-                        wins.append(time.time())
+                        wins.append(time.time() - started)
                 except atlas_lock.AtlasLocked:
-                    refusals.append(time.time())
+                    refusals.append(time.time() - started)
                 except Exception as exc:
                     errors.append(f"{type(exc).__name__}: {exc}")
                     return
@@ -222,14 +234,21 @@ class Rehearsal:
 
         thread = threading.Thread(target=hammer)
         with self.session('race long holder', ttl=6.0, heartbeat_interval=1.5):
+            started = time.time()
             thread.start()
-            time.sleep(8)
+            time.sleep(hold)
             done.set()
-        thread.join()
+            thread.join()
 
         assert not errors, f"unexpected failures: {errors}"
-        assert not wins, f"a second worker took the atlas mid-run at {wins}"
+        assert not wins, (
+            f"a second worker took the atlas {[f'{w:.2f}s' for w in wins]} into "
+            f"a {hold:.0f}s hold whose lease TTL is 6s — the heartbeat let the "
+            f"lease lapse")
         assert len(refusals) > 5, f"hammer barely ran ({len(refusals)} attempts)"
+        assert max(refusals) > 6.0, (
+            f"the hammer stopped attempting {max(refusals):.2f}s in, before the "
+            f"6s TTL — this check proved nothing about renewal")
 
     def check_a_delta_written_during_a_session_is_not_lost(self):
         """`delta_upload` deliberately writes without the lock, so an edit
@@ -387,11 +406,14 @@ class Rehearsal:
             except Exception as exc:
                 errors.append(f"{type(exc).__name__}: {exc}")
 
+        # Joined inside the session for the same reason as the long-run check:
+        # a contender still running when the holder releases would acquire
+        # correctly, and the check would read that as an overlap.
         thread = threading.Thread(target=second)
         with self.session('publish holder', heartbeat_interval=0):
             thread.start()
             time.sleep(1.0)
-        thread.join()
+            thread.join()
 
         assert not errors, errors
         assert refused, "the contender was never refused"
