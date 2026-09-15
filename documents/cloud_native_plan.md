@@ -170,18 +170,60 @@ Absent or `enabled: false` → publish behaves exactly as before. That flag is t
 ### Phase 3 — S3 data-layer refactor · *L, the long pole*
 Makes the *source* data S3-native so compute can be stateless. The real engineering.
 
-- **3a. Storage abstraction for source data** — `versioning.py` / `dataswale_geojson.py` read/write layers, deltas, versions from S3 (symlink→prefix: `CURRENT`→`current/` pointer, `local`→shared prefix). DuckDB via httpfs.
-- **3b. S3-native materialize path** for inlets/eddies/outlets (QGIS excepted — reads via GDAL `/vsis3/`).
+**Status: the code is complete and rehearsed on the staging substrate (2026-09-15); nothing is in production.** Branch `feature/cloud-phase3-compute`, issue #159.
+
+- **3a. Read path to S3 + CloudFront** — DONE, merged to `main` `ac03d8a` (2026-09-10). Publish mirrors a version's public outlets and the layers they reference to `{atlas}/current/`, so one built artifact resolves `../../layers/…` against the local tree on the box and against S3 on CloudFront. `cloud.enabled` is gone; S3 is unconditional and `cloud.outlets` is a required, fail-closed allowlist.
+- **3b. S3-native compute, via sessions** — a *session* is: take a per-atlas S3 lease (conditional PUT) → hydrate a local workspace laid out exactly like `{data_root}/{atlas}/staging/` → point `config['data_root']` at it → run the **unchanged** materializer → hash-diff write-back → release. A Dagster cascade is one session, never one per asset.
+- **3c. Publish becomes a STAC version.** No `shutil.copytree`, no local version directory, no `CURRENT` symlink. A version is a Catalog naming immutable, version-stamped objects; outlets are Items alongside layers, carrying their entry point as an asset and `derived_from` links to the layer Items they were built from. Unchanged layers and outlets are *referenced*, not re-stored.
 
 **Deliverable:** no local-disk/symlink dependence; S3 is source of truth. Box still runs the API, now statelessly — the precondition for Lambda.
 
-**Starting point:** `python/atlas_store.py` is the first slice of this seam, built in Phase 2 and deliberately shaped so Phase 3 extends rather than replaces it — a pure half (tiers, keys, upload plans; no boto3, unit-testable locally) and an S3 half.
+#### The correction that matters: QGIS never needs `/vsis3/`
 
-**The load-bearing leak** is `versioning.atlas_path()` returning a concrete `pathlib.Path`. `outlets.py` has 58 direct calls and `eddies.py` 27, all reaching around `dataswale_geojson` straight to the filesystem — so the dataswale seam exists nominally but is routinely bypassed.
+This section previously said "S3-native materialize path for inlets/eddies/outlets (QGIS excepted — reads via GDAL `/vsis3/`)". That framing is wrong, and dropping it is what made Phase 3 tractable.
 
-**Do not build a `Path` lookalike.** Third-party libraries (rasterio, QGIS, geopandas, shutil) call `os.fspath()` on whatever they are handed and then open a real file; partial emulation fails silently inside a dependency. Keep compute filesystem-native and move only the boundaries — explicit fetch/publish around a materializer, `fsspec` underneath. QGIS and gdal2tiles need real paths regardless, so a local workspace is part of the design, not a failure of it.
+Compute is never given an S3 path. The session hydrates a real directory and every materializer — QGIS, gdal2tiles, rasterio, geopandas, `shutil` — keeps opening real files, unchanged. The boundary moved to the *edges* of a run rather than into the middle of it, which is also why the "do not build a `Path` lookalike" warning below stopped being a live hazard: nothing hands a lookalike to anything.
 
-**What actually breaks under S3**, in order of how much it will hurt: call granularity (a free `.exists()` becomes a network round trip — the failure mode is *correct but unusably slow*), mutation semantics (no rename, no append, no symlinks), and read-modify-write concurrency. The delta system is already the right answer to the third; `atlas_config.json` rewritten in place is not.
+The same correction applies to **Phase 5**: an SQS render worker does not read layers via `/vsis3/` either, it opens a session like everything else.
+
+Reading S3 directly is still worth doing eventually, but as an *optimization* a materializer opts into (COG via `/vsis3/`, GeoParquet via DuckDB httpfs — `overture_duckdb` is the precedent), letting the session skip hydrating those inputs. The wins concentrate in big rasters and shared sources; most layers are too small to benefit. That is issue #174, not Phase 3.
+
+#### What was actually built
+
+| module | role |
+|---|---|
+| `atlas_lock.py` | per-atlas lease via S3 conditional PUT; TTL, heartbeat renewal, expired-lease takeover |
+| `atlas_workspace.py` | hydrate/write-back planners and executors; sha256 manifest; the delta archive is never hydrated and never deleted |
+| `atlas_session.py` | `open_session()` — lock, hydrate, run, write back, release; read-only sessions take no lease |
+| `atlas_shared.py` | shared `/root/data` files fetched on demand into a per-workspace cache; `staging/local` symlinked to it |
+| `atlas_seed.py` + `scripts/seed_atlas.py` | the one-time move of the box's staging trees into S3 |
+| `atlas_catalog.py` / `federation.py` | the version Catalog: layers and outlets as Items, reuse by checksum, history read from S3 |
+
+**Failure semantics.** The body raises → nothing is written back, and the next hydrate resets the workspace. The write-back fails part-way → a marker file means the next session on that workspace finishes it *before* hydrating, and uploads go before deletes, so an interruption can leave a consumed delta still pending but never lost. The lease is lost → the final renew raises and nothing is written back. Side effects outside the workspace (`s3_upload` outlets, COG pushes, SES) are not rolled back.
+
+**A successful run that deleted things is obeyed.** That is the one failure mode worth stating plainly: write-back cannot tell a deliberate removal from a mistaken one, so a wipe reaches S3. Recovery is the private bucket's object versioning — which is why its noncurrent retention is a year, and why `scripts/session_race.py` proves the recovery against the real bucket rather than assuming it.
+
+**Interactive edits do not queue.** `delta_upload` writes the delta straight to S3 without the lock and applies it only if the atlas is free; otherwise it stays pending, which the delta system already supports. A running session leaves it alone, because write-back only deletes what its own manifest vouches for.
+
+#### Rehearsal
+
+`scripts/staging_rehearsal.sh <atlas>` runs the whole cutover path against the staging substrate: seed → config rebuild → materialize → publish → verify through CloudFront. Since Phase 3 it reads the box read-only and mutates nothing there. `scripts/session_race.py` covers the parts a unit test structurally cannot — genuine lease contention across threads, heartbeat renewal past TTL, wipe and recovery, a full publish against the real object store.
+
+Green on `kennedy`, `scvfd`, `westport`, `fhe` (2026-09-15).
+
+#### Still true, and still load-bearing
+
+**Do not build a `Path` lookalike.** Third-party libraries (rasterio, QGIS, geopandas, shutil) call `os.fspath()` on whatever they are handed and then open a real file; partial emulation fails silently inside a dependency. The workspace exists so this never has to be attempted.
+
+**Do not convert the 142 `versioning.atlas_path()` call sites.** `outlets.py` has 58 and `eddies.py` 27, all reaching around `dataswale_geojson` straight to the filesystem. They keep working untouched because `config['data_root']` is what the session repoints — one assignment moves every one of them.
+
+**What breaks under S3**, in order of how much it hurts: call granularity (a free `.exists()` becomes a network round trip — the failure mode is *correct but unusably slow*), mutation semantics (no rename, no append, no symlinks), and read-modify-write concurrency. The workspace answers the first two by not being S3; the lease answers the third.
+
+#### Not done
+
+- **mineralkinsey cannot go through this pipeline** — still the two-file config format (`MineralKinsey_*.json`), so there is no single-file source for `build_atlas.py` to read. Needs #100 first.
+- **#181 — site-wide `/local/` assets have no cloud home.** nginx serves all of `/root/data` at `/local/`, unauthenticated, and hand-made about/contact pages live only on the box. A cutover blocker.
+- Six atlases have no `cloud.outlets` allowlist and would publish nothing; `abi_demo` has an empty one deliberately.
 
 ### Phase 4 — API → Lambda · *M–L*
 - **4a.** FastAPI as a Lambda container image (Lambda Web Adapter or Mangum), behind API Gateway/Function URL with a Cognito authorizer on writes.
@@ -192,7 +234,7 @@ Makes the *source* data S3-native so compute can be stateless. The real engineer
 **Deliverable:** scale-to-zero API. Box now runs **only** QGIS, with no public exposure.
 
 ### Phase 5 — QGIS as an async SQS worker · *M*
-- **5a.** Lambda enqueues render jobs `{atlas, asset, version}` to SQS; a worker on the box consumes them, reads layers via `/vsis3/`, writes PDFs to S3, updates a status object the client polls (matches submit→spinner→poll).
+- **5a.** Lambda enqueues render jobs `{atlas, asset, version}` to SQS; a worker on the box consumes them, **opens a session** like any other compute (not `/vsis3/` — see Phase 3), writes PDFs to S3, updates a status object the client polls (matches submit→spinner→poll).
 - **5b.** Box shrinks to a minimal private worker; optionally scale-from-zero on queue depth.
 
 **Deliverable:** QGIS fully decoupled; box has no public exposure and no other job.
@@ -245,4 +287,6 @@ private. Revisit after Phase 2:
 - **No throwaway "private box" step** — the existing box is hardened and its responsibilities *wither* (reads → S3, API → Lambda) until only QGIS remains. We effectively go straight to serverless.
 - **All-CDK, CI-built container images** — one source of truth; immutable artifacts end the live-checkout antipattern and the whole `.git`-exposure class.
 - **2d deferred into Phase 4 rather than done at the end of Phase 2** — its larger half (a CloudFront origin pointing back at the box) is deleted by Phase 4, and its durable half (the path-rewrite) targets a URL scheme Phase 3 is about to change. Narrowing Phase 2 to the public tier is what created this dependency; it is recorded rather than silently skipped.
+- **Compute is never handed an S3 path** — a session hydrates a real directory and every materializer keeps opening real files unchanged. This replaced "S3-native materialize path, QGIS excepted via `/vsis3/`", and it is what made Phase 3 tractable: the boundary is at the edges of a run rather than in the middle of it, so none of the 142 `atlas_path()` call sites had to move. Direct S3 reads survive as a per-materializer *optimization* (#174), not as the model.
+- **A version is a STAC Catalog, not a copy of staging** — outlets are Items alongside layers, and an unchanged layer or outlet is referenced at its existing immutable key rather than re-stored. The `copytree` this replaced is why westport's ten versions cost 6 GB of mostly identical bytes. The corollary is that publish cannot fail safe *and* write the catalog first: objects, then the documents naming them, then the pointer.
 - **The storage seam is built where a phase forces it, not up front** — `atlas_store.py` splits into a pure half (tiers, keys, upload plans; unit-testable with no AWS) and an S3 half, so a different backend reimplements the second against the same plan objects. That is the "multiple implementations of one interface" idea the dataswale was designed around, applied narrowly. It is deliberately *not* a general filesystem abstraction: Phase 3 generalizes it with real usage to point at. Note the existing seam is routinely bypassed — `outlets.py` has 58 direct `versioning.atlas_path()` calls and `eddies.py` 27, all reaching around `dataswale_geojson` straight to a concrete `pathlib.Path`. That return type is the load-bearing leak.

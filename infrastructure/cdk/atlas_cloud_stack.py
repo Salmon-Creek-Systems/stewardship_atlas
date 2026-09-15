@@ -123,7 +123,31 @@ class AtlasCloudStack(Stack):
             enforce_ssl=True,
             versioned=True,
             lifecycle_rules=[
-                s3.LifecycleRule(noncurrent_version_expiration=Duration.days(30)),
+                # A year, raised from 30 days when Phase 3 made this bucket the
+                # source of truth rather than a copy of it.
+                #
+                # Versioning here is not belt-and-braces: a session's write-back
+                # deletes, and it obeys a *successful* run that removed things.
+                # A mistaken clear_layer, a bad materialize, a wipe — all reach
+                # S3 as ordinary deletions, and the previous object version is
+                # the only way back. What it protects is the hand-collected
+                # half of the dataswale: hydrants, watertanks, culverts, notes,
+                # road mileage, conversations. None of that is re-derivable
+                # from an inlet, and Phase 6 removes the box's EBS snapshot as
+                # a second copy.
+                #
+                # Longer than the outlets bucket's 90 days for the same reason
+                # that one is longer than 30 was: published outlets can be
+                # rebuilt from the layers, and the layers cannot be rebuilt
+                # from anything. The cost is noncurrent copies of whatever in
+                # staging/ churns — layer and outlet keys are immutable and
+                # version-stamped, so they never generate any.
+                s3.LifecycleRule(noncurrent_version_expiration=Duration.days(365)),
+                # Multipart uploads that failed part-way are invisible in a
+                # normal listing and are billed. atlas_store.upload_plan uses
+                # upload_file, which goes multipart for the large rasters, so
+                # an interrupted seed or publish can leave them behind.
+                s3.LifecycleRule(abort_incomplete_multipart_upload_after=Duration.days(7)),
             ],
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -142,11 +166,13 @@ class AtlasCloudStack(Stack):
             # does not write, so without versioning a publish that followed a
             # bad wipe on the box would propagate the wipe and destroy the last
             # good copy. Versioning is what makes this a replica rather than a
-            # mirror. 90 days, longer than the private bucket's 30, because the
-            # damage this protects against can go unnoticed for a while.
+            # mirror. 90 days — shorter than the private bucket's 365, because
+            # a published outlet can be rebuilt from the layers it was made
+            # from, and the layers cannot be rebuilt from anything.
             versioned=True,
             lifecycle_rules=[
                 s3.LifecycleRule(noncurrent_version_expiration=Duration.days(90)),
+                s3.LifecycleRule(abort_incomplete_multipart_upload_after=Duration.days(7)),
             ],
             # COG and PMTiles are read with HTTP range requests from the browser.
             cors=[
