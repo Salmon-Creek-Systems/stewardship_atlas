@@ -723,7 +723,19 @@ def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> st
     Phase 1 left the distribution's default TTL at 5 minutes precisely because
     this was not wired up; with it in place that TTL can be raised.
     """
-    if not distribution_id:
+    return invalidate_paths(distribution_id,
+                            [f"/{current_prefix(atlas_name)}/*"],
+                            caller_prefix=atlas_name, client=client)
+
+
+def invalidate_paths(distribution_id: str, paths: list, caller_prefix: str = 'atlas',
+                     client=None) -> str:
+    """Invalidate an explicit list of CloudFront paths.
+
+    Separate from invalidate_current because the site-wide assets under
+    /local/* belong to no atlas (site_assets.py, #181).
+    """
+    if not distribution_id or not paths:
         return None
     if client is None:
         import boto3
@@ -731,8 +743,8 @@ def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> st
     response = client.create_invalidation(
         DistributionId=distribution_id,
         InvalidationBatch={
-            'Paths': {'Quantity': 1, 'Items': [f"/{current_prefix(atlas_name)}/*"]},
-            'CallerReference': f"{atlas_name}-{datetime.datetime.now().timestamp()}",
+            'Paths': {'Quantity': len(paths), 'Items': list(paths)},
+            'CallerReference': f"{caller_prefix}-{datetime.datetime.now().timestamp()}",
         },
     )
     return response['Invalidation']['Id']

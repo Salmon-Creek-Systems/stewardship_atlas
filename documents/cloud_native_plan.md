@@ -222,7 +222,7 @@ Green on `kennedy`, `scvfd`, `westport`, `fhe` (2026-09-15).
 #### Not done
 
 - **mineralkinsey cannot go through this pipeline** — still the two-file config format (`MineralKinsey_*.json`), so there is no single-file source for `build_atlas.py` to read. Needs #100 first.
-- **#181 — site-wide `/local/` assets have no cloud home.** nginx serves all of `/root/data` at `/local/`, unauthenticated, and hand-made about/contact pages live only on the box. A cutover blocker.
+- ~~**#181 — site-wide `/local/` assets have no cloud home.**~~ **Done.** The console stylesheets, help pages, manuals, about/contact and the default logo are built from the repo by `python/site_assets.py` and published to the `local/` prefix at the root of the outlets bucket by `scripts/publish_site_assets.py` — which the distribution's default behaviour already serves at `/`, so the baked `/local/...` URLs resolve with no CloudFront change. **Run that script once at cutover**; an atlas materialize deliberately no longer regenerates them. What is left is cosmetic: the prefix name (#182) and the unsprited-icon fallback (#183).
 - Six atlases have no `cloud.outlets` allowlist and would publish nothing; `abi_demo` has an empty one deliberately.
 
 ### Phase 4 — API → Lambda · *M–L*

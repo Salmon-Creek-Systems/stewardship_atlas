@@ -2261,31 +2261,7 @@ def make_console_html(config,
     return html
 
 
-def render_styled_doc(md_text, help_template, config, title=None):
-    """Render one markdown doc to a styled HTML page using the help template.
-
-    Rewrites intra-doc relative '.md' links to '.html' (so links between the
-    rendered pages resolve), and enables tables + header anchors so in-page
-    '#section' links work. Returns the full styled HTML string.
-    """
-    import markdown
-    if title is None:
-        first = md_text.splitlines()[0] if md_text else ''
-        title = first.replace('# ', '') if first.startswith('#') else 'Document'
-    html_content = markdown.markdown(md_text, extensions=['tables', 'toc'])
-    # rewrite relative markdown links (skip absolute URLs containing a scheme)
-    html_content = re.sub(
-        r'href="([^":]+?)\.md(#[^"]*)?"',
-        lambda m: f'href="{m.group(1)}.html{m.group(2) or ""}"',
-        html_content)
-    return help_template.format(
-        atlas_name=config['name'],
-        title=title,
-        content=html_content,
-        base_url=config.get('base_url', ''))
-
-
-def make_swale_html(config, outlet_config, store_materialized=True, template_name='console.html', css_name='console.css'):
+def make_swale_html(config, outlet_config, store_materialized=True, template_name='console.html'):
     """Generate HTML for the swale interface."""
     # Get version string
     version_string = config.get('version_string', 'staging')
@@ -2295,14 +2271,9 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
     #outpath.mkdir(parents=True, exist_ok=True)
     #logger.info(f"Created output directory: {outpath}")
     
-    # Copy CSS
-    css_dir =  versioning.atlas_path(config, "local") / 'css'
-    logger.debug(f"Creating CSS dir: {css_dir}")
-    css_dir.mkdir(exist_ok=True)
-    template_dir = versioning.atlas_path(config, version='app') / 'templates'
-    template_path = Path(template_dir / 'css' / css_name)
-    subprocess.run(['cp', template_path, str(css_dir)])
-    
+    # The console stylesheets are site-wide assets served from /local/css/ and
+    # are published by scripts/publish_site_assets.py, not copied per atlas (#181).
+
     # Get interfaces and downloads based on access level
     public_interfaces = [
         ac for ac in config['assets'].values() 
@@ -2388,183 +2359,11 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
     use_case_paths = list(app_docs_path.glob('*.md'))
     use_cases = { path.stem: [path.read_text().splitlines()[0].replace('# ', ''), str("/local/documents/help/" + path.name).replace('.md', '.html')] for path in use_case_paths}
     
-    # Convert markdown files to HTML and write to local documents/help directory
-    import markdown
-    local_docs_path = versioning.atlas_path(config, "local") / "documents" / "help"
-    local_docs_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Generating help into docs dir: {str(local_docs_path)}: {use_case_paths}")
-
-    # Read the help template
-
-    template_dir = versioning.atlas_path(config, version='app') / 'templates'
-    help_template_path = Path(template_dir / 'help.html')
-    
-    #help_template_path = Path("../templates/help.html")
-    help_template = help_template_path.read_text()
-
-    # Track titles and filenames for index generation
-    page_list = []
-    
-    for path in use_case_paths:
-        # Read markdown content
-        logger.info(f"Converting {path.name} to HTML...")
-        markdown_content = path.read_text()
-        
-        # Convert to HTML
-        html_content = markdown.markdown(markdown_content)
-        
-        # Extract title from first line (remove "# " prefix)
-        title = markdown_content.splitlines()[0].replace('# ', '') if markdown_content.startswith('#') else path.stem
-        
-        # Generate styled HTML using template
-        styled_html = help_template.format(
-            atlas_name=config['name'],
-            title=title,
-            content=html_content,
-            base_url=config.get('base_url', '')
-        )
-        
-        # Write HTML file
-        html_filename = path.stem + ".html"
-        html_path = local_docs_path / html_filename
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(styled_html)
-        
-        # Store for index generation
-        page_list.append((title, html_filename))
-        
-        logger.info(f"Converted {path.name} to {html_filename}")
-
-    # Render top-level manuals (documents/*.md) alongside about/contact, one
-    # level up from help/. These link into help/*.md, rewritten to .html.
-    manuals_dir = versioning.atlas_path(config, version='app') / 'documents'
-    manual_links = []
-    for manual in ('user_manual', 'admin_manual'):
-        manual_src = manuals_dir / f'{manual}.md'
-        if not manual_src.exists():
-            continue
-        md_text = manual_src.read_text()
-        m_title = md_text.splitlines()[0].replace('# ', '') if md_text.startswith('#') else manual
-        styled = render_styled_doc(md_text, help_template, config, title=m_title)
-        (local_docs_path.parent / f'{manual}.html').write_text(styled, encoding='utf-8')
-        manual_links.append((m_title, f'../{manual}.html'))
-        logger.info(f"Rendered manual {manual}.md")
-
-    # Generate index.html with list of all help pages
-    if page_list:
-        # Create list items for all pages
-        page_links = "\n".join([f'        <li><a href="{filename}">{title}</a></li>' for title, filename in sorted(page_list)])
-
-        manuals_section = ""
-        if manual_links:
-            manual_items = "\n".join(f'        <li><a href="{href}">{t}</a></li>' for t, href in manual_links)
-            manuals_section = f"        <h2>Manuals</h2>\n        <ul>\n{manual_items}\n        </ul>\n"
-
-        index_content = f"""
-{manuals_section}        <h2>Help Topics</h2>
-        <p>Browse the available help documentation:</p>
-        <ul>
-{page_links}
-        </ul>
-        """
-        
-        # Generate styled HTML using template
-        index_html = help_template.format(
-            atlas_name=config['name'],
-            title="Help Index",
-            content=index_content,
-            base_url=config.get('base_url', '')
-        )
-        
-        # Write index.html
-        index_path = local_docs_path / "index.html"
-        with open(index_path, 'w', encoding='utf-8') as f:
-            f.write(index_html)
-        
-        logger.info(f"Generated index.html with {len(page_list)} help pages")
-    
-    # Generate contact page in documents directory (one level up from help)
-    contact_content = """
-        <h2>Contact Information</h2>
-        <p>For questions, support, or more information about this atlas, please reach out:</p>
-        
-        <h3>General Inquiries</h3>
-        <p>
-            <strong>Email:</strong> <a href="mailto:info@example.org">info@example.org</a><br>
-            <strong>Website:</strong> <a href="https://www.example.org" target="_blank">www.example.org</a>
-        </p>
-        
-        <h3>Technical Support</h3>
-        <p>
-            <strong>Email:</strong> <a href="mailto:support@example.org">support@example.org</a><br>
-            <strong>Website:</strong> <a href="https://support.example.org" target="_blank">support.example.org</a>
-        </p>
-        
-        <h3>Administration</h3>
-        <p>
-            <strong>Email:</strong> <a href="mailto:admin@example.org">admin@example.org</a><br>
-            <strong>Phone:</strong> (555) 123-4567
-        </p>
-        """
-    
-    # Generate styled HTML using template
-    contact_html = help_template.format(
-        atlas_name=config['name'],
-        title="Contact",
-        content=contact_content,
-        base_url=config.get('base_url', '')
-    )
-    
-    # Write contact.html to documents directory (parent of help directory)
-    contact_path = local_docs_path.parent / "contact.html"
-    with open(contact_path, 'w', encoding='utf-8') as f:
-        f.write(contact_html)
-    
-    logger.info(f"Generated contact page at {contact_path}")
-    
-    # Generate about page in documents directory
-    about_content = """
-        <h2>About Stewardship Atlas</h2>
-        
-        <p>
-            Stewardship Atlas is a powerful geospatial platform designed to help community organizations, volunteer fire departments, 
-            land stewards, and local agencies manage and share critical location-based information. By combining interactive web maps, 
-            downloadable data packages, and collaborative editing tools, the platform makes it easy to maintain up-to-date records of 
-            roads, buildings, water sources, access points, and other essential infrastructure. Whether you're planning emergency response 
-            routes, coordinating land management activities, or simply need to share accurate maps with your team, Stewardship Atlas 
-            provides the tools to do it efficiently.
-        </p>
-        
-        <p>
-            The platform is built around the concept of making geospatial data accessible to everyone, not just GIS professionals. 
-            Community members can view and interact with maps through any web browser, download mobile-ready formats for offline use 
-            in the field, and contribute updates through simple web interfaces. Administrators have fine-grained control over data 
-            layers, user access levels, and versioning, ensuring that information stays accurate and secure while remaining accessible 
-            to those who need it.
-        </p>
-        
-        <p>
-            Whether your organization needs to maintain a comprehensive atlas of local roads and structures, coordinate with multiple 
-            agencies on shared resources, or simply provide your volunteers with reliable maps they can use on their phones, 
-            Stewardship Atlas offers a flexible, scalable solution. The platform supports standard GIS formats, integrates with 
-            existing workflows, and can be customized to meet the specific needs of your community.
-        </p>
-        """
-    
-    # Generate styled HTML using template
-    about_html = help_template.format(
-        atlas_name=config['name'],
-        title="About",
-        content=about_content,
-        base_url=config.get('base_url', '')
-    )
-    
-    # Write about.html to documents directory
-    about_path = local_docs_path.parent / "about.html"
-    with open(about_path, 'w', encoding='utf-8') as f:
-        f.write(about_html)
-    
-    logger.info(f"Generated about page at {about_path}")
+    # The help pages, manuals and the about/contact pages are site-wide, built
+    # from this repo by python/site_assets.py and published once to /local/ by
+    # scripts/publish_site_assets.py. They used to be generated here into the
+    # shared local/ tree, where the last atlas to materialize decided whose name
+    # they carried (#181).
 
     # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
     #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
@@ -2704,7 +2503,7 @@ def outlet_html(config, outlet_name):
 def outlet_console(config, outlet_name):
     """Generate redesigned console HTML (mobile-first, grouped layer actions)."""
     outlet_config = config['assets'][outlet_name]
-    return make_swale_html(config, outlet_config, template_name='console_new.html', css_name='console_new.css')
+    return make_swale_html(config, outlet_config, template_name='console_new.html')
 
 def outlet_sqlquery(config: dict, outlet_name: str):
     """Generate HTML interface for SQL queries."""

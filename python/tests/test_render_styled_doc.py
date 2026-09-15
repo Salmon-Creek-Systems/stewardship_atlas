@@ -1,9 +1,10 @@
 """
-Test outlets.render_styled_doc — markdown docs rendered to styled HTML with
+Test site_assets.render_styled_doc — markdown docs rendered to styled HTML with
 intra-doc .md->.html link rewriting and header anchors.
 
-Requires markdown + outlets' import chain (duckdb/geopandas/etc.), so it
-skips where those aren't installed (runs on the server).
+Needs markdown (skips where it isn't installed), but no longer drags in
+outlets' import chain: the renderer moved to site_assets when the site's web
+assets stopped being a per-atlas materialize side effect (#181).
 """
 import os
 import sys
@@ -13,20 +14,30 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 pytest.importorskip("markdown")
-outlets = pytest.importorskip("outlets")
+import site_assets
 
-TEMPLATE = "<html><head><title>{title}</title></head><body>{atlas_name}|{base_url}|{content}</body></html>"
-CONFIG = {"name": "testatlas", "base_url": "https://fireatlas.org/testatlas"}
-
-
-def render(md):
-    return outlets.render_styled_doc(md, TEMPLATE, CONFIG)
+TEMPLATE = "<html><head><title>{title}</title></head><body>{content}</body></html>"
 
 
-def test_title_from_first_heading_and_template_fields():
+def render(md, **kwargs):
+    return site_assets.render_styled_doc(md, TEMPLATE, **kwargs)
+
+
+def test_title_from_first_heading():
     html = render("# My Manual\n\nHello.")
     assert "<title>My Manual</title>" in html
-    assert "testatlas|https://fireatlas.org/testatlas|" in html
+
+
+def test_explicit_title_wins():
+    assert "<title>Help Index</title>" in render("# Ignored", title="Help Index")
+
+
+def test_page_carries_no_atlas_identity():
+    # One published copy serves every atlas, so nothing atlas-specific may be
+    # baked in — that was the last-writer-wins bug this replaced.
+    html = render("# About\n\ntext")
+    assert "{atlas_name}" not in html
+    assert "base_url" not in html
 
 
 def test_relative_md_links_rewritten_to_html():
