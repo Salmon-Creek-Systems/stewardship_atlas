@@ -125,24 +125,50 @@ def plan_staging_upload(staging_dir, *, include_delta_archive: bool = True,
     return plan
 
 
+def bundled_icons_dir() -> Path:
+    """The repo's fallback icons, which both icon call sites already use."""
+    return Path(__file__).parent.parent / 'templates' / 'icons'
+
+
+def has_fallback(rel: str, icons) -> bool:
+    """Is this shared file one the code can do without?
+
+    Two conditions, and the first is the one that matters: the file must be
+    referenced *as an icon*, not merely named like one. Classifying by filename
+    alone would downgrade an inlet whose source happened to be called
+    camera.png from "this layer cannot be built" to "fine".
+    """
+    return rel in icons and (bundled_icons_dir() / Path(rel).name).is_file()
+
+
 def plan_shared_upload(config: dict, shared_dir) -> tuple:
-    """`([(Path, shared-relative path)], [missing])` for one atlas's shared files.
+    """`([(Path, shared-relative path)], [missing], [missing_but_bundled])`.
 
     Missing files are reported rather than raised: the box has several
     pre-existing broken inlet inputs (westport_incidents.geojson,
     documents.zip, a .shp with no siblings) and a seed that refuses to run
     until they are fixed would block the migration on unrelated breakage. They
     are as broken after the move as before it, which is the honest outcome.
+
+    Split in two because the undifferentiated list cried wolf: the first real
+    run flagged 12 of 15 atlases, and for nine of them every "missing" file was
+    an icon the repo bundles and the code already falls back to. A warning that
+    fires on almost everything is one an operator learns to skip past, which is
+    exactly when it stops catching the kennedy shapefile that actually is
+    broken.
     """
     shared_dir = Path(shared_dir)
-    plan, missing = [], []
+    icons = atlas_shared.referenced_icons(config)
+    plan, missing, bundled = [], [], []
     for rel in atlas_shared.referenced_files(config):
         path = shared_dir / rel
         if path.is_file():
             plan.append((path, rel))
+        elif has_fallback(rel, icons):
+            bundled.append(rel)
         else:
             missing.append(rel)
-    return plan, missing
+    return plan, missing, bundled
 
 
 def summarize(plan) -> dict:

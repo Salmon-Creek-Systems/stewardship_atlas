@@ -74,9 +74,10 @@ def seed_one(client, bucket, atlas_name, args) -> dict:
         skip_outlets=args.skip_outlet)
 
     config = load_config(staging_dir)
-    shared_plan, missing = ([], [])
+    shared_plan, missing, bundled = ([], [], [])
     if config is not None:
-        shared_plan, missing = atlas_seed.plan_shared_upload(config, args.shared_dir)
+        shared_plan, missing, bundled = atlas_seed.plan_shared_upload(
+            config, args.shared_dir)
 
     totals = atlas_seed.summarize(plan)
     total_bytes = sum(v['bytes'] for v in totals.values())
@@ -88,12 +89,15 @@ def seed_one(client, bucket, atlas_name, args) -> dict:
             print(f"      {atlas_seed.human(entry['bytes']):>9}  "
                   f"{entry['files']:>5} files  {name}")
     if missing:
-        print(f"      MISSING shared input(s), seeding without them: "
+        print(f"      MISSING shared input(s) with no fallback: "
               f"{', '.join(missing)}")
+    if bundled and args.verbose:
+        print(f"      not in {args.shared_dir}, using the repo's bundled copy: "
+              f"{', '.join(bundled)}")
 
     result = {'atlas': atlas_name, 'status': 'ok', 'files': len(plan),
               'bytes': total_bytes, 'shared': len(shared_plan),
-              'missing_shared': missing}
+              'missing_shared': missing, 'bundled_shared': bundled}
 
     moved = atlas_seed.upload(
         client, bucket, plan, lambda rel: ws._key(atlas_name, rel),

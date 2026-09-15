@@ -68,6 +68,21 @@ def with_sidecars(rels) -> list:
     return sorted(wanted)
 
 
+def referenced_icons(config: dict) -> set:
+    """Just the icons — the only shared files the code can do without.
+
+    Both icon call sites (`outlets.build_sprite` and
+    `outlets_qgis.apply_basic_styling`) fall back to the repo's
+    `templates/icons/` and warn. An inlet's source has no fallback, so a
+    missing one is a layer that cannot be built. Keeping these separable is
+    what lets a report say which of the two a missing file is, rather than
+    guessing from the filename.
+    """
+    return {(layer.get('symbol') or {}).get('png')
+            for layer in (config.get('dataswale') or {}).get('layers') or []
+            if (layer.get('symbol') or {}).get('png')}
+
+
 def referenced_files(config: dict) -> list:
     """Every shared file an atlas's config names, sidecars included.
 

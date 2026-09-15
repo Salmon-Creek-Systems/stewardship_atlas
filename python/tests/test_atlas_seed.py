@@ -192,10 +192,45 @@ class TestSharedPlan(unittest.TestCase):
             'incidents': {'config': {'fetch_type': 'local_ogr',
                                      'inpath_template': 'westport_incidents.geojson'}},
         })
-        plan, missing = atlas_seed.plan_shared_upload(config, self.shared)
+        plan, missing, bundled = atlas_seed.plan_shared_upload(config, self.shared)
 
         self.assertEqual([rel for _, rel in plan], ['ponds_scvfd.geojson'])
         self.assertEqual(missing, ['westport_incidents.geojson'])
+        self.assertEqual(bundled, [])
+
+    def test_a_missing_icon_the_repo_bundles_is_not_a_missing_input(self):
+        """Both icon call sites fall back to templates/icons/ and warn. The
+        undifferentiated list flagged 12 of 15 atlases on the first real run,
+        nine of them purely for icons that work — and a warning that fires on
+        almost everything is one an operator learns to skip past."""
+        config = self.config(layers=[{'name': 'photos',
+                                      'symbol': {'png': 'camera.png'}}])
+        plan, missing, bundled = atlas_seed.plan_shared_upload(config, self.shared)
+
+        self.assertEqual(plan, [])
+        self.assertEqual(missing, [])
+        self.assertEqual(bundled, ['camera.png'])
+
+    def test_an_icon_the_repo_does_not_bundle_is_still_missing(self):
+        """mineralkinsey's conservation_pile.png has no fallback anywhere, so
+        it renders as a missing marker on the map."""
+        config = self.config(layers=[{'name': 'piles',
+                                      'symbol': {'png': 'conservation_pile.png'}}])
+        _, missing, bundled = atlas_seed.plan_shared_upload(config, self.shared)
+
+        self.assertEqual(missing, ['conservation_pile.png'])
+        self.assertEqual(bundled, [])
+
+    def test_an_inlet_source_never_counts_as_having_a_fallback(self):
+        """A missing icon is cosmetic; a missing inlet source is a layer that
+        cannot be built. Classifying by filename would downgrade an inlet whose
+        source happens to be called camera.png to 'fine'."""
+        config = self.config(assets={
+            'roads': {'config': {'fetch_type': 'local_ogr',
+                                 'inpath_template': 'camera.png'}}})
+        _, missing, bundled = atlas_seed.plan_shared_upload(config, self.shared)
+        self.assertEqual(missing, ['camera.png'])
+        self.assertEqual(bundled, [])
 
 
 class TestUpload(unittest.TestCase):
