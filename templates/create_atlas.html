@@ -41,9 +41,14 @@
         </div>
 
         <div class="control-panel">
-            <p style="margin:0 0 6px 0; font-size:13px;">Draw a rectangle to define the atlas area, or enter coordinates below, then submit.</p>
+            <p style="margin:0 0 6px 0; font-size:13px;">Draw a rectangle, enter coordinates, or upload a GeoJSON to define the atlas area, then submit.</p>
             <button id="draw-btn" class="button" style="width:100%; margin-bottom:6px;">Draw Area</button>
             <button id="clear-btn" class="button" style="width:100%; margin-bottom:6px;" disabled>Clear</button>
+            <div style="margin-bottom:6px;">
+                <label for="boundary-file" style="font-size:12px; display:block; margin-bottom:2px;">Or upload a GeoJSON</label>
+                <input type="file" id="boundary-file" accept=".geojson,.json,application/geo+json,application/json" class="input-field" style="width:100%; font-size:12px;">
+                <div id="boundary-summary" style="font-size:12px; margin-top:4px;"></div>
+            </div>
             <div style="margin-bottom:6px;">
                 <div style="text-align:center; margin-bottom:2px;">
                     <input type="number" id="bbox-north" step="any" placeholder="N" style="width:72px; text-align:center;" class="input-field">
@@ -143,6 +148,7 @@
     // TerraDraw polygon mode — user draws any shape, we extract the bbox
     let td = null;
     let drawnBbox = null;
+    let uploadedBoundary = null;
 
     function nameToSlug(name) {
         return name.toLowerCase()
@@ -190,7 +196,7 @@
 
     function updateSubmitBtn() {
         const slug = document.getElementById('atlas-slug').value;
-        const hasBbox = drawnBbox || getTypedBbox();
+        const hasBbox = drawnBbox || getTypedBbox() || uploadedBoundary;
         const valid = hasBbox && slug && /^[a-zA-Z][a-zA-Z0-9_]*$/.test(slug);
         document.getElementById('submit-btn').disabled = !valid;
     }
@@ -241,6 +247,106 @@
         });
     });
 
+    // --- Uploaded boundary -------------------------------------------------
+    // The file never leaves the browser until you submit; /create-preview says
+    // what a create would do with it — extent, and which features land in which
+    // layer — so a mismatch is found here rather than after a create that would
+    // leave a half-built atlas behind.
+    const boundarySummary = document.getElementById('boundary-summary');
+
+    function clearUploadedBoundary() {
+        uploadedBoundary = null;
+        boundarySummary.textContent = '';
+        document.getElementById('boundary-file').value = '';
+        if (map.getLayer('uploaded-boundary-line')) map.removeLayer('uploaded-boundary-line');
+        if (map.getLayer('uploaded-boundary-fill')) map.removeLayer('uploaded-boundary-fill');
+        if (map.getSource('uploaded-boundary')) map.removeSource('uploaded-boundary');
+        updateSubmitBtn();
+    }
+
+    function showBoundaryOnMap(gj, bbox) {
+        if (!map.isStyleLoaded()) {
+            map.once('load', function() { showBoundaryOnMap(gj, bbox); });
+            return;
+        }
+        if (map.getSource('uploaded-boundary')) {
+            map.getSource('uploaded-boundary').setData(gj);
+        } else {
+            map.addSource('uploaded-boundary', { type: 'geojson', data: gj });
+            map.addLayer({ id: 'uploaded-boundary-fill', type: 'fill',
+                source: 'uploaded-boundary',
+                paint: { 'fill-color': '#2a6', 'fill-opacity': 0.15 } });
+            map.addLayer({ id: 'uploaded-boundary-line', type: 'line',
+                source: 'uploaded-boundary',
+                paint: { 'line-color': '#2a6', 'line-width': 2 } });
+        }
+        map.fitBounds([[bbox.west, bbox.south], [bbox.east, bbox.north]],
+                      { padding: 40, duration: 0 });
+    }
+
+    async function previewBoundary(gj) {
+        let resp;
+        try {
+            resp = await fetch('/create-preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ boundary: gj, starter: starterSelect.value || 'simple' })
+            });
+        } catch (e) {
+            boundarySummary.innerHTML = '<span style="color:#c00;">Could not reach the server: ' + e.message + '</span>';
+            return;
+        }
+        const data = await resp.json();
+        if (!resp.ok) {
+            boundarySummary.innerHTML = '<span style="color:#c00;">' + (data.detail || resp.statusText) + '</span>';
+            uploadedBoundary = null;
+            updateSubmitBtn();
+            return;
+        }
+
+        uploadedBoundary = gj;
+        const lines = [];
+        const b = data.bbox;
+        lines.push(data.total + ' feature(s); extent ' +
+                   b.west.toFixed(4) + ',' + b.south.toFixed(4) + ' to ' +
+                   b.east.toFixed(4) + ',' + b.north.toFixed(4));
+        Object.keys(data.routed).sort().forEach(function(name) {
+            lines.push('&rarr; ' + data.routed[name] + ' into <strong>' + name + '</strong>');
+        });
+        if (data.extent_only) lines.push(data.extent_only + ' define the extent only');
+        Object.keys(data.unknown).sort().forEach(function(name) {
+            lines.push('<span style="color:#c60;">' + data.unknown[name] +
+                       ' name layer &ldquo;' + name + '&rdquo;, which this starter does not have</span>');
+        });
+        boundarySummary.innerHTML = lines.join('<br>');
+        showBoundaryOnMap(gj, b);
+        updateSubmitBtn();
+    }
+
+    document.getElementById('boundary-file').addEventListener('change', function() {
+        const file = this.files && this.files[0];
+        if (!file) { clearUploadedBoundary(); return; }
+        const reader = new FileReader();
+        reader.onload = function() {
+            let gj;
+            try {
+                gj = JSON.parse(reader.result);
+            } catch (e) {
+                boundarySummary.innerHTML = '<span style="color:#c00;">Not valid JSON: ' + e.message + '</span>';
+                uploadedBoundary = null;
+                updateSubmitBtn();
+                return;
+            }
+            previewBoundary(gj);
+        };
+        reader.readAsText(file);
+    });
+
+    // Which layers exist depends on the starter, so re-check when it changes.
+    starterSelect.addEventListener('change', function() {
+        if (uploadedBoundary) previewBoundary(uploadedBoundary);
+    });
+
     document.getElementById('draw-btn').addEventListener('click', function() {
         td.setMode('polygon');
     });
@@ -248,6 +354,7 @@
     document.getElementById('clear-btn').addEventListener('click', function() {
         td.clear();
         drawnBbox = null;
+        clearUploadedBoundary();
         this.disabled = true;
         document.getElementById('draw-btn').disabled = false;
         updateSubmitBtn();
@@ -255,7 +362,7 @@
 
     document.getElementById('submit-btn').addEventListener('click', async function() {
         const bbox = getTypedBbox() || drawnBbox;
-        if (!validateSlug() || !bbox) return;
+        if (!validateSlug() || !(bbox || uploadedBoundary)) return;
         const name = document.getElementById('atlas-name').value.trim() || document.getElementById('atlas-slug').value;
         const slug = document.getElementById('atlas-slug').value.trim();
 
@@ -270,7 +377,11 @@
             resp = await fetch('/create_atlas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, slug, bbox: bbox, starter: starterSelect.value || 'simple' })
+                // An uploaded boundary wins: the server derives the bbox from
+                // its envelope, so the two never disagree.
+                body: JSON.stringify(uploadedBoundary
+                    ? { name, slug, boundary: uploadedBoundary, starter: starterSelect.value || 'simple' }
+                    : { name, slug, bbox: bbox, starter: starterSelect.value || 'simple' })
             });
         } catch(e) {
             appendLog('ERROR: ' + e.message);

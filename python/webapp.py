@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 import os
 import shutil
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 import logging
 import traceback
@@ -35,6 +35,7 @@ import dataswale_geojson
 import outlets
 import versioning
 import deltas_geojson
+import geojson_import
 import utils
 import vector_inlets
 import email_inlet
@@ -86,8 +87,15 @@ class BBox(BaseModel):
 class CreateAtlasRequest(BaseModel):
     name: str   # display name (e.g. "Salmon Creek VFD")
     slug: str   # atlas ID / directory name (e.g. "scvfd")
-    bbox: BBox
+    bbox: Optional[BBox] = None          # drawn rectangle, or derived from boundary
+    boundary: Optional[Dict[str, Any]] = None   # uploaded GeoJSON (see geojson_import)
     starter: str = "simple"   # starter bundle key (configuration/{starter}_starter.json)
+
+
+class BoundaryPreviewRequest(BaseModel):
+    """What /create-preview needs to say what a create would do."""
+    boundary: Dict[str, Any]
+    starter: str = "simple"
 
 class MovePayload(BaseModel):
     source_layer: str
@@ -851,6 +859,26 @@ def _load_starter(key: str) -> dict:
         return json.load(f)
 
 
+@app.post("/create-preview")
+async def preview_boundary(payload: BoundaryPreviewRequest):
+    """What a create would do with an uploaded GeoJSON, without creating anything.
+
+    Lets the create page show the extent and the per-layer feature counts before
+    you commit — a mismatch found here costs nothing, where the same mismatch
+    found after a create leaves a half-built atlas behind.
+
+    Under the /create prefix for the same nginx reason as /create-starters.
+    """
+    try:
+        starter = _load_starter(payload.starter)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=400, detail=f"starter '{payload.starter}': {e}")
+    try:
+        return geojson_import.summarize(payload.boundary, starter.get('layers', {}).keys())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"boundary geojson: {e}")
+
+
 @app.get("/create-starters")
 async def list_starters():
     """List available starter bundles for the /create dropdown.
@@ -902,8 +930,19 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
         "log": [["Starting atlas creation", datetime.now().isoformat()]]
     }
 
-    bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
-            "north": payload.bbox.north, "south": payload.bbox.south}
+    if payload.bbox is not None:
+        bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
+                "north": payload.bbox.north, "south": payload.bbox.south}
+    elif payload.boundary is not None:
+        # Every feature contributes to the extent, so an upload that is only a
+        # boundary and one that also carries regions both land here.
+        try:
+            bbox = geojson_import.boundary_bbox(payload.boundary)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"boundary geojson: {e}")
+    else:
+        raise HTTPException(status_code=400,
+                            detail="a bbox or a boundary geojson is required")
 
     # Compute H3 resolution that gives ~10 cells across the short axis of the bbox.
     # H3 approximate average edge lengths (km) by resolution.
@@ -1011,6 +1050,25 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 except Exception as inlet_err:
                     logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
                     create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
+
+            # Features from the uploaded boundary are seeded exactly the way an
+            # inlet seeds one — as a delta, applied by the refresh below. One
+            # path into a layer rather than two.
+            if payload.boundary is not None:
+                known = [l['name'] for l in ac['dataswale']['layers']]
+                split = geojson_import.split_features_by_layer(payload.boundary, known)
+                for layer_name, features in sorted(split['routed'].items()):
+                    fc = {"type": "FeatureCollection", "features": features}
+                    await asyncio.to_thread(deltas_geojson.add_deltas_from_features,
+                                            ac, None, fc, "create", layer_name)
+                    create_statuses[slug]["log"].append(
+                        [f"Imported {len(features)} feature(s) into {layer_name}",
+                         datetime.now().isoformat()])
+                for unknown_name, count in sorted(split['unknown'].items()):
+                    create_statuses[slug]["log"].append(
+                        [f"Warning: {count} feature(s) name layer '{unknown_name}', "
+                         f"which this starter does not have — not imported",
+                         datetime.now().isoformat()])
 
             # Inlets only wrote deltas; apply them so the layers actually hold
             # data, and give inlet-less layers an empty FeatureCollection so the
