@@ -1027,10 +1027,22 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             # Outlets: webmap must precede html (console HTML checks for the
             # webmap output); notebook first, html last.
             _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
+            # QGIS PDF outlets are deferred for the same reason eddies are: a
+            # runbook render is slow and memory-hungry, and at create time it
+            # would run over regions that were only just imported. Materialize
+            # them once the atlas has been looked at.
+            deferred = [n for n, a in assets.items()
+                        if a.get('type') == 'outlet'
+                        and a.get('config', {}).get('data_type') == 'geopdf']
             outlet_names = sorted(
-                (n for n, a in assets.items() if a.get('type') == 'outlet'),
+                (n for n, a in assets.items()
+                 if a.get('type') == 'outlet' and n not in deferred),
                 key=lambda n: _outlet_order.get(n, 5)
             )
+            for deferred_name in deferred:
+                create_statuses[slug]["log"].append(
+                    [f"Deferred {deferred_name} (PDF outlets are materialized on request)",
+                     datetime.now().isoformat()])
             for outlet_name in outlet_names:
                 create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                 try:
