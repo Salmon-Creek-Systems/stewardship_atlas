@@ -348,7 +348,8 @@
           [
             "require",
             "class",
-            [ "primary",
+            [ "motorway",
+              "primary",
               "trunk"
             ]
           ]
@@ -408,6 +409,8 @@
             "remove",
             "class",
             [
+              "motorway",
+              "primary",
               "trunk",
               "secondary",
               "residential",
