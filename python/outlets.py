@@ -31,19 +31,27 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-def _resolve_cog_color(config, layer_name, cog_color):
-    """Substitute 'auto' min/max in cog_color with values from stats.json sidecar."""
+def _resolve_cog_color(config, layer_name, cog_color, layer=None):
+    """Substitute 'auto' min/max in cog_color with values from stats.json sidecar.
+
+    An external COG (`cog_url`) has no sidecar in *this* atlas, and emitting
+    the literal string 'auto' into the colour ramp renders nothing at all — so
+    that case raises instead of warning into a log nobody reads. Put explicit
+    min/max in the layer's cog_color; fetching the source atlas's sidecar over
+    HTTP is the nicer answer and is deliberately not done inside materialize.
+    """
     stats_path = versioning.atlas_path(config, 'layers') / layer_name / 'stats.json'
-    if not stats_path.exists():
+    stats = json.loads(stats_path.read_text()) if stats_path.exists() else None
+
+    if stats is None and map_style.cog_color_wants_stats(cog_color):
+        if layer is not None and map_style.is_external_cog(layer):
+            raise ValueError(
+                f"layer '{layer_name}' reads an external COG and its cog_color "
+                f"{cog_color!r} defers its range to a stats.json this atlas does "
+                f"not have — put explicit min/max values in cog_color")
         logger.warning(f"cog_color has 'auto' but no stats.json for '{layer_name}'")
-        return cog_color
-    stats = json.loads(stats_path.read_text())
-    parts = cog_color.split(',')
-    if parts[1] == 'auto':
-        parts[1] = str(round(stats['min'], 4))
-    if parts[2] == 'auto':
-        parts[2] = str(round(stats['max'], 4))
-    return ','.join(parts)
+
+    return map_style.resolve_cog_color(cog_color, stats)
 
 
 # --- Layer data addressing (Phase 3, #159) ---------------------------------
@@ -133,10 +141,11 @@ def webmap_json(config, name, sprite_json=None):
                 # about. Relative here, made absolute in webmap.js — the COG
                 # protocol needs a real URL for its range requests, but which
                 # host that is depends on where the page is served from.
-                cog_url = _layer_data_url(layer_name, f"{layer_name}.cog.tif")
+                cog_url = map_style.cog_href(
+                    layer, _layer_data_url(layer_name, f"{layer_name}.cog.tif"))
                 cog_color = layer.get('cog_color')
-                if cog_color and 'auto' in cog_color:
-                    cog_color = _resolve_cog_color(config, layer_name, cog_color)
+                if map_style.cog_color_wants_stats(cog_color):
+                    cog_color = _resolve_cog_color(config, layer_name, cog_color, layer)
                 cog_source_url = f"cog://{cog_url}" + (f"#color:{cog_color}" if cog_color else "")
                 cog_sources[layer_name] = {
                     'type': 'raster',

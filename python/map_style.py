@@ -25,3 +25,49 @@ def visibility(vis):
     if vis.get('maxzoom') is not None and vis['maxzoom'] >= MAPLIBRE_CEILING_ZOOM:
         vis['maxzoom'] = NO_ZOOM_LIMIT
     return vis
+
+
+# ---------------------------------------------------------------------------
+# COG addressing. A raster layer normally reads its COG out of its own atlas,
+# but `cog_url` lets it name one published by another atlas — so a wider atlas
+# can show a neighbour's canopy or fuel rasters without copying gigabytes or
+# re-deriving them. Referencing rather than copying is what `classify_layer`
+# in federation.py already assumes about rasters.
+#
+# A federation inlet is the eventual writer of this field, resolving the href
+# through the source atlas's STAC catalog instead of having it typed in by
+# hand (#159's raster federation). The field is the seam either way.
+# ---------------------------------------------------------------------------
+
+def cog_href(layer, local_href):
+    """Where a COG layer's data lives — its own atlas, or another's."""
+    return layer.get('cog_url') or local_href
+
+
+def is_external_cog(layer):
+    """True when this layer's COG belongs to a different atlas."""
+    return bool(layer.get('cog_url'))
+
+
+def cog_color_wants_stats(cog_color):
+    """Whether a cog_color string defers its range to a stats.json sidecar."""
+    return bool(cog_color) and 'auto' in str(cog_color).split(',')
+
+
+def resolve_cog_color(cog_color, stats):
+    """Substitute 'auto' min/max in a cog_color with values from a stats dict.
+
+    `stats` is the parsed stats.json sidecar, or None when there isn't one, in
+    which case the string comes back untouched for the caller to complain about.
+    Format is "{palette},{min},{max},{mode}".
+    """
+    if not cog_color_wants_stats(cog_color) or not stats:
+        return cog_color
+    parts = str(cog_color).split(',')
+    if len(parts) < 3:
+        return cog_color
+    if parts[1] == 'auto' and stats.get('min') is not None:
+        parts[1] = str(round(stats['min'], 4))
+    if parts[2] == 'auto' and stats.get('max') is not None:
+        parts[2] = str(round(stats['max'], 4))
+    return ','.join(parts)

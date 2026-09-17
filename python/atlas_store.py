@@ -371,6 +371,7 @@ def plan_current_layers(config: dict, version_path, stub_dir=None,
     """
     import federation
     import atlas_catalog
+    import map_style
 
     version_path = Path(version_path)
     atlas_name = config['name']
@@ -385,6 +386,14 @@ def plan_current_layers(config: dict, version_path, stub_dir=None,
             logger.warning(f"atlas_store: outlet references undeclared layer "
                            f"'{layer_name}' — not mirroring")
             continue
+        if map_style.is_external_cog(layer):
+            # The bytes live in the atlas that published them, and the webmap
+            # addresses them absolutely rather than through ../../layers/, so
+            # there is nothing to mirror here — and a #135 stub would be a lie.
+            logger.info(f"atlas_store: layer '{layer_name}' reads an external COG "
+                        f"({layer['cog_url']}) — nothing to mirror")
+            continue
+
         access = federation.layer_access(layer)
         if not is_public(access):
             logger.warning(
