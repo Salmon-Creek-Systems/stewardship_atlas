@@ -348,7 +348,7 @@
           [
             "require",
             "class",
-            [
+            [ "primary",
               "trunk"
             ]
           ]
@@ -377,7 +377,7 @@
           [
             "require",
             "class",
-            [
+            [ "secondary",
               "residential",
               "service"
             ]
@@ -409,6 +409,7 @@
             "class",
             [
               "trunk",
+              "secondary",
               "residential",
               "service"
             ]
