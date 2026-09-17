@@ -118,5 +118,48 @@ class TestCogColor(unittest.TestCase):
             'BrewerPuBu9,5,auto,c')
 
 
+class TestLocalBasemapOption(unittest.TestCase):
+    """The basemap dropdown may only offer a layer the style actually has."""
+
+    RASTER = {'geometry_type': 'raster'}
+    LINE = {'geometry_type': 'linestring'}
+
+    def test_offered_when_the_named_raster_is_in_the_outlet(self):
+        # kennedy: 'basemap' is a raster and is in the webmap's in_layers.
+        self.assertTrue(map_style.has_local_basemap(
+            ['basemap', 'roads'], {'basemap': self.RASTER, 'roads': self.LINE}))
+
+    def test_not_offered_when_the_atlas_has_no_such_layer(self):
+        # south_fork_eel: borrowed COGs, no basemap layer of its own.
+        self.assertFalse(map_style.has_local_basemap(
+            ['fhe_canopy_density', 'roads'],
+            {'fhe_canopy_density': self.RASTER, 'roads': self.LINE}))
+
+    def test_a_leading_raster_is_not_evidence_of_a_basemap(self):
+        # The bug this replaces: any raster first in in_layers offered a
+        # basemap option wired to a style layer that does not exist.
+        layers = {'canopy': self.RASTER, 'basemap': self.RASTER, 'roads': self.LINE}
+        self.assertFalse(map_style.has_local_basemap(['canopy', 'roads'], layers))
+
+    def test_declared_but_not_in_the_outlet_is_not_offered(self):
+        # fhe has a 'basemap' layer but its webmap does not reference it, so
+        # no 'basemap-layer' exists in that style.
+        self.assertFalse(map_style.has_local_basemap(
+            ['creeks'], {'basemap': self.RASTER, 'creeks': self.LINE}))
+
+    def test_a_vector_layer_of_that_name_is_not_a_basemap(self):
+        self.assertFalse(map_style.has_local_basemap(
+            ['basemap'], {'basemap': self.LINE}))
+
+    def test_webedit_uses_its_own_layer_name(self):
+        layers = {'hillshade': self.RASTER, 'basemap': self.RASTER}
+        self.assertTrue(map_style.has_local_basemap(['hillshade'], layers, 'hillshade'))
+        self.assertFalse(map_style.has_local_basemap(['basemap'], layers, 'hillshade'))
+
+    def test_empty_and_missing_are_safe(self):
+        self.assertFalse(map_style.has_local_basemap([], {}))
+        self.assertFalse(map_style.has_local_basemap(None, {}))
+
+
 if __name__ == '__main__':
     unittest.main()

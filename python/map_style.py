@@ -71,3 +71,19 @@ def resolve_cog_color(cog_color, stats):
     if parts[2] == 'auto' and stats.get('max') is not None:
         parts[2] = str(round(stats['max'], 4))
     return ','.join(parts)
+
+
+def has_local_basemap(in_layers, layers_dict, layer_name='basemap'):
+    """Whether an outlet should offer the atlas's own raster basemap.
+
+    The dropdown option selects a style layer named `{layer_name}-layer`, which
+    exists only when a raster layer of that exact name is among the outlet's
+    `in_layers`. The test this replaces — "is the first in_layers entry a
+    raster" — held only by the convention of listing the basemap first, and
+    broke the moment some other raster went first: a COG borrowed from another
+    atlas has to be ordered first so its `before_layer_id` resolves to a vector
+    layer and it draws underneath. That offered a basemap the atlas does not
+    have, and selecting it makes MapLibre fire an error and skip the change.
+    """
+    return (layer_name in (in_layers or ())
+            and (layers_dict.get(layer_name) or {}).get('geometry_type') == 'raster')

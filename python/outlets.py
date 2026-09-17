@@ -624,7 +624,7 @@ void await map.loadImage('{im_uri}',
     
     layers_dict = {l['name']: l for l in config['dataswale']['layers']}
     webmap_in_layers = config.get('assets', {}).get('webmap', {}).get('in_layers', [])
-    basemap_is_raster = bool(webmap_in_layers) and layers_dict.get(webmap_in_layers[0], {}).get('geometry_type') == 'raster'
+    basemap_is_raster = map_style.has_local_basemap(webmap_in_layers, layers_dict)
     lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if basemap_is_raster else ''
 
     # Generate QR code if a page URL was supplied
@@ -984,7 +984,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
     
     layers_dict_edit = {l['name']: l for l in config['dataswale']['layers']}
     webedit_in_layers = config.get('assets', {}).get('webedit', {}).get('in_layers', [])
-    basemap_is_raster_edit = bool(webedit_in_layers) and layers_dict_edit.get(webedit_in_layers[0], {}).get('geometry_type') == 'raster'
+    basemap_is_raster_edit = map_style.has_local_basemap(webedit_in_layers, layers_dict_edit, 'hillshade')
     lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if basemap_is_raster_edit else ''
 
     move_targets = candidate_move_targets(config, ea['name'])
