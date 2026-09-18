@@ -90,7 +90,7 @@ def _ingest_directory(s3, bucket, prefix, args):
             feature = email_inlet.build_feature(
                 lat=gps['lat'], lon=gps['lon'],
                 title=Path(key).stem, sender=args.sender,
-                timestamp=obj['LastModified'].isoformat(),
+                timestamp=email_inlet.exif_timestamp(gps, obj['LastModified'].isoformat()),
                 image_url=image_url, extra_props=extra_props,
             )
             features.append(feature)
@@ -151,7 +151,7 @@ def _ingest_zip(s3, bucket, prefix, args):
                 continue
 
             zinfo = zf.getinfo(name)
-            ts = datetime(*zinfo.date_time).isoformat()
+            ts = email_inlet.exif_timestamp(gps, datetime(*zinfo.date_time).isoformat())
             extra_props = {k: v for k, v in gps.items() if k not in ('lat', 'lon')}
             feature = email_inlet.build_feature(
                 lat=gps['lat'], lon=gps['lon'],

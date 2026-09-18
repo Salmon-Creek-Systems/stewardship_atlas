@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from email_inlet import parse_subject, extract_gps, build_feature
+from email_inlet import parse_subject, extract_gps, build_feature, exif_timestamp
 
 
 class TestParseSubject(unittest.TestCase):
@@ -189,6 +189,32 @@ class TestBuildFeature(unittest.TestCase):
                                 extra_props={"make": "Apple", "altitude": 142.0})
         self.assertEqual(feature["properties"]["make"], "Apple")
         self.assertEqual(feature["properties"]["altitude"], 142.0)
+
+
+class TestExifTimestamp(unittest.TestCase):
+    """Capture date beats arrival date — see the Hargus batch, uploaded to S3
+    in 2026 from photos taken in March 2025."""
+
+    FALLBACK = "2026-04-08T13:04:57+00:00"
+
+    def test_prefers_exif_datetime(self):
+        ts = exif_timestamp({"datetime": "2025:03:29 17:33:28"}, self.FALLBACK)
+        self.assertEqual(ts, "2025-03-29T17:33:28")
+
+    def test_falls_back_when_absent(self):
+        self.assertEqual(exif_timestamp({"lat": 39.7}, self.FALLBACK), self.FALLBACK)
+
+    def test_falls_back_on_empty_gps(self):
+        self.assertEqual(exif_timestamp({}, self.FALLBACK), self.FALLBACK)
+        self.assertEqual(exif_timestamp(None, self.FALLBACK), self.FALLBACK)
+
+    def test_falls_back_on_unparseable(self):
+        self.assertEqual(exif_timestamp({"datetime": "not a date"}, self.FALLBACK),
+                         self.FALLBACK)
+
+    def test_tolerates_surrounding_whitespace(self):
+        ts = exif_timestamp({"datetime": "  2024:12:08 03:02:51  "}, self.FALLBACK)
+        self.assertEqual(ts, "2024-12-08T03:02:51")
 
 
 if __name__ == "__main__":

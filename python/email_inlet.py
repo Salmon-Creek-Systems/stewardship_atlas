@@ -4,6 +4,7 @@ and build GeoJSON point features for ingestion into atlas layers.
 """
 import io
 import logging
+from datetime import datetime
 
 import geojson
 from PIL import Image
@@ -144,6 +145,23 @@ def extract_gps(image_bytes: bytes) -> dict | None:
             result[key] = raw_exif[exif_tag]
 
     return result
+
+
+def exif_timestamp(gps: dict, fallback: str) -> str:
+    """Capture time from EXIF, falling back to a caller-supplied timestamp.
+
+    `extract_gps` surfaces EXIF DateTime as `datetime`, in EXIF's
+    "YYYY:MM:DD HH:MM:SS" form. Prefer it: a caller's fallback is when the
+    bytes arrived — in the mailbox, in S3, in a zip — which for a batch
+    back-filled long after the fact can be years off the capture date.
+    """
+    raw = (gps or {}).get('datetime')
+    if raw:
+        try:
+            return datetime.strptime(str(raw).strip(), '%Y:%m:%d %H:%M:%S').isoformat()
+        except ValueError:
+            logger.warning(f"unparseable EXIF DateTime {raw!r}, using {fallback}")
+    return fallback
 
 
 def build_feature(lat: float, lon: float, title: str, sender: str,
