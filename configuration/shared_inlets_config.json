@@ -726,6 +726,12 @@
         "interaction": "import",
         "data_type": "tiff"
     },
+    "cog_source": {
+        "asset_type": "inlet",
+        "fetch_type": "cog_source",
+        "interaction": "import",
+        "data_type": "tiff"
+    },
     "s3_geojson_inlet": {
         "asset_type": "inlet",
         "fetch_type": "s3_geojson",

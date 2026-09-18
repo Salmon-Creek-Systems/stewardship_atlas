@@ -134,6 +134,59 @@ def terrain_dem_inlet(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE
     return out_path
 
 
+def vsi_path(url: str) -> str:
+    """Translate a source URL into the GDAL virtual filesystem path for it.
+
+    Anything GDAL already understands — a local path, an explicit /vsi.../ —
+    passes through untouched.
+    """
+    if url.startswith('s3://'):
+        return '/vsis3/' + url[len('s3://'):]
+    if url.startswith(('http://', 'https://')):
+        return '/vsicurl/' + url
+    return url
+
+
+def cog_source(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
+    """Window a remote COG into this atlas's bbox, downloading nothing else.
+
+    The counterpart of every other raster inlet, which fetch the whole object
+    and then throw most of it away: s3_raster calls download_file, url_raster
+    GETs the entire body, local_raster reads a whole local file. gdalwarp over
+    /vsicurl/ issues range requests instead, so the cost is the atlas's own
+    window and the overviews it passes through — the same selectivity
+    overture_duckdb already gets on the vector side by pushing the bbox down
+    into a remote GeoParquet scan.
+
+    That makes a state- or continent-scale COG usable without a local copy,
+    and leaves derivation where it belongs: eddies downstream turn this into
+    whatever this particular atlas needs.
+
+    Config keys:
+        url:            the source COG — https://, s3://, or a /vsi path
+        resample_width: optional output width in pixels, height auto
+
+    The asset also needs a top-level `out_layer`; delta_path reads it from
+    there, not from the nested config.
+    """
+    inlet_config = config['assets'][name]['config']
+    source = vsi_path(inlet_config['url'].format(**config))
+    outpath = delta_queue.delta_path(config, name, 'create')
+
+    logger.info(f"cog_source: windowing {source} -> {outpath}")
+    utils.canonicalize_raster(
+        source,
+        outpath,
+        config['dataswale']['crs'],
+        config['dataswale']['bbox'],
+        inlet_config.get('resample_width', None),
+        gdal_config={'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR'},
+    )
+    # canonicalize_raster returns its input; the delta we just wrote is what
+    # callers care about.
+    return outpath
+
+
 def s3_raster(config: Dict[str, Any], name: str, delta_queue=DELTA_QUEUE):
     """Fetch GeoTIFF from a private S3 bucket and save to versioned outpath."""
     import boto3
@@ -165,4 +218,5 @@ asset_methods = {
     'local_raster': local_raster,
     'terrain_dem': terrain_dem_inlet,
     's3_raster': s3_raster,
+    'cog_source': cog_source,
 }

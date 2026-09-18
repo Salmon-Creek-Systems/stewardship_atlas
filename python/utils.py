@@ -136,8 +136,16 @@ def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
 
     return jpg_path
 
-def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
-    """Canonicalize raster to target CRS using versioned paths"""
+def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None,
+                       gdal_config=None):
+    """Canonicalize raster to target CRS using versioned paths
+
+    gdal_config is an optional {name: value} of GDAL config options, passed as
+    --config pairs. A remote source read through /vsicurl/ wants
+    GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR, without which GDAL lists the whole
+    containing prefix before reading a byte. inpath may be any path GDAL
+    accepts, including /vsicurl/ and /vsis3/.
+    """
     
     logger.info(f"Canonicalizing raster: {inpath}")
 
@@ -146,7 +154,10 @@ def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
 
     extent = [str(bbox['west']), str(bbox['south']),str(bbox['east']), str(bbox['north'])]
     
-    warp_args = [ 'gdalwarp', '-t_srs', target_srs, '-te'] + extent
+    warp_args = ['gdalwarp']
+    for key, value in (gdal_config or {}).items():
+        warp_args += ['--config', key, str(value)]
+    warp_args += ['-t_srs', target_srs, '-te'] + extent
     if resample_width:
         warp_args += [ '-ts', str(resample_width), '0', '-r', 'bilinear']
     warp_args += [str(inpath), str(outpath)]

@@ -255,5 +255,41 @@ class TestUtils(unittest.TestCase):
         
         self.assertEqual(result['features'][0]['properties']['clean_name'], "Point")
 
+
+class TestCanonicalizeRasterGdalConfig(unittest.TestCase):
+    """gdal_config becomes --config pairs, and existing callers are unaffected."""
+
+    BBOX = {'west': -123.7, 'east': -123.4, 'south': 39.5, 'north': 39.8}
+
+    def _warp_args(self, **kwargs):
+        with patch('utils.subprocess.check_output') as run:
+            canonicalize_raster('in.tif', 'out.tif', 'EPSG:4269', self.BBOX, **kwargs)
+        return run.call_args[0][0]
+
+    def test_no_config_is_unchanged(self):
+        args = self._warp_args()
+        self.assertEqual(args[0], 'gdalwarp')
+        self.assertNotIn('--config', args)
+        self.assertEqual(args[1:3], ['-t_srs', 'EPSG:4269'])
+
+    def test_config_pairs_precede_other_options(self):
+        args = self._warp_args(gdal_config={'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR'})
+        self.assertEqual(args[:4],
+                         ['gdalwarp', '--config', 'GDAL_DISABLE_READDIR_ON_OPEN', 'EMPTY_DIR'])
+        self.assertEqual(args[4], '-t_srs')
+
+    def test_extent_and_paths_still_present(self):
+        args = self._warp_args(gdal_config={'A': 'B'})
+        self.assertEqual(args[-2:], ['in.tif', 'out.tif'])
+        self.assertIn('-te', args)
+        te = args.index('-te')
+        self.assertEqual(args[te + 1:te + 5], ['-123.7', '39.5', '-123.4', '39.8'])
+
+    def test_resample_width_still_applies(self):
+        args = self._warp_args(resample_width=2048, gdal_config={'A': 'B'})
+        self.assertIn('-ts', args)
+        self.assertEqual(args[args.index('-ts') + 1], '2048')
+
+
 if __name__ == '__main__':
     unittest.main() 
