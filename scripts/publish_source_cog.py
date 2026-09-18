@@ -106,9 +106,15 @@ def build_cog(src, out_path, meta, args):
              str(src), str(tmp_vrt)], args.dry_run)
         warp_input = tmp_vrt
 
-    cmd = ['gdalwarp', '-t_srs', 'EPSG:3857', '-r', args.resampling, '-of', 'COG',
-           '-co', 'COMPRESS=DEFLATE', '-co', 'BLOCKSIZE=512',
-           '-co', 'OVERVIEW_RESAMPLING=' + args.resampling.upper()]
+    creation = {'COMPRESS': 'DEFLATE', 'BLOCKSIZE': '512',
+                'OVERVIEW_RESAMPLING': args.resampling.upper()}
+    for opt in args.co:
+        key, _, value = opt.partition('=')
+        creation[key.upper()] = value
+
+    cmd = ['gdalwarp', '-t_srs', 'EPSG:3857', '-r', args.resampling, '-of', 'COG']
+    for key, value in creation.items():
+        cmd += ['-co', f'{key}={value}']
 
     # Source nodata of 0 is why this matters: without an alpha band the
     # no-coverage area renders as opaque black rather than as nothing.
@@ -123,6 +129,8 @@ def build_cog(src, out_path, meta, args):
     if tmp_vrt is not None and not args.dry_run and tmp_vrt.exists():
         tmp_vrt.unlink()
 
+    return creation
+
 
 def main():
     ap = argparse.ArgumentParser(
@@ -136,6 +144,13 @@ def main():
     ap.add_argument('--profile', default='atlas', help='AWS profile (default: atlas)')
     ap.add_argument('--resampling', default='bilinear',
                     help='gdalwarp -r value (default: bilinear)')
+    ap.add_argument('--co', action='append', default=[], metavar='KEY=VALUE',
+                    help='extra COG creation option, repeatable; overrides the '
+                         'defaults (COMPRESS=DEFLATE, BLOCKSIZE=512, '
+                         'OVERVIEW_RESAMPLING). PREDICTOR=2 is worth trying on '
+                         'continuous-tone imagery. Stay with a compression '
+                         'geotiff.js can decode — DEFLATE, LZW or JPEG — since '
+                         'WEBP would render server-side but not in the browser.')
     ap.add_argument('--rgb', dest='rgb', action='store_true', default=None,
                     help='expand a single band to 3-band RGB (default: auto)')
     ap.add_argument('--no-rgb', dest='rgb', action='store_false')
@@ -170,7 +185,7 @@ def main():
     out_path = workdir / f'{args.source_name}.cog.tif'
 
     print(f"Converting -> {out_path}")
-    build_cog(src, out_path, meta, args)
+    creation_used = build_cog(src, out_path, meta, args)
 
     key_base = f"{args.prefix}/{args.source_name}/{args.source_name}"
     cog_key = f"{key_base}.cog.tif"
@@ -199,6 +214,7 @@ def main():
         'conversion': {
             'target_crs': 'EPSG:3857',
             'resampling': args.resampling,
+            'creation_options': creation_used,
             'expanded_to_rgb': args.rgb,
             'alpha_from_nodata': args.alpha,
             'gdal_version': (subprocess.run(['gdalinfo', '--version'], capture_output=True,
