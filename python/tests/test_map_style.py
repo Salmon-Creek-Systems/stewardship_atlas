@@ -122,6 +122,7 @@ class TestLocalBasemapOption(unittest.TestCase):
     """The basemap dropdown may only offer a layer the style actually has."""
 
     RASTER = {'geometry_type': 'raster'}
+    COG_RASTER = {'geometry_type': 'raster', 'cog': True}
     LINE = {'geometry_type': 'linestring'}
 
     def test_offered_when_the_named_raster_is_in_the_outlet(self):
@@ -130,10 +131,22 @@ class TestLocalBasemapOption(unittest.TestCase):
             ['basemap', 'roads'], {'basemap': self.RASTER, 'roads': self.LINE}))
 
     def test_not_offered_when_the_atlas_has_no_such_layer(self):
-        # south_fork_eel: borrowed COGs, no basemap layer of its own.
+        # An atlas showing only COGs borrowed from elsewhere, with no basemap
+        # layer of its own — south_fork_eel before it got one.
         self.assertFalse(map_style.has_local_basemap(
             ['fhe_canopy_density', 'roads'],
             {'fhe_canopy_density': self.RASTER, 'roads': self.LINE}))
+
+    def test_a_cog_backed_basemap_is_still_a_basemap(self):
+        # south_fork_eel now: 'basemap' is a COG windowed from a shared source,
+        # so its style layer is added after load rather than sitting in the
+        # style. It is still `basemap-layer`, so the option is genuine — the
+        # ordering that makes it true lives in webmap.js, not here.
+        self.assertTrue(map_style.has_local_basemap(
+            ['basemap', 'fhe_canopy_density', 'roads'],
+            {'basemap': self.COG_RASTER,
+             'fhe_canopy_density': self.COG_RASTER,
+             'roads': self.LINE}))
 
     def test_a_leading_raster_is_not_evidence_of_a_basemap(self):
         # The bug this replaces: any raster first in in_layers offered a

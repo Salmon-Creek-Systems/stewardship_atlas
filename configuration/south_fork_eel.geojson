@@ -53,6 +53,17 @@
         "admin_emails": [],
         "logo_url": "",
         "layers": {
+          "basemap": {
+            "geometry_type": "raster",
+            "cog": true,
+            "display_name": "LIDAR Hillshade",
+            "paint": {
+              "raster-opacity": 1.0
+            },
+            "access": [
+              "public"
+            ]
+          },
           "fhe_canopy_density": {
             "geometry_type": "raster",
             "cog": true,
@@ -401,6 +412,25 @@
           }
         },
         "assets": {
+          "hillshade_source": {
+            "type": "inlet",
+            "out_layer": "basemap",
+            "config_def": "cog_source",
+            "url": "https://scs-atlas-data.s3.us-east-1.amazonaws.com/sources/rasters/mendocino_coast_hillshade_2m/mendocino_coast_hillshade_2m.cog.tif",
+            "attribution": {
+              "description": "2m lidar hillshade, Mendocino coast",
+              "url": "https://portal.opentopography.org/api/terms",
+              "license": "https://portal.opentopography.org/api/terms",
+              "citation": "OpenTopography"
+            }
+          },
+          "basemap_cog": {
+            "type": "eddy",
+            "in_layer": "basemap",
+            "out_layer": "basemap",
+            "config_def": "tiff_to_cog",
+            "stats": false
+          },
           "public_roads_primary": {
             "type": "inlet",
             "out_layer": "roads_primary",
@@ -765,6 +795,7 @@
             "name": "webmap",
             "config_def": "webmap",
             "in_layers": [
+              "basemap",
               "fhe_canopy_density", "fhe_ladder_fuel_density", "fhe_flow_accumulation",
               "roads_tertiary",
               "roads_secondary",
