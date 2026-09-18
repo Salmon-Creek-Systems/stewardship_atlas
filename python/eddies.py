@@ -1269,6 +1269,27 @@ def terrain_rgb_tiff(config: Dict[str, Any], eddy_name: str) -> Path:
     return out_path
 
 
+def _band_min_max(ds, bidx=1):
+    """Exact min and max of a band, one block at a time.
+
+    The whole-band `read(1, masked=True)` this replaces needed the entire band
+    resident at once — around 2.3 GB on a gigapixel raster, on a box with no
+    swap. Reading block by block gives identical numbers in bounded memory.
+
+    Returns (None, None) when every pixel is masked.
+    """
+    low = high = None
+    for _, window in ds.block_windows(bidx):
+        block = ds.read(bidx, window=window, masked=True)
+        if block.count() == 0:
+            continue
+        block_low = float(block.min())
+        block_high = float(block.max())
+        low = block_low if low is None else min(low, block_low)
+        high = block_high if high is None else max(high, block_high)
+    return low, high
+
+
 def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
     """Convert a GeoTIFF layer to a Cloud-Optimized GeoTIFF (COG).
 
@@ -1281,6 +1302,10 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
         out_layer:     output layer name (defaults to in_layer)
         log_transform: if true, apply log1p to pixel values before COG conversion
                        (stopgap for skewed distributions; see issue #97 for setColorFunction approach)
+        stats:         write the stats.json sidecar (default true). Set false for
+                       a layer whose cog_color names no 'auto' — a hillshade
+                       rendered as RGB needs no range, and computing one costs a
+                       full pass over the raster.
     """
     eddy = config['assets'][eddy_name]
     in_layer = eddy['in_layer']
@@ -1327,14 +1352,26 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
     if result.returncode != 0:
         raise RuntimeError(f"gdalwarp COG failed:\n{result.stderr}")
 
+    if not eddy.get('stats', True):
+        logger.info(f"tiff_to_cog complete: {out_path}, stats skipped")
+        return out_path
+
     with rasterio.open(out_path) as ds:
-        data = ds.read(1, masked=True)
-        stats = {
-            'min': float(data.min()),
-            'max': float(data.max()),
-            'nodata': ds.nodata,
-            'log_transformed': bool(eddy.get('log_transform', False)),
-        }
+        low, high = _band_min_max(ds)
+        nodata = ds.nodata
+
+    if low is None:
+        logger.warning(
+            f"tiff_to_cog: {out_path} has no unmasked pixels, writing no stats.json — "
+            f"a cog_color asking for 'auto' will not resolve")
+        return out_path
+
+    stats = {
+        'min': low,
+        'max': high,
+        'nodata': nodata,
+        'log_transformed': bool(eddy.get('log_transform', False)),
+    }
     (out_dir / 'stats.json').write_text(json.dumps(stats, indent=2))
     logger.info(f"tiff_to_cog complete: {out_path}, stats={stats}")
     return out_path

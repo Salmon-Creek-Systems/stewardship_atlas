@@ -21,7 +21,8 @@ for _mod in ('duckdb', 'geojson', 'osgeo', 'osgeo.gdal', 'osgeo.ogr',
 
 import h3
 from eddies import (contours_gdal, hillshade_gdal, h3_for_point, asset_methods,
-                    _h3_grid_distance_safe, _get_cell_path_distances, _cell_yield)
+                    _h3_grid_distance_safe, _get_cell_path_distances, _cell_yield,
+                    _band_min_max)
 
 class TestEddies(unittest.TestCase):
     def setUp(self):
@@ -302,6 +303,54 @@ class TestBiocharSimulation(unittest.TestCase):
         result = _cell_yield(burn_props, 'chop_and_leave', treatment_no_biochar, 0.001, 0.01)
         self.assertEqual(result['biochar_extracted'], 0.0)
         self.assertEqual(result['biochar_sale'], 0.0)
+
+
+
+class SequencedReader:
+    """Serves blocks in the order block_windows yields them."""
+
+    def __init__(self, blocks):
+        self.blocks = blocks
+
+    def block_windows(self, bidx=1):
+        for i in range(len(self.blocks)):
+            yield (0, i), i
+
+    def read(self, bidx=1, window=None, masked=False):
+        return self.blocks[window]
+
+
+class TestBandMinMax(unittest.TestCase):
+    """Block-wise min/max replaces a whole-band read that needed ~2.3 GB
+    resident on a gigapixel raster."""
+
+    def _masked(self, values, mask=None):
+        return np.ma.masked_array(np.array(values, dtype=float),
+                                  mask=np.array(mask if mask is not None
+                                                else [False] * len(values)))
+
+    def test_min_max_across_blocks(self):
+        ds = SequencedReader([self._masked([5, 9]), self._masked([2, 7]),
+                              self._masked([6, 8])])
+        self.assertEqual(_band_min_max(ds), (2.0, 9.0))
+
+    def test_fully_masked_blocks_are_skipped(self):
+        ds = SequencedReader([self._masked([1, 2], [True, True]),
+                              self._masked([4, 6])])
+        self.assertEqual(_band_min_max(ds), (4.0, 6.0))
+
+    def test_masked_values_do_not_count(self):
+        # The 0 is nodata; the real minimum is 3.
+        ds = SequencedReader([self._masked([0, 3, 5], [True, False, False])])
+        self.assertEqual(_band_min_max(ds), (3.0, 5.0))
+
+    def test_all_masked_returns_none(self):
+        ds = SequencedReader([self._masked([0, 0], [True, True])])
+        self.assertEqual(_band_min_max(ds), (None, None))
+
+    def test_single_block(self):
+        ds = SequencedReader([self._masked([42])])
+        self.assertEqual(_band_min_max(ds), (42.0, 42.0))
 
 
 if __name__ == '__main__':
