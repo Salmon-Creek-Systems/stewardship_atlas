@@ -227,20 +227,6 @@ map.on('load', async () => {
     // Initialize basemap switching
     initializeBasemapSwitching(map);
 
-    // Hide all basemaps then show the one matching the dropdown's selected value
-    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer', 'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
-    allBasemapLayerIds.forEach(id => {
-        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
-    });
-    const basemapValueToLayer = {
-        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
-        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
-        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
-    };
-    const initialBasemap = document.getElementById('basemap-select').value;
-    if (basemapValueToLayer[initialBasemap]) {
-        map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
-    }
     // The COG protocol issues HTTP range requests, so it needs a real absolute
     // URL — but which host that is depends on where this page is being served
     // from (the box, or CloudFront). So the generator emits a relative path and
@@ -267,6 +253,29 @@ map.on('load', async () => {
         for (const layerDef of COG_LAYERS) {
             map.addLayer(layerDef, layerDef.before_layer_id || undefined);
         }
+    }
+
+    // Hide all basemaps then show the one matching the dropdown's selected value.
+    // This has to run *after* the COG block above: an atlas whose basemap is a
+    // COG gets `basemap-layer` added there, not in the style, so doing this
+    // earlier would find no such layer — and the show call below is the one
+    // that throws rather than being swallowed, taking the rest of init with it.
+    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer', 'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
+    allBasemapLayerIds.forEach(id => {
+        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+    });
+    const basemapValueToLayer = {
+        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
+        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
+        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
+    };
+    const initialBasemap = document.getElementById('basemap-select').value;
+    const initialBasemapLayer = basemapValueToLayer[initialBasemap];
+    if (initialBasemapLayer && map.getLayer(initialBasemapLayer)) {
+        map.setLayoutProperty(initialBasemapLayer, 'visibility', 'visible');
+    } else if (initialBasemapLayer) {
+        console.warn('Basemap option "' + initialBasemap + '" selects layer "' +
+                     initialBasemapLayer + '", which this style does not have.');
     }
 
     // Restore layer visibility from ?s= state before legend initializes (so checkboxes render correctly)
