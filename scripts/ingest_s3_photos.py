@@ -17,6 +17,7 @@ Options:
     --sender TEXT       provenance string in feature properties (default: "s3_import")
     --dry-run           print what would be ingested without writing anything
     --profile PROFILE   AWS profile name (default: atlas)
+    --no-bbox-filter    keep fixes outside the atlas bbox (default: skip them)
 
 Example:
     SWALES_ROOT=/root/swales_dev \\
@@ -55,6 +56,18 @@ def parse_s3_url(s3_url: str):
     return bucket, prefix
 
 
+def outside_bbox(bbox, lat, lon):
+    """Whether a fix falls outside the atlas, and so would import invisibly.
+
+    s3_geojson already bbox-filters what it imports. Photo ingest did not, so a
+    stray fix landed a feature off the edge of its own map with nothing to say
+    so — Hargus_biochar carries three March 2024 GoPro shots ~6km west of
+    south_fork_eel, inside westport instead.
+    """
+    return not (bbox['west'] <= lon <= bbox['east']
+                and bbox['south'] <= lat <= bbox['north'])
+
+
 def _ingest_directory(s3, bucket, prefix, args):
     """List and process image objects under an S3 prefix."""
     paginator = s3.get_paginator('list_objects_v2')
@@ -82,6 +95,12 @@ def _ingest_directory(s3, bucket, prefix, args):
                 continue
             if 'lat' not in gps or 'lon' not in gps:
                 print(f"SKIP {key}: incomplete GPS ({gps})")
+                n_skip += 1
+                continue
+
+            if args.bbox and outside_bbox(args.bbox, gps['lat'], gps['lon']):
+                print(f"SKIP {key}: outside atlas bbox "
+                      f"({gps['lat']:.5f}, {gps['lon']:.5f})")
                 n_skip += 1
                 continue
 
@@ -150,6 +169,12 @@ def _ingest_zip(s3, bucket, prefix, args):
                 n_skip += 1
                 continue
 
+            if args.bbox and outside_bbox(args.bbox, gps['lat'], gps['lon']):
+                print(f"SKIP {name}: outside atlas bbox "
+                      f"({gps['lat']:.5f}, {gps['lon']:.5f})")
+                n_skip += 1
+                continue
+
             zinfo = zf.getinfo(name)
             ts = email_inlet.exif_timestamp(gps, datetime(*zinfo.date_time).isoformat())
             extra_props = {k: v for k, v in gps.items() if k not in ('lat', 'lon')}
@@ -173,6 +198,10 @@ def main():
     parser.add_argument('--sender', default='s3_import', help='Provenance string (default: s3_import)')
     parser.add_argument('--dry-run', action='store_true', help='Preview only, no writes')
     parser.add_argument('--profile', default='atlas', help='AWS profile name (default: atlas)')
+    parser.add_argument('--no-bbox-filter', dest='bbox_filter', action='store_false',
+                        default=True,
+                        help='import fixes that fall outside the atlas bbox '
+                             '(default: skip them, as s3_geojson does)')
     args = parser.parse_args()
 
     # Load atlas config
@@ -206,6 +235,10 @@ def main():
     print(f"Layer:   {layer_name}")
     print(f"Source:  s3://{bucket}/{prefix}")
     print(f"Sender:  {args.sender}")
+    args.bbox = config['dataswale']['bbox'] if args.bbox_filter else None
+    if args.bbox:
+        print(f"Bbox:    {args.bbox['west']}, {args.bbox['south']} .. "
+              f"{args.bbox['east']}, {args.bbox['north']}")
     if args.dry_run:
         print("Mode:    dry-run (no writes)")
     print()
