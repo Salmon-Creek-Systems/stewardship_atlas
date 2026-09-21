@@ -554,10 +554,17 @@ def geojson_bbox(coordinates):
 def square_from_bbox(bbox):
     """A closed square ring covering bbox, sized by its longer side, concentric.
 
-    The square is in degrees, not metres, and that is deliberate: a runbook page
-    is rendered in the dataswale's geographic CRS, where equal degrees of
-    latitude and longitude occupy equal space on the page. A metrically square
-    region would print as a rectangle.
+    The square is in degrees, which is NOT the same as square on the page.
+    outlets_qgis switches to EPSG:3857 whenever the layer CRS is geographic, so
+    a degree-square reaches the page about 1.30x taller than wide at 40N. The
+    renderer then expands the extent to fit the frame, so nothing is distorted,
+    but each page covers appreciably more ground east-west than the region
+    describes.
+
+    This is how westport's existing regions were made and reproduces them
+    exactly, so it is the right transform for restoring them. It is probably
+    the wrong one going forward: a region square in 3857 needs its latitude
+    span scaled by cos(lat). Unchanged here because every stored region moves.
     """
     min_x, min_y, max_x, max_y = bbox
     half = max(max_x - min_x, max_y - min_y) / 2
@@ -572,6 +579,9 @@ def squarify_feature(feature):
     Regions become runbook pages, and a page is a fixed shape — so a region is
     stored already squared rather than squared at render time, which keeps what
     is drawn on the webmap identical to what gets printed.
+
+    See square_from_bbox on why "square" here means square in degrees, and why
+    that is not square on the printed page.
 
     Non-polygons and unreadable geometries pass through untouched.
     """
