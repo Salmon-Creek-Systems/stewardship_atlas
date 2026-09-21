@@ -16,128 +16,19 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
-def get_bbox(coordinates):
-    """
-    Get bounding box (min_x, min_y, max_x, max_y) from polygon coordinates.
-    Handles both Polygon and MultiPolygon types.
-    """
-    # Flatten all coordinate pairs
-    all_coords = []
-    
-    def flatten(coords):
-        """Recursively flatten coordinate structure"""
-        for item in coords:
-            if isinstance(item, list) and len(item) > 0:
-                if isinstance(item[0], (int, float)):
-                    # This is a coordinate pair [lon, lat]
-                    all_coords.append(item)
-                else:
-                    # This is a nested list, recurse
-                    flatten(item)
-    
-    flatten(coordinates)
-    
-    if not all_coords:
-        return None
-    
-    lons = [c[0] for c in all_coords]
-    lats = [c[1] for c in all_coords]
-    
-    return (min(lons), min(lats), max(lons), max(lats))
+import utils
 
 
-def create_square_from_bbox(bbox):
-    """
-    Create a square polygon from a bounding box.
-    Uses the larger dimension and centers the square on the bbox center.
-    
-    Args:
-        bbox: tuple of (min_x, min_y, max_x, max_y)
-        
-    Returns:
-        List of coordinates forming a square polygon
-    """
-    min_x, min_y, max_x, max_y = bbox
-    
-    # Calculate dimensions
-    width = max_x - min_x
-    height = max_y - min_y
-    
-    # Use the larger dimension
-    size = max(width, height)
-    
-    # Calculate center
-    center_x = (min_x + max_x) / 2
-    center_y = (min_y + max_y) / 2
-    
-    # Create square coordinates (closed polygon)
-    half_size = size / 2
-    square_coords = [
-        [center_x - half_size, center_y - half_size],  # Bottom-left
-        [center_x + half_size, center_y - half_size],  # Bottom-right
-        [center_x + half_size, center_y + half_size],  # Top-right
-        [center_x - half_size, center_y + half_size],  # Top-left
-        [center_x - half_size, center_y - half_size]   # Close the polygon
-    ]
-    
-    return square_coords
 
 
-def squarify_feature(feature):
-    """
-    Convert a feature's geometry to a square.
-    
-    Args:
-        feature: GeoJSON feature dict
-        
-    Returns:
-        New feature with square geometry
-    """
-    import copy
-    
-    # Create a deep copy to avoid modifying the original
-    new_feature = copy.deepcopy(feature)
-    
-    geometry = new_feature.get('geometry', {})
-    geom_type = geometry.get('type', '')
-    
-    if geom_type not in ['Polygon', 'MultiPolygon']:
-        # Not a polygon, return copy as-is
-        return new_feature
-    
-    coordinates = geometry.get('coordinates', [])
-    bbox = get_bbox(coordinates)
-    
-    if bbox is None:
-        # Invalid geometry, return copy as-is
-        return new_feature
-    
-    # Calculate dimensions for logging
-    min_x, min_y, max_x, max_y = bbox
-    width = max_x - min_x
-    height = max_y - min_y
-    size = max(width, height)
-    
-    # Create square coordinates
-    square_coords = create_square_from_bbox(bbox)
-    
-    # Replace geometry with a simple Polygon (square)
-    new_feature['geometry'] = {
-        'type': 'Polygon',
-        'coordinates': [square_coords]  # Single ring
-    }
-    
-    # Add metadata about the transformation
-    if 'properties' not in new_feature:
-        new_feature['properties'] = {}
-    
-    new_feature['properties']['_squarified'] = True
-    new_feature['properties']['_original_width'] = width
-    new_feature['properties']['_original_height'] = height
-    new_feature['properties']['_square_size'] = size
-    
-    return new_feature
+
+# The transform lives in utils so the s3_geojson inlet and this CLI stay in
+# step; a region squared on import and one squared by hand must not differ.
+get_bbox = utils.geojson_bbox
+create_square_from_bbox = utils.square_from_bbox
+squarify_feature = utils.squarify_feature
 
 
 def squarify_geojson(input_path):

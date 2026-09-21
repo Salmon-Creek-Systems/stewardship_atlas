@@ -684,6 +684,14 @@
           }
         },
         "assets": {
+          "regions_import": {
+            "type": "inlet",
+            "out_layer": "regions",
+            "config_def": "s3_geojson_inlet",
+            "s3_bucket": "scs-internal",
+            "s3_key": "westport_regions_restore_20260921.geojson",
+            "squarify": true
+          },
           "dem": {
             "type": "inlet",
             "out_layer": "elevation",

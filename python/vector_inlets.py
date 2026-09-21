@@ -245,6 +245,10 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch a GeoJSON file from a private S3 bucket, filter to atlas bbox, write to delta queue.
     Copies image_url → URL on each feature to enable webmap click-to-open behavior.
 
+    squarify: replace each polygon with the square covering it (see
+    utils.squarify_feature). Intended for regions, which are printed one per
+    runbook page.
+
     Geometry handling:
     - null geometry: included unconditionally (tabular layers)
     - Point: bbox-filter on the coordinate
@@ -300,6 +304,13 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
             props['URL'] = props['image_url']
         props['name'] = props.get('common_name', props.get('name', ''))
         features.append(feature)
+
+    # Regions become runbook pages, and a page is a fixed shape, so a region is
+    # stored already squared rather than squared at render time — what the
+    # webmap draws is then what gets printed.
+    if inlet_config.get('squarify'):
+        features = [utils.squarify_feature(f) for f in features]
+        logger.info(f"s3_geojson: squarified {len(features)} feature(s)")
 
     filtered = geojson.FeatureCollection(features)
     logger.info(f"s3_geojson: {len(features)} features within bbox (of {len(fc.get('features', []))} total)")

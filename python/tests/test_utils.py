@@ -11,6 +11,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from utils import (
     rgb_to_css,
+    geojson_bbox,
+    square_from_bbox,
+    squarify_feature,
     bbox_to_corners,
     bbox_to_polygon,
     geojson_to_bbox,
@@ -289,6 +292,76 @@ class TestCanonicalizeRasterGdalConfig(unittest.TestCase):
         args = self._warp_args(resample_width=2048, gdal_config={'A': 'B'})
         self.assertIn('-ts', args)
         self.assertEqual(args[args.index('-ts') + 1], '2048')
+
+
+
+class TestSquarify(unittest.TestCase):
+    """Regions are stored already squared, because each one prints as a page."""
+
+    def _ring(self, feature):
+        return feature['geometry']['coordinates'][0]
+
+    def _wh(self, feature):
+        r = self._ring(feature)
+        xs = [p[0] for p in r]
+        ys = [p[1] for p in r]
+        return max(xs) - min(xs), max(ys) - min(ys)
+
+    RECT = {'type': 'Feature', 'properties': {'name': 'x'},
+            'geometry': {'type': 'Polygon',
+                         'coordinates': [[[0, 0], [4, 0], [4, 1], [0, 1], [0, 0]]]}}
+
+    def test_bbox_over_nested_rings(self):
+        self.assertEqual(geojson_bbox([[[0, 0], [4, 0], [4, 1], [0, 1], [0, 0]]]),
+                         (0, 0, 4, 1))
+
+    def test_bbox_of_nothing_is_none(self):
+        self.assertIsNone(geojson_bbox([]))
+
+    def test_square_takes_the_longer_side(self):
+        ring = square_from_bbox((0, 0, 4, 1))
+        xs = [p[0] for p in ring]
+        ys = [p[1] for p in ring]
+        self.assertEqual(max(xs) - min(xs), 4)
+        self.assertEqual(max(ys) - min(ys), 4)
+
+    def test_square_is_concentric_with_the_original(self):
+        ring = square_from_bbox((0, 0, 4, 1))
+        self.assertEqual((sum(p[0] for p in ring[:4]) / 4,
+                          sum(p[1] for p in ring[:4]) / 4), (2.0, 0.5))
+
+    def test_square_ring_is_closed(self):
+        ring = square_from_bbox((0, 0, 4, 1))
+        self.assertEqual(ring[0], ring[-1])
+
+    def test_feature_geometry_becomes_square(self):
+        w, h = self._wh(squarify_feature(self.RECT))
+        self.assertEqual(w, h)
+
+    def test_transform_metadata_is_recorded(self):
+        props = squarify_feature(self.RECT)['properties']
+        self.assertTrue(props['_squarified'])
+        self.assertEqual(props['_original_width'], 4)
+        self.assertEqual(props['_original_height'], 1)
+        self.assertEqual(props['_square_size'], 4)
+
+    def test_input_is_not_mutated(self):
+        squarify_feature(self.RECT)
+        self.assertEqual(self.RECT['geometry']['coordinates'][0][1], [4, 0])
+
+    def test_non_polygons_pass_through(self):
+        pt = {'type': 'Feature', 'properties': {},
+              'geometry': {'type': 'Point', 'coordinates': [1, 2]}}
+        self.assertEqual(squarify_feature(pt)['geometry'], pt['geometry'])
+
+    def test_null_geometry_passes_through(self):
+        f = {'type': 'Feature', 'properties': {}, 'geometry': None}
+        self.assertIsNone(squarify_feature(f)['geometry'])
+
+    def test_squaring_a_square_is_a_no_op(self):
+        # Re-importing regions must not drift them.
+        once = squarify_feature(self.RECT)
+        self.assertEqual(self._ring(squarify_feature(once)), self._ring(once))
 
 
 if __name__ == '__main__':

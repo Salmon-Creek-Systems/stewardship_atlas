@@ -531,3 +531,69 @@ def build_qgis_color_expression(value_expression, stops):
         f"CASE\n  {body}\n"
         f"  ELSE color_rgb({last_r}, {last_g}, {last_b})\nEND"
     )
+
+def geojson_bbox(coordinates):
+    """(min_x, min_y, max_x, max_y) over any nesting of Polygon/MultiPolygon rings."""
+    xs, ys = [], []
+
+    def walk(item):
+        if (isinstance(item, (list, tuple)) and len(item) >= 2
+                and all(isinstance(v, (int, float)) for v in item[:2])):
+            xs.append(item[0])
+            ys.append(item[1])
+        elif isinstance(item, (list, tuple)):
+            for sub in item:
+                walk(sub)
+
+    walk(coordinates)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def square_from_bbox(bbox):
+    """A closed square ring covering bbox, sized by its longer side, concentric.
+
+    The square is in degrees, not metres, and that is deliberate: a runbook page
+    is rendered in the dataswale's geographic CRS, where equal degrees of
+    latitude and longitude occupy equal space on the page. A metrically square
+    region would print as a rectangle.
+    """
+    min_x, min_y, max_x, max_y = bbox
+    half = max(max_x - min_x, max_y - min_y) / 2
+    cx, cy = (min_x + max_x) / 2, (min_y + max_y) / 2
+    return [[cx - half, cy - half], [cx + half, cy - half], [cx + half, cy + half],
+            [cx - half, cy + half], [cx - half, cy - half]]
+
+
+def squarify_feature(feature):
+    """Replace a polygon's geometry with the square that covers it.
+
+    Regions become runbook pages, and a page is a fixed shape — so a region is
+    stored already squared rather than squared at render time, which keeps what
+    is drawn on the webmap identical to what gets printed.
+
+    Non-polygons and unreadable geometries pass through untouched.
+    """
+    import copy
+
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+
+    min_x, min_y, max_x, max_y = bbox
+    width, height = max_x - min_x, max_y - min_y
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [square_from_bbox(bbox)]}
+    out.setdefault('properties', {}).update({
+        '_squarified': True,
+        '_original_width': width,
+        '_original_height': height,
+        '_square_size': max(width, height),
+    })
+    return out
+
