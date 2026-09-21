@@ -302,5 +302,43 @@ class TestOutlets(unittest.TestCase):
         expected_path = Path(self.test_config["data_root"]) / "outlets" / "test_region" / "test_region.geojson"
         self.assertEqual(result, expected_path)
 
+
+class TestLabelTextMinzoom(unittest.TestCase):
+    """The icon and the label share one symbol layer, so hiding the label by
+    zoom must not take the icon with it."""
+
+    def _apply(self, label_layer, layer):
+        from outlets import _apply_label_text_minzoom
+        _apply_label_text_minzoom(label_layer, layer)
+        return label_layer
+
+    def test_absent_key_changes_nothing(self):
+        ll = {'paint': {'icon-color': 'rgb(255,100,0)'}}
+        self._apply(ll, {'name': 'photos'})
+        self.assertEqual(ll['paint'], {'icon-color': 'rgb(255,100,0)'})
+
+    def test_text_is_stepped_on_zoom(self):
+        ll = {'paint': {}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(ll['paint']['text-opacity'], ['step', ['zoom'], 0, 16, 1])
+
+    def test_icon_paint_survives(self):
+        # The symbol branch sets these; losing them would lose the pin.
+        ll = {'paint': {'icon-color': 'rgb(255,100,0)', 'icon-halo-blur': 10}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(ll['paint']['icon-color'], 'rgb(255,100,0)')
+        self.assertEqual(ll['paint']['icon-halo-blur'], 10)
+
+    def test_paint_is_created_when_absent(self):
+        ll = {}
+        self._apply(ll, {'label_text_minzoom': 14})
+        self.assertEqual(ll['paint'], {'text-opacity': ['step', ['zoom'], 0, 14, 1]})
+
+    def test_only_text_opacity_is_added(self):
+        ll = {'paint': {}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(set(ll['paint']), {'text-opacity'})
+
+
 if __name__ == '__main__':
     unittest.main() 

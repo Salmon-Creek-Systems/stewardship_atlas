@@ -236,6 +236,7 @@
           },
           "photos": {
             "geometry_type": "point",
+            "label_text_minzoom": 16,
             "conversations_enabled": true,
             "color": [
               255,

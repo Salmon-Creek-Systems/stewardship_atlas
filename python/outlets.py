@@ -31,6 +31,24 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+def _apply_label_text_minzoom(label_layer, layer):
+    """Fade the text in at a zoom while leaving the icon drawn all the way out.
+
+    The icon and the label share one symbol layer, so `label_minzoom` hides
+    both — at a wide zoom the pins vanish along with their titles. Stepping
+    text-opacity on zoom is the only way to split them without splitting the
+    layer: the symbol still draws, the text is simply transparent until the
+    titles stop being clutter.
+
+    Applied after the symbol branch, which assigns label_layer['paint']
+    wholesale and would otherwise discard it.
+    """
+    if 'label_text_minzoom' not in layer:
+        return
+    label_layer.setdefault('paint', {})['text-opacity'] = [
+        'step', ['zoom'], 0, layer['label_text_minzoom'], 1]
+
+
 def _resolve_cog_color(config, layer_name, cog_color, layer=None):
     """Substitute 'auto' min/max in cog_color with values from stats.json sidecar.
 
@@ -372,6 +390,7 @@ def webmap_json(config, name, sprite_json=None):
                     meta = label_layer.setdefault('metadata', {})
                     meta['show_attributes'] = True
                     meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+                _apply_label_text_minzoom(label_layer, layer)
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -444,6 +463,7 @@ def webmap_json(config, name, sprite_json=None):
                         meta = label_layer.setdefault('metadata', {})
                         meta['show_attributes'] = True
                         meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+                    _apply_label_text_minzoom(label_layer, layer)
                     map_layers.append(label_layer)
                 else:
                     # Keep as dynamic layer for loadImage approach
