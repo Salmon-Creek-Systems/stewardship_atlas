@@ -53,46 +53,6 @@
         "admin_emails": [],
         "logo_url": "",
         "layers": {
-          "fhe_photos": {
-            "geometry_type": "point",
-            "display_name": "Forest Health Photos",
-            "color": [
-              0,
-              140,
-              140
-            ],
-            "fill_color": [
-              255,
-              255,
-              255
-            ],
-            "add_labels": false,
-            "show_attributes": true,
-            "symbol": {
-              "png": "camera.png",
-              "icon": "camera"
-            },
-            "icon-size": 1.0,
-            "interaction": "interface",
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Processing Site"
-              },
-              {
-                "name": "datetime",
-                "type": "string"
-              },
-              {
-                "name": "sender",
-                "type": "string"
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
           "basemap": {
             "geometry_type": "raster",
             "cog": true,
@@ -454,7 +414,7 @@
         "assets": {
           "fhe_photos_import": {
             "type": "inlet",
-            "out_layer": "fhe_photos",
+            "out_layer": "photos",
             "config_def": "s3_geojson_inlet",
             "s3_bucket": "scs-internal",
             "s3_key": "fhe_photos_snapshot_20260921.geojson"
@@ -851,7 +811,6 @@
               "landmarks",
               "photos",
               "hargus_processing_sites",
-              "fhe_photos",
               "inaturalist",
               "inaturalist_threatened"
             ],
