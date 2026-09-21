@@ -22,7 +22,8 @@ for _mod in ('duckdb', 'geojson', 'osgeo', 'osgeo.gdal', 'osgeo.ogr',
 import h3
 from eddies import (contours_gdal, hillshade_gdal, h3_for_point, asset_methods,
                     _h3_grid_distance_safe, _get_cell_path_distances, _cell_yield,
-                    _band_min_max)
+                    _band_min_max, _count_by_h3, h3_count)
+import eddies
 
 class TestEddies(unittest.TestCase):
     def setUp(self):
@@ -351,6 +352,132 @@ class TestBandMinMax(unittest.TestCase):
     def test_single_block(self):
         ds = SequencedReader([self._masked([42])])
         self.assertEqual(_band_min_max(ds), (42.0, 42.0))
+
+
+class _FakeCentroid:
+    """Stand-in for a shapely geometry: centroid = mean of the outer ring's vertices.
+    shapely is stubbed in this suite, so eddies.shape is patched with this."""
+    def __init__(self, geom):
+        coords = geom['coordinates']
+        if isinstance(coords[0], (int, float)):  # Point
+            coords = [coords]
+        while isinstance(coords[0][0], list):    # Polygon: descend to the outer ring
+            coords = coords[0]
+        self.x = sum(c[0] for c in coords) / len(coords)
+        self.y = sum(c[1] for c in coords) / len(coords)
+
+    @property
+    def centroid(self):
+        return self
+
+
+def _point(lng, lat):
+    return {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+            'properties': {}}
+
+
+def _square(lng, lat, half=0.0001):
+    ring = [[lng - half, lat - half], [lng + half, lat - half], [lng + half, lat + half],
+            [lng - half, lat + half], [lng - half, lat - half]]
+    return {'type': 'Feature', 'geometry': {'type': 'Polygon', 'coordinates': [ring]},
+            'properties': {}}
+
+
+@patch.object(eddies, 'shape', _FakeCentroid)
+class TestCountByH3(unittest.TestCase):
+    """_count_by_h3 puts each feature in exactly one cell: its centroid's."""
+
+    RES = 8
+    LNG, LAT = -123.6, 39.7
+
+    def test_points_in_same_cell_are_summed(self):
+        counts = _count_by_h3([_point(self.LNG, self.LAT)] * 3, self.RES)
+        cell = h3.latlng_to_cell(self.LAT, self.LNG, self.RES)
+        self.assertEqual(counts, {cell: 3})
+
+    def test_small_polygon_counts_once(self):
+        # A building-sized polygon is much smaller than an r8 cell; polyfill would
+        # find no cell for it. The centroid approach must still count it once.
+        counts = _count_by_h3([_square(self.LNG, self.LAT)], self.RES)
+        self.assertEqual(sum(counts.values()), 1)
+        self.assertIn(h3.latlng_to_cell(self.LAT, self.LNG, self.RES), counts)
+
+    def test_features_without_geometry_are_skipped(self):
+        features = [{'type': 'Feature', 'geometry': None, 'properties': {}},
+                    _point(self.LNG, self.LAT)]
+        self.assertEqual(sum(_count_by_h3(features, self.RES).values()), 1)
+
+    def test_distant_points_land_in_different_cells(self):
+        counts = _count_by_h3([_point(self.LNG, self.LAT), _point(self.LNG + 0.1, self.LAT)],
+                              self.RES)
+        self.assertEqual(len(counts), 2)
+
+
+@patch.object(eddies, 'shape', _FakeCentroid)
+class TestH3Count(unittest.TestCase):
+    """h3_count writes the grid with one {source}_count per source, zeros kept."""
+
+    RES = 8
+    LNG, LAT = -123.6, 39.7
+
+    def setUp(self):
+        self.tmp = Path(__file__).parent / '_tmp_h3_count'
+        self.tmp.mkdir(exist_ok=True)
+        center = h3.latlng_to_cell(self.LAT, self.LNG, self.RES)
+        self.center = center
+        self.grid = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'geometry': {'type': 'Polygon', 'coordinates': []},
+             'properties': {'h3_index': c, 'h3_resolution': self.RES}}
+            for c in h3.grid_disk(center, 1)]}
+        self.layers = {
+            'grid': self.grid,
+            # 2 in the center cell, 1 far off-grid
+            'buildings': {'type': 'FeatureCollection', 'features': [
+                _square(self.LNG, self.LAT), _square(self.LNG, self.LAT),
+                _square(self.LNG + 1.0, self.LAT)]},
+            'photos': {'type': 'FeatureCollection', 'features': [_point(self.LNG, self.LAT)]},
+        }
+        self.config = {'assets': {'counts': {'config': {
+            'in_layer': 'grid', 'source_layers': ['buildings', 'photos'], 'out_layer': 'out'}}}}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self):
+        fake_geojson = MagicMock()
+        fake_geojson.FeatureCollection = lambda feats: {'type': 'FeatureCollection',
+                                                        'features': feats}
+        fake_geojson.dump = json.dump
+        with patch.object(eddies.dataswale, 'layer_as_featurecollection',
+                          side_effect=lambda config, name: self.layers[name]), \
+             patch.object(eddies.versioning, 'atlas_path', return_value=self.tmp), \
+             patch.object(eddies, 'geojson', fake_geojson):
+            out_path = h3_count(self.config, 'counts')
+        with open(out_path) as f:
+            return json.load(f)['features']
+
+    def test_every_grid_cell_is_kept_with_counts(self):
+        features = self._run()
+        self.assertEqual(len(features), 7)
+        for f in features:
+            props = f['properties']
+            self.assertIn('buildings_count', props)
+            self.assertIn('photos_count', props)
+            self.assertIn('h3_index', props)
+
+    def test_counts_land_on_the_right_cell(self):
+        by_cell = {f['properties']['h3_index']: f['properties'] for f in self._run()}
+        self.assertEqual(by_cell[self.center]['buildings_count'], 2)
+        self.assertEqual(by_cell[self.center]['photos_count'], 1)
+        others = [p for c, p in by_cell.items() if c != self.center]
+        self.assertTrue(all(p['buildings_count'] == 0 and p['photos_count'] == 0
+                            for p in others))
+
+    def test_grid_without_h3_index_raises(self):
+        self.layers['grid'] = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'geometry': None, 'properties': {}}]}
+        with self.assertRaises(Exception):
+            self._run()
 
 
 if __name__ == '__main__':
