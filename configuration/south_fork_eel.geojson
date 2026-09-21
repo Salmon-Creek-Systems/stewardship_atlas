@@ -87,6 +87,23 @@
           },
           "regions": {
             "layer_def": "regions",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "unique name"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "default": "Text describing the region"
+              },
+              {
+                "name": "caption",
+                "type": "string",
+                "default": "Displayed Title"
+              }
+            ],
             "access": [
               "admin"
             ]
