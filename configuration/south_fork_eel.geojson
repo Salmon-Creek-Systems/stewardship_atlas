@@ -53,46 +53,6 @@
         "admin_emails": [],
         "logo_url": "",
         "layers": {
-          "hargus_biochar": {
-            "geometry_type": "point",
-            "display_name": "Hargus Biochar",
-            "conversations_enabled": true,
-            "color": [
-              200,
-              110,
-              30
-            ],
-            "fill_color": [
-              255,
-              255,
-              255
-            ],
-            "add_labels": false,
-            "symbol": {
-              "png": "camera.png",
-              "icon": "camera"
-            },
-            "icon-size": 1.0,
-            "interaction": "interface",
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Biochar site photo"
-              },
-              {
-                "name": "datetime",
-                "type": "string"
-              },
-              {
-                "name": "model",
-                "type": "string"
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
           "fhe_photos": {
             "geometry_type": "point",
             "display_name": "Forest Health Photos",
@@ -891,7 +851,6 @@
               "landmarks",
               "photos",
               "hargus_processing_sites",
-              "hargus_biochar",
               "fhe_photos",
               "inaturalist",
               "inaturalist_threatened"
