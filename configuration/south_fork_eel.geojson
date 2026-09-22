@@ -493,6 +493,28 @@
               }
             ],
             "access": ["public"]
+          },
+          "inaturalist_threatened_count_h3_r8": {
+            "geometry_type": "polygon",
+            "display_name": "Threatened Species Observations (r8)",
+            "color": [120, 120, 120],
+            "fill_opacity": 0.6,
+            "paint": {
+              "fill-color": [
+                "step", ["get", "inaturalist_threatened_count"],
+                "rgba(0,0,0,0)",
+                1, "rgb(242,240,247)",
+                2, "rgb(203,201,226)",
+                5, "rgb(158,154,200)",
+                15, "rgb(117,107,177)",
+                40, "rgb(84,39,143)"
+              ]
+            },
+            "show_attributes": true,
+            "editable_columns": [
+              { "name": "inaturalist_threatened_count", "type": "number" }
+            ],
+            "access": ["public"]
           }
         },
         "assets": {
@@ -533,6 +555,13 @@
             "in_layer": "h3_grid_r9",
             "in_layers": ["inaturalist_threatened"],
             "out_layer": "inaturalist_threatened_count_h3_r9"
+          },
+          "inaturalist_threatened_count_h3_r8": {
+            "type": "eddy",
+            "config_def": "h3_count",
+            "in_layer": "h3_grid_r8",
+            "in_layers": ["inaturalist_threatened"],
+            "out_layer": "inaturalist_threatened_count_h3_r8"
           },
           "fhe_photos_import": {
             "type": "inlet",
@@ -928,6 +957,7 @@
               "fhe_canopy_density", "fhe_ladder_fuel_density", "fhe_flow_accumulation",
               "buildings_count_h3_r8",
               "inaturalist_threatened_count_h3_r9",
+              "inaturalist_threatened_count_h3_r8",
               "buildings",
               "roads_tertiary",
               "roads_secondary",
