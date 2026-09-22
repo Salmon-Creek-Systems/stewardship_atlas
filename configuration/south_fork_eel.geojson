@@ -428,6 +428,20 @@
               "public"
             ]
           },
+          "driving_route": {
+            "name": "driving_route",
+            "geometry_type": "linestring",
+            "color": [255, 0, 255],
+            "interaction": "interface",
+            "add_labels": false,
+            "paint": {
+              "line-color": "#ff00ff",
+              "line-width": 7
+            },
+            "editable_columns": [
+              { "name": "name", "type": "string", "default": "" }
+            ]
+          },
           "mileage_zones": {
             "geometry_type": "polygon",
             "display_name": "Mileage Zones (control layer)",
@@ -1058,7 +1072,8 @@
               "photos",
               "hargus_processing_sites",
               "inaturalist",
-              "inaturalist_threatened"
+              "inaturalist_threatened",
+              "driving_route"
             ],
             "access": [
               "public",
