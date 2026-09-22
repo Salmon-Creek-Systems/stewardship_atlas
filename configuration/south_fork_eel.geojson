@@ -483,8 +483,8 @@
                 33, "#c80000",
                 100, "#888888"
               ],
-              "line-width": 5,
-              "line-opacity": 0.85
+              "line-width": 10,
+              "line-opacity": 1.0
             },
             "qgis_color_stops": {
               "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
@@ -564,13 +564,13 @@
             "paint": {
               "fill-color": [
                 "step", ["get", "inaturalist_threatened_count"],
-                "rgba(0,0,0,0)",
-                1, "rgb(242,240,247)",
-                2, "rgb(203,201,226)",
-                5, "rgb(158,154,200)",
-                10, "rgb(117,107,177)",
-                25, "rgb(84,39,143)"
-              ]
+		"rgba(0,0,0,0)",
+       		1, "rgb(237,248,233)",
+                2, "rgb(186,228,179)",
+                5, "rgb(116,196,118)",
+                10, "rgb(49,163,84)",
+                25, "rgb(0,109,44)"
+		],	
             },
             "show_attributes": true,
             "editable_columns": [
@@ -624,7 +624,7 @@
             "config_def": "road_lrs_markers",
             "in_layer": "road_mileage",
             "out_layer": "mileage_markers",
-            "marker_interval_mi": 1,
+            "marker_interval_mi": 5,
             "label_template": "{d_mi:.0f} mi"
           },
           "public_buildings": {
@@ -1059,16 +1059,16 @@
               "fhe_canopy_density", "fhe_ladder_fuel_density", "fhe_flow_accumulation",
               "buildings_count_h3_r8",
               "inaturalist_threatened_count_h3_r9",
-              "road_mileage",
-              "mileage_markers",
-              "mileage_zones",
               "inaturalist_threatened_count_h3_r8",
               "buildings",
               "roads_tertiary",
               "roads_secondary",
               "roads_primary",
               "creeks",
-              "landmarks",
+              "road_mileage",
+              "mileage_markers",
+              "mileage_zones",
+	      "landmarks",
               "photos",
               "hargus_processing_sites",
               "inaturalist",
