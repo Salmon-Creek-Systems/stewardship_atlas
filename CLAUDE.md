@@ -633,6 +633,8 @@ atlas.materialize(config, "webmap")    # outlet
 
 **`ssurgo_enrich`** (`eddies.py`) — enriches a layer with NRCS soil properties via the SDA REST API. Writes `ssurgo_mukey`, `ssurgo_compname`, `ssurgo_drainagecl`, `ssurgo_ph`, `ssurgo_om`, `ssurgo_sand/silt/clay` onto each feature. Works on Point layers (direct lookup) and Polygon/MultiPolygon layers (centroid used for lookup). Config: `in_layer` (required), `out_layer` (defaults to `in_layer`, i.e. enriches in place).
 
+**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: its deltas are `assetless__…` and a re-run appends a duplicate grid.
+
 **`h3_cells`** (`eddies.py`) — indexes an existing vector layer by H3 cells. Takes `in_layer`, produces a new polygon layer of hex geometries, one per H3 cell, with all original feature properties copied. Use `h3_grid` instead if you just want a blank coverage grid.
 
 ## Current Atlases

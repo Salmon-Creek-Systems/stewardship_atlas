@@ -16,6 +16,7 @@ import outlets
 import federation
 import h3
 from datetime import datetime
+from collections import Counter
 
 import requests
 import dataswale_geojson as dataswale
@@ -1890,6 +1891,79 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def _count_by_h3(features, resolution):
+    """
+    Count features per H3 cell. Each feature lands in exactly one cell: the one
+    containing its centroid. Polyfilling instead would drop features smaller
+    than a cell (no cell center inside them) or double-count ones on an edge.
+
+    Returns a Counter of {h3_index: count}; features without geometry are skipped.
+    """
+    counts = Counter()
+    for feature in features:
+        geom = feature.get('geometry')
+        if not geom:
+            continue
+        centroid = shape(geom).centroid
+        counts[h3.latlng_to_cell(centroid.y, centroid.x, resolution)] += 1
+    return counts
+
+
+def h3_count(config: Dict[str, Any], asset_name: str):
+    """
+    Summarise layers onto an H3 grid: each cell gets a `{layer}_count` property
+    holding how many of that layer's features fall in it (0 if none). Works for
+    any vector layer — points directly, lines and polygons by centroid.
+
+    Writes a new layer rather than enriching the grid in place — the grid is
+    delta-built by the h3_grid inlet, so a refresh of it would wipe in-place counts.
+
+    Config:
+      in_layer: H3 grid layer; features must carry h3_index (required)
+      in_layers: list of layer names to count (required). Named in_layers, not
+                 something clearer, so Dagster and rename/copy_layer see them as inputs.
+      out_layer: output layer name (required)
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config['in_layer']
+    count_layers = asset_config['in_layers']
+    out_layer = asset_config['out_layer']
+
+    grid = dataswale.layer_as_featurecollection(config, in_layer)
+    if not grid or not grid.get('features'):
+        raise Exception(f"h3_count: could not load H3 grid layer '{in_layer}'")
+    cells = grid['features']
+    first_idx = (cells[0].get('properties') or {}).get('h3_index')
+    if not first_idx:
+        raise Exception(f"h3_count: grid layer '{in_layer}' has no h3_index property")
+    resolution = h3.get_resolution(first_idx)
+    grid_indices = {(f.get('properties') or {}).get('h3_index') for f in cells}
+
+    counts_by_source = {}
+    for source in count_layers:
+        source_data = dataswale.layer_as_featurecollection(config, source)
+        features = (source_data or {}).get('features') or []
+        counts = _count_by_h3(features, resolution)
+        off_grid = sum(n for cell, n in counts.items() if cell not in grid_indices)
+        logger.info(f"h3_count: '{source}': {len(features)} features, "
+                    f"{off_grid} outside grid '{in_layer}' (r{resolution})")
+        counts_by_source[source] = counts
+
+    out_features = []
+    for cell in cells:
+        props = dict(cell.get('properties') or {})
+        for source, counts in counts_by_source.items():
+            props[f"{source}_count"] = counts.get(props.get('h3_index'), 0)
+        out_features.append({'type': 'Feature', 'geometry': cell.get('geometry'), 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(geojson.FeatureCollection(out_features), f)
+    logger.info(f"h3_count: wrote {len(out_features)} cells to {out_path}")
+    return str(out_path)
+
+
 def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
                     target_ph: float = None, top_n: int = 5, soil_sand: float = None) -> list:
     """Simplified Phillips 2020 suitability calculation (point mode).
@@ -2106,5 +2180,6 @@ asset_methods = {
     "road_lrs_markers": road_lrs_markers,
     "ssurgo_enrich": ssurgo_enrich,
     "merge_h3": merge_h3,
+    "h3_count": h3_count,
     "dst_match_simplified": dst_match_simplified,
 }
