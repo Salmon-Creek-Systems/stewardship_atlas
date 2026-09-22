@@ -1,15 +1,34 @@
 # Adding a Layer to an Atlas
 
 Add a GeoJSON dataset (points, lines, or polygons) as a new layer in an existing
-atlas, from a file hosted in S3. This is a maintainer/developer task run on the
-server — not something an atlas administrator does from the console.
+atlas — either from a file, or as an empty layer to draw into. Atlas
+administrators do this from the console (below); developers can also use the
+script or the GET endpoint with a file already in S3.
+
+## From the console (the usual way)
+
+On the **Administration console**, the Layers bar has a **+** button on the
+right (the Technical console has a `+ Add Layer` button). It opens a form:
+
+| Field | What it does |
+|---|---|
+| **Layer name** | The layer's id: lowercase letters, digits, underscores, starting with a letter. Suggested from the file name. |
+| **Type** | point, linestring or polygon. Set automatically from an uploaded file when the file has one geometry type. |
+| **Width** | Pixels: *line width* for lines, *point radius* for points. Not shown for polygons (a fill outline is always 1px). |
+| **Source** | **Upload file**: a GeoJSON FeatureCollection, up to 50 MB. Every feature must match the chosen type. **Empty**: no data; draw features in the edit map. |
+| **Label** | Upload: the property to label features with, or *(no labels)*. The choice is copied into `name` at import, which is what the map and PDF labels read. Empty: a checkbox; labels read the `name` field you type when drawing. |
+| **Colour** | **Single colour**: R/G/B sliders. **Colour map**: colour features by a numeric property across a named palette (the same palettes rasters use), from *Min* to *Max*. Min/Max are pre-filled from the file. PDFs use the same ramp. |
+
+**Add** uploads the file, registers the layer, rebuilds the config and
+materializes the map, edit map, SQL database and consoles. Reload the console
+to see the new layer.
 
 `scripts/add_layer.py` (and the equivalent `/add_layer` endpoint) automate what
 was previously a hand-edit of the atlas config: it registers the layer and its
 inlet, wires it into the map/edit/SQL outlets, rebuilds the config, and
 materializes it.
 
-## 1. Put the file in S3
+## From a shell: 1. Put the file in S3
 
 Upload the GeoJSON to the **`scs-internal`** bucket, which the server can read
 (the `scs-atlas-data` bucket is write-only for the webapp role, so a fetch from
@@ -22,7 +41,7 @@ aws s3 cp derelicts.geojson s3://scs-internal/kennedy/imports/derelicts.geojson 
 The default key is `{atlas}/imports/{layer}.geojson`. Use `--s3-key` for a
 different location.
 
-## 2. Run the tool
+## From a shell: 2. Run the tool
 
 On the server, from the app checkout:
 
@@ -46,11 +65,8 @@ Equivalent HTTP call (`s3_url` accepts a full `s3://bucket/key` or a bare key;
 GET /add_layer/{atlas}/{layer}?geometry=point&s3_url=...&color=%23FFAA33
 ```
 
-### From the console
-
-The **Technical console** has a `+ Add Layer` button that opens a small form
-(layer name, S3 URL, color) and calls the same endpoint — handy when you don't
-have a shell on the server.
+The console form uses `POST /add_layer/{atlas}/{layer}` with a JSON body
+(`geometry`, `source`, `color`, `width`, `label_property`, `colormap`, `data`).
 
 ## What it does
 

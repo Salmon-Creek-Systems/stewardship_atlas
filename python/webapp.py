@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, logger
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, logger
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -358,6 +359,75 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logging.error(f"add_layer failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Uploads are parsed in the browser (the form reads them anyway, to offer the
+# file's properties as label/colour choices) and sent as JSON, so no multipart
+# dependency. 50 MB is well above any hand-collected layer we have.
+ADD_LAYER_MAX_BYTES = 50 * 1024 * 1024
+ADD_LAYER_UPLOAD_BUCKET = "scs-internal"
+
+
+@app.post("/add_layer/{swalename}/{layer_name}")
+async def add_layer_post(swalename: str, layer_name: str, request: Request):
+    """Add a layer from the console's Add Layer form.
+
+    JSON body: geometry ('point'|'linestring'|'polygon'), source ('upload'|
+    'empty'), and optional color ('#rrggbb'), width (px), label_property,
+    colormap ({palette, property, min, max}), and data (the GeoJSON
+    FeatureCollection, required for source='upload').
+
+    An upload is validated, written to s3://scs-internal/{atlas}/imports/
+    {layer}.geojson, and imported through the same s3_geojson inlet as the GET
+    endpoint. Synchronous (#154), but run off the event loop.
+    """
+    size = int(request.headers.get('content-length') or 0)
+    if size > ADD_LAYER_MAX_BYTES:
+        raise HTTPException(status_code=413, detail=(
+            f"Upload is {size // (1024 * 1024)} MB; the limit is "
+            f"{ADD_LAYER_MAX_BYTES // (1024 * 1024)} MB."))
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+        geometry = body.get('geometry', 'point')
+        source = body.get('source', 'upload')
+        if source not in ('upload', 'empty'):
+            raise ValueError(f"Unknown source {source!r}; expected 'upload' or 'empty'.")
+
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"No atlas named {swalename!r}.")
+        ac = json.load(open(config_path))
+
+        s3_key = None
+        if source == 'upload':
+            data = body.get('data')
+            n = atlas.validate_layer_upload(data, geometry)
+            s3_key = f"{swalename}/imports/{layer_name}.geojson"
+            boto3.client('s3').put_object(
+                Bucket=ADD_LAYER_UPLOAD_BUCKET, Key=s3_key,
+                Body=json.dumps(data).encode('utf-8'),
+                ContentType='application/geo+json')
+            logging.info(f"add_layer: uploaded {n} features to "
+                         f"s3://{ADD_LAYER_UPLOAD_BUCKET}/{s3_key}")
+
+        await run_in_threadpool(
+            atlas.add_layer, ac, layer_name,
+            s3_key=s3_key, s3_bucket=ADD_LAYER_UPLOAD_BUCKET,
+            geometry_type=geometry,
+            source='s3' if source == 'upload' else 'empty',
+            color=body.get('color'), width=body.get('width'),
+            label_property=body.get('label_property') or None,
+            colormap=body.get('colormap') or None)
+        return {"status": "success",
+                "message": f"Layer '{layer_name}' added and materialized.",
+                "layer": layer_name}
+    except (ValueError, FileExistsError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"add_layer (POST) failed for {swalename}/{layer_name}: {e}")
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 

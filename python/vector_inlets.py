@@ -305,6 +305,11 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
         props['name'] = props.get('common_name', props.get('name', ''))
         features.append(feature)
 
+    # After the name defaulting above, so a canonicalize-to-name (the label
+    # property chosen in the console's Add Layer form) wins.
+    if 'alterations' in inlet_config:
+        features = utils.alter_features(features, inlet_config['alterations'])
+
     # Regions become runbook pages, and a page is a fixed shape, so a region is
     # stored already squared rather than squared at render time — what the
     # webmap draws is then what gets printed.

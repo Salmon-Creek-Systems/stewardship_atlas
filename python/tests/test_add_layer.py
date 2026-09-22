@@ -115,6 +115,108 @@ class TestPlanAddLayer(unittest.TestCase):
         self.assertEqual([k for k, _ in plan['consumer_edits']], ['webmap'])
 
 
+class TestPlanAddLayerOptions(unittest.TestCase):
+    """The console Add Layer form's options: name validation, empty source,
+    label property, width, colour map."""
+
+    def test_unsafe_names_rejected(self):
+        for bad in ('../etc', 'Trailheads', 'trail heads', '1roads', '', 'a/b', 'x' * 50):
+            with self.assertRaises(ValueError, msg=bad):
+                atlas.plan_add_layer(RESOLVED_ASSETS, bad)
+
+    def test_good_name_accepted(self):
+        atlas.plan_add_layer(RESOLVED_ASSETS, 'road_2026_v2')
+
+    def test_unknown_geometry_and_source_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', geometry_type='raster')
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', source='ftp')
+
+    def test_empty_source_has_no_inlet_and_a_name_column(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'culverts', source='empty')
+        self.assertIsNone(plan['inlet_key'])
+        self.assertIsNone(plan['inlet_asset'])
+        self.assertEqual(plan['layer_def']['editable_columns'][0]['name'], 'name')
+        # Still wired into consumers so it can be drawn in webedit and seen.
+        self.assertIn('webedit', [k for k, _ in plan['consumer_edits']])
+
+    def test_label_property_canonicalizes_to_name(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2', label_property='street')
+        self.assertTrue(plan['layer_def']['add_labels'])
+        self.assertEqual(plan['inlet_asset']['alterations'],
+                         {'canonicalize': [{'to': 'name', 'from': ['street']}]})
+
+    def test_label_property_name_needs_no_alteration(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2', label_property='name')
+        self.assertTrue(plan['layer_def']['add_labels'])
+        self.assertNotIn('alterations', plan['inlet_asset'])
+
+    def test_no_label_property_turns_labels_off(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2')
+        self.assertFalse(plan['layer_def']['add_labels'])
+        self.assertNotIn('alterations', plan['inlet_asset'])
+
+    def test_width_maps_per_geometry(self):
+        line = atlas.plan_add_layer(RESOLVED_ASSETS, 'a', geometry_type='linestring', width=7)
+        point = atlas.plan_add_layer(RESOLVED_ASSETS, 'b', geometry_type='point', width=5)
+        poly = atlas.plan_add_layer(RESOLVED_ASSETS, 'c', geometry_type='polygon', width=5)
+        self.assertEqual(line['layer_def']['paint']['line-width'], 7)
+        self.assertEqual(point['layer_def']['paint']['circle-radius'], 5)
+        self.assertNotIn('line-width', poly['layer_def']['paint'])
+        self.assertNotIn('circle-radius', poly['layer_def']['paint'])
+
+    def test_colormap_builds_ramp_and_pdf_stops(self):
+        cm = {'palette': 'YlGn', 'property': 'depth', 'min': 0, 'max': 8}
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'wells', geometry_type='point', colormap=cm)
+        ld = plan['layer_def']
+        expr = ld['paint']['circle-color']
+        self.assertEqual(expr[0], 'interpolate')
+        self.assertEqual(expr[2], ['to-number', ['get', 'depth'], 0])
+        self.assertEqual(len(expr), 3 + 2 * 9)                 # 9 stops, value+colour each
+        self.assertEqual(expr[3:5], [0.0, '#ffffe5'])
+        self.assertEqual(expr[-2:], [8.0, '#004529'])
+        self.assertEqual(len(ld['qgis_color_stops']['stops']), 9)
+        # The coloured property is readable in a popup.
+        self.assertTrue(ld['show_attributes'])
+        self.assertIn({'name': 'depth', 'type': 'number'}, ld['editable_columns'])
+
+    def test_colormap_paint_key_per_geometry(self):
+        cm = {'palette': 'Reds', 'property': 'v', 'min': 0, 'max': 1}
+        for geom, key in (('linestring', 'line-color'), ('polygon', 'fill-color')):
+            plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'x', geometry_type=geom, colormap=cm)
+            self.assertEqual(plan['layer_def']['paint'][key][0], 'interpolate')
+
+    def test_colormap_bad_palette_or_range_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', colormap={
+                'palette': 'Nope', 'property': 'v', 'min': 0, 'max': 1})
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', colormap={
+                'palette': 'Reds', 'property': 'v', 'min': 5, 'max': 5})
+
+
+class TestValidateLayerUpload(unittest.TestCase):
+
+    def _fc(self, *types):
+        return {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'properties': {},
+             'geometry': None if t is None else {'type': t, 'coordinates': []}}
+            for t in types]}
+
+    def test_matching_geometries_accepted(self):
+        self.assertEqual(atlas.validate_layer_upload(self._fc('Point', 'MultiPoint', None), 'point'), 3)
+
+    def test_mismatched_geometry_named_in_error(self):
+        with self.assertRaisesRegex(ValueError, 'LineString'):
+            atlas.validate_layer_upload(self._fc('Point', 'LineString'), 'point')
+
+    def test_not_a_feature_collection_rejected(self):
+        for bad in ({'type': 'Feature'}, [], {'type': 'FeatureCollection'}, self._fc()):
+            with self.assertRaises(ValueError):
+                atlas.validate_layer_upload(bad, 'point')
+
+
 class TestAddLayerExecutor(unittest.TestCase):
 
     def setUp(self):
@@ -215,6 +317,26 @@ class TestAddLayerExecutor(unittest.TestCase):
         self.assertEqual(fixed['out_layer'], 'derelicts')         # out_layer added
         self.assertEqual(self.materialized[0], 'derelicts')       # (re)materialized
 
+
+    def test_empty_layer_initialised_not_imported(self):
+        import dataswale_geojson
+        orig_clear = dataswale_geojson.clear_vector_layer
+        dataswale_geojson.clear_vector_layer = MagicMock()
+        self.addCleanup(setattr, dataswale_geojson, 'clear_vector_layer', orig_clear)
+
+        atlas.add_layer(self.config, 'culverts', geometry_type='point', source='empty')
+
+        props = json.load(open(self.seed))['features'][0]['properties']
+        self.assertIn('culverts', props['layers'])
+        self.assertNotIn('culverts', props['assets'])              # no inlet
+        self.assertIn('culverts', props['assets']['webmap']['in_layers'])
+        dataswale_geojson.clear_vector_layer.assert_called_once()  # file exists, so no 404
+        self._refresh_mock.assert_not_called()
+        self.assertNotIn('culverts', self.materialized)            # nothing to materialize
+
+    def test_empty_layer_refuses_existing_name(self):
+        with self.assertRaises(ValueError):
+            atlas.add_layer(self.config, 'roads', source='empty')
 
 if __name__ == '__main__':
     unittest.main()

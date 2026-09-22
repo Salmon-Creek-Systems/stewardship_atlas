@@ -21,7 +21,8 @@ from utils import (
     canonicalize_raster,
     resample_raster_gdal,
     set_crs_raster,
-    alter_geojson
+    alter_geojson,
+    alter_features
 )
 
 class TestUtils(unittest.TestCase):
@@ -202,6 +203,21 @@ class TestUtils(unittest.TestCase):
         
         self.assertEqual(result['features'][0]['properties']['display_name'], "Test Point")
         self.assertNotIn('name', result['features'][0]['properties'])
+
+    def test_alter_features_canonicalize_to_name_in_memory(self):
+        """The Add Layer label property: copy a chosen property into `name`,
+        which the webmap and PDF labels read. The source property is kept."""
+        features = [{'type': 'Feature', 'geometry': None,
+                     'properties': {'street': 'Miller Rd', 'name': ''}}]
+        kept = alter_features(features, {'canonicalize': [{'to': 'name', 'from': ['street']}]})
+        self.assertEqual(kept[0]['properties']['name'], 'Miller Rd')
+        self.assertEqual(kept[0]['properties']['street'], 'Miller Rd')
+
+    def test_alter_features_filter_returns_kept_only(self):
+        features = [{'type': 'Feature', 'geometry': None, 'properties': {'class': c}}
+                    for c in ('primary', 'track')]
+        kept = alter_features(features, {'filter': [['require', 'class', ['primary']]]})
+        self.assertEqual([f['properties']['class'] for f in kept], ['primary'])
 
     def test_alter_geojson_vector_width(self):
         """Test GeoJSON vector width alteration"""

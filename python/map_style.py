@@ -87,3 +87,52 @@ def has_local_basemap(in_layers, layers_dict, layer_name='basemap'):
     """
     return (layer_name in (in_layers or ())
             and (layers_dict.get(layer_name) or {}).get('geometry_type') == 'raster')
+
+
+# Named 9-class ColorBrewer ramps, low → high. Named to match cog_color's
+# "Brewer{Name}9" so a raster and a vector coloured with the same palette look
+# the same. The console's Add Layer form draws its palette picker from this
+# table, so this is the one list to extend.
+PALETTES = {
+    'YlGn':     ['#ffffe5', '#f7fcb9', '#d9f0a3', '#addd8e', '#78c679', '#41ab5d', '#238443', '#006837', '#004529'],
+    'YlOrRd':   ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#bd0026', '#800026'],
+    'OrRd':     ['#fff7ec', '#fee8c8', '#fdd49e', '#fdbb84', '#fc8d59', '#ef6548', '#d7301f', '#b30000', '#7f0000'],
+    'BuGn':     ['#f7fcfd', '#e5f5f9', '#ccece6', '#99d8c9', '#66c2a4', '#41ae76', '#238b45', '#006d2c', '#00441b'],
+    'PuBu':     ['#fff7fb', '#ece7f2', '#d0d1e6', '#a6bddb', '#74a9cf', '#3690c0', '#0570b0', '#045a8d', '#023858'],
+    'Purples':  ['#fcfbfd', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d'],
+    'Blues':    ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+    'Greens':   ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c', '#00441b'],
+    'Reds':     ['#fff5f0', '#fee0d2', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#a50f15', '#67000d'],
+    'RdYlGn':   ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850'],
+    'Spectral': ['#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#ffffbf', '#e6f598', '#abdda4', '#66c2a5', '#3288bd'],
+}
+
+
+def palette_stops(palette, lo, hi):
+    """[[value, '#rrggbb'], ...] spreading the palette's colours evenly from lo
+    to hi. The form both colour outputs below are built from."""
+    if palette not in PALETTES:
+        raise ValueError(f"Unknown palette {palette!r}; expected one of {sorted(PALETTES)}")
+    lo, hi = float(lo), float(hi)
+    if not lo < hi:
+        raise ValueError(f"Colour map range needs min < max, got {lo}..{hi}")
+    colors = PALETTES[palette]
+    step = (hi - lo) / (len(colors) - 1)
+    return [[round(lo + i * step, 6), c] for i, c in enumerate(colors)]
+
+
+def palette_paint_expression(prop, palette, lo, hi):
+    """MapLibre colour expression: linear ramp of `prop` over the palette.
+    Features missing the property get the palette's low colour rather than
+    MapLibre's black."""
+    expr = ['interpolate', ['linear'], ['to-number', ['get', prop], lo]]
+    for value, color in palette_stops(palette, lo, hi):
+        expr += [value, color]
+    return expr
+
+
+def palette_qgis_color_stops(prop, palette, lo, hi):
+    """The `qgis_color_stops` block (read by utils.build_qgis_color_expression)
+    that makes PDF output use the same ramp as the webmap."""
+    return {'expression': f'coalesce("{prop}", {lo})',
+            'stops': palette_stops(palette, lo, hi)}

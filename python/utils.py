@@ -211,16 +211,15 @@ def set_crs_raster(config, inpath):
 
 
 
-def alter_geojson(json_path, alt_conf, sample_names=True):
-    """Alter GeoJSON properties"""
-    logger.info(f"Altering GeoJSON in {json_path} with {alt_conf}.")
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
+def alter_features(features, alt_conf):
+    """Apply an `alterations` block (canonicalize, vector_width, filter) to a
+    list of features in memory. Mutates properties in place and returns the
+    features the filter keeps. File-based inlets go through alter_geojson;
+    inlets that hold features in memory (s3_geojson) call this directly."""
     # Handle feature filtering - collect features to keep
     filtered_features = []
     
-    for feature in data['features']:
+    for feature in features:
         # Handle property canonicalization
         if 'canonicalize' in alt_conf:
             for canon in alt_conf['canonicalize']:
@@ -289,9 +288,15 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
             # No filtering, keep all features
             filtered_features.append(feature)
     
-    # Update features list
-    data['features'] = filtered_features
-    
+    return filtered_features
+
+
+def alter_geojson(json_path, alt_conf, sample_names=True):
+    """Alter GeoJSON properties"""
+    logger.info(f"Altering GeoJSON in {json_path} with {alt_conf}.")
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    data['features'] = alter_features(data['features'], alt_conf)
     with open(json_path, 'w') as f:
         json.dump(data, f)
 

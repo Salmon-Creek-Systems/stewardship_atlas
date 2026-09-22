@@ -158,5 +158,70 @@ class TestWebApp(unittest.TestCase):
         self.assertIn("finished_at", data)
         self.assertIn("log", data)
 
+class TestAddLayerPost(unittest.TestCase):
+    """POST /add_layer — the console Add Layer form. atlas.add_layer and S3
+    are mocked; what is under test is validation order and routing."""
+
+    FC = {'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'street': 'Miller Rd'},
+         'geometry': {'type': 'Point', 'coordinates': [-122.8, 38.4]}}]}
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        staging = Path(self.root) / 'testatlas' / 'staging'
+        staging.mkdir(parents=True)
+        (staging / 'atlas_config.json').write_text(json.dumps({'name': 'testatlas'}))
+        self.client = TestClient(app)
+        self.patchers = [patch('webapp.SWALES_ROOT', self.root),
+                         patch('webapp.boto3'),
+                         patch('webapp.atlas.add_layer')]
+        _, self.boto3, self.add_layer = [p.start() for p in self.patchers]
+
+    def tearDown(self):
+        for p in self.patchers:
+            p.stop()
+        shutil.rmtree(self.root)
+
+    def test_upload_goes_to_s3_then_add_layer(self):
+        r = self.client.post('/add_layer/testatlas/hydrants', json={
+            'geometry': 'point', 'source': 'upload', 'data': self.FC,
+            'label_property': 'street', 'width': 6})
+        self.assertEqual(r.status_code, 200, r.text)
+        put = self.boto3.client.return_value.put_object.call_args.kwargs
+        self.assertEqual(put['Bucket'], 'scs-internal')
+        self.assertEqual(put['Key'], 'testatlas/imports/hydrants.geojson')
+        kwargs = self.add_layer.call_args.kwargs
+        self.assertEqual(kwargs['source'], 's3')
+        self.assertEqual(kwargs['s3_key'], 'testatlas/imports/hydrants.geojson')
+        self.assertEqual(kwargs['label_property'], 'street')
+
+    def test_empty_source_skips_s3(self):
+        r = self.client.post('/add_layer/testatlas/culverts',
+                             json={'geometry': 'point', 'source': 'empty'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.boto3.client.return_value.put_object.assert_not_called()
+        self.assertEqual(self.add_layer.call_args.kwargs['source'], 'empty')
+
+    def test_bad_name_rejected_before_upload(self):
+        r = self.client.post('/add_layer/testatlas/..%2Fescape',
+                             json={'geometry': 'point', 'source': 'upload', 'data': self.FC})
+        self.assertIn(r.status_code, (400, 404))
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+    def test_wrong_geometry_rejected_before_upload(self):
+        r = self.client.post('/add_layer/testatlas/roads2',
+                             json={'geometry': 'linestring', 'source': 'upload', 'data': self.FC})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('Point', r.json()['detail'])
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+    def test_oversize_rejected(self):
+        with patch('webapp.ADD_LAYER_MAX_BYTES', 100):
+            r = self.client.post('/add_layer/testatlas/big',
+                                 json={'geometry': 'point', 'source': 'upload', 'data': self.FC})
+        self.assertEqual(r.status_code, 413)
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main() 

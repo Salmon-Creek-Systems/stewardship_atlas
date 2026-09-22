@@ -2281,6 +2281,9 @@ def make_console_html(config,
         'spreadsheets': spreadsheets,
         'layers': displayed_inlets,
         'webmapAvailable': webmap_available,
+        # Colour ramps for the Add Layer form's palette picker — the same table
+        # atlas.plan_add_layer builds the layer's paint from.
+        'palettes': map_style.PALETTES,
     }
     
     # Insert the data initialization script
