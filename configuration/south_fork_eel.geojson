@@ -1077,6 +1077,9 @@
               ]
             }
           },
+          "console": {
+            "config_def": "console"
+          },
           "html": {
             "type": "outlet",
             "name": "html",
