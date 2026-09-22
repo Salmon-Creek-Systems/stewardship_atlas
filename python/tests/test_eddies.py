@@ -438,7 +438,7 @@ class TestH3Count(unittest.TestCase):
             'photos': {'type': 'FeatureCollection', 'features': [_point(self.LNG, self.LAT)]},
         }
         self.config = {'assets': {'counts': {'config': {
-            'in_layer': 'grid', 'source_layers': ['buildings', 'photos'], 'out_layer': 'out'}}}}
+            'in_layer': 'grid', 'in_layers': ['buildings', 'photos'], 'out_layer': 'out'}}}}
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)

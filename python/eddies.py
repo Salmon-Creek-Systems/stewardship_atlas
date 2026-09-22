@@ -1911,20 +1911,22 @@ def _count_by_h3(features, resolution):
 
 def h3_count(config: Dict[str, Any], asset_name: str):
     """
-    Summarise source layers onto an H3 grid: each cell gets a `{source}_count`
-    property holding how many of that layer's features fall in it (0 if none).
+    Summarise layers onto an H3 grid: each cell gets a `{layer}_count` property
+    holding how many of that layer's features fall in it (0 if none). Works for
+    any vector layer — points directly, lines and polygons by centroid.
 
     Writes a new layer rather than enriching the grid in place — the grid is
     delta-built by the h3_grid inlet, so a refresh of it would wipe in-place counts.
 
     Config:
       in_layer: H3 grid layer; features must carry h3_index (required)
-      source_layers: list of layer names to count (required)
+      in_layers: list of layer names to count (required). Named in_layers, not
+                 something clearer, so Dagster and rename/copy_layer see them as inputs.
       out_layer: output layer name (required)
     """
     asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
     in_layer = asset_config['in_layer']
-    source_layers = asset_config['source_layers']
+    count_layers = asset_config['in_layers']
     out_layer = asset_config['out_layer']
 
     grid = dataswale.layer_as_featurecollection(config, in_layer)
@@ -1938,7 +1940,7 @@ def h3_count(config: Dict[str, Any], asset_name: str):
     grid_indices = {(f.get('properties') or {}).get('h3_index') for f in cells}
 
     counts_by_source = {}
-    for source in source_layers:
+    for source in count_layers:
         source_data = dataswale.layer_as_featurecollection(config, source)
         features = (source_data or {}).get('features') or []
         counts = _count_by_h3(features, resolution)
