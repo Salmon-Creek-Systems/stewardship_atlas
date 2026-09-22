@@ -745,6 +745,26 @@ def _build_road_graph(features, resolution):
     return G, segment_nodes
 
 
+def road_name_matcher(names):
+    """Return a predicate matching a road name against a list of names, by
+    prefix: "Thomas" matches "Thomas Road" and "Thomas Drive" but not
+    "Thomasville Lane". Used both to restrict an LRS zone to its own roads and
+    to filter which roads get distance markers. `names` may be a list or a
+    comma-separated string; empty means match everything."""
+    if isinstance(names, str):
+        names = [n.strip() for n in names.split(',')]
+    names = [n.strip().lower() for n in (names or []) if n and n.strip()]
+    if not names:
+        return lambda _name: True
+
+    def _matches(feature_name):
+        if not feature_name:
+            return False
+        n = feature_name.lower()
+        return any(n == prefix or n.startswith(prefix + ' ') for prefix in names)
+    return _matches
+
+
 def _snap_anchor(G, anchor_lat, anchor_lng, resolution):
     """Return the graph node nearest to the anchor coordinates, searching outward
     in H3 rings if the anchor's own cell isn't a node."""
@@ -755,7 +775,22 @@ def _snap_anchor(G, anchor_lat, anchor_lng, resolution):
         for candidate in h3.grid_disk(anchor_cell, ring):
             if candidate in G:
                 return candidate
-    raise Exception("road_lrs: no graph node found within 30 rings of anchor — check anchor coordinates and road data")
+    # An anchor this far out is usually a point picked off the road (the end of
+    # a hand-drawn line, say), so say how far away the road is rather than
+    # leaving the reader to guess what is wrong.
+    nearest_m = None
+    if G.number_of_nodes():
+        geod = Geod(ellps='WGS84')
+        nearest_m = min(
+            abs(geod.inv(anchor_lng, anchor_lat, lng, lat)[2])
+            for lat, lng in (h3.cell_to_latlng(n) for n in G))
+    raise Exception(
+        f"road_lrs: no road within 30 H3 rings (about "
+        f"{30 * h3.average_hexagon_edge_length(resolution, unit='m'):.0f} m) of anchor "
+        f"({anchor_lat}, {anchor_lng}); nearest road is "
+        f"{nearest_m:.0f} m away. Put the anchor on the road itself."
+        if nearest_m is not None else
+        f"road_lrs: no road segments to anchor to at ({anchor_lat}, {anchor_lng}).")
 
 
 def _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None):
@@ -789,8 +824,11 @@ def _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None)
 def _load_lrs_zones(config, zones_layer):
     """Load LRS zones from an editable polygon control layer. Each feature needs a
     `name` and an `anchor` property (a JSON string `{"latitude":.., "longitude":..}`
-    as produced by the webmap Share button). Returns a list of
-    {name, anchor_lat, anchor_lng, polygon (shapely geometry)}."""
+    as produced by the webmap Share button), and may carry `roads`: a
+    comma-separated list of road names the zone measures along. Without it the
+    LRS spreads down every connected driveway and side road inside the polygon.
+    Returns a list of {name, anchor_lat, anchor_lng, polygon (shapely geometry),
+    roads (matcher predicate)}."""
     data = dataswale.layer_as_featurecollection(config, zones_layer)
     if not data or 'features' not in data:
         raise Exception(f"road_lrs: could not load zones layer '{zones_layer}'")
@@ -811,28 +849,38 @@ def _load_lrs_zones(config, zones_layer):
         except (ValueError, KeyError, TypeError) as e:
             logger.warning(f"road_lrs: zone '{name}' has unparseable anchor {anchor_raw!r}: {e}")
             continue
+        roads = props.get('roads')
         zones.append({
             'name': name,
             'anchor_lat': anchor_lat,
             'anchor_lng': anchor_lng,
             'polygon': shape(geom),
+            'roads': road_name_matcher(roads),
+            'road_names': roads,
         })
     return zones
 
 
 def _assign_features_to_zones(features, zones):
     """Assign each road segment to the zone whose polygon contains the segment's
-    midpoint. Zones are assumed non-overlapping, so each segment lands in at most
-    one zone (first match wins). Segments in no zone are dropped. Returns a dict
-    keyed by zone name -> list of features."""
+    midpoint and whose `roads` list the segment's name matches. Zones are assumed
+    non-overlapping, so each segment lands in at most one zone (first match
+    wins). Segments in no zone are dropped. Returns a dict keyed by zone name ->
+    list of features.
+
+    The name test is what keeps a route on its own roads: a polygon drawn around
+    a highway also contains every driveway hanging off it, and Dijkstra would
+    otherwise measure down all of them."""
     buckets = {z['name']: [] for z in zones}
     for feature in features:
         geom = feature.get('geometry')
         if not geom or geom.get('type') != 'LineString':
             continue
         midpoint = shape(geom).interpolate(0.5, normalized=True)
+        road_name = (feature.get('properties') or {}).get('name')
         for z in zones:
-            if z['polygon'].contains(midpoint):
+            matches_road = z.get('roads') or (lambda _n: True)
+            if z['polygon'].contains(midpoint) and matches_road(road_name):
                 buckets[z['name']].append(feature)
                 break
     return buckets
@@ -856,16 +904,22 @@ def road_lrs(config, asset_name):
         reachable segments from one anchor.
     """
     asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
-    in_layer = asset_config.get('in_layer', 'roads')
     out_layer = asset_config.get('out_layer', 'road_mileage')
     resolution = asset_config.get('h3_resolution', 12)
     zones_layer = asset_config.get('lrs_zones_layer')
     anchor_coords = asset_config.get('lrs_anchor_coordinates')
 
-    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
-    if not layer_data or 'features' not in layer_data:
-        raise Exception(f"road_lrs: could not load layer '{in_layer}'")
-    features = layer_data['features']
+    # in_layers (plural) for atlases whose roads are split by class: a route that
+    # runs from a highway onto a named side road needs one graph spanning them,
+    # or it stops measuring where the first layer ends.
+    in_layers = asset_config.get('in_layers') or [asset_config.get('in_layer', 'roads')]
+    features = []
+    for layer_name in in_layers:
+        layer_data = dataswale.layer_as_featurecollection(config, layer_name)
+        if not layer_data or 'features' not in layer_data:
+            raise Exception(f"road_lrs: could not load layer '{layer_name}'")
+        features.extend(layer_data['features'])
+    logger.info(f"road_lrs: {len(features)} segments from {in_layers}")
 
     if zones_layer:
         zones = _load_lrs_zones(config, zones_layer)
@@ -876,8 +930,12 @@ def road_lrs(config, asset_name):
         for z in zones:
             zone_features = buckets[z['name']]
             if not zone_features:
-                logger.warning(f"road_lrs: zone '{z['name']}' contains no road segments")
+                logger.warning(
+                    f"road_lrs: zone '{z['name']}' contains no road segments "
+                    f"(roads={z['road_names']!r}) — check the road names against the data")
                 continue
+            logger.info(f"road_lrs: zone '{z['name']}': {len(zone_features)} segments"
+                        + (f" matching {z['road_names']!r}" if z['road_names'] else ""))
             annotated.extend(
                 _lrs_annotate(zone_features, z['anchor_lat'], z['anchor_lng'], resolution, route_name=z['name'])
             )
@@ -932,16 +990,7 @@ def road_lrs_markers(config, asset_name):
 
     features = layer_data['features']
     if road_names:
-        # Prefix match: "Thomas" matches "Thomas Road", "Thomas Drive", etc.
-        road_names_lower = [p.lower() for p in road_names]
-        def _name_matches(feature_name):
-            if not feature_name:
-                return False
-            n = feature_name.lower()
-            for prefix in road_names_lower:
-                if n == prefix or n.startswith(prefix + ' '):
-                    return True
-            return False
+        _name_matches = road_name_matcher(road_names)
         all_names = sorted({f.get('properties', {}).get('name') for f in features if f.get('properties', {}).get('name')})
         features = [f for f in features if _name_matches(f.get('properties', {}).get('name'))]
         if not features:
