@@ -188,11 +188,12 @@ class TestAddLayerPost(unittest.TestCase):
             'label_property': 'street', 'width': 6})
         self.assertEqual(r.status_code, 200, r.text)
         put = self.boto3.client.return_value.put_object.call_args.kwargs
-        self.assertEqual(put['Bucket'], 'scs-internal')
+        self.assertEqual(put['Bucket'], 'scs-atlas-private-prod')  # not public scs-internal
         self.assertEqual(put['Key'], 'testatlas/imports/hydrants.geojson')
         kwargs = self.add_layer.call_args.kwargs
         self.assertEqual(kwargs['source'], 's3')
         self.assertEqual(kwargs['s3_key'], 'testatlas/imports/hydrants.geojson')
+        self.assertEqual(kwargs['s3_bucket'], 'scs-atlas-private-prod')
         self.assertEqual(kwargs['label_property'], 'street')
 
     def test_empty_source_skips_s3(self):

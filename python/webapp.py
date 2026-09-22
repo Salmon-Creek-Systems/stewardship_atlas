@@ -367,7 +367,11 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
 # file's properties as label/colour choices) and sent as JSON, so no multipart
 # dependency. 50 MB is well above any hand-collected layer we have.
 ADD_LAYER_MAX_BYTES = 50 * 1024 * 1024
-ADD_LAYER_UPLOAD_BUCKET = "scs-internal"
+# The private data bucket, not scs-internal: scs-internal is public-read, and an
+# upload may well be admin-only data. The box's role already reads and writes
+# here (the publish path uses it), so no IAM change was needed. Same override
+# as atlas_store, so the staging substrate uses its own bucket.
+ADD_LAYER_UPLOAD_BUCKET = os.environ.get('ATLAS_PRIVATE_BUCKET', 'scs-atlas-private-prod')
 
 
 @app.post("/add_layer/{swalename}/{layer_name}")
@@ -379,9 +383,9 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
     colormap ({palette, property, min, max}), and data (the GeoJSON
     FeatureCollection, required for source='upload').
 
-    An upload is validated, written to s3://scs-internal/{atlas}/imports/
-    {layer}.geojson, and imported through the same s3_geojson inlet as the GET
-    endpoint. Synchronous (#154), but run off the event loop.
+    An upload is validated, written to s3://{ADD_LAYER_UPLOAD_BUCKET}/{atlas}/
+    imports/{layer}.geojson, and imported through the same s3_geojson inlet as
+    the GET endpoint. Synchronous (#154), but run off the event loop.
     """
     size = int(request.headers.get('content-length') or 0)
     if size > ADD_LAYER_MAX_BYTES:

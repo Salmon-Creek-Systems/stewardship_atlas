@@ -67,6 +67,8 @@ GET /add_layer/{atlas}/{layer}?geometry=point&s3_url=...&color=%23FFAA33
 
 The console form uses `POST /add_layer/{atlas}/{layer}` with a JSON body
 (`geometry`, `source`, `color`, `width`, `label_property`, `colormap`, `data`).
+Uploads are stored in the private bucket, `s3://scs-atlas-private-prod/{atlas}/imports/{layer}.geojson`.
+Not in `scs-internal`, which is public-read.
 
 ## What it does
 
