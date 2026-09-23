@@ -851,11 +851,12 @@ function initializePage(data) {
                 actions.appendChild(makeLayerDropdown('Refresh', entries));
             })(item.name, item.has_rebuild);
 
-            // Alter: Draw, Edit
+            // Alter: Draw, Edit, Style
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Alter', [
                     { type: 'link', href: '../../webedit/' + name + '_create.html', text: 'Draw' },
-                    { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' }
+                    { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' },
+                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } }
                 ]));
             })(item.name);
 
@@ -864,13 +865,6 @@ function initializePage(data) {
                 actions.appendChild(makeLayerDropdown('Spreadsheets', [
                     { type: 'button', text: 'Import from Sheet', onclick: function(btn) { importFromSheet(name, btn); } },
                     { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } }
-                ]));
-            })(item.name);
-
-            // Style: restyle the layer in place (administration only)
-            (function(name) {
-                actions.appendChild(makeLayerDropdown('Style', [
-                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } }
                 ]));
             })(item.name);
 
