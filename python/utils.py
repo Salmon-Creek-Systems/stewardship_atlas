@@ -578,6 +578,83 @@ def square_from_bbox(bbox):
             [cx - half, cy + half], [cx - half, cy - half]]
 
 
+def page_square_from_bbox(bbox):
+    """A closed ring covering bbox that is square ON THE PRINTED PAGE.
+
+    outlets_qgis renders in EPSG:3857, where a degree of latitude occupies
+    1/cos(lat) times the space of a degree of longitude — so the square a
+    runbook page wants is wider in degrees than it is tall: dlat = dlon *
+    cos(lat). At 40N that is about 0.77.
+
+    Contrast square_from_bbox, which is square in degrees and reaches the page
+    ~1.30x taller than wide. That one exists to reproduce westport's stored
+    regions; this one is what "square" should mean for a page.
+    """
+    import math
+
+    min_x, min_y, max_x, max_y = bbox
+    cx, cy = (min_x + max_x) / 2, (min_y + max_y) / 2
+    scale = math.cos(math.radians(cy)) or 1.0      # 1.0 guards the poles
+    # Compare the sides in page units, then grow the smaller one to match.
+    side = max(max_x - min_x, (max_y - min_y) / scale)
+    half_x, half_y = side / 2, side * scale / 2
+    return [[cx - half_x, cy - half_y], [cx + half_x, cy - half_y],
+            [cx + half_x, cy + half_y], [cx - half_x, cy + half_y],
+            [cx - half_x, cy - half_y]]
+
+
+# What a layer's `polygon_shape` can be. 'raw' keeps the drawn geometry;
+# 'bbox' replaces it with its bounding rectangle; 'square' with the square that
+# prints square; 'square_degrees' with a square in degrees (what the older
+# inlet-level `squarify` does — kept so the difference is explicit rather than
+# a trap).
+POLYGON_SHAPES = ('raw', 'bbox', 'square', 'square_degrees')
+
+
+def bbox_feature(feature):
+    """Replace a polygon's geometry with its bounding rectangle."""
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+    min_x, min_y, max_x, max_y = bbox
+    ring = [[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y], [min_x, min_y]]
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [ring]}
+    return out
+
+
+def page_squarify_feature(feature):
+    """Replace a polygon's geometry with the square that prints square."""
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [page_square_from_bbox(bbox)]}
+    return out
+
+
+def shape_feature(feature, polygon_shape):
+    """Apply a layer's `polygon_shape` to one incoming feature.
+
+    Called where features land in a layer, so an imported, uploaded and
+    hand-drawn polygon all end up the same shape. Unknown modes and 'raw' pass
+    through untouched.
+    """
+    if polygon_shape == 'bbox':
+        return bbox_feature(feature)
+    if polygon_shape == 'square':
+        return page_squarify_feature(feature)
+    if polygon_shape == 'square_degrees':
+        return squarify_feature(feature)
+    return feature
+
+
 def squarify_feature(feature):
     """Replace a polygon's geometry with the square that covers it.
 

@@ -427,6 +427,7 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
             label_field=body.get('label_field') or None,
             icon=body.get('icon') or None,
             opacity=body.get('opacity'),
+            polygon_shape=body.get('polygon_shape') or None,
             colormap=body.get('colormap') or None)
         return {"status": "success",
                 "message": f"Layer '{layer_name}' added and materialized.",

@@ -887,7 +887,7 @@ def validate_layer_upload(fc, geometry_type):
 def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
                    s3_bucket='scs-internal', s3_key=None, consumers=None,
                    source='s3', label_property=None, width=None, colormap=None,
-                   icon=None, opacity=None, label_field=None, icons=()):
+                   icon=None, opacity=None, label_field=None, polygon_shape=None, icons=()):
     """Decide the config additions for a new vector layer. Pure.
 
     source:         's3'    — an s3_geojson inlet imports s3://{s3_bucket}/{s3_key}
@@ -951,7 +951,8 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
     # Icon, opacity and label_field mean the same thing here as in a restyle,
     # so the Edit Layer planner owns them and this stays one implementation.
     restyle = {k: v for k, v in (('icon', icon), ('opacity', opacity),
-                                 ('label_field', label_field)) if v is not None}
+                                 ('label_field', label_field),
+                                 ('polygon_shape', polygon_shape)) if v is not None}
     if restyle:
         layer_def = plan_edit_layer(layer_def, restyle, icons=icons)
 
@@ -992,7 +993,7 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
 # uses an icon — its icon size, scaled so the default dot radius maps to 1.0.
 _DEFAULT_POINT_WIDTH = 9
 EDIT_LAYER_FIELDS = ('color', 'fill_color', 'opacity', 'width', 'icon', 'add_labels',
-                     'label_field', 'colormap', 'visible')
+                     'label_field', 'colormap', 'visible', 'polygon_shape')
 
 
 def available_icons(config=None, app_dir=None):
@@ -1097,6 +1098,20 @@ def plan_edit_layer(layer_def, changes, icons=()):
                 columns.append({'name': field, 'type': 'string', 'default': ''})
         else:
             layer.pop('label_field', None)
+
+    if 'polygon_shape' in changes and changes['polygon_shape'] is not None:
+        shape_mode = changes['polygon_shape']
+        if geometry != 'polygon':
+            raise ValueError("polygon_shape applies to polygon layers only.")
+        if shape_mode not in utils.POLYGON_SHAPES:
+            raise ValueError(f"Unknown polygon_shape {shape_mode!r}; "
+                             f"expected one of {utils.POLYGON_SHAPES}")
+        # Shapes features as they arrive (import, upload, draw); already-stored
+        # geometry is left alone.
+        if shape_mode == 'raw':
+            layer.pop('polygon_shape', None)
+        else:
+            layer['polygon_shape'] = shape_mode
 
     if 'visible' in changes:
         # Webmap only: the PDF outlets draw whatever is in their own in_layers,
@@ -1221,7 +1236,7 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
               geometry_type='point', color=None, consumers=None,
               rebuild=True, run_materialize=True,
               source='s3', label_property=None, width=None, colormap=None,
-              icon=None, opacity=None, label_field=None):
+              icon=None, opacity=None, label_field=None, polygon_shape=None):
     """Add a new vector layer to an existing atlas.
 
     source='s3' (default): assumes the GeoJSON file is ALREADY in S3 at
@@ -1255,7 +1270,8 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
                           consumers=consumers, source=source,
                           label_property=label_property, width=width,
                           colormap=colormap, icon=icon, opacity=opacity,
-                          label_field=label_field, icons=available_icons(config))
+                          label_field=label_field, polygon_shape=polygon_shape,
+                          icons=available_icons(config))
     inlet_key = plan['inlet_key']
 
     gj = json.load(open(geojson_path))

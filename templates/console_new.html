@@ -177,6 +177,18 @@
       </div>
     </div>
 
+    <div id="al-shape-box">
+      <label class="field-label" for="al-shape">Polygon shape</label>
+      <select id="al-shape" class="field-input">
+        <option value="raw">As drawn</option>
+        <option value="bbox">Bounding box</option>
+        <option value="square">Square (prints square)</option>
+        <option value="square_degrees">Square in degrees (legacy)</option>
+      </select>
+      <div class="field-hint">Applied to polygons as they arrive — drawn, uploaded
+        or imported. Existing features are left as they are.</div>
+    </div>
+
     <div id="al-icon-box">
       <label class="field-label" for="al-icon">Icon</label>
       <select id="al-icon" class="field-input" onchange="alSyncForm()"></select>
@@ -969,6 +981,7 @@ function openAddLayerModal() {
     setRgb([12, 94, 46]);
     setOutlineRgb([6, 60, 28]);
     document.getElementById('al-visible-check').checked = true;
+    document.getElementById('al-shape').value = 'raw';
     document.getElementById('al-opacity').value = DEFAULT_OPACITY.point;
     document.getElementById('al-width').value = 9;
     if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
@@ -1012,6 +1025,7 @@ function alOpenEditLayerModal(layerName) {
     var isPolygon = layer.geometry_type === 'polygon';
     setRgb((isPolygon ? (layer.fill_color || layer.color) : layer.color) || [150, 150, 150]);
     setOutlineRgb(layer.color || [150, 150, 150]);
+    document.getElementById('al-shape').value = layer.polygon_shape || 'raw';
     var visibility = ((layer.vis || {}).layout || {}).visibility;
     document.getElementById('al-visible-check').checked = visibility !== 'none';
     var key = { point: 'circle-opacity', linestring: 'line-opacity', polygon: 'fill-opacity' }[layer.geometry_type];
@@ -1126,6 +1140,7 @@ function alSyncForm() {
         geometry === 'linestring' ? 'Line width (px)' :
         (icon ? 'Icon size (px)' : 'Point radius (px)');
     document.getElementById('al-icon-box').hidden = geometry !== 'point';
+    document.getElementById('al-shape-box').hidden = geometry !== 'polygon';
     // A polygon's main colour is its fill; its edge gets its own control.
     document.getElementById('al-outline-box').hidden = geometry !== 'polygon';
 
@@ -1300,6 +1315,7 @@ function alStyleFields(geometry) {
         body.width = w;
     }
     if (geometry === 'point') body.icon = document.getElementById('al-icon').value || '';
+    if (geometry === 'polygon') body.polygon_shape = document.getElementById('al-shape').value;
     body.opacity = alOpacity();
     body.visible = document.getElementById('al-visible-check').checked;
     body.add_labels = document.getElementById('al-label-check').checked;

@@ -22,7 +22,10 @@ from utils import (
     resample_raster_gdal,
     set_crs_raster,
     alter_geojson,
-    alter_features
+    alter_features,
+    shape_feature,
+    page_square_from_bbox,
+    POLYGON_SHAPES
 )
 
 class TestUtils(unittest.TestCase):
@@ -382,3 +385,72 @@ class TestSquarify(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main() 
+
+class TestPolygonShapes(unittest.TestCase):
+    """polygon_shape: what a polygon becomes when it lands in a layer.
+
+    'square' has to be square ON THE PAGE — outlets_qgis renders in EPSG:3857,
+    where a degree of latitude takes 1/cos(lat) the space of a degree of
+    longitude — while 'square_degrees' reproduces the older inlet squarify.
+    """
+
+    # A tall, narrow corridor at ~39.65N, like a drawn driving route.
+    FEATURE = {'type': 'Feature', 'properties': {},
+               'geometry': {'type': 'Polygon', 'coordinates': [[
+                   [-123.60, 39.60], [-123.58, 39.60], [-123.58, 39.70],
+                   [-123.60, 39.70], [-123.60, 39.60]]]}}
+
+    def _extent(self, feature):
+        ring = feature['geometry']['coordinates'][0]
+        xs = [c[0] for c in ring]
+        ys = [c[1] for c in ring]
+        return max(xs) - min(xs), max(ys) - min(ys), (max(ys) + min(ys)) / 2
+
+    def _page_ratio(self, feature):
+        """Height/width as the printed page sees it (1.0 = square on paper)."""
+        import math
+        dlon, dlat, lat = self._extent(feature)
+        return (dlat / math.cos(math.radians(lat))) / dlon
+
+    def test_raw_passes_through(self):
+        self.assertEqual(shape_feature(self.FEATURE, 'raw'), self.FEATURE)
+        self.assertEqual(shape_feature(self.FEATURE, None), self.FEATURE)
+
+    def test_bbox_becomes_a_rectangle_covering_the_original(self):
+        out = shape_feature(self.FEATURE, 'bbox')
+        dlon, dlat, _ = self._extent(out)
+        self.assertAlmostEqual(dlon, 0.02, places=6)
+        self.assertAlmostEqual(dlat, 0.10, places=6)
+        self.assertEqual(len(out['geometry']['coordinates'][0]), 5)   # closed ring
+
+    def test_square_is_square_on_the_page(self):
+        out = shape_feature(self.FEATURE, 'square')
+        self.assertAlmostEqual(self._page_ratio(out), 1.0, places=3)
+
+    def test_square_degrees_is_the_legacy_shape(self):
+        out = shape_feature(self.FEATURE, 'square_degrees')
+        dlon, dlat, _ = self._extent(out)
+        self.assertAlmostEqual(dlon, dlat, places=6)          # square in degrees
+        # ...which reaches the page ~1.3x taller than wide at this latitude.
+        self.assertAlmostEqual(self._page_ratio(out), 1.30, places=2)
+
+    def test_square_covers_the_original_and_stays_centred(self):
+        out = shape_feature(self.FEATURE, 'square')
+        dlon, dlat, lat = self._extent(out)
+        self.assertGreaterEqual(dlon + 1e-9, 0.02)
+        self.assertGreaterEqual(dlat + 1e-9, 0.10)
+        self.assertAlmostEqual(lat, 39.65, places=6)
+
+    def test_points_and_lines_pass_through_every_mode(self):
+        point = {'type': 'Feature', 'properties': {},
+                 'geometry': {'type': 'Point', 'coordinates': [-123.6, 39.6]}}
+        for mode in POLYGON_SHAPES:
+            self.assertEqual(shape_feature(point, mode)['geometry'], point['geometry'])
+
+    def test_page_square_from_bbox_at_the_equator_is_a_degree_square(self):
+        # cos(0) = 1, so the two definitions agree there.
+        ring = page_square_from_bbox((0.0, 0.0, 0.2, 0.1))
+        xs = [c[0] for c in ring]
+        ys = [c[1] for c in ring]
+        self.assertAlmostEqual(max(xs) - min(xs), max(ys) - min(ys), places=6)
+

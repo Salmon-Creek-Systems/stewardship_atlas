@@ -18,6 +18,7 @@ from deltas_geojson import (
     apply_deltas,
     InvalidDelta,
     _apply_delete_delta,
+    layer_polygon_shape,
 )
 
 class TestDeltasGeoJSON(unittest.TestCase):
@@ -313,3 +314,66 @@ class TestApplyDeleteDelta(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main() 
+
+class TestPolygonShapeOnApply(unittest.TestCase):
+    """A layer's polygon_shape is applied where create deltas land, so an
+    import, an upload and a hand-drawn polygon all end up the same shape.
+    This is what makes a drawn region print as a page-shaped region."""
+
+    CORRIDOR = [[-123.60, 39.60], [-123.58, 39.60], [-123.58, 39.70],
+                [-123.60, 39.70], [-123.60, 39.60]]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _config(self, polygon_shape=None):
+        layer = {'name': 'regions', 'geometry_type': 'polygon'}
+        if polygon_shape:
+            layer['polygon_shape'] = polygon_shape
+        return {'name': 'testatlas', 'data_root': str(self.root),
+                'version_string': 'staging',
+                'dataswale': {'name': 'testatlas', 'layers': [layer]}}
+
+    def _write_delta(self, config):
+        deltas = self.root / 'testatlas' / 'staging' / 'deltas' / 'regions'
+        deltas.mkdir(parents=True, exist_ok=True)
+        (self.root / 'testatlas' / 'staging' / 'layers' / 'regions').mkdir(parents=True, exist_ok=True)
+        payload = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'properties': {'name': 'drawn'},
+             'geometry': {'type': 'Polygon', 'coordinates': [self.CORRIDOR]}}]}
+        (deltas / 'webedit__20260923_120000__create.geojson').write_text(json.dumps(payload))
+
+    def _apply(self, polygon_shape):
+        config = self._config(polygon_shape)
+        self._write_delta(config)
+        # overwrite: each call in a test starts from an empty layer, so the
+        # feature read back is the one this call applied.
+        apply_deltas(config, 'regions', overwrite=True)
+        layer = json.loads((self.root / 'testatlas' / 'staging' / 'layers' / 'regions'
+                            / 'regions.geojson').read_text())
+        ring = layer['features'][0]['geometry']['coordinates'][0]
+        xs = [c[0] for c in ring]
+        ys = [c[1] for c in ring]
+        return max(xs) - min(xs), max(ys) - min(ys)
+
+    def test_default_is_raw(self):
+        self.assertEqual(layer_polygon_shape(self._config(), 'regions'), 'raw')
+        self.assertEqual(layer_polygon_shape(self._config(), 'nosuchlayer'), 'raw')
+        dlon, dlat = self._apply(None)
+        self.assertAlmostEqual(dlon, 0.02, places=6)      # as drawn
+
+    def test_square_shapes_a_hand_drawn_polygon(self):
+        dlon, dlat = self._apply('square')
+        # Page-square at 39.65N: wider in degrees than tall.
+        self.assertAlmostEqual(dlat, 0.10, places=6)
+        self.assertAlmostEqual(dlon, 0.10 / 0.7705, places=2)
+
+    def test_bbox_and_square_degrees(self):
+        self.assertAlmostEqual(self._apply('bbox')[0], 0.02, places=6)
+        dlon, dlat = self._apply('square_degrees')
+        self.assertAlmostEqual(dlon, dlat, places=6)
+
