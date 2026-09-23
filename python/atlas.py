@@ -1179,11 +1179,26 @@ def edit_layer(config, layer_name, changes, rebuild=True, run_materialize=True):
     if layer_name not in layers:
         raise ValueError(f"No layer '{layer_name}' in {geojson_path.name}")
 
-    # The source geojson keys layers by name; plan wants the name inside too.
-    current = dict(layers[layer_name])
+    # Plan from the RESOLVED layer, not the source entry: a layer written as
+    # {"layer_def": "regions", ...} carries none of the template's values —
+    # including geometry_type — so styling it from the source alone would treat
+    # a polygon as a point. The resolved config is what the map actually draws.
+    source = dict(layers[layer_name])
+    resolved = next((l for l in config.get('dataswale', {}).get('layers', [])
+                     if l.get('name') == layer_name), None)
+    current = dict(resolved or {})
+    current.update({k: v for k, v in source.items() if k != 'layer_def'})
     current.setdefault('name', layer_name)
+
     updated = plan_edit_layer(current, changes, icons=available_icons(config))
-    layers[layer_name] = updated
+
+    # Overrides replace a key wholesale rather than merging into the template,
+    # so the resolved values are written back as overrides — otherwise editing
+    # one paint property would drop the rest of the template's paint block.
+    new_def = {k: v for k, v in updated.items() if k != 'layer_def'}
+    if 'layer_def' in source:
+        new_def['layer_def'] = source['layer_def']
+    layers[layer_name] = new_def
     print(f"Styling '{layer_name}': {sorted(changes)}")
 
     with open(geojson_path, 'w') as f:

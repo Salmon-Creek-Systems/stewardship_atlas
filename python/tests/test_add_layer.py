@@ -487,5 +487,97 @@ class TestAddLayerExecutor(unittest.TestCase):
         with self.assertRaises(ValueError):
             atlas.add_layer(self.config, 'roads', source='empty')
 
+class TestEditLayerExecutor(unittest.TestCase):
+    """edit_layer against a temp seed geojson, including the layer_def case that
+    broke on regions: geometry_type lives in the shared template, not the seed."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.name = 'testatlas'
+        app_cfg = root / self.name / 'app' / 'configuration'
+        app_cfg.mkdir(parents=True)
+        (root / self.name / 'staging').mkdir(parents=True)
+        self.seed = app_cfg / f'{self.name}.geojson'
+        self.seed.write_text(json.dumps({
+            "type": "FeatureCollection",
+            "features": [{"type": "Feature", "geometry": None, "properties": {
+                "layers": {
+                    # A layer_def layer: everything but the overrides comes from
+                    # shared_layers_config at build time.
+                    "regions": {"layer_def": "regions", "access": ["admin"]},
+                    "hydrants": {"name": "hydrants", "geometry_type": "point",
+                                 "color": [12, 94, 46]},
+                },
+                "assets": {"webmap": {"type": "outlet", "in_layers": ["regions", "hydrants"]}},
+            }}],
+        }, indent=2))
+
+        # The resolved config the running system uses: template values merged in.
+        self.config = {
+            'name': self.name,
+            'data_root': str(root),
+            'dataswale': {'layers': [
+                {'name': 'regions', 'geometry_type': 'polygon', 'color': [255, 140, 0],
+                 'fill_color': [255, 140, 0], 'access': ['admin'],
+                 'paint': {'fill-color': '#ff8c00', 'fill-opacity': 0.15,
+                           'fill-outline-color': '#ff8c00'}},
+                {'name': 'hydrants', 'geometry_type': 'point', 'color': [12, 94, 46]},
+            ]},
+            'assets': {'webmap': {'type': 'outlet',
+                                  'config': {'fetch_type': 'webmap',
+                                             'in_layers': ['regions', 'hydrants']}}},
+        }
+
+        self.materialized = []
+        self._orig_build = atlas.build_atlas_from_geojson
+        self._orig_materialize = atlas.materialize
+        atlas.build_atlas_from_geojson = MagicMock(side_effect=self._fake_build)
+        atlas.materialize = MagicMock(side_effect=lambda cfg, a, *x, **k: self.materialized.append(a))
+
+        def _restore():
+            atlas.build_atlas_from_geojson = self._orig_build
+            atlas.materialize = self._orig_materialize
+        self.addCleanup(_restore)
+
+    def _fake_build(self, geojson_path, config_only=False):
+        (Path(self.config['data_root']) / self.name / 'staging' / 'atlas_config.json').write_text(
+            json.dumps(self.config))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _layer(self, name):
+        return json.loads(self.seed.read_text())['features'][0]['properties']['layers'][name]
+
+    def test_layer_def_layer_is_styled_as_its_resolved_geometry(self):
+        # The bug: a polygon written as {"layer_def": ...} read as a point, so
+        # "Only polygon layers have a separate fill colour."
+        atlas.edit_layer(self.config, 'regions',
+                         {'fill_color': '#00FF00', 'color': '#000000', 'opacity': 0.4})
+        regions = self._layer('regions')
+        self.assertEqual(regions['fill_color'], [0, 255, 0])
+        self.assertEqual(regions['paint']['fill-color'], '#00ff00')
+        self.assertEqual(regions['paint']['fill-outline-color'], '#000000')
+        self.assertEqual(regions['paint']['fill-opacity'], 0.4)
+
+    def test_layer_def_is_kept_and_template_values_preserved(self):
+        atlas.edit_layer(self.config, 'regions', {'opacity': 0.4})
+        regions = self._layer('regions')
+        self.assertEqual(regions['layer_def'], 'regions')      # still template-backed
+        self.assertEqual(regions['access'], ['admin'])         # override kept
+        # Writing one paint property must not drop the rest of the block.
+        self.assertEqual(regions['paint']['fill-color'], '#ff8c00')
+        self.assertEqual(regions['geometry_type'], 'polygon')
+
+    def test_only_the_webmaps_are_rematerialized(self):
+        atlas.edit_layer(self.config, 'hydrants', {'color': '#FFAA33'})
+        self.assertEqual(self.materialized, ['webmap'])
+
+    def test_unknown_layer_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.edit_layer(self.config, 'nosuchlayer', {'color': '#FFAA33'})
+
+
 if __name__ == '__main__':
     unittest.main()
