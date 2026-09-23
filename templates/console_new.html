@@ -985,6 +985,20 @@ function openAddLayerModal() {
 // be disruptive to change (name, geometry, data source) left out. Renaming in
 // particular is refused server-side — the name is the identifier everywhere.
 function openEditLayerModal(layerName) {
+    // The console page is baked when it is materialized, but a restyle only
+    // rebuilds the webmaps — so the embedded layer data goes stale as soon as
+    // you save. Read the live config first, and fall back to what was baked.
+    fetch('../../../atlas_config.json?t=' + Date.now())
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(cfg) {
+            var layers = ((cfg || {}).dataswale || {}).layers || [];
+            layers.forEach(function(l) { if (l.name) alLayersByName[l.name] = l; });
+        })
+        .catch(function() { /* offline or static copy: baked data it is */ })
+        .then(function() { alOpenEditLayerModal(layerName); });
+}
+
+function alOpenEditLayerModal(layerName) {
     var layer = alLayersByName[layerName] || { name: layerName };
     alMode = 'edit';
     alEditing = layerName;
