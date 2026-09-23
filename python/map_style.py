@@ -1,9 +1,11 @@
-"""Helpers for the MapLibre style layers the webmap outlet emits.
+"""Helpers for the MapLibre style layers the webmap outlet emits, and the
+pure parts of the QGIS styling that mirrors them.
 
 Standard library only: `outlets` imports duckdb, geopandas, pandas, nbformat,
-PIL and gspread at module scope and cannot be imported on a bare checkout, so
-anything here that deserves a test lives outside it.
+PIL and gspread at module scope (and `outlets_qgis` imports QGIS), so neither
+can be imported on a bare checkout; anything that deserves a test lives here.
 """
+from pathlib import Path
 
 # Every `maxzoom` in every config in this repo is 22, and every one of them
 # means "no upper limit". MapLibre hides a layer at zoom levels *greater than
@@ -161,3 +163,55 @@ def paint_for(layer_type, paint):
     if not prefixes or not paint:
         return dict(paint or {})
     return {k: v for k, v in paint.items() if k.startswith(prefixes)}
+
+
+# ---------------------------------------------------------------------------
+# QGIS print widths. On the webmap `vector_width` is a width in screen pixels;
+# QGIS has always read it as ground metres, so a road's printed thickness
+# depended on how much ground its page covered — a 9 m road is 1.5 mm on a
+# 1 km page and a hairline on a 6 km one. `qgis_width_units: "mm"` reads it as
+# paper width instead, the print analogue of the webmap's pixels. Opt-in, so
+# atlases tuned against the metres behaviour keep it.
+# ---------------------------------------------------------------------------
+
+QGIS_MM_PER_WIDTH_UNIT = 0.12
+
+
+def qgis_width_in_mm(layer):
+    """Whether this layer's QGIS line width is paper millimetres."""
+    return layer.get('qgis_width_units') == 'mm'
+
+
+def qgis_mm_width(layer, has_width_field, line_scale=1.0):
+    """(expression, constant) for a paper-width line, in millimetres.
+
+    With a per-feature `vector_width` field the expression reads it, falling
+    back to `constant_width` for a feature that has none; without the field
+    the expression is None and the constant alone applies."""
+    factor = QGIS_MM_PER_WIDTH_UNIT * layer.get('qgis_width_scale', 1.0) * line_scale
+    constant_width = layer.get('constant_width', 2)
+    constant = constant_width * factor
+    if 'vector_width' in layer and has_width_field:
+        return f'coalesce("vector_width", {constant_width}) * {factor:g}', constant
+    return None, constant
+
+
+# ---------------------------------------------------------------------------
+# Where QGIS reads a COG layer from. It renders on the box, which holds the
+# layer's own files, so those come first: a local file is faster than range
+# requests and exists whether or not anything was ever uploaded. Then another
+# atlas's COG by `cog_url`, then this atlas's s3_upload location.
+# ---------------------------------------------------------------------------
+
+def qgis_cog_sources(layer_name, layer, layer_dir, atlas_name):
+    """Ordered sources for QgsRasterLayer — existing local files, then remote."""
+    sources = [str(Path(layer_dir) / f'{layer_name}{suffix}')
+               for suffix in ('.cog.tif', '.tiff')
+               if (Path(layer_dir) / f'{layer_name}{suffix}').exists()]
+    if layer.get('cog_url'):
+        sources.append(f"/vsicurl/{layer['cog_url']}")
+    bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
+    region = layer.get('cog_s3_region', 'us-east-1')
+    sources.append(f'/vsicurl/https://{bucket}.s3.{region}.amazonaws.com'
+                   f'/{atlas_name}/rasters/{layer_name}/{layer_name}.cog.tif')
+    return sources

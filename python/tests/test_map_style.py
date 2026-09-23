@@ -7,7 +7,9 @@ another suite (#153).
 """
 import os
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -206,3 +208,64 @@ class TestPaintFor(unittest.TestCase):
         self.assertEqual(map_style.paint_for('circle', {}), {})
         self.assertEqual(map_style.paint_for('circle', None), {})
 
+
+
+class TestQgisMmWidth(unittest.TestCase):
+    ROAD = {'vector_width': True, 'qgis_width_units': 'mm'}
+
+    def test_opt_in_only(self):
+        # Atlases tuned against the ground-metres behaviour must keep it.
+        self.assertFalse(map_style.qgis_width_in_mm({'vector_width': True}))
+        self.assertTrue(map_style.qgis_width_in_mm(self.ROAD))
+
+    def test_reads_vector_width_as_paper_mm(self):
+        expr, _ = map_style.qgis_mm_width(self.ROAD, has_width_field=True)
+        self.assertEqual(expr, f'coalesce("vector_width", 2) * {map_style.QGIS_MM_PER_WIDTH_UNIT:g}')
+
+    def test_width_scale_and_line_scale_multiply(self):
+        layer = dict(self.ROAD, qgis_width_scale=2.0)
+        _, constant = map_style.qgis_mm_width(layer, has_width_field=True, line_scale=1.5)
+        self.assertAlmostEqual(constant, 2 * map_style.QGIS_MM_PER_WIDTH_UNIT * 3.0)
+
+    def test_no_width_field_means_constant_only(self):
+        expr, constant = map_style.qgis_mm_width(
+            dict(self.ROAD, constant_width=5), has_width_field=False)
+        self.assertIsNone(expr)
+        self.assertAlmostEqual(constant, 5 * map_style.QGIS_MM_PER_WIDTH_UNIT)
+
+    def test_layer_without_vector_width_ignores_the_field(self):
+        expr, _ = map_style.qgis_mm_width({'qgis_width_units': 'mm'}, has_width_field=True)
+        self.assertIsNone(expr)
+
+
+class TestQgisCogSources(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_local_files_come_first_cog_before_tiff(self):
+        (self.dir / 'basemap.tiff').touch()
+        (self.dir / 'basemap.cog.tif').touch()
+        sources = map_style.qgis_cog_sources('basemap', {'cog': True}, self.dir, 'sfe')
+        self.assertEqual(sources[:2], [str(self.dir / 'basemap.cog.tif'),
+                                       str(self.dir / 'basemap.tiff')])
+
+    def test_missing_local_files_are_skipped(self):
+        sources = map_style.qgis_cog_sources('basemap', {'cog': True}, self.dir, 'sfe')
+        self.assertEqual(len(sources), 1)
+        self.assertTrue(sources[0].startswith('/vsicurl/'))
+
+    def test_s3_fallback_is_the_s3_upload_location(self):
+        # s3_upload writes {atlas}/rasters/{layer}/{layer}.cog.tif to
+        # scs-atlas-data, which is in us-east-1 (us-west-1 answers 301).
+        sources = map_style.qgis_cog_sources('basemap', {}, self.dir, 'sfe')
+        self.assertEqual(sources[-1], '/vsicurl/https://scs-atlas-data.s3.us-east-1'
+                         '.amazonaws.com/sfe/rasters/basemap/basemap.cog.tif')
+
+    def test_cog_url_before_own_s3(self):
+        layer = {'cog_url': 'https://example.org/fhe/canopy.cog.tif'}
+        sources = map_style.qgis_cog_sources('canopy', layer, self.dir, 'sfe')
+        self.assertEqual(sources[0], '/vsicurl/https://example.org/fhe/canopy.cog.tif')

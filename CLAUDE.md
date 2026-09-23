@@ -489,6 +489,12 @@ All options live in the per-atlas `{atlas}_layers.json` and are read by `apply_b
 | `label_expression` | string | **Most powerful.** Raw QGIS expression; NULL return suppresses label. Use this first for non-trivial filtering. |
 | `label_color` | [r, g, b] | Overrides default label color |
 | `qgis_width_scale` | float | Multiplies line width (roads, creeks) |
+| `qgis_width_units` | `"mm"` | Read `vector_width` as paper width (0.12 mm/unit × `qgis_width_scale`), like the webmap's pixels. Default is ground **metres**, so thickness varies with page scale — a 9 m road is a hairline on a 6 km page |
+| `label_buffer` | bool or mm | White halo around label text; `true` = 0.6 mm |
+
+Line labels with no `label_color` default to **white with no buffer** — invisible on white paper. Any linestring layer with `add_labels` needs a `label_color` in PDF output.
+
+`cog: true` raster layers load from the box's local `{layer}.cog.tif`/`.tiff` first, then `cog_url`, then the `s3_upload` location (`map_style.qgis_cog_sources`). `blend_percent` is a dead key in the QGIS path; the halftone basemap is `qgis_opacity` on the raster layer.
 
 `label_deduplicate` uses PAL expression: `if($id = minimum($id, group_by:="<field>"), "<field>", NULL)` — aggregate runs across the whole layer. Works well for buildings/addresses; less predictable for per-cell gazetteer context.
 

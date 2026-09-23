@@ -57,6 +57,7 @@
             "geometry_type": "raster",
             "cog": true,
             "display_name": "LIDAR Hillshade",
+            "qgis_opacity": 0.5,
             "paint": {
               "raster-opacity": 1.0
             },
@@ -118,6 +119,10 @@
             "add_labels": true,
             "interaction": "interface",
             "vector_width": true,
+            "qgis_width_units": "mm",
+            "qgis_width_scale": 1.25,
+            "label_color": [30, 30, 30],
+            "label_buffer": true,
             "vis": {
               "minzoom": 10,
               "maxzoom": 22
@@ -148,6 +153,10 @@
             "add_labels": true,
             "interaction": "interface",
             "vector_width": true,
+            "qgis_width_units": "mm",
+            "qgis_width_scale": 1.25,
+            "label_color": [30, 30, 30],
+            "label_buffer": true,
             "vis": {
               "minzoom": 13,
               "maxzoom": 22
@@ -178,6 +187,10 @@
             "add_labels": true,
             "interaction": "interface",
             "vector_width": true,
+            "qgis_width_units": "mm",
+            "qgis_width_scale": 1.25,
+            "label_color": [30, 30, 30],
+            "label_buffer": true,
             "vis": {
               "minzoom": 16,
               "maxzoom": 22
@@ -200,6 +213,10 @@
           },
           "creeks": {
             "layer_def": "creeks",
+            "qgis_width_units": "mm",
+            "qgis_width_scale": 1.5,
+            "label_color": [30, 60, 170],
+            "label_buffer": true,
             "vis": {
               "minzoom": 10,
               "maxzoom": 22
@@ -491,7 +508,8 @@
               "stops": [[0, "#00a000"], [11, "#999900"], [22, "#cc8400"], [33, "#a00000"], [100, "#6c6c6c"]]
             },
             "vector_width": true,
-            "qgis_width_scale": 12.0
+            "qgis_width_units": "mm",
+            "qgis_width_scale": 3.0
           },
           "mileage_markers": {
             "geometry_type": "point",
@@ -1284,12 +1302,15 @@
             "feature_scale": 0.5,
             "blend_percent": 50,
             "in_layers": [
-              "roads_primary",
-              "roads_secondary",
-              "roads_tertiary",
+              "basemap",
               "creeks",
+              "road_mileage",
+              "roads_tertiary",
+              "roads_secondary",
+              "roads_primary",
               "landmarks",
-              "photos"
+              "photos",
+              "mileage_markers"
             ],
             "access": [
               "public",

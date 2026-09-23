@@ -53,6 +53,7 @@ from qgis.core import (
     QgsSimpleMarkerSymbolLayer,
     QgsTextFormat,
     QgsTextBackgroundSettings,
+    QgsTextBufferSettings,
     QgsVectorLayerSimpleLabeling,
     QgsPalLayerSettings,
     QgsProperty,
@@ -68,9 +69,11 @@ from qgis.PyQt.QtCore import QSizeF, Qt
 try:
     from . import versioning
     from . import utils
+    from . import map_style
 except ImportError:
     import versioning
     import utils
+    import map_style
 
 #logger = logging.getLogger(__name__)
 
@@ -258,11 +261,13 @@ def load_full_layer(layer_config, config):
         return layer
     elif geometry_type == 'raster':
         if layer_config.get('cog'):
-            s3_bucket = layer_config.get('cog_s3_bucket', 'scs-atlas-data')
-            cog_url = (f"https://{s3_bucket}.s3.us-west-1.amazonaws.com"
-                       f"/{config['name']}/rasters/{layer_name}/{layer_name}.cog.tif")
-            layer = QgsRasterLayer(f'/vsicurl/{cog_url}', layer_name)
-            source_desc = f"/vsicurl/{cog_url}"
+            layer_dir = versioning.atlas_path(config, "layers") / layer_name
+            sources = map_style.qgis_cog_sources(layer_name, layer_config, layer_dir, config['name'])
+            for source_desc in sources:
+                layer = QgsRasterLayer(source_desc, layer_name)
+                if layer.isValid():
+                    break
+                logger.info(f"COG source not usable for {layer_name}: {source_desc}")
         else:
             layer_path = versioning.atlas_path(config, "layers") / layer_name / f"{layer_name}.tiff"
             layer = QgsRasterLayer(str(layer_path), layer_name)
@@ -400,9 +405,24 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
         # qgis_width_scale multiplies line widths in QGIS output only — no effect on webmap.
         qgis_width_scale = layer_config.get('qgis_width_scale', 1.0)
 
+        # qgis_width_units: "mm" — vector_width is paper width, like the webmap's
+        # pixels, so a road prints equally thick on every page (see map_style).
+        if map_style.qgis_width_in_mm(layer_config):
+            has_width_field = layer.fields().indexOf('vector_width') >= 0
+            width_expr, constant_mm = map_style.qgis_mm_width(
+                layer_config, has_width_field, line_scale)
+            line_layer = symbol.symbolLayer(0)
+            line_layer.setWidthUnit(QgsUnitTypes.RenderMillimeters)
+            line_layer.setWidth(constant_mm)
+            if width_expr:
+                line_layer.setDataDefinedProperty(
+                    QgsSymbolLayer.PropertyStrokeWidth,
+                    QgsProperty.fromExpression(width_expr)
+                )
+            logger.info(f"Paper-width lines for {layer.name()}: {width_expr or constant_mm} mm")
         # Check if width should come from per-feature attribute
         # If 'vector_width' key exists in config (any value), use feature's vector_width attribute
-        if 'vector_width' in layer_config:
+        elif 'vector_width' in layer_config:
             # Check if the layer actually has a vector_width field
             fields = layer.fields()
             if fields.indexOf('vector_width') >= 0:
@@ -548,6 +568,19 @@ def apply_basic_styling(layer, layer_config, config=None, feature_scale=1.0, lin
             
             text_format.setFont(font)
             
+            # White halo around the text so labels stay legible over a hillshade
+            # or a dense road net. `label_buffer: true` for the default 0.6 mm,
+            # or a number for its width in mm.
+            label_buffer = layer_config.get('label_buffer', False)
+            if label_buffer:
+                buffer = QgsTextBufferSettings()
+                buffer.setEnabled(True)
+                buffer.setSize(0.6 if label_buffer is True else float(label_buffer))
+                buffer.setSizeUnit(QgsUnitTypes.RenderMillimeters)
+                buffer.setColor(QColor(255, 255, 255))
+                buffer.setOpacity(0.85)
+                text_format.setBuffer(buffer)
+
             # Add white background box if configured (useful for notes/annotations)
             if layer_config.get('label_background', False):
                 background = QgsTextBackgroundSettings()
