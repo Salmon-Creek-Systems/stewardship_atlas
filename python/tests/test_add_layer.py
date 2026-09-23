@@ -217,6 +217,131 @@ class TestValidateLayerUpload(unittest.TestCase):
                 atlas.validate_layer_upload(bad, 'point')
 
 
+class TestPlanEditLayer(unittest.TestCase):
+    """The console's Edit Layer form: restyle an existing layer in place."""
+
+    POINT = {'name': 'hydrants', 'geometry_type': 'point', 'color': [12, 94, 46],
+             'paint': {'circle-radius': 9, 'circle-color': '#0c5e2e',
+                       'circle-stroke-width': 1.5, 'circle-stroke-color': '#063c1c'}}
+    LINE = {'name': 'trails', 'geometry_type': 'linestring', 'color': [12, 94, 46],
+            'paint': {'line-color': '#0c5e2e', 'line-width': 4}}
+    POLY = {'name': 'parcels', 'geometry_type': 'polygon', 'color': [12, 94, 46],
+            'fill_color': [12, 94, 46], 'paint': {'fill-color': '#0c5e2e', 'fill-opacity': 0.5}}
+    ICONS = ('camera', 'culvert', 'flower')
+
+    def test_absent_keys_are_left_alone(self):
+        out = atlas.plan_edit_layer(self.POINT, {'width': 12}, icons=self.ICONS)
+        self.assertEqual(out['paint']['circle-radius'], 12)
+        self.assertEqual(out['paint']['circle-color'], '#0c5e2e')       # untouched
+        self.assertEqual(out['paint']['circle-stroke-width'], 1.5)      # untouched
+        self.assertEqual(out['color'], [12, 94, 46])
+
+    def test_renaming_is_refused(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.POINT, {'name': 'other'}, icons=self.ICONS)
+
+    def test_width_means_radius_width_and_nothing_for_polygons(self):
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'width': 5})['paint']['circle-radius'], 5)
+        self.assertEqual(atlas.plan_edit_layer(self.LINE, {'width': 5})['paint']['line-width'], 5)
+        poly = atlas.plan_edit_layer(self.POLY, {'width': 5})
+        self.assertNotIn('line-width', poly['paint'])
+        self.assertNotIn('circle-radius', poly['paint'])
+
+    def test_colour_updates_both_color_and_paint(self):
+        out = atlas.plan_edit_layer(self.LINE, {'color': '#FFAA33'})
+        self.assertEqual(out['color'], [255, 170, 51])
+        self.assertEqual(out['paint']['line-color'], '#ffaa33')
+
+    def test_polygon_colour_also_sets_fill_color_and_outline(self):
+        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33'})
+        self.assertEqual(out['fill_color'], [255, 170, 51])
+        self.assertEqual(out['paint']['fill-color'], '#ffaa33')
+        self.assertEqual(out['paint']['fill-outline-color'], '#ffaa33')
+
+    def test_opacity_per_geometry(self):
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'opacity': 0.5})['paint']['circle-opacity'], 0.5)
+        self.assertEqual(atlas.plan_edit_layer(self.LINE, {'opacity': 0.5})['paint']['line-opacity'], 0.5)
+        poly = atlas.plan_edit_layer(self.POLY, {'opacity': 0.25})
+        self.assertEqual(poly['paint']['fill-opacity'], 0.25)
+        self.assertEqual(poly['fill_opacity'], 0.25)        # QGIS reads this one
+
+    def test_opacity_out_of_range_rejected(self):
+        for bad in (-0.1, 1.5):
+            with self.assertRaises(ValueError):
+                atlas.plan_edit_layer(self.POINT, {'opacity': bad})
+
+    def test_icon_sets_symbol_and_forces_labels(self):
+        out = atlas.plan_edit_layer(self.POINT, {'icon': 'camera'}, icons=self.ICONS)
+        self.assertEqual(out['symbol'], {'png': 'camera.png', 'icon': 'camera'})
+        # The icon rides on the label layer, so labels have to be on.
+        self.assertTrue(out['add_labels'])
+
+    def test_icon_size_follows_width(self):
+        out = atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 18}, icons=self.ICONS)
+        self.assertEqual(out['icon-size'], 2.0)             # 9 (the default dot) -> 1.0
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 9},
+                                               icons=self.ICONS)['icon-size'], 1.0)
+
+    def test_clearing_icon_goes_back_to_a_dot(self):
+        withicon = atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 18}, icons=self.ICONS)
+        out = atlas.plan_edit_layer(withicon, {'icon': ''}, icons=self.ICONS)
+        self.assertNotIn('symbol', out)
+        self.assertNotIn('icon-size', out)
+
+    def test_unknown_icon_and_icon_on_a_line_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.POINT, {'icon': 'rocket'}, icons=self.ICONS)
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.LINE, {'icon': 'camera'}, icons=self.ICONS)
+
+    def test_label_field_is_made_editable(self):
+        out = atlas.plan_edit_layer(self.POINT, {'label_field': 'street'})
+        self.assertEqual(out['label_field'], 'street')
+        # Otherwise a hand-drawn feature could never be given a label.
+        self.assertIn({'name': 'street', 'type': 'string', 'default': ''}, out['editable_columns'])
+
+    def test_label_field_name_is_the_default_and_stored_as_absent(self):
+        out = atlas.plan_edit_layer(dict(self.POINT, label_field='street'), {'label_field': 'name'})
+        self.assertNotIn('label_field', out)
+
+    def test_colormap_and_back_to_flat(self):
+        cm = {'palette': 'Greens', 'property': 'depth', 'min': 0, 'max': 10}
+        ramped = atlas.plan_edit_layer(self.POINT, {'colormap': cm})
+        self.assertEqual(ramped['paint']['circle-color'][0], 'interpolate')
+        self.assertEqual(len(ramped['qgis_color_stops']['stops']), 9)
+
+        flat = atlas.plan_edit_layer(ramped, {'colormap': None, 'color': '#FFAA33'})
+        self.assertEqual(flat['paint']['circle-color'], '#ffaa33')
+        self.assertNotIn('qgis_color_stops', flat)
+
+    def test_colour_does_not_clobber_an_existing_ramp(self):
+        cm = {'palette': 'Greens', 'property': 'depth', 'min': 0, 'max': 10}
+        ramped = atlas.plan_edit_layer(self.POINT, {'colormap': cm})
+        still = atlas.plan_edit_layer(ramped, {'color': '#FFAA33'})
+        self.assertEqual(still['paint']['circle-color'][0], 'interpolate')
+        self.assertEqual(still['color'], [255, 170, 51])     # legend/QGIS colour still updates
+
+
+class TestStylingOutlets(unittest.TestCase):
+    """Which outlets a restyle re-materializes: webmaps, not the slow ones."""
+
+    CONFIG = {'assets': {
+        'webmap':     {'type': 'outlet', 'config': {'fetch_type': 'webmap', 'in_layers': ['roads', 'hydrants']}},
+        'experimental_webmap': {'type': 'outlet', 'config': {'fetch_type': 'webmap', 'in_layers': ['hydrants']}},
+        'webedit':    {'type': 'outlet', 'config': {'fetch_type': 'webedit', 'in_layers': ['hydrants']}},
+        'runbook':    {'type': 'outlet', 'config': {'fetch_type': 'qgis_atlas', 'in_layers': ['hydrants']}},
+        'html':       {'type': 'outlet', 'config': {'fetch_type': 'html'}},
+    }}
+
+    def test_every_webmap_showing_the_layer(self):
+        self.assertEqual(sorted(atlas.styling_outlets(self.CONFIG, 'hydrants')),
+                         ['experimental_webmap', 'webedit', 'webmap'])
+
+    def test_skips_maps_without_the_layer_and_slow_outlets(self):
+        self.assertEqual(atlas.styling_outlets(self.CONFIG, 'roads'), ['webmap'])
+        self.assertNotIn('runbook', atlas.styling_outlets(self.CONFIG, 'hydrants'))
+
+
 class TestAddLayerExecutor(unittest.TestCase):
 
     def setUp(self):

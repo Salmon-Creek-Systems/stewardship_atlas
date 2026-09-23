@@ -886,17 +886,20 @@ def validate_layer_upload(fc, geometry_type):
 
 def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
                    s3_bucket='scs-internal', s3_key=None, consumers=None,
-                   source='s3', label_property=None, width=None, colormap=None):
+                   source='s3', label_property=None, width=None, colormap=None,
+                   icon=None, opacity=None, label_field=None, icons=()):
     """Decide the config additions for a new vector layer. Pure.
 
     source:         's3'    — an s3_geojson inlet imports s3://{s3_bucket}/{s3_key}
                     'empty' — no inlet; the layer is filled by hand (webedit,
                               photo/email ingest), like culverts.
-    label_property: s3: the feature property to label with. It is copied into
-                    `name` at import (alterations.canonicalize), because the
-                    webmap and the PDFs label from `name`. empty: any truthy
-                    value turns labels on; they read the `name` edit column.
-                    Unset → add_labels False.
+    label_property: s3 only: a feature property copied into `name` at import
+                    (alterations.canonicalize). Rewrites the data, so it is the
+                    CLI/GET option; the console form sends label_field instead.
+    label_field:    the property the map labels from, as display config —
+                    reversible, and it works for a hand-drawn layer too. Added
+                    to editable_columns so webedit can set it.
+    icon/opacity:   styling shared with the Edit Layer form (plan_edit_layer).
     width:          pixels; line-width for lines, circle-radius for points,
                     ignored for polygons.
     colormap:       {"palette", "property", "min", "max"} — colour by a numeric
@@ -945,6 +948,13 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
         layer_def['show_attributes'] = True
         layer_def['editable_columns'] = [{"name": prop, "type": "number"}]
 
+    # Icon, opacity and label_field mean the same thing here as in a restyle,
+    # so the Edit Layer planner owns them and this stays one implementation.
+    restyle = {k: v for k, v in (('icon', icon), ('opacity', opacity),
+                                 ('label_field', label_field)) if v is not None}
+    if restyle:
+        layer_def = plan_edit_layer(layer_def, restyle, icons=icons)
+
     inlet_key, inlet_asset = None, None
     if source == 'empty':
         # Hand-drawn features need somewhere to type the label.
@@ -977,10 +987,207 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
             "consumer_edits": consumer_edits}
 
 
+# Styling the console's Edit Layer form can change, per geometry. One "width"
+# covers all three: a line's width, a dot's radius, and — when a point layer
+# uses an icon — its icon size, scaled so the default dot radius maps to 1.0.
+_DEFAULT_POINT_WIDTH = 9
+EDIT_LAYER_FIELDS = ('color', 'opacity', 'width', 'icon', 'add_labels', 'label_field', 'colormap')
+
+
+def available_icons(config=None, app_dir=None):
+    """Icon names (PNG stems) a point layer can use, from templates/icons.
+
+    Sprites are built per layer from `symbol.png` (generate_sprite_from_layers),
+    so any of these works on any point layer — but only when add_labels is on,
+    because the icon rides on the label layer.
+    """
+    if app_dir is None:
+        # Same shape add_layer uses for the source geojson: {data_root}/{atlas}/app.
+        app_dir = Path(config['data_root']) / config['name'] / 'app'
+    icons_dir = Path(app_dir) / 'templates' / 'icons'
+    if not icons_dir.is_dir():
+        return []
+    return sorted(p.stem for p in icons_dir.glob('*.png'))
+
+
+def plan_edit_layer(layer_def, changes, icons=()):
+    """Apply Edit Layer form changes to one layer definition. Pure.
+
+    changes may carry any of EDIT_LAYER_FIELDS; anything absent is left alone,
+    so the form can send only what it touched. Returns a new layer def.
+
+    Deliberately cannot rename a layer: the name is the identifier in the
+    config, the delta paths, the outlets and the sprite, so renaming is
+    rename_layer's job, not a styling form's.
+    """
+    unknown = set(changes) - set(EDIT_LAYER_FIELDS)
+    if unknown:
+        raise ValueError(f"Cannot change {sorted(unknown)} here; "
+                         f"editable: {sorted(EDIT_LAYER_FIELDS)}")
+
+    layer = copy.deepcopy(layer_def)
+    geometry = layer.get('geometry_type', 'point')
+    if geometry not in ADD_LAYER_GEOMETRIES:
+        raise ValueError(f"Cannot style a {geometry} layer here.")
+    paint = dict(layer.get('paint') or {})
+
+    if 'color' in changes and changes['color'] is not None:
+        rgb = _parse_color(changes['color'])
+        layer['color'] = rgb
+        if geometry == 'polygon':
+            layer['fill_color'] = rgb
+
+    if 'opacity' in changes and changes['opacity'] is not None:
+        opacity = float(changes['opacity'])
+        if not 0 <= opacity <= 1:
+            raise ValueError(f"Opacity must be between 0 and 1, got {opacity}")
+        if geometry == 'polygon':
+            layer['fill_opacity'] = opacity
+        paint[{'point': 'circle-opacity', 'linestring': 'line-opacity',
+               'polygon': 'fill-opacity'}[geometry]] = opacity
+
+    if 'width' in changes and changes['width'] is not None:
+        width = float(changes['width'])
+        if width <= 0:
+            raise ValueError(f"Width must be greater than 0, got {width}")
+        width = int(width) if width == int(width) else width
+        if geometry == 'linestring':
+            paint['line-width'] = width
+        elif geometry == 'point':
+            paint['circle-radius'] = width
+        # polygons: a MapLibre fill outline is always 1px, so width is ignored.
+
+    if 'icon' in changes:
+        icon = (changes['icon'] or '').strip()
+        if icon:
+            if geometry != 'point':
+                raise ValueError("Only point layers can use an icon.")
+            if icons and icon not in icons:
+                raise ValueError(f"Unknown icon {icon!r}; available: {sorted(icons)}")
+            layer['symbol'] = {'png': f'{icon}.png', 'icon': icon}
+            # The icon replaces the dot, and rides on the label layer.
+            layer['add_labels'] = True
+        else:
+            layer.pop('symbol', None)
+            layer.pop('icon-size', None)
+
+    # icon-size follows width whenever the layer ends up with an icon, so the
+    # form keeps one control: the default dot radius (9) means icon-size 1.0.
+    if layer.get('symbol') and 'width' in changes and changes['width'] is not None:
+        layer['icon-size'] = round(float(changes['width']) / _DEFAULT_POINT_WIDTH, 2)
+
+    if 'add_labels' in changes:
+        layer['add_labels'] = bool(changes['add_labels'])
+
+    if 'label_field' in changes:
+        field = (changes['label_field'] or '').strip()
+        if field and field != 'name':
+            layer['label_field'] = field
+            # Labels are drawn from this property, so it has to be editable in
+            # webedit or a hand-drawn feature can never be given a label.
+            columns = layer.setdefault('editable_columns', [])
+            if not any(c.get('name') == field for c in columns):
+                columns.append({'name': field, 'type': 'string', 'default': ''})
+        else:
+            layer.pop('label_field', None)
+
+    if 'colormap' in changes:
+        colormap = changes['colormap']
+        if colormap:
+            stops = map_style.palette_paint_expression(
+                colormap['property'], colormap['palette'], colormap['min'], colormap['max'])
+            paint[_COLOR_PAINT_KEY[geometry]] = stops
+            layer['qgis_color_stops'] = map_style.palette_qgis_color_stops(
+                colormap['property'], colormap['palette'], colormap['min'], colormap['max'])
+        else:
+            # Back to a flat colour: drop the ramp from both outputs.
+            layer.pop('qgis_color_stops', None)
+            paint.pop(_COLOR_PAINT_KEY[geometry], None)
+
+    # A flat colour only reaches the map through paint, so write it there too —
+    # unless a colour map is in force, which owns that key.
+    has_ramp = isinstance(paint.get(_COLOR_PAINT_KEY[geometry]), list)
+    if 'color' in changes and changes['color'] is not None and not has_ramp:
+        paint[_COLOR_PAINT_KEY[geometry]] = _rgb_hex(layer['color'])
+        if geometry == 'polygon':
+            paint['fill-outline-color'] = _rgb_hex(layer['color'])
+
+    if paint:
+        layer['paint'] = paint
+    return layer
+
+
+def styling_outlets(config, layer_name):
+    """Outlet asset names that should be re-materialized after a styling change:
+    the webmaps showing this layer.
+
+    Deliberately not the PDF/QGIS outlets — they honour the same styling, but
+    they are slow, so they are left for an explicit rebuild.
+    """
+    names = []
+    for asset_name, asset in config.get('assets', {}).items():
+        resolved = asset.get('config', asset)
+        if resolved.get('fetch_type') not in ('webmap', 'webmap_private', 'webedit'):
+            continue
+        if layer_name in (resolved.get('in_layers') or asset.get('in_layers') or []):
+            names.append(asset_name)
+    return names
+
+
+def edit_layer(config, layer_name, changes, rebuild=True, run_materialize=True):
+    """Change one layer's styling in an existing atlas.
+
+    Edits the layer definition in the atlas's source GeoJSON, rebuilds the
+    config, and re-materializes the webmaps that show the layer. PDF and other
+    slow outlets are left alone — `styling_outlets` says why.
+
+    Returns (geojson_path, [outlet names materialized]).
+    """
+    name = config['name']
+    data_root = config['data_root']
+    staging_path = Path(data_root) / name / 'staging'
+    geojson_path = Path(data_root) / name / 'app' / 'configuration' / f'{name}.geojson'
+    if not geojson_path.exists():
+        raise FileNotFoundError(
+            f"Source GeoJSON not found: {geojson_path}. edit_layer supports the "
+            f"single-file GeoJSON config format only.")
+
+    gj = json.load(open(geojson_path))
+    props = gj['features'][0]['properties']
+    if 'layers' not in props:
+        raise ValueError(f"{geojson_path.name} does not use the single-file format.")
+    layers = props['layers']
+    if layer_name not in layers:
+        raise ValueError(f"No layer '{layer_name}' in {geojson_path.name}")
+
+    # The source geojson keys layers by name; plan wants the name inside too.
+    current = dict(layers[layer_name])
+    current.setdefault('name', layer_name)
+    updated = plan_edit_layer(current, changes, icons=available_icons(config))
+    layers[layer_name] = updated
+    print(f"Styling '{layer_name}': {sorted(changes)}")
+
+    with open(geojson_path, 'w') as f:
+        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+
+    materialized = []
+    if rebuild:
+        print("Rebuilding config (config_only)...")
+        build_atlas_from_geojson(geojson_path, config_only=True)
+    if run_materialize:
+        fresh = json.load(open(staging_path / 'atlas_config.json'))
+        for outlet in styling_outlets(fresh, layer_name):
+            print(f"  materializing {outlet}")
+            materialize(fresh, outlet)
+            materialized.append(outlet)
+    return geojson_path, materialized
+
+
 def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
               geometry_type='point', color=None, consumers=None,
               rebuild=True, run_materialize=True,
-              source='s3', label_property=None, width=None, colormap=None):
+              source='s3', label_property=None, width=None, colormap=None,
+              icon=None, opacity=None, label_field=None):
     """Add a new vector layer to an existing atlas.
 
     source='s3' (default): assumes the GeoJSON file is ALREADY in S3 at
@@ -1013,7 +1220,8 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
                           color=color, s3_bucket=s3_bucket, s3_key=s3_key,
                           consumers=consumers, source=source,
                           label_property=label_property, width=width,
-                          colormap=colormap)
+                          colormap=colormap, icon=icon, opacity=opacity,
+                          label_field=label_field, icons=available_icons(config))
     inlet_key = plan['inlet_key']
 
     gj = json.load(open(geojson_path))

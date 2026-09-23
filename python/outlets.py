@@ -346,7 +346,10 @@ def webmap_json(config, name, sprite_json=None):
                     "symbol-placement": map_layer['symbol_placement'],
                     "text-offset": map_layer.get('text_offset', [0,2]),
                     "text-font": ["Open Sans Regular"],
-                    "text-field": ["get", "name"],
+                    # label_field lets a layer label from one of its own
+                    # properties; `name` stays the default, and is what
+                    # hand-drawn features carry.
+                    "text-field": ["get", layer.get('label_field', 'name')],
                     "text-size": 20
                 }
             }
@@ -2240,6 +2243,15 @@ def make_root_html(root_path_str):
         f.write(atlas_html)
     return outpath
 
+def atlas_icons(config):
+    """Icon names available to point layers (templates/icons/*.png)."""
+    icons_dir = versioning.atlas_path(config, version='app') / 'templates' / 'icons'
+    try:
+        return sorted(p.stem for p in icons_dir.glob('*.png'))
+    except OSError:
+        return []
+
+
 def make_console_html(config,
                       displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
                       admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[],
@@ -2284,6 +2296,8 @@ def make_console_html(config,
         # Colour ramps for the Add Layer form's palette picker — the same table
         # atlas.plan_add_layer builds the layer's paint from.
         'palettes': map_style.PALETTES,
+        # Icons a point layer can use, for the Add/Edit Layer forms.
+        'icons': atlas_icons(config),
     }
     
     # Insert the data initialization script

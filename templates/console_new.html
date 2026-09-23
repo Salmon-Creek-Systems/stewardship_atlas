@@ -155,13 +155,15 @@
   <div class="modal" role="dialog" aria-labelledby="al-title">
     <h3 id="al-title" class="modal-title">Add Layer</h3>
 
-    <label class="field-label" for="al-name">Layer name</label>
-    <input id="al-name" class="field-input" type="text" placeholder="e.g. derelicts"
-           autocomplete="off" spellcheck="false">
-    <div class="field-hint">Lowercase letters, digits and underscores.</div>
+    <div id="al-name-box">
+      <label class="field-label" for="al-name">Layer name</label>
+      <input id="al-name" class="field-input" type="text" placeholder="e.g. derelicts"
+             autocomplete="off" spellcheck="false">
+      <div class="field-hint">Lowercase letters, digits and underscores.</div>
+    </div>
 
     <div class="field-row">
-      <div class="field-col">
+      <div class="field-col" id="al-geometry-col">
         <label class="field-label" for="al-geometry">Type</label>
         <select id="al-geometry" class="field-input" onchange="alSyncForm()">
           <option value="point">point</option>
@@ -175,6 +177,13 @@
       </div>
     </div>
 
+    <div id="al-icon-box">
+      <label class="field-label" for="al-icon">Icon</label>
+      <select id="al-icon" class="field-input" onchange="alSyncForm()"></select>
+      <div class="field-hint">An icon replaces the dot and needs labels on.</div>
+    </div>
+
+    <div id="al-source-box">
     <span class="field-label">Source</span>
     <div class="seg" role="radiogroup">
       <label><input type="radio" name="al-source" value="upload" checked onchange="alSyncForm()"> Upload file</label>
@@ -185,12 +194,17 @@
              onchange="alReadFile(this.files[0])">
       <div class="field-hint" id="al-file-summary"></div>
     </div>
+    </div>
 
-    <label class="field-label" for="al-label">Label</label>
-    <select id="al-label" class="field-input"></select>
-    <label id="al-label-empty" class="field-check" hidden>
-      <input type="checkbox" id="al-label-check"> Show labels (from the <code>name</code> field)
+    <label class="field-check">
+      <input type="checkbox" id="al-label-check" onchange="alSyncForm()"> Show labels
     </label>
+    <div id="al-label-box">
+      <label class="field-label" for="al-label">Label from</label>
+      <select id="al-label" class="field-input"></select>
+      <div class="field-hint">Defaults to <code>name</code>, which is what hand-drawn
+        features carry. Whichever field you pick becomes editable in the edit map.</div>
+    </div>
 
     <span class="field-label">Colour</span>
     <div class="seg" role="radiogroup">
@@ -207,6 +221,10 @@
       </div>
       <code class="rgb-hex" id="al-hex"></code>
     </div>
+
+    <label class="field-label" for="al-opacity">Opacity <span id="al-opacity-value" class="rgb-hex"></span></label>
+    <input id="al-opacity" class="field-input" type="range" min="0" max="100" value="100"
+           oninput="alSyncSwatch()">
 
     <div id="al-map-box" hidden>
       <div class="palette-picker">
@@ -242,6 +260,8 @@
 let swalename, baseurl, atlasappport, apiurl;
 let activeTab = 'layers';
 let alPalettes = {};
+let alIcons = [];
+let alLayersByName = {};
 
 // ── Toast ────────────────────────────────────────────────
 function showToast(message, isError) {
@@ -691,6 +711,8 @@ function initializePage(data) {
         }
     }
     alPalettes = data.palettes || {};
+    alIcons = data.icons || [];
+    (data.layers || []).forEach(function(l) { alLayersByName[l.name] = l; });
 
     // Version badge (both sidebar and mobile)
     ['sb-version-badge', 'mobile-version-badge'].forEach(function(id) {
@@ -845,6 +867,13 @@ function initializePage(data) {
                 ]));
             })(item.name);
 
+            // Style: restyle the layer in place (administration only)
+            (function(name) {
+                actions.appendChild(makeLayerDropdown('Style', [
+                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } }
+                ]));
+            })(item.name);
+
             // Dataset: Upload, Clear, Directory
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Dataset', [
@@ -907,16 +936,115 @@ var alUpload = null;        // parsed FeatureCollection
 var alProps = [];           // property names in the upload
 var alNumeric = {};         // numeric property name -> [min, max]
 var alPalette = null;       // selected palette name
+var alMode = 'add';         // 'add' | 'edit'
+var alEditing = null;       // layer name being restyled
 
 function openAddLayerModal() {
+    alMode = 'add';
+    alEditing = null;
+    alUpload = null; alProps = []; alNumeric = {};
     alSetStatus('');
+    document.getElementById('al-title').textContent = 'Add Layer';
+    document.getElementById('al-create').textContent = 'Add';
+    document.getElementById('al-name').value = '';
+    // Reset everything a previous Edit may have left behind.
+    document.getElementById('al-geometry').value = 'point';
+    document.querySelector('input[name="al-source"][value="upload"]').checked = true;
+    document.querySelector('input[name="al-color-mode"][value="rgb"]').checked = true;
+    document.getElementById('al-file').value = '';
+    document.getElementById('al-file-summary').textContent = '';
+    document.getElementById('al-label-check').checked = false;
+    setRgb([12, 94, 46]);
+    document.getElementById('al-opacity').value = 100;
+    document.getElementById('al-width').value = 9;
     if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
+    alRenderIcons('');
     alRenderPalettes();
-    if (!alUpload) alFillPropertySelects();
+    alFillPropertySelects();
     alSyncSwatch();
     alSyncForm();
     document.getElementById('add-layer-modal').hidden = false;
     document.getElementById('al-name').focus();
+}
+
+// Restyle an existing layer: same form, prefilled, with the fields that would
+// be disruptive to change (name, geometry, data source) left out. Renaming in
+// particular is refused server-side — the name is the identifier everywhere.
+function openEditLayerModal(layerName) {
+    var layer = alLayersByName[layerName] || { name: layerName };
+    alMode = 'edit';
+    alEditing = layerName;
+    alUpload = null; alProps = []; alNumeric = {};
+    alSetStatus('');
+    document.getElementById('al-title').textContent = 'Style: ' + layerName;
+    document.getElementById('al-create').textContent = 'Save';
+    document.getElementById('al-geometry').value = layer.geometry_type || 'point';
+
+    var paint = layer.paint || {};
+    setRgb(layer.color || [150, 150, 150]);
+    var key = { point: 'circle-opacity', linestring: 'line-opacity', polygon: 'fill-opacity' }[layer.geometry_type];
+    var opacity = paint[key];
+    if (opacity === undefined) opacity = layer.fill_opacity;
+    document.getElementById('al-opacity').value = Math.round((opacity === undefined ? 1 : opacity) * 100);
+
+    var width = paint['line-width'] || paint['circle-radius'];
+    document.getElementById('al-width').value = (typeof width === 'number') ? width : 9;
+    document.getElementById('al-label-check').checked = !!layer.add_labels;
+    alRenderIcons((layer.symbol && layer.symbol.icon) || '');
+
+    // A colour map already on the layer shows as one; otherwise flat colour.
+    var ramped = Array.isArray(paint['circle-color'] || paint['line-color'] || paint['fill-color']);
+    document.querySelector('input[name="al-color-mode"][value="' + (ramped ? 'map' : 'rgb') + '"]').checked = true;
+    if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
+    alRenderPalettes();
+
+    // Offer the layer's own fields for the label, read from its data.
+    alFillPropertySelects(layer.label_field || 'name');
+    alLoadLayerFields(layerName, layer);
+    alSyncSwatch();
+    alSyncForm();
+    document.getElementById('add-layer-modal').hidden = false;
+}
+
+function setRgb(rgb) {
+    ['al-r', 'al-g', 'al-b'].forEach(function(id, i) {
+        document.getElementById(id).value = rgb[i];
+    });
+}
+
+// The layer's properties, for the label dropdown. Layer data is served next to
+// the console, so this reads the real fields rather than guessing from config.
+function alLoadLayerFields(layerName, layer) {
+    var configured = (layer.editable_columns || []).map(function(c) { return c.name; });
+    fetch('../../../layers/' + layerName + '/' + layerName + '.geojson')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(fc) {
+            var props = {};
+            configured.forEach(function(k) { props[k] = true; });
+            ((fc && fc.features) || []).slice(0, 500).forEach(function(f) {
+                Object.keys(f.properties || {}).forEach(function(k) { props[k] = true; });
+            });
+            alProps = Object.keys(props).sort();
+            alFillPropertySelects(layer.label_field || 'name');
+        })
+        .catch(function() {
+            alProps = configured.sort();
+            alFillPropertySelects(layer.label_field || 'name');
+        });
+}
+
+function alRenderIcons(selected) {
+    var sel = document.getElementById('al-icon');
+    sel.innerHTML = '';
+    var dot = document.createElement('option');
+    dot.value = ''; dot.textContent = '(plain dot)';
+    sel.appendChild(dot);
+    alIcons.forEach(function(name) {
+        var o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        sel.appendChild(o);
+    });
+    sel.value = selected || '';
 }
 
 function closeAddLayerModal() {
@@ -935,17 +1063,29 @@ function alSetStatus(text, isError) {
 // Show/hide the parts of the form that depend on type, source and colour mode.
 function alSyncForm() {
     var geometry = document.getElementById('al-geometry').value;
-    var upload = alSource() === 'upload';
+    var editing = alMode === 'edit';
+    var upload = !editing && alSource() === 'upload';
     var map = alColorMode() === 'map';
+    var icon = document.getElementById('al-icon').value;
 
-    // One width number, meaning whatever it means for this geometry.
+    // Identity and data source are add-only: a restyle changes appearance.
+    document.getElementById('al-name-box').hidden = editing;
+    document.getElementById('al-geometry-col').hidden = editing;
+    document.getElementById('al-source-box').hidden = editing;
+
+    // One width number, meaning whatever it means for this geometry — and for
+    // a point with an icon, the icon's size.
     document.getElementById('al-width-col').hidden = geometry === 'polygon';
     document.getElementById('al-width-label').textContent =
-        geometry === 'linestring' ? 'Line width (px)' : 'Point radius (px)';
+        geometry === 'linestring' ? 'Line width (px)' :
+        (icon ? 'Icon size (px)' : 'Point radius (px)');
+    document.getElementById('al-icon-box').hidden = geometry !== 'point';
 
     document.getElementById('al-upload-box').hidden = !upload;
-    document.getElementById('al-label').hidden = !upload;
-    document.getElementById('al-label-empty').hidden = upload;
+    // An icon is drawn by the label layer, so labels come with it.
+    var labelCheck = document.getElementById('al-label-check');
+    if (icon && geometry === 'point') labelCheck.checked = true;
+    document.getElementById('al-label-box').hidden = !labelCheck.checked;
 
     document.getElementById('al-rgb-box').hidden = map;
     document.getElementById('al-map-box').hidden = !map;
@@ -957,8 +1097,15 @@ function alSyncForm() {
 
 function alSyncSwatch() {
     var hex = alRgbHex();
+    var opacity = alOpacity();
     document.getElementById('al-swatch').style.background = hex;
+    document.getElementById('al-swatch').style.opacity = opacity;
     document.getElementById('al-hex').textContent = hex;
+    document.getElementById('al-opacity-value').textContent = Math.round(opacity * 100) + '%';
+}
+
+function alOpacity() {
+    return parseInt(document.getElementById('al-opacity').value, 10) / 100;
 }
 
 function alRgbHex() {
@@ -1052,18 +1199,17 @@ function alReadFile(file) {
     reader.readAsText(file);
 }
 
-function alFillPropertySelects() {
+function alFillPropertySelects(selected) {
     var label = document.getElementById('al-label');
     label.innerHTML = '';
-    var none = document.createElement('option');
-    none.value = ''; none.textContent = '(no labels)';
-    label.appendChild(none);
-    alProps.forEach(function(k) {
+    var fields = alProps.slice();
+    if (fields.indexOf('name') < 0) fields.unshift('name');
+    fields.forEach(function(k) {
         var o = document.createElement('option');
-        o.value = k; o.textContent = k;
+        o.value = k; o.textContent = k === 'name' ? 'name (default)' : k;
         label.appendChild(o);
     });
-    if (alProps.indexOf('name') >= 0) label.value = 'name';
+    label.value = selected || 'name';
 
     var mp = document.getElementById('al-map-prop');
     mp.innerHTML = '';
@@ -1082,23 +1228,18 @@ function alPrefillRange() {
     document.getElementById('al-map-max').value = r[1];
 }
 
-function alBuildRequest() {
-    var geometry = document.getElementById('al-geometry').value;
-    var source = alSource();
-    var body = { geometry: geometry, source: source };
-
+function alStyleFields(geometry) {
+    var body = {};
     if (geometry !== 'polygon') {
         var w = parseFloat(document.getElementById('al-width').value);
         if (!(w > 0)) throw 'Width must be a positive number.';
         body.width = w;
     }
-    if (source === 'upload') {
-        if (!alUpload) throw 'Choose a GeoJSON file to upload, or pick Empty.';
-        body.data = alUpload;
-        body.label_property = document.getElementById('al-label').value || null;
-    } else {
-        body.label_property = document.getElementById('al-label-check').checked ? 'name' : null;
-    }
+    if (geometry === 'point') body.icon = document.getElementById('al-icon').value || '';
+    body.opacity = alOpacity();
+    body.add_labels = document.getElementById('al-label-check').checked;
+    body.label_field = body.add_labels ? (document.getElementById('al-label').value || 'name') : 'name';
+
     if (alColorMode() === 'map') {
         var useSelect = !document.getElementById('al-map-prop').hidden;
         var prop = (useSelect ? document.getElementById('al-map-prop').value
@@ -1111,13 +1252,30 @@ function alBuildRequest() {
         body.colormap = { palette: alPalette, property: prop, min: lo, max: hi };
     } else {
         body.color = alRgbHex();
+        body.colormap = null;
     }
     return body;
 }
 
+function alBuildRequest() {
+    var geometry = document.getElementById('al-geometry').value;
+    var body = alStyleFields(geometry);
+    if (alMode === 'edit') return body;          // styling only
+
+    var source = alSource();
+    body.geometry = geometry;
+    body.source = source;
+    if (source === 'upload') {
+        if (!alUpload) throw 'Choose a GeoJSON file to upload, or pick Empty.';
+        body.data = alUpload;
+    }
+    if (body.colormap === null) delete body.colormap;   // add: omit rather than clear
+    return body;
+}
+
 function submitAddLayer() {
-    var name = document.getElementById('al-name').value.trim();
-    if (!LAYER_NAME_RE.test(name)) {
+    var name = alMode === 'edit' ? alEditing : document.getElementById('al-name').value.trim();
+    if (alMode === 'add' && !LAYER_NAME_RE.test(name)) {
         alSetStatus('Layer name: lowercase letters, digits and underscores, starting with a letter.', true);
         return;
     }
@@ -1125,13 +1283,17 @@ function submitAddLayer() {
     try { body = alBuildRequest(); }
     catch (msg) { alSetStatus(msg, true); return; }
 
+    var editing = alMode === 'edit';
     var btn = document.getElementById('al-create');
+    var original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Adding…';
-    alSetStatus(body.source === 'upload' ? 'Uploading and importing… this can take a minute.'
-                                         : 'Creating layer…');
+    btn.textContent = editing ? 'Saving…' : 'Adding…';
+    alSetStatus(editing ? 'Restyling and rebuilding the maps…'
+                        : (body.source === 'upload' ? 'Uploading and importing… this can take a minute.'
+                                                    : 'Creating layer…'));
 
-    fetch(apiurl + '/add_layer/' + swalename + '/' + encodeURIComponent(name), {
+    var endpoint = editing ? '/edit_layer/' : '/add_layer/';
+    fetch(apiurl + endpoint + swalename + '/' + encodeURIComponent(name), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -1140,13 +1302,14 @@ function submitAddLayer() {
         .then(function(res) {
             if (res.ok && res.body.status === 'success') {
                 closeAddLayerModal();
-                showToast('Layer "' + name + '" added — reload to see it');
+                showToast(editing ? 'Styled "' + name + '" — reload the map to see it'
+                                  : 'Layer "' + name + '" added — reload to see it');
             } else {
                 alSetStatus('Failed: ' + (res.body.detail || 'unknown error'), true);
             }
         })
         .catch(function(err) { alSetStatus('Error: ' + err, true); })
-        .finally(function() { btn.disabled = false; btn.textContent = 'Add'; });
+        .finally(function() { btn.disabled = false; btn.textContent = original; });
 }
 
 // Escape closes the modal; a click outside the palette list closes the list.

@@ -379,9 +379,9 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
     """Add a layer from the console's Add Layer form.
 
     JSON body: geometry ('point'|'linestring'|'polygon'), source ('upload'|
-    'empty'), and optional color ('#rrggbb'), width (px), label_property,
-    colormap ({palette, property, min, max}), and data (the GeoJSON
-    FeatureCollection, required for source='upload').
+    'empty'), and optional color ('#rrggbb'), opacity (0-1), width (px), icon,
+    label_field, colormap ({palette, property, min, max}), and data (the
+    GeoJSON FeatureCollection, required for source='upload').
 
     An upload is validated, written to s3://{ADD_LAYER_UPLOAD_BUCKET}/{atlas}/
     imports/{layer}.geojson, and imported through the same s3_geojson inlet as
@@ -424,6 +424,9 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
             source='s3' if source == 'upload' else 'empty',
             color=body.get('color'), width=body.get('width'),
             label_property=body.get('label_property') or None,
+            label_field=body.get('label_field') or None,
+            icon=body.get('icon') or None,
+            opacity=body.get('opacity'),
             colormap=body.get('colormap') or None)
         return {"status": "success",
                 "message": f"Layer '{layer_name}' added and materialized.",
@@ -432,6 +435,42 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logging.error(f"add_layer (POST) failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/edit_layer/{swalename}/{layer_name}")
+async def edit_layer_post(swalename: str, layer_name: str, request: Request):
+    """Restyle an existing layer from the console's Edit Layer form.
+
+    JSON body carries any of: color ('#rrggbb'), opacity (0-1), width (px),
+    icon (a name from templates/icons, point layers only), add_labels (bool),
+    label_field (property to label from), colormap ({palette, property, min,
+    max}) or colormap: null to go back to a flat colour. Absent keys are left
+    alone. Cannot rename a layer — that is rename_layer's job.
+
+    Rebuilds the config and re-materializes the webmaps showing the layer; the
+    PDF outlets honour the same styling but are slow, so they are not rebuilt.
+    """
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"No atlas named {swalename!r}.")
+        ac = json.load(open(config_path))
+        _, materialized = await run_in_threadpool(atlas.edit_layer, ac, layer_name, body)
+        return {
+            "status": "success",
+            "message": f"Layer '{layer_name}' restyled.",
+            "layer": layer_name,
+            "materialized": materialized,
+            "note": "PDF and other slow outlets keep their old styling until rebuilt.",
+        }
+    except (ValueError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"edit_layer failed for {swalename}/{layer_name}: {e}")
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
