@@ -182,11 +182,13 @@
       <select id="al-shape" class="field-input">
         <option value="raw">As drawn</option>
         <option value="bbox">Bounding box</option>
-        <option value="square">Square (prints square)</option>
-        <option value="square_degrees">Square in degrees (legacy)</option>
+        <option value="square_degrees">Square in degrees (fills a runbook page)</option>
+        <option value="square">Square on paper (fills a square frame)</option>
       </select>
       <div class="field-hint">Applied to polygons as they arrive — drawn, uploaded
-        or imported. Existing features are left as they are.</div>
+        or imported; existing features are left as they are. <b>For regions choose
+        square in degrees</b>: a runbook page wants Δlon/Δlat = frame_aspect ÷ cos(lat),
+        which at this latitude on A4 with a collar is 1. See #189.</div>
     </div>
 
     <div id="al-icon-box">

@@ -587,8 +587,13 @@ def page_square_from_bbox(bbox):
     cos(lat). At 40N that is about 0.77.
 
     Contrast square_from_bbox, which is square in degrees and reaches the page
-    ~1.30x taller than wide. That one exists to reproduce westport's stored
-    regions; this one is what "square" should mean for a page.
+    ~1.30x taller than wide.
+
+    NOT the shape a runbook region wants. A region fills its page when
+    Δlon/Δlat = frame_aspect / cos(lat), and A4 portrait with the standard
+    collar has frame_aspect 0.7687 against cos(39.72N) = 0.7690 — so at these
+    latitudes a DEGREE square fills the page and this one is ~30% too wide.
+    Use this for a square frame; #189 covers reading the real page aspect.
     """
     import math
 
@@ -604,10 +609,11 @@ def page_square_from_bbox(bbox):
 
 
 # What a layer's `polygon_shape` can be. 'raw' keeps the drawn geometry;
-# 'bbox' replaces it with its bounding rectangle; 'square' with the square that
-# prints square; 'square_degrees' with a square in degrees (what the older
-# inlet-level `squarify` does — kept so the difference is explicit rather than
-# a trap).
+# 'bbox' replaces it with its bounding rectangle; 'square_degrees' makes a
+# square in degrees — what the older inlet-level `squarify` does, and the shape
+# that fills a runbook page at ~40N on A4 with a collar; 'square' makes a square
+# on paper, which is right for a square frame and ~30% too wide for that page.
+# See #189: the general form is Δlon/Δlat = frame_aspect / cos(lat).
 POLYGON_SHAPES = ('raw', 'bbox', 'square', 'square_degrees')
 
 
