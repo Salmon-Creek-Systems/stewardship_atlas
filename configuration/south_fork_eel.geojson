@@ -564,13 +564,13 @@
             "paint": {
               "fill-color": [
                 "step", ["get", "inaturalist_threatened_count"],
-		"rgba(0,0,0,0)",
-       		1, "rgb(237,248,233)",
+                "rgba(0,0,0,0)",
+                1, "rgb(237,248,233)",
                 2, "rgb(186,228,179)",
                 5, "rgb(116,196,118)",
                 10, "rgb(49,163,84)",
                 25, "rgb(0,109,44)"
-		],	
+              ]
             },
             "show_attributes": true,
             "editable_columns": [
@@ -1068,7 +1068,7 @@
               "road_mileage",
               "mileage_markers",
               "mileage_zones",
-	      "landmarks",
+              "landmarks",
               "photos",
               "hargus_processing_sites",
               "inaturalist",
