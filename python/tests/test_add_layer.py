@@ -276,9 +276,11 @@ class TestPlanEditLayer(unittest.TestCase):
         # The icon rides on the label layer, so labels have to be on.
         self.assertTrue(out['add_labels'])
 
-    def test_icon_size_follows_width(self):
+    def test_icon_size_follows_width_and_the_dot_goes_away(self):
         out = atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 18}, icons=self.ICONS)
         self.assertEqual(out['icon-size'], 2.0)             # 9 (the default dot) -> 1.0
+        # Otherwise a coloured dot sits behind the icon.
+        self.assertEqual(out['paint']['circle-radius'], 0)
         self.assertEqual(atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 9},
                                                icons=self.ICONS)['icon-size'], 1.0)
 

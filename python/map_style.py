@@ -136,3 +136,28 @@ def palette_qgis_color_stops(prop, palette, lo, hi):
     that makes PDF output use the same ramp as the webmap."""
     return {'expression': f'coalesce("{prop}", {lo})',
             'stops': palette_stops(palette, lo, hi)}
+
+
+# MapLibre rejects a paint property that does not belong to the layer type it
+# lands on ("unknown property circle-color"), and one rejected property makes it
+# refuse the whole style. A layer's `paint` block in config is written for what
+# that layer mainly is, but it gets merged into every style layer generated from
+# it — a point layer with an icon produces both a circle layer and a symbol one —
+# so each merge keeps only the properties its own type accepts.
+_PAINT_PREFIXES = {
+    'circle': ('circle-',),
+    'line': ('line-',),
+    'fill': ('fill-',),
+    'fill-extrusion': ('fill-extrusion-',),
+    'symbol': ('text-', 'icon-'),
+    'raster': ('raster-',),
+}
+
+
+def paint_for(layer_type, paint):
+    """The subset of `paint` that `layer_type` accepts. An unknown type passes
+    through untouched — better to render what the author wrote than to drop it."""
+    prefixes = _PAINT_PREFIXES.get(layer_type)
+    if not prefixes or not paint:
+        return dict(paint or {})
+    return {k: v for k, v in paint.items() if k.startswith(prefixes)}

@@ -261,7 +261,7 @@ def webmap_json(config, name, sprite_json=None):
         if paint := layer.get('paint'):
             if not 'paint' in map_layer:
                 map_layer['paint'] = {}
-            map_layer['paint'] |=  paint
+            map_layer['paint'] |= map_style.paint_for(map_layer.get('type'), paint)
 
         if layer.get('conversations_enabled'):
             map_layer.setdefault('metadata', {})['conversations_enabled'] = True
@@ -414,7 +414,10 @@ def webmap_json(config, name, sprite_json=None):
                     'icon-halo-blur': 10                    
                 }
 
-                label_layer['paint'] |= layer.get('paint', {})
+                # Symbol layer: text-*/icon-* only. A point layer's circle-*
+                # paint belongs to its circle layer, and MapLibre refuses the
+                # whole style if it arrives here.
+                label_layer['paint'] |= map_style.paint_for('symbol', layer.get('paint', {}))
                 
                 # If we have sprites, add the layer to the initial style so it appears in legend
                 if sprite_json and layer['name'] in sprite_json:

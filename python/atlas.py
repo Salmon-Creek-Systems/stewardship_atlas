@@ -1073,8 +1073,11 @@ def plan_edit_layer(layer_def, changes, icons=()):
 
     # icon-size follows width whenever the layer ends up with an icon, so the
     # form keeps one control: the default dot radius (9) means icon-size 1.0.
-    if layer.get('symbol') and 'width' in changes and changes['width'] is not None:
-        layer['icon-size'] = round(float(changes['width']) / _DEFAULT_POINT_WIDTH, 2)
+    # The dot itself goes away — the icon is what the reader should see.
+    if layer.get('symbol'):
+        if 'width' in changes and changes['width'] is not None:
+            layer['icon-size'] = round(float(changes['width']) / _DEFAULT_POINT_WIDTH, 2)
+        paint['circle-radius'] = 0
 
     if 'add_labels' in changes:
         layer['add_labels'] = bool(changes['add_labels'])

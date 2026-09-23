@@ -176,3 +176,33 @@ class TestLocalBasemapOption(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestPaintFor(unittest.TestCase):
+    """MapLibre refuses a whole style over one paint property that does not
+    belong to the layer type, so each generated layer keeps only its own."""
+
+    POINT_PAINT = {'circle-radius': 9, 'circle-color': '#0c5e2e', 'circle-opacity': 0.8,
+                   'icon-color': '#ffffff', 'text-halo-width': 1}
+
+    def test_circle_layer_keeps_circle_properties(self):
+        self.assertEqual(map_style.paint_for('circle', self.POINT_PAINT),
+                         {'circle-radius': 9, 'circle-color': '#0c5e2e', 'circle-opacity': 0.8})
+
+    def test_symbol_layer_keeps_text_and_icon_only(self):
+        # The reported failure: circle-* reaching the icon layer of a point
+        # layer that has both.
+        self.assertEqual(map_style.paint_for('symbol', self.POINT_PAINT),
+                         {'icon-color': '#ffffff', 'text-halo-width': 1})
+
+    def test_line_and_fill(self):
+        paint = {'line-width': 4, 'line-color': '#fff', 'fill-opacity': 0.5}
+        self.assertEqual(map_style.paint_for('line', paint), {'line-width': 4, 'line-color': '#fff'})
+        self.assertEqual(map_style.paint_for('fill', paint), {'fill-opacity': 0.5})
+
+    def test_unknown_type_passes_through(self):
+        self.assertEqual(map_style.paint_for('heatmap', {'heatmap-radius': 3}), {'heatmap-radius': 3})
+
+    def test_empty_paint(self):
+        self.assertEqual(map_style.paint_for('circle', {}), {})
+        self.assertEqual(map_style.paint_for('circle', None), {})
+
