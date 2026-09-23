@@ -165,7 +165,7 @@
     <div class="field-row">
       <div class="field-col" id="al-geometry-col">
         <label class="field-label" for="al-geometry">Type</label>
-        <select id="al-geometry" class="field-input" onchange="alSyncForm()">
+        <select id="al-geometry" class="field-input" onchange="alGeometryChanged()">
           <option value="point">point</option>
           <option value="linestring">linestring</option>
           <option value="polygon">polygon</option>
@@ -969,7 +969,7 @@ function openAddLayerModal() {
     setRgb([12, 94, 46]);
     setOutlineRgb([6, 60, 28]);
     document.getElementById('al-visible-check').checked = true;
-    document.getElementById('al-opacity').value = 100;
+    document.getElementById('al-opacity').value = DEFAULT_OPACITY.point;
     document.getElementById('al-width').value = 9;
     if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
     alRenderIcons('');
@@ -1067,6 +1067,20 @@ function alRenderIcons(selected) {
 
 function closeAddLayerModal() {
     document.getElementById('add-layer-modal').hidden = true;
+}
+
+// A new polygon starts half-transparent so the map stays readable underneath —
+// the default a polygon has had all along. Editing an existing layer prefills
+// from that layer instead, so this only applies to Add.
+var DEFAULT_OPACITY = { polygon: 50, point: 100, linestring: 100 };
+
+function alGeometryChanged() {
+    if (alMode === 'add') {
+        document.getElementById('al-opacity').value =
+            DEFAULT_OPACITY[document.getElementById('al-geometry').value];
+        alSyncSwatch();
+    }
+    alSyncForm();
 }
 
 function alSource()    { return document.querySelector('input[name="al-source"]:checked').value; }
@@ -1221,7 +1235,10 @@ function alReadFile(file) {
         var geoms = {};
         Object.keys(types).forEach(function(t) { if (GEOJSON_TO_GEOMETRY[t]) geoms[GEOJSON_TO_GEOMETRY[t]] = true; });
         var geomList = Object.keys(geoms);
-        if (geomList.length === 1) document.getElementById('al-geometry').value = geomList[0];
+        if (geomList.length === 1) {
+            document.getElementById('al-geometry').value = geomList[0];
+            alGeometryChanged();
+        }
         summary.textContent = fc.features.length + ' features · ' +
             (Object.keys(types).join(', ') || 'no geometry') + ' · ' + alProps.length + ' properties';
         alSetStatus(geomList.length > 1 ? 'The file mixes geometry types (' + geomList.join(', ') +
