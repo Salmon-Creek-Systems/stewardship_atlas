@@ -991,7 +991,8 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
 # covers all three: a line's width, a dot's radius, and — when a point layer
 # uses an icon — its icon size, scaled so the default dot radius maps to 1.0.
 _DEFAULT_POINT_WIDTH = 9
-EDIT_LAYER_FIELDS = ('color', 'opacity', 'width', 'icon', 'add_labels', 'label_field', 'colormap')
+EDIT_LAYER_FIELDS = ('color', 'fill_color', 'opacity', 'width', 'icon', 'add_labels',
+                     'label_field', 'colormap', 'visible')
 
 
 def available_icons(config=None, app_dir=None):
@@ -1032,10 +1033,13 @@ def plan_edit_layer(layer_def, changes, icons=()):
     paint = dict(layer.get('paint') or {})
 
     if 'color' in changes and changes['color'] is not None:
-        rgb = _parse_color(changes['color'])
-        layer['color'] = rgb
-        if geometry == 'polygon':
-            layer['fill_color'] = rgb
+        # For a polygon this is the outline; its interior is fill_color.
+        layer['color'] = _parse_color(changes['color'])
+
+    if 'fill_color' in changes and changes['fill_color'] is not None:
+        if geometry != 'polygon':
+            raise ValueError("Only polygon layers have a separate fill colour.")
+        layer['fill_color'] = _parse_color(changes['fill_color'])
 
     if 'opacity' in changes and changes['opacity'] is not None:
         opacity = float(changes['opacity'])
@@ -1094,6 +1098,15 @@ def plan_edit_layer(layer_def, changes, icons=()):
         else:
             layer.pop('label_field', None)
 
+    if 'visible' in changes:
+        # Webmap only: the PDF outlets draw whatever is in their own in_layers,
+        # with no notion of a default-off layer.
+        vis = dict(layer.get('vis') or {})
+        layout = dict(vis.get('layout') or {})
+        layout['visibility'] = 'visible' if changes['visible'] else 'none'
+        vis['layout'] = layout
+        layer['vis'] = vis
+
     if 'colormap' in changes:
         colormap = changes['colormap']
         if colormap:
@@ -1110,10 +1123,13 @@ def plan_edit_layer(layer_def, changes, icons=()):
     # A flat colour only reaches the map through paint, so write it there too —
     # unless a colour map is in force, which owns that key.
     has_ramp = isinstance(paint.get(_COLOR_PAINT_KEY[geometry]), list)
-    if 'color' in changes and changes['color'] is not None and not has_ramp:
-        paint[_COLOR_PAINT_KEY[geometry]] = _rgb_hex(layer['color'])
+    if 'color' in changes and changes['color'] is not None:
         if geometry == 'polygon':
             paint['fill-outline-color'] = _rgb_hex(layer['color'])
+        elif not has_ramp:
+            paint[_COLOR_PAINT_KEY[geometry]] = _rgb_hex(layer['color'])
+    if 'fill_color' in changes and changes['fill_color'] is not None and not has_ramp:
+        paint['fill-color'] = _rgb_hex(layer['fill_color'])
 
     if paint:
         layer['paint'] = paint

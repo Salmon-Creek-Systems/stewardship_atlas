@@ -197,6 +197,11 @@
     </div>
 
     <label class="field-check">
+      <input type="checkbox" id="al-visible-check" checked> Visible by default
+    </label>
+    <div class="field-hint">Webmap only — the PDF outlets draw every layer they are given.</div>
+
+    <label class="field-check">
       <input type="checkbox" id="al-label-check" onchange="alSyncForm()"> Show labels
     </label>
     <div id="al-label-box">
@@ -225,6 +230,19 @@
     <label class="field-label" for="al-opacity">Opacity <span id="al-opacity-value" class="rgb-hex"></span></label>
     <input id="al-opacity" class="field-input" type="range" min="0" max="100" value="100"
            oninput="alSyncSwatch()">
+
+    <div id="al-outline-box">
+      <span class="field-label">Outline colour</span>
+      <div class="rgb-box">
+        <div class="rgb-swatch" id="al-outline-swatch"></div>
+        <div class="rgb-sliders">
+          <label>R <input type="range" id="al-or" min="0" max="255" value="12" oninput="alSyncSwatch()"></label>
+          <label>G <input type="range" id="al-og" min="0" max="255" value="94" oninput="alSyncSwatch()"></label>
+          <label>B <input type="range" id="al-ob" min="0" max="255" value="46" oninput="alSyncSwatch()"></label>
+        </div>
+        <code class="rgb-hex" id="al-outline-hex"></code>
+      </div>
+    </div>
 
     <div id="al-map-box" hidden>
       <div class="palette-picker">
@@ -949,6 +967,8 @@ function openAddLayerModal() {
     document.getElementById('al-file-summary').textContent = '';
     document.getElementById('al-label-check').checked = false;
     setRgb([12, 94, 46]);
+    setOutlineRgb([6, 60, 28]);
+    document.getElementById('al-visible-check').checked = true;
     document.getElementById('al-opacity').value = 100;
     document.getElementById('al-width').value = 9;
     if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
@@ -975,7 +995,11 @@ function openEditLayerModal(layerName) {
     document.getElementById('al-geometry').value = layer.geometry_type || 'point';
 
     var paint = layer.paint || {};
-    setRgb(layer.color || [150, 150, 150]);
+    var isPolygon = layer.geometry_type === 'polygon';
+    setRgb((isPolygon ? (layer.fill_color || layer.color) : layer.color) || [150, 150, 150]);
+    setOutlineRgb(layer.color || [150, 150, 150]);
+    var visibility = ((layer.vis || {}).layout || {}).visibility;
+    document.getElementById('al-visible-check').checked = visibility !== 'none';
     var key = { point: 'circle-opacity', linestring: 'line-opacity', polygon: 'fill-opacity' }[layer.geometry_type];
     var opacity = paint[key];
     if (opacity === undefined) opacity = layer.fill_opacity;
@@ -1074,6 +1098,8 @@ function alSyncForm() {
         geometry === 'linestring' ? 'Line width (px)' :
         (icon ? 'Icon size (px)' : 'Point radius (px)');
     document.getElementById('al-icon-box').hidden = geometry !== 'point';
+    // A polygon's main colour is its fill; its edge gets its own control.
+    document.getElementById('al-outline-box').hidden = geometry !== 'polygon';
 
     document.getElementById('al-upload-box').hidden = !upload;
     // An icon is drawn by the label layer, so labels come with it.
@@ -1096,17 +1122,30 @@ function alSyncSwatch() {
     document.getElementById('al-swatch').style.opacity = opacity;
     document.getElementById('al-hex').textContent = hex;
     document.getElementById('al-opacity-value').textContent = Math.round(opacity * 100) + '%';
+    var outline = alOutlineHex();
+    document.getElementById('al-outline-swatch').style.background = outline;
+    document.getElementById('al-outline-hex').textContent = outline;
+}
+
+function setOutlineRgb(rgb) {
+    ['al-or', 'al-og', 'al-ob'].forEach(function(id, i) {
+        document.getElementById(id).value = rgb[i];
+    });
 }
 
 function alOpacity() {
     return parseInt(document.getElementById('al-opacity').value, 10) / 100;
 }
 
-function alRgbHex() {
-    return '#' + ['al-r', 'al-g', 'al-b'].map(function(id) {
+function alRgbHex(ids) {
+    return '#' + (ids || ['al-r', 'al-g', 'al-b']).map(function(id) {
         var v = parseInt(document.getElementById(id).value, 10);
         return (v < 16 ? '0' : '') + v.toString(16);
     }).join('');
+}
+
+function alOutlineHex() {
+    return alRgbHex(['al-or', 'al-og', 'al-ob']);
 }
 
 function alGradient(colors) {
@@ -1231,6 +1270,7 @@ function alStyleFields(geometry) {
     }
     if (geometry === 'point') body.icon = document.getElementById('al-icon').value || '';
     body.opacity = alOpacity();
+    body.visible = document.getElementById('al-visible-check').checked;
     body.add_labels = document.getElementById('al-label-check').checked;
     body.label_field = body.add_labels ? (document.getElementById('al-label').value || 'name') : 'name';
 
@@ -1244,10 +1284,15 @@ function alStyleFields(geometry) {
         if (!alPalette) throw 'Choose a colour map.';
         if (!(isFinite(lo) && isFinite(hi) && lo < hi)) throw 'Colour map needs Min less than Max.';
         body.colormap = { palette: alPalette, property: prop, min: lo, max: hi };
+    } else if (geometry === 'polygon') {
+        body.fill_color = alRgbHex();       // the main control is the interior
+        body.colormap = null;
     } else {
         body.color = alRgbHex();
         body.colormap = null;
     }
+    // A polygon's outline always has its own control, colour map or not.
+    if (geometry === 'polygon') body.color = alOutlineHex();
     return body;
 }
 

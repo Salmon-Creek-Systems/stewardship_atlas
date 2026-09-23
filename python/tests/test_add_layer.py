@@ -252,11 +252,33 @@ class TestPlanEditLayer(unittest.TestCase):
         self.assertEqual(out['color'], [255, 170, 51])
         self.assertEqual(out['paint']['line-color'], '#ffaa33')
 
-    def test_polygon_colour_also_sets_fill_color_and_outline(self):
-        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33'})
-        self.assertEqual(out['fill_color'], [255, 170, 51])
-        self.assertEqual(out['paint']['fill-color'], '#ffaa33')
+    def test_polygon_colour_is_the_outline_fill_color_the_interior(self):
+        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33', 'fill_color': '#0000FF'})
+        self.assertEqual(out['color'], [255, 170, 51])
         self.assertEqual(out['paint']['fill-outline-color'], '#ffaa33')
+        self.assertEqual(out['fill_color'], [0, 0, 255])        # QGIS reads this one
+        self.assertEqual(out['paint']['fill-color'], '#0000ff')
+
+    def test_polygon_outline_alone_leaves_the_fill(self):
+        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33'})
+        self.assertEqual(out['paint']['fill-color'], '#0c5e2e')  # untouched
+        self.assertEqual(out['paint']['fill-outline-color'], '#ffaa33')
+
+    def test_fill_color_only_for_polygons(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.LINE, {'fill_color': '#0000FF'})
+
+    def test_visible_toggles_the_webmap_visibility(self):
+        off = atlas.plan_edit_layer(self.POINT, {'visible': False})
+        self.assertEqual(off['vis']['layout']['visibility'], 'none')
+        on = atlas.plan_edit_layer(off, {'visible': True})
+        self.assertEqual(on['vis']['layout']['visibility'], 'visible')
+
+    def test_visible_keeps_other_vis_settings(self):
+        zoomed = dict(self.POINT, vis={'minzoom': 13, 'layout': {'visibility': 'visible'}})
+        out = atlas.plan_edit_layer(zoomed, {'visible': False})
+        self.assertEqual(out['vis']['minzoom'], 13)
+        self.assertEqual(out['vis']['layout']['visibility'], 'none')
 
     def test_opacity_per_geometry(self):
         self.assertEqual(atlas.plan_edit_layer(self.POINT, {'opacity': 0.5})['paint']['circle-opacity'], 0.5)
