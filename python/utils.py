@@ -559,17 +559,15 @@ def geojson_bbox(coordinates):
 def square_from_bbox(bbox):
     """A closed square ring covering bbox, sized by its longer side, concentric.
 
-    The square is in degrees, which is NOT the same as square on the page.
-    outlets_qgis switches to EPSG:3857 whenever the layer CRS is geographic, so
-    a degree-square reaches the page about 1.30x taller than wide at 40N. The
-    renderer then expands the extent to fit the frame, so nothing is distorted,
-    but each page covers appreciably more ground east-west than the region
-    describes.
+    The square is in degrees, which is NOT square on the printed page: the
+    runbook renders in EPSG:3857, where a degree-square is 1/cos(lat) taller
+    than wide (~1.30x at 40N). outlets_qgis_atlas then squares every region in
+    3857 by its longer side, so a degree-square region prints ~1.3x taller than
+    wide and fills only ~77% of the frame's width. Use page_square_from_bbox
+    ('square') for runbook regions.
 
-    This is how westport's existing regions were made and reproduces them
-    exactly, so it is the right transform for restoring them. It is probably
-    the wrong one going forward: a region square in 3857 needs its latitude
-    span scaled by cos(lat). Unchanged here because every stored region moves.
+    Kept because it is how westport's existing regions were made and
+    reproduces them exactly.
     """
     min_x, min_y, max_x, max_y = bbox
     half = max(max_x - min_x, max_y - min_y) / 2
@@ -581,19 +579,20 @@ def square_from_bbox(bbox):
 def page_square_from_bbox(bbox):
     """A closed ring covering bbox that is square ON THE PRINTED PAGE.
 
-    outlets_qgis renders in EPSG:3857, where a degree of latitude occupies
-    1/cos(lat) times the space of a degree of longitude — so the square a
-    runbook page wants is wider in degrees than it is tall: dlat = dlon *
-    cos(lat). At 40N that is about 0.77.
+    The runbook renders in EPSG:3857, where a degree of latitude occupies
+    1/cos(lat) times the space of a degree of longitude — so a square on the
+    page is wider in degrees than it is tall: dlat = dlon * cos(lat), about
+    0.77 at 40N.
 
-    Contrast square_from_bbox, which is square in degrees and reaches the page
-    ~1.30x taller than wide.
+    THE shape for runbook regions. outlets_qgis_atlas reprojects each region to
+    3857 and replaces it with the 3857 square on its longer side before fitting
+    it to the frame, so a region already square in 3857 is printed exactly as
+    drawn and fills the frame's width. The frame itself is not square (A4
+    portrait with the 55 mm side collar is 151 x 293 mm), so every page also
+    shows map above and below the region, whatever its shape.
 
-    NOT the shape a runbook region wants. A region fills its page when
-    Δlon/Δlat = frame_aspect / cos(lat), and A4 portrait with the standard
-    collar has frame_aspect 0.7687 against cos(39.72N) = 0.7690 — so at these
-    latitudes a DEGREE square fills the page and this one is ~30% too wide.
-    Use this for a square frame; #189 covers reading the real page aspect.
+    Contrast square_from_bbox, which is square in degrees and prints ~1.30x
+    taller than wide.
     """
     import math
 
@@ -609,11 +608,13 @@ def page_square_from_bbox(bbox):
 
 
 # What a layer's `polygon_shape` can be. 'raw' keeps the drawn geometry;
-# 'bbox' replaces it with its bounding rectangle; 'square_degrees' makes a
-# square in degrees — what the older inlet-level `squarify` does, and the shape
-# that fills a runbook page at ~40N on A4 with a collar; 'square' makes a square
-# on paper, which is right for a square frame and ~30% too wide for that page.
-# See #189: the general form is Δlon/Δlat = frame_aspect / cos(lat).
+# 'bbox' replaces it with its bounding rectangle; 'square' makes a square on
+# paper — the runbook region shape, because outlets_qgis_atlas squares every
+# region in EPSG:3857 before fitting it to the page; 'square_degrees' makes a
+# square in degrees, what the older inlet-level `squarify` did, which prints
+# ~1.3x taller than wide at 40N. (#189's "a degree-square fills the page" was
+# worked out from outlets_qgis.outlet_regions_qgis, which is not a registered
+# materializer; the live renderer is outlets_qgis_atlas.)
 POLYGON_SHAPES = ('raw', 'bbox', 'square', 'square_degrees')
 
 
