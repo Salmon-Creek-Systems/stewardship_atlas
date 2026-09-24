@@ -145,7 +145,8 @@
     font-weight: bold;
 }
 
-/* Sharing panel */
+/* Regions and sharing panels */
+.regions-panel label,
 .sharing-panel label {
     display: block;
     margin-bottom: 5px;

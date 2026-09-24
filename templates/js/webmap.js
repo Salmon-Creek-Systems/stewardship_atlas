@@ -673,6 +673,21 @@ map.on('load', async () => {
         });
     }
 
+    // Regions dropdown — each option is the region's stored webmap_url. Its ?s=
+    // view is opened on *this* page, so the staging, CURRENT or experimental map
+    // stays where it is; a link with no ?s= (e.g. a hand-set override) is followed.
+    const regionsSelect = document.getElementById('regions-select');
+    if (regionsSelect) {
+        regionsSelect.addEventListener('change', () => {
+            if (!regionsSelect.value) return;
+            const target = new URL(regionsSelect.value, window.location.href);
+            const state = target.searchParams.get('s');
+            window.location.href = state
+                ? `${window.location.pathname}?s=${encodeURIComponent(state)}`
+                : target.href;
+        });
+    }
+
     // Add event listeners for the Go button and Enter key
     const goBtn = document.getElementById('go-location-btn');
     const locationInput = document.getElementById('location-input');

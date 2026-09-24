@@ -5,7 +5,12 @@ Standard library only: `outlets` imports duckdb, geopandas, pandas, nbformat,
 PIL and gspread at module scope (and `outlets_qgis` imports QGIS), so neither
 can be imported on a bare checkout; anything that deserves a test lives here.
 """
+import base64
+import html
+import json
+import math
 from pathlib import Path
+from urllib.parse import quote
 
 # Every `maxzoom` in every config in this repo is 22, and every one of them
 # means "no upper limit". MapLibre hides a layer at zoom levels *greater than
@@ -215,3 +220,85 @@ def qgis_cog_sources(layer_name, layer, layer_dir, atlas_name):
     sources.append(f'/vsicurl/https://{bucket}.s3.{region}.amazonaws.com'
                    f'/{atlas_name}/rasters/{layer_name}/{layer_name}.cog.tif')
     return sources
+
+
+# ---------------------------------------------------------------------------
+# Webmap view links. A share link is `?s=` + base64(JSON) of the state the
+# webmap's own Share button encodes (webmap.js encodeMapState): a=lat, o=lng,
+# z=zoom, b=basemap, l=visible layer names — anything not in `l` is hidden,
+# p=drop a pin. Building the same blob here lets a layer's features carry a
+# purpose-built view instead of the default centroid-at-zoom-17 link.
+# ---------------------------------------------------------------------------
+
+# What a region link shows: the atlas's context layers, and not `regions`
+# itself — the view is the region, so its outline would only be clutter.
+# Names the atlas lacks are dropped by the caller.
+REGION_VIEW_LAYERS = ('basemap', 'roads', 'roads_primary', 'roads_secondary',
+                      'roads_tertiary', 'creeks', 'buildings')
+
+# The state cannot carry a bbox, so the zoom is fitted to an assumed viewport:
+# narrow enough that a region still fits on a phone, and a laptop just shows
+# a margin around it.
+REGION_VIEW_PX = 700
+MAPLIBRE_TILE_PX = 512
+
+
+def fit_zoom(bbox, view_px=REGION_VIEW_PX):
+    """The zoom at which bbox (w, s, e, n in degrees) fits in view_px square."""
+    west, south, east, north = bbox
+
+    def mercator_y(lat):
+        return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+
+    x_fraction = (east - west) / 360
+    y_fraction = (mercator_y(north) - mercator_y(south)) / (2 * math.pi)
+    fraction = max(x_fraction, y_fraction)
+    if fraction <= 0:
+        return 17
+    zoom = math.log2(view_px / (MAPLIBRE_TILE_PX * fraction))
+    return round(min(max(zoom, 0), 22), 2)
+
+
+def encode_view_state(lat, lng, zoom, layers):
+    """The `s` value webmap.js decodes: base64 of the JSON it would encode."""
+    state = {'a': lat, 'o': lng, 'z': zoom, 'l': list(layers)}
+    return base64.b64encode(json.dumps(state, separators=(',', ':')).encode()).decode()
+
+
+def webmap_view_url(base_url, state):
+    """A staging webmap link for a state. Percent-encoded: base64 can contain
+    '+', which URLSearchParams would otherwise read back as a space."""
+    return f"{base_url}/staging/outlets/webmap/?s={quote(state, safe='')}"
+
+
+def region_view_url(bbox, base_url, atlas_layer_names):
+    """A webmap link framing one region, showing the atlas's context layers."""
+    west, south, east, north = bbox
+    layers = [name for name in REGION_VIEW_LAYERS if name in set(atlas_layer_names)]
+    state = encode_view_state(round((south + north) / 2, 6), round((west + east) / 2, 6),
+                              fit_zoom(bbox), layers)
+    return webmap_view_url(base_url, state)
+
+
+def regions_panel_html(features):
+    """The webmap's Regions dropdown, or '' when there are no linked regions.
+
+    Each option's value is the region feature's stored `webmap_url`, so an
+    edited link (webmap_url_override) is what the dropdown follows too."""
+    options = []
+    for i, feature in enumerate(features):
+        props = feature.get('properties') or {}
+        url = props.get('webmap_url')
+        if not url:
+            continue
+        name = props.get('name') or props.get('caption') or f"Region {i + 1}"
+        options.append(f'<option value="{html.escape(url, quote=True)}">{html.escape(str(name))}</option>')
+    if not options:
+        return ''
+    return ('<div class="control-panel regions-panel">\n'
+            '                <label>Regions:</label>\n'
+            '                <select id="regions-select" class="input-field">\n'
+            '                    <option value="">Go to region…</option>\n'
+            + ''.join(f'                    {o}\n' for o in options) +
+            '                </select>\n'
+            '            </div>')

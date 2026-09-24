@@ -19,6 +19,7 @@ from pathlib import Path
 
 import versioning
 import utils
+import map_style
 
 # Layer geometry_types backed by a {layer}.geojson file. 'raster', 'document'
 # and 'wms' layers are refreshed by other means.
@@ -51,45 +52,59 @@ def clear_vector_layer(config, name, delta_queue_builder=DQB):
     # refresh_document_layer(config, name, delta_queue_builder)
 
 
-def add_webmap_urls(config, layer_name, fc, zoom=17):
+def centroid_view_url(config, layer_name, feature, zoom=17):
+    """The default feature link: the webmap centred on the feature, with a pin."""
+    from shapely.geometry import shape
+    centroid = shape(feature['geometry']).centroid
+    return f"{config.get('base_url', '')}/staging/outlets/webmap/?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
+
+
+def region_view_url(config, layer_name, feature):
+    """A region's link: the webmap framing the region, context layers only."""
+    bbox = utils.geojson_bbox(feature['geometry']['coordinates'])
+    atlas_layers = [l['name'] for l in config.get('dataswale', {}).get('layers', [])]
+    return map_style.region_view_url(bbox, config.get('base_url', ''), atlas_layers)
+
+
+# Layers whose features get a purpose-built webmap link instead of the default
+# centroid one, keyed by layer name. Each builder is (config, layer_name,
+# feature) -> url.
+FEATURE_URL_BUILDERS = {
+    'regions': region_view_url,
+}
+
+
+def add_webmap_urls(config, layer_name, fc):
     """
-    Add webmap_url property to each feature in the feature collection.
-    
+    Set a webmap_url property on each feature in the feature collection.
+
+    Regenerated on every refresh, so a feature that moves gets a fresh link.
+    A hand-set `webmap_url_override` property wins over the generated link —
+    editing webmap_url itself would be overwritten by the next refresh.
+
     Args:
         config: Atlas configuration dict
-        layer_name: Name of the layer
+        layer_name: Name of the layer; picks the builder from FEATURE_URL_BUILDERS
         fc: GeoJSON FeatureCollection
-        zoom: Zoom level for the webmap link (default: 14)
-    
+
     Returns:
         Modified FeatureCollection with webmap_url in each feature's properties
     """
-    from shapely.geometry import shape
-    
-    base_url = config.get('base_url', '')
-    if not base_url:
+    if not config.get('base_url'):
         logger.warning(f"No base_url in config, webmap_url will be relative")
-    
+    build_url = FEATURE_URL_BUILDERS.get(layer_name, centroid_view_url)
+
     feature_count = 0
     for feature in fc.get('features', []):
         try:
-            # Get geometry and calculate centroid
-            geom = shape(feature['geometry'])
-            centroid = geom.centroid
-            
-            # Construct webmap URL
-            webmap_url = f"{base_url}/staging/outlets/webmap/?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
-            
-            # Add to properties
-            if 'properties' not in feature:
-                feature['properties'] = {}
-            feature['properties']['webmap_url'] = webmap_url
+            properties = feature.setdefault('properties', {})
+            properties['webmap_url'] = (properties.get('webmap_url_override')
+                                        or build_url(config, layer_name, feature))
             feature_count += 1
-            
         except Exception as e:
             logger.warning(f"Failed to add webmap_url to feature in {layer_name}: {e}")
             continue
-    
+
     logger.info(f"Added webmap_url to {feature_count} features in {layer_name}")
     return fc
 
@@ -145,7 +160,14 @@ def refresh_vector_layer(config, name, delta_queue_builder=DQB):
                 feature.setdefault('properties', {})['atlas_id'] = str(uuid.uuid4())
             new_features.append(feature)
     fc['features'] = new_features
-    # Add webmap URLs to each feature
+    # A layer with a polygon_shape keeps every polygon in that shape, not only
+    # the ones that arrived after it was set — so a hand-drawn regions layer
+    # can be squared by setting it and refreshing. Each shape is idempotent,
+    # so reapplying on every refresh leaves the layer as it was.
+    polygon_shape = deltas.layer_polygon_shape(config, name)
+    if polygon_shape != 'raw':
+        fc['features'] = [utils.shape_feature(f, polygon_shape) for f in fc['features']]
+    # Add webmap URLs to each feature (after shaping, so a link frames the final shape)
     fc = add_webmap_urls(config, name, fc)
     # Assign show_label for layers with label_deduplicate
     fc = add_show_labels(config, name, fc)

@@ -55,6 +55,12 @@ Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{actio
 
 Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
 
+### Feature webmap links
+
+Every vector refresh (`refresh_vector_layer`) rewrites `webmap_url` on every feature. `dataswale_geojson.FEATURE_URL_BUILDERS` picks the builder by layer name; the default is the centroid at zoom 17 with a pin. `regions` gets a share-view `?s=` link (the same state the Share button encodes) fitted to the region, with `l` listing only context layers so the regions outline is hidden. **Edit a link via `webmap_url_override`, not `webmap_url`** — the latter is overwritten on the next refresh. The runbook index and the webmap's Regions dropdown both read the stored `webmap_url`.
+
+A layer's `polygon_shape` is applied to *every* polygon on each refresh (not only incoming deltas), so setting it and refreshing squares an existing hand-drawn layer. `raw` (the default) leaves polygons alone.
+
 ### Versioning
 
 `staging/` is the only editable version. Published versions are immutable snapshots created by `versioning.publish_new_version()`, which copies `staging/` to a timestamped directory and updates the `CURRENT` symlink.

@@ -1,5 +1,6 @@
 import subprocess, math, string, shutil
 import json, csv
+from html import escape as html_escape
 import re
 import sys,os,time
 from io import StringIO
@@ -580,7 +581,7 @@ def webmap_json(config, name, sprite_json=None):
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
             "cog_sources": cog_sources, "cog_layers": cog_layers}
 
-def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view='', show_user_location=False):
+def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view='', show_user_location=False, regions_panel=''):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     source_root = versioning.atlas_path(config, version='app') 
@@ -689,6 +690,7 @@ void await map.loadImage('{im_uri}',
             lidar_basemap_option=lidar_basemap_option,
             default_view=json.dumps(default_view or ""),
             show_user_location=json.dumps(bool(show_user_location)),
+            regions_panel=regions_panel,
             qr_code=qr_code_html)
 
     with open(output_path, 'w') as f_out:
@@ -897,9 +899,17 @@ def outlet_webmap(config, name):
     # Optional "show my location" control (off by default). When on, webmap.js adds a
     # MapLibre GeolocateControl the user can tap to plot their live position.
     show_user_location = config['assets'][name].get('show_user_location', False)
+    # Regions dropdown: every atlas with a `regions` layer gets one, following
+    # each region's stored webmap_url (built when the regions layer refreshes).
+    regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
+    regions_features = []
+    if regions_path.exists():
+        with open(regions_path) as f:
+            regions_features = json.load(f).get('features', [])
     html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json,
                                   page_url=page_url, default_view=default_view,
-                                  show_user_location=show_user_location)
+                                  show_user_location=show_user_location,
+                                  regions_panel=map_style.regions_panel_html(regions_features))
   
     return output_path
 
@@ -1507,6 +1517,7 @@ def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description
                 'index': region['properties'].get(index_property, canonical_name), 
                 'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
+                'webmap_url': region['properties'].get('webmap_url'),
                 'bbox': bbox,
                 "neighbors": region.get('neighbors'),
                 "vectors": [],
@@ -1804,7 +1815,10 @@ def make_regions_index(config, outlet_name, regions):
         cname  = utils.canonicalize_name(r.get('name', f"region_{i}"))
         iname  = utils.canonicalize_name(str(r.get('index', f"region_{i}")))
         url = f"{base_url}/{iname}.pdf"
-        index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
+        # The region's own webmap link, made when the regions layer was refreshed.
+        map_link = (f" &middot; <a href='{html_escape(r['webmap_url'], quote=True)}'>Map</a>"
+                    if r.get('webmap_url') else '')
+        index_html += f"<li><a href='{url}'>{r['name']}</a>{map_link}</li>\n"
     
     index_html += """            </ul>
         </div>

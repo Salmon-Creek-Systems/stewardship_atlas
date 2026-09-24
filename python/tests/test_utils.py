@@ -441,6 +441,16 @@ class TestPolygonShapes(unittest.TestCase):
         self.assertGreaterEqual(dlat + 1e-9, 0.10)
         self.assertAlmostEqual(lat, 39.65, places=6)
 
+    def test_every_shape_is_idempotent(self):
+        # refresh_vector_layer reapplies the layer's shape to every feature on
+        # every refresh, so shaping a shaped polygon must change nothing.
+        for mode in POLYGON_SHAPES:
+            once = shape_feature(self.FEATURE, mode)
+            twice = shape_feature(once, mode)
+            for a, b in zip(once['geometry']['coordinates'][0], twice['geometry']['coordinates'][0]):
+                self.assertAlmostEqual(a[0], b[0], places=9, msg=mode)
+                self.assertAlmostEqual(a[1], b[1], places=9, msg=mode)
+
     def test_points_and_lines_pass_through_every_mode(self):
         point = {'type': 'Feature', 'properties': {},
                  'geometry': {'type': 'Point', 'coordinates': [-123.6, 39.6]}}

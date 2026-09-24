@@ -7,8 +7,11 @@ another suite (#153).
 """
 import os
 import sys
+import base64
+import json
 import tempfile
 import unittest
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -269,3 +272,66 @@ class TestQgisCogSources(unittest.TestCase):
         layer = {'cog_url': 'https://example.org/fhe/canopy.cog.tif'}
         sources = map_style.qgis_cog_sources('canopy', layer, self.dir, 'sfe')
         self.assertEqual(sources[0], '/vsicurl/https://example.org/fhe/canopy.cog.tif')
+
+
+class TestRegionViewUrl(unittest.TestCase):
+    # ~1.1 km square near SFE
+    BBOX = (-123.70, 39.70, -123.687, 39.71)
+
+    def _state(self, url):
+        s = parse_qs(urlparse(url).query)['s'][0]
+        return json.loads(base64.b64decode(s))
+
+    def test_state_decodes_to_what_webmap_js_reads(self):
+        url = map_style.region_view_url(self.BBOX, 'https://fireatlas.org/sfe', ['roads_primary'])
+        self.assertTrue(url.startswith('https://fireatlas.org/sfe/staging/outlets/webmap/?s='))
+        state = self._state(url)
+        self.assertAlmostEqual(state['a'], 39.705)
+        self.assertAlmostEqual(state['o'], -123.6935)
+        self.assertNotIn('p', state)      # a view, not a point: no pin
+
+    def test_regions_layer_is_hidden_and_missing_layers_dropped(self):
+        url = map_style.region_view_url(self.BBOX, '', ['regions', 'creeks', 'roads_primary', 'photos'])
+        self.assertEqual(self._state(url)['l'], ['roads_primary', 'creeks'])
+
+    def test_state_is_percent_encoded(self):
+        # URLSearchParams reads a raw '+' back as a space and breaks the base64.
+        state = map_style.encode_view_state(1, 2, 3, ['a' * 40])
+        url = map_style.webmap_view_url('', state + '+/=')
+        self.assertNotIn('+', url.split('?s=')[1])
+
+    def test_fit_zoom_bigger_region_zooms_out(self):
+        small = map_style.fit_zoom(self.BBOX)
+        large = map_style.fit_zoom((-123.75, 39.70, -123.69, 39.76))
+        self.assertGreater(small, large)
+        self.assertTrue(14 < small < 16.5)
+
+    def test_fit_zoom_degenerate_bbox(self):
+        self.assertEqual(map_style.fit_zoom((1, 1, 1, 1)), 17)
+
+
+class TestRegionsPanel(unittest.TestCase):
+    def _feature(self, name, url):
+        return {'type': 'Feature', 'properties': {'name': name, 'webmap_url': url}}
+
+    def test_no_linked_regions_means_no_panel(self):
+        self.assertEqual(map_style.regions_panel_html([]), '')
+        self.assertEqual(map_style.regions_panel_html([self._feature('A', None)]), '')
+
+    def test_one_option_per_linked_region_in_order(self):
+        out = map_style.regions_panel_html([self._feature('North', 'u1'),
+                                            self._feature('Nowhere', None),
+                                            self._feature('South', 'u2')])
+        self.assertIn('id="regions-select"', out)
+        self.assertLess(out.index('North'), out.index('South'))
+        self.assertNotIn('Nowhere', out)
+
+    def test_names_and_urls_are_escaped(self):
+        out = map_style.regions_panel_html([self._feature('<b>', 'x?a=1&b="2"')])
+        self.assertIn('&lt;b&gt;', out)
+        self.assertIn('&amp;b=&quot;2&quot;', out)
+
+    def test_panel_has_no_format_braces(self):
+        # generate_map_page substitutes it into a str.format template.
+        out = map_style.regions_panel_html([self._feature('A', 'u')])
+        self.assertNotIn('{', out)

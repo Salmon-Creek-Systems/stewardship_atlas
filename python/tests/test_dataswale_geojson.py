@@ -124,3 +124,36 @@ class TestDataswaleGeoJSON(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main() 
+
+class TestFeatureWebmapUrls(unittest.TestCase):
+    """add_webmap_urls picks a builder by layer name; an override always wins."""
+
+    CONFIG = {'base_url': 'https://fireatlas.org/sfe',
+              'dataswale': {'layers': [{'name': 'regions'}, {'name': 'roads_primary'}]}}
+
+    def _fc(self, **props):
+        return {'type': 'FeatureCollection', 'features': [{
+            'type': 'Feature', 'properties': dict(props),
+            'geometry': {'type': 'Polygon', 'coordinates': [[
+                [-123.70, 39.70], [-123.69, 39.70], [-123.69, 39.71],
+                [-123.70, 39.71], [-123.70, 39.70]]]}}]}
+
+    def test_the_module_under_test_is_real(self):
+        import dataswale_geojson
+        self.assertFalse(hasattr(dataswale_geojson.add_webmap_urls, 'return_value'))
+
+    def test_regions_get_a_share_view_link(self):
+        from dataswale_geojson import add_webmap_urls
+        url = add_webmap_urls(self.CONFIG, 'regions', self._fc())['features'][0]['properties']['webmap_url']
+        self.assertIn('/staging/outlets/webmap/?s=', url)
+
+    def test_other_layers_keep_the_centroid_link(self):
+        from dataswale_geojson import add_webmap_urls
+        url = add_webmap_urls(self.CONFIG, 'roads_primary', self._fc())['features'][0]['properties']['webmap_url']
+        self.assertIn('?lat=', url)
+        self.assertIn('&zoom=17', url)
+
+    def test_override_wins(self):
+        from dataswale_geojson import add_webmap_urls
+        fc = add_webmap_urls(self.CONFIG, 'regions', self._fc(webmap_url_override='https://x/y'))
+        self.assertEqual(fc['features'][0]['properties']['webmap_url'], 'https://x/y')
