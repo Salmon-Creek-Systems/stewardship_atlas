@@ -107,7 +107,20 @@
             ],
             "access": [
               "admin"
-            ]
+            ],
+            "color": [255, 0, 144],
+            "fill_color": [255, 0, 0],
+            "fill_opacity": 0.5,
+            "add_labels": true,
+            "vis": {"layout": {"visibility": "visible"}},
+            "paint": {
+              "circle-opacity": 0.72,
+              "circle-color": "#ff0090",
+              "fill-opacity": 0.5,
+              "fill-outline-color": "#ff0090",
+              "fill-color": "#ff0000"
+            },
+            "polygon_shape": "square"
           },
           "roads_primary": {
             "geometry_type": "linestring",
@@ -1078,6 +1091,7 @@
               "buildings_count_h3_r8",
               "inaturalist_threatened_count_h3_r9",
               "inaturalist_threatened_count_h3_r8",
+              "regions",
               "buildings",
               "roads_tertiary",
               "roads_secondary",
