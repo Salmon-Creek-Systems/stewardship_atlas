@@ -61,7 +61,7 @@ Every vector refresh (`refresh_vector_layer`) rewrites `webmap_url` on every fea
 
 A layer's `polygon_shape` is applied to *every* polygon on each refresh (not only incoming deltas), so setting it and refreshing squares an existing hand-drawn layer. `raw` (the default) leaves polygons alone.
 
-**Runbook regions want `square` (square on paper), NOT `square_degrees`.** `outlets_qgis_atlas` squares every region in EPSG:3857 before fitting it to the frame, so a paper square prints exactly as drawn; a degree-square prints ~1.3× taller than wide. The opposite claim ("a degree-square fills the page") came from #189's analysis of `outlets_qgis.outlet_regions_qgis`, which is not a registered materializer — verify against `outlets_qgis_atlas.py`, never `outlets_qgis.py`, when reasoning about runbook layout.
+**Runbook regions want `square` (square on paper), NOT `square_degrees`.** `outlets_qgis_atlas` squares every region in EPSG:3857 before fitting it to the frame, so a paper square prints exactly as drawn; a degree-square prints ~1.3× taller than wide. The opposite claim ("a degree-square fills the page") came from #189's analysis of `outlets_qgis.outlet_regions_qgis`, which is not a registered materializer — verify against `outlets_qgis_atlas.py`, never `outlets_qgis.py`, when reasoning about runbook layout. Every runbook renders **Letter landscape** (220 × 212 mm frame beside the 55 mm side collar): the template's `page_size: A4`/`Portrait` is nested in the asset's `config` and ignored (#194).
 
 ### Versioning
 

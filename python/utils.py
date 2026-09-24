@@ -587,9 +587,10 @@ def page_square_from_bbox(bbox):
     THE shape for runbook regions. outlets_qgis_atlas reprojects each region to
     3857 and replaces it with the 3857 square on its longer side before fitting
     it to the frame, so a region already square in 3857 is printed exactly as
-    drawn and fills the frame's width. The frame itself is not square (A4
-    portrait with the 55 mm side collar is 151 x 293 mm), so every page also
-    shows map above and below the region, whatever its shape.
+    drawn. The frame is close to square by design: every runbook renders Letter
+    landscape (the template's A4/Portrait sits in the asset's nested `config`,
+    which create_atlas_layout never reads), and with the 55 mm side collar that
+    leaves a 220 x 212 mm frame, so the square fills the page.
 
     Contrast square_from_bbox, which is square in degrees and prints ~1.30x
     taller than wide.
