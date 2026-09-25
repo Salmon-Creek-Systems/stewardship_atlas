@@ -1,1377 +1,1647 @@
 {
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              -123.726259,
-              39.591268
-            ],
-            [
-              -123.428583,
-              39.591268
-            ],
-            [
-              -123.428583,
-              39.873943
-            ],
-            [
-              -123.726259,
-              39.873943
-            ],
-            [
-              -123.726259,
-              39.591268
-            ]
-          ]
-        ]
-      },
-      "properties": {
-        "name": "south_fork_eel",
-        "description": "south_fork_eel",
-        "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
-        "default_h3_resolution": 9,
-        "email_photo_default_layer": "photos",
-        "cloud": {
-          "outlets": [
-            "webmap",
-            "html"
-          ]
-        },
-        "data_root": "/root/swales_dev",
-        "shared_dir": "/root/data",
-        "base_url": "https://fireatlas.org/south_fork_eel",
-        "port": 9000,
-        "admin_emails": [],
-        "logo_url": "",
-        "layers": {
-          "basemap": {
-            "geometry_type": "raster",
-            "cog": true,
-            "display_name": "LIDAR Hillshade",
-            "qgis_opacity": 0.5,
-            "paint": {
-              "raster-opacity": 1.0
-            },
-            "access": [
-              "public"
-            ]
-          },
-          "fhe_canopy_density": {
-            "geometry_type": "raster",
-            "cog": true,
-            "cog_color": "BrewerBuGn9,0,50,c",
-            "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/canopy_density/canopy_density.cog.tif",
-            "access": ["public"]
-          },
-          "fhe_ladder_fuel_density": {
-            "geometry_type": "raster",
-            "cog": true,
-            "cog_color": "BrewerOrRd9,0,20,c",
-            "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/ladder_fuel_density/ladder_fuel_density.cog.tif",
-            "access": ["public"]
-          },
-          "fhe_flow_accumulation": {
-            "geometry_type": "raster",
-            "cog": true,
-            "cog_color": "BrewerPuBu9,6.9088,11.0904,c",
-            "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/flow_accumulation/flow_accumulation.cog.tif",
-            "access": ["public"]
-          },
-          "regions": {
-            "layer_def": "regions",
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "unique name"
-              },
-              {
-                "name": "description",
-                "type": "string",
-                "default": "Text describing the region"
-              },
-              {
-                "name": "caption",
-                "type": "string",
-                "default": "Displayed Title"
-              }
-            ],
-            "access": [
-              "admin"
-            ],
-            "color": [255, 0, 144],
-            "fill_color": [255, 0, 0],
-            "fill_opacity": 0.5,
-            "add_labels": true,
-            "vis": {"layout": {"visibility": "visible"}},
-            "paint": {
-              "circle-opacity": 0.72,
-              "circle-color": "#ff0090",
-              "fill-opacity": 0.5,
-              "fill-outline-color": "#ff0090",
-              "fill-color": "#ff0000"
-            },
-            "polygon_shape": "square"
-          },
-          "roads_primary": {
-            "geometry_type": "linestring",
-            "color": [
-              40,
-              40,
-              40
-            ],
-            "add_labels": true,
-            "interaction": "interface",
-            "vector_width": true,
-            "qgis_width_units": "mm",
-            "qgis_width_scale": 1.25,
-            "label_color": [30, 30, 30],
-            "label_buffer": true,
-            "vis": {
-              "minzoom": 10,
-              "maxzoom": 22
-            },
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Road"
-              },
-              {
-                "name": "class",
-                "type": "string",
-                "default": ""
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "roads_secondary": {
-            "geometry_type": "linestring",
-            "color": [
-              90,
-              90,
-              90
-            ],
-            "add_labels": true,
-            "interaction": "interface",
-            "vector_width": true,
-            "qgis_width_units": "mm",
-            "qgis_width_scale": 1.25,
-            "label_color": [30, 30, 30],
-            "label_buffer": true,
-            "vis": {
-              "minzoom": 13,
-              "maxzoom": 22
-            },
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Road"
-              },
-              {
-                "name": "class",
-                "type": "string",
-                "default": ""
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "roads_tertiary": {
-            "geometry_type": "linestring",
-            "color": [
-              150,
-              120,
-              90
-            ],
-            "add_labels": true,
-            "interaction": "interface",
-            "vector_width": true,
-            "qgis_width_units": "mm",
-            "qgis_width_scale": 1.25,
-            "label_color": [30, 30, 30],
-            "label_buffer": true,
-            "vis": {
-              "minzoom": 16,
-              "maxzoom": 22
-            },
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Road"
-              },
-              {
-                "name": "class",
-                "type": "string",
-                "default": ""
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "creeks": {
-            "layer_def": "creeks",
-            "qgis_width_units": "mm",
-            "qgis_width_scale": 1.5,
-            "label_color": [30, 60, 170],
-            "label_buffer": true,
-            "vis": {
-              "minzoom": 10,
-              "maxzoom": 22
-            },
-            "paint": {
-              "line-opacity": [
-                "step",
-                [
-                  "zoom"
-                ],
-                [
-                  "case",
-                  [
-                    ">=",
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
                     [
-                      "get",
-                      "vector_width"
-                    ],
-                    3
-                  ],
-                  1,
-                  0
-                ],
-                13,
-                [
-                  "case",
-                  [
-                    ">=",
-                    [
-                      "get",
-                      "vector_width"
-                    ],
-                    2
-                  ],
-                  1,
-                  0
-                ],
-                16,
-                1
-              ]
-            },
-            "access": [
-              "public"
-            ]
-          },
-          "landmarks": {
-            "layer_def": "poi",
-            "access": [
-              "public"
-            ]
-          },
-          "photos": {
-            "geometry_type": "point",
-            "label_text_minzoom": 16,
-            "conversations_enabled": true,
-            "color": [
-              255,
-              100,
-              0
-            ],
-            "fill_color": [
-              255,
-              255,
-              255
-            ],
-            "add_labels": true,
-            "label_background": true,
-            "symbol": {
-              "png": "camera.png",
-              "icon": "camera"
-            },
-            "icon-size": 1.0,
-            "interaction": "interface",
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Photo"
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "inaturalist": {
-            "geometry_type": "point",
-            "color": [
-              60,
-              160,
-              60
-            ],
-            "add_labels": true,
-            "show_attributes": true,
-            "symbol": {
-              "png": "flower.png",
-              "icon": "flower"
-            },
-            "icon-size": 1.5,
-            "interaction": "interface",
-            "vis": {
-              "layout": {
-                "visibility": "none"
-              }
-            },
-            "editable_columns": [
-              {
-                "name": "common_name",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "taxon_name",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "iconic_taxon",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "observed_on",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "username",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "quality_grade",
-                "type": "string",
-                "default": ""
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "inaturalist_threatened": {
-            "geometry_type": "point",
-            "color": [
-              230,
-              160,
-              20
-            ],
-            "add_labels": true,
-            "show_attributes": true,
-            "symbol": {
-              "png": "flower.png",
-              "icon": "flower"
-            },
-            "icon-size": 1.7,
-            "interaction": "interface",
-            "vis": {
-              "layout": {
-                "visibility": "none"
-              }
-            },
-            "editable_columns": [
-              {
-                "name": "common_name",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "taxon_name",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "iconic_taxon",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "observed_on",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "username",
-                "type": "string",
-                "default": ""
-              },
-              {
-                "name": "quality_grade",
-                "type": "string",
-                "default": ""
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "hargus_processing_sites": {
-            "geometry_type": "point",
-            "display_name": "Hargus Processing Sites",
-            "conversations_enabled": true,
-            "color": [140, 60, 170],
-            "fill_color": [255, 255, 255],
-            "add_labels": false,
-            "symbol": {
-              "png": "camera.png",
-              "icon": "camera"
-            },
-            "icon-size": 1.0,
-            "interaction": "interface",
-            "editable_columns": [
-              {
-                "name": "name",
-                "type": "string",
-                "default": "Processing site photo"
-              },
-              {
-                "name": "datetime",
-                "type": "string"
-              },
-              {
-                "name": "model",
-                "type": "string"
-              }
-            ],
-            "access": [
-              "public"
-            ]
-          },
-          "driving_route": {
-            "name": "driving_route",
-            "geometry_type": "linestring",
-            "color": [255, 0, 255],
-            "interaction": "interface",
-            "add_labels": false,
-            "paint": {
-              "line-color": "#ff00ff",
-              "line-width": 7
-            },
-            "editable_columns": [
-              { "name": "name", "type": "string", "default": "" }
-            ]
-          },
-          "mileage_zones": {
-            "geometry_type": "polygon",
-            "display_name": "Mileage Zones (control layer)",
-            "color": [255, 140, 0],
-            "interaction": "interface",
-            "access": ["admin"],
-            "show_attributes": true,
-            "editable_columns": [
-              { "name": "name", "type": "string", "default": "" },
-              { "name": "anchor", "type": "string", "default": "" },
-              { "name": "roads", "type": "string", "default": "" }
-            ],
-            "vis": { "layout": { "visibility": "none" } },
-            "paint": {
-              "fill-color": "#ff8c00",
-              "fill-opacity": 0.15,
-              "fill-outline-color": "#ff8c00"
-            }
-          },
-          "road_mileage": {
-            "geometry_type": "linestring",
-            "display_name": "Route Mileage",
-            "color": [255, 140, 0],
-            "interaction": "interface",
-            "access": ["public"],
-            "show_attributes": true,
-            "editable_columns": [
-              { "name": "route_name", "type": "string", "default": "" },
-              { "name": "m_start", "type": "string", "default": "" },
-              { "name": "m_end", "type": "string", "default": "" }
-            ],
-            "paint": {
-              "line-color": [
-                "interpolate", ["linear"],
-                ["/", ["min", ["coalesce", ["get", "m_start"], 1000000], ["coalesce", ["get", "m_end"], 1000000]], 1609.34],
-                0, "#00c800",
-                11, "#ffff00",
-                22, "#ffa500",
-                33, "#c80000",
-                100, "#888888"
-              ],
-              "line-width": 10,
-              "line-opacity": 1.0
-            },
-            "qgis_color_stops": {
-              "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
-              "stops": [[0, "#00a000"], [11, "#999900"], [22, "#cc8400"], [33, "#a00000"], [100, "#6c6c6c"]]
-            },
-            "vector_width": true,
-            "qgis_width_units": "mm",
-            "qgis_width_scale": 3.0
-          },
-          "mileage_markers": {
-            "geometry_type": "point",
-            "display_name": "Mile Markers",
-            "access": ["public"],
-            "color": [255, 255, 255],
-            "fill_color": [50, 50, 50],
-            "add_labels": true,
-            "symbol": { "png": "map_marker.png" },
-            "icon-size": 1.5,
-            "icon-anchor": "bottom",
-            "interaction": "interface",
-            "show_attributes": true,
-            "editable_columns": [
-              { "name": "name", "type": "string", "default": "" },
-              { "name": "route_name", "type": "string", "default": "" },
-              { "name": "d_mi", "type": "string", "default": "" },
-              { "name": "d_m", "type": "string", "default": "" },
-              { "name": "d_km", "type": "string", "default": "" }
-            ],
-            "label_color": [0, 0, 0],
-            "qgis_label_scale": 2.0
-          },
-          "buildings": {
-            "layer_def": "buildings",
-            "add_labels": false,
-            "access": ["public"]
-          },
-          "h3_grid_r8": {
-            "geometry_type": "polygon",
-            "color": [150, 150, 150],
-            "fill_opacity": 0.2,
-            "access": ["admin"]
-          },
-          "buildings_count_h3_r8": {
-            "geometry_type": "polygon",
-            "display_name": "Building Density",
-            "color": [120, 120, 120],
-            "fill_opacity": 0.6,
-            "paint": {
-              "fill-color": [
-                "step", ["get", "buildings_count"],
-                "rgba(0,0,0,0)",
-                1, "rgb(255,237,160)",
-                5, "rgb(254,178,76)",
-                20, "rgb(240,59,32)",
-                50, "rgb(128,0,38)"
-              ]
-            },
-            "show_attributes": true,
-            "editable_columns": [
-              {
-                "name": "buildings_count",
-                "type": "number"
-              }
-            ],
-            "access": ["public"]
-          },
-          "h3_grid_r9": {
-            "geometry_type": "polygon",
-            "color": [150, 150, 150],
-            "fill_opacity": 0.2,
-            "access": ["admin"]
-          },
-          "inaturalist_threatened_count_h3_r9": {
-            "geometry_type": "polygon",
-            "display_name": "Threatened Species Observations",
-            "color": [120, 120, 120],
-            "fill_opacity": 0.6,
-            "paint": {
-              "fill-color": [
-                "step", ["get", "inaturalist_threatened_count"],
-                "rgba(0,0,0,0)",
-                1, "rgb(237,248,233)",
-                2, "rgb(186,228,179)",
-                5, "rgb(116,196,118)",
-                10, "rgb(49,163,84)",
-                25, "rgb(0,109,44)"
-              ]
-            },
-            "show_attributes": true,
-            "editable_columns": [
-              {
-                "name": "inaturalist_threatened_count",
-                "type": "number"
-              }
-            ],
-            "access": ["public"]
-          },
-          "inaturalist_threatened_count_h3_r8": {
-            "geometry_type": "polygon",
-            "display_name": "Threatened Species Observations (r8)",
-            "color": [120, 120, 120],
-            "fill_opacity": 0.6,
-            "paint": {
-              "fill-color": [
-                "step", ["get", "inaturalist_threatened_count"],
-                "rgba(0,0,0,0)",
-                1, "rgb(242,240,247)",
-                2, "rgb(203,201,226)",
-                5, "rgb(158,154,200)",
-                15, "rgb(117,107,177)",
-                40, "rgb(84,39,143)"
-              ]
-            },
-            "show_attributes": true,
-            "editable_columns": [
-              { "name": "inaturalist_threatened_count", "type": "number" }
-            ],
-            "access": ["public"]
-          }
-        },
-        "assets": {
-          "regions_import": {
-            "type": "inlet",
-            "out_layer": "regions",
-            "config_def": "s3_geojson_inlet",
-            "s3_bucket": "scs-internal",
-            "s3_key": "sfe_regions_20260921.geojson"
-          },
-          "road_lrs": {
-            "type": "eddy",
-            "config_def": "road_lrs",
-            "in_layers": ["roads_primary", "roads_secondary", "roads_tertiary"],
-            "lrs_zones_layer": "mileage_zones",
-            "out_layer": "road_mileage"
-          },
-          "road_lrs_markers": {
-            "type": "eddy",
-            "config_def": "road_lrs_markers",
-            "in_layer": "road_mileage",
-            "out_layer": "mileage_markers",
-            "marker_interval_mi": 5,
-            "label_template": "{d_mi:.0f} mi"
-          },
-          "public_buildings": {
-            "type": "inlet",
-            "out_layer": "buildings",
-            "config_def": "overture_buildings"
-          },
-          "h3_grid_r8": {
-            "type": "inlet",
-            "config_def": "h3_grid",
-            "resolution": 8,
-            "out_layer": "h3_grid_r8"
-          },
-          "buildings_count_h3": {
-            "type": "eddy",
-            "config_def": "h3_count",
-            "in_layer": "h3_grid_r8",
-            "in_layers": ["buildings"],
-            "out_layer": "buildings_count_h3_r8"
-          },
-          "h3_grid_r9": {
-            "type": "inlet",
-            "config_def": "h3_grid",
-            "resolution": 9,
-            "out_layer": "h3_grid_r9"
-          },
-          "inaturalist_threatened_count_h3": {
-            "type": "eddy",
-            "config_def": "h3_count",
-            "in_layer": "h3_grid_r9",
-            "in_layers": ["inaturalist_threatened"],
-            "out_layer": "inaturalist_threatened_count_h3_r9"
-          },
-          "inaturalist_threatened_count_h3_r8": {
-            "type": "eddy",
-            "config_def": "h3_count",
-            "in_layer": "h3_grid_r8",
-            "in_layers": ["inaturalist_threatened"],
-            "out_layer": "inaturalist_threatened_count_h3_r8"
-          },
-          "fhe_photos_import": {
-            "type": "inlet",
-            "out_layer": "photos",
-            "config_def": "s3_geojson_inlet",
-            "s3_bucket": "scs-internal",
-            "s3_key": "fhe_photos_snapshot_20260921.geojson"
-          },
-          "hillshade_source": {
-            "type": "inlet",
-            "out_layer": "basemap",
-            "config_def": "cog_source",
-            "url": "https://scs-atlas-data.s3.us-east-1.amazonaws.com/sources/rasters/mendocino_coast_hillshade_2m/mendocino_coast_hillshade_2m.cog.tif",
-            "attribution": {
-              "description": "2m lidar hillshade, Mendocino coast",
-              "url": "https://portal.opentopography.org/api/terms",
-              "license": "https://portal.opentopography.org/api/terms",
-              "citation": "OpenTopography"
-            }
-          },
-          "basemap_cog": {
-            "type": "eddy",
-            "in_layer": "basemap",
-            "out_layer": "basemap",
-            "config_def": "tiff_to_cog",
-            "stats": false
-          },
-          "public_roads_primary": {
-            "type": "inlet",
-            "out_layer": "roads_primary",
-            "config_def": "overture_roads",
-            "alterations": {
-              "canonicalize": [
-                {
-                  "to": "name",
-                  "from": [
-                    "primary_name",
-                    "FULLRDNAME"
-                  ],
-                  "remove_prefix": []
-                }
-              ],
-              "filter": [
-                [
-                  "require",
-                  "class",
-                  [ "primary",
-                  "motorway",
-                    "trunk"
-                  ]
-                ]
-              ],
-              "vector_width": {
-                "default": 9
-              }
-            },
-            "name": "public_roads_primary",
-            "config": {
-              "asset_type": "inlet",
-              "fetch_type": "overture_duckdb",
-              "interaction": "import",
-              "data_type": "geojson",
-              "out_layer": "roads_primary",
-              "color": [
-                110,
-                110,
-                255
-              ],
-              "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
-              "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
-              "outpath_template": "overture_roads.geojson",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "alterations": {
-                "canonicalize": [
-                  {
-                    "to": "name",
-                    "from": [
-                      "primary_name",
-                      "FULLRDNAME"
-                    ],
-                    "remove_prefix": []
-                  }
-                ],
-                "filter": [
-                  [
-                    "require",
-                    "class",
-                    [ "primary",
-                    "motorway",
-                      "trunk"
+                        [
+                            -123.726259,
+                            39.591268
+                        ],
+                        [
+                            -123.428583,
+                            39.591268
+                        ],
+                        [
+                            -123.428583,
+                            39.873943
+                        ],
+                        [
+                            -123.726259,
+                            39.873943
+                        ],
+                        [
+                            -123.726259,
+                            39.591268
+                        ]
                     ]
-                  ]
-                ],
-                "vector_width": {
-                  "default": 9
-                }
-              },
-              "type": "inlet",
-              "config_def": "overture_roads",
-              "name": "public_roads_primary"
-            }
-          },
-          "public_roads_secondary": {
-            "type": "inlet",
-            "out_layer": "roads_secondary",
-            "config_def": "overture_roads",
-            "alterations": {
-              "canonicalize": [
-                {
-                  "to": "name",
-                  "from": [
-                    "primary_name",
-                    "FULLRDNAME"
-                  ],
-                  "remove_prefix": []
-                }
-              ],
-              "filter": [
-                [
-                  "require",
-                  "class",
-                  [ "secondary",
-                    "residential",
-                    "service"
-                  ]
                 ]
-              ],
-              "vector_width": {
-                "default": 6
-              }
             },
-            "name": "public_roads_secondary",
-            "config": {
-              "asset_type": "inlet",
-              "fetch_type": "overture_duckdb",
-              "interaction": "import",
-              "data_type": "geojson",
-              "out_layer": "roads_secondary",
-              "color": [
-                110,
-                110,
-                255
-              ],
-              "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
-              "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
-              "outpath_template": "overture_roads.geojson",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "alterations": {
-                "canonicalize": [
-                  {
-                    "to": "name",
-                    "from": [
-                      "primary_name",
-                      "FULLRDNAME"
-                    ],
-                    "remove_prefix": []
-                  }
+            "properties": {
+                "name": "south_fork_eel",
+                "description": "south_fork_eel",
+                "app_url": "https://fireatlas.org:9000",
+                "versioned_outlets": [
+                    "html",
+                    "webmap"
                 ],
-                "filter": [
-                  [
-                    "require",
-                    "class",
-                    [ "secondary",
-                      "residential",
-                      "service"
+                "default_h3_resolution": 9,
+                "email_photo_default_layer": "photos",
+                "cloud": {
+                    "outlets": [
+                        "webmap",
+                        "html"
                     ]
-                  ]
-                ],
-                "vector_width": {
-                  "default": 6
-                }
-              },
-              "type": "inlet",
-              "config_def": "overture_roads",
-              "name": "public_roads_secondary"
-            }
-          },
-          "public_roads_tertiary": {
-            "type": "inlet",
-            "out_layer": "roads_tertiary",
-            "config_def": "overture_roads",
-            "alterations": {
-              "canonicalize": [
-                {
-                  "to": "name",
-                  "from": [
-                    "primary_name",
-                    "FULLRDNAME"
-                  ],
-                  "remove_prefix": []
-                }
-              ],
-              "filter": [
-                [
-                  "remove",
-                  "class",
-                  [
-                    "trunk",
-                    "primary",
-                    "motorway",
-                    "secondary",
-                    "residential",
-                    "service"
-                  ]
-                ]
-              ],
-              "vector_width": {
-                "default": 3
-              }
-            },
-            "name": "public_roads_tertiary",
-            "config": {
-              "asset_type": "inlet",
-              "fetch_type": "overture_duckdb",
-              "interaction": "import",
-              "data_type": "geojson",
-              "out_layer": "roads_tertiary",
-              "color": [
-                110,
-                110,
-                255
-              ],
-              "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
-              "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
-              "outpath_template": "overture_roads.geojson",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "alterations": {
-                "canonicalize": [
-                  {
-                    "to": "name",
-                    "from": [
-                      "primary_name",
-                      "FULLRDNAME"
-                    ],
-                    "remove_prefix": []
-                  }
-                ],
-                "filter": [
-                  [
-                    "remove",
-                    "class",
-                    [
-                      "trunk",
-                      "primary", 
-                      "secondary",
-                     "motorway",
-                      "residential",
-                      "service"
-                    ]
-                  ]
-                ],
-                "vector_width": {
-                  "default": 3
-                }
-              },
-              "type": "inlet",
-              "config_def": "overture_roads",
-              "name": "public_roads_tertiary"
-            }
-          },
-          "public_creeks": {
-            "type": "inlet",
-            "out_layer": "creeks",
-            "config_def": "nhd_creeks",
-            "name": "public_creeks",
-            "config": {
-              "asset_type": "inlet",
-              "fetch_type": "local_ogr",
-              "interaction": "import",
-              "data_type": "geojson",
-              "name": "public_creeks",
-              "description": "External creek vector source",
-              "feature_type": "linestring",
-              "color": [
-                110,
-                110,
-                255
-              ],
-              "source_sublayer": "NHDFlowline",
-              "inpath_template": "NHD_H_California_State_GPKG.gpkg",
-              "geometry": "dataswale",
-              "alterations": {
-                "canonicalize": [
-                  {
-                    "to": "name",
-                    "from": [
-                      "gnis_name"
-                    ],
-                    "remove_prefix": []
-                  }
-                ],
-                "vector_width": {
-                  "attribute": "fcode_description",
-                  "map": {
-                    "Stream/River: Hydrographic Category = Ephemeral": 2,
-                    "Stream/River: Hydrographic Category = Perennial": 3,
-                    "Stream/River: Hydrographic Category = Intermittent": 1,
-                    "Artificial Path": 1
-                  },
-                  "default": 1
                 },
-                "filter": [
-                  [
-                    "remove",
-                    "fcode_description",
-                    []
-                  ]
-                ]
-              },
-              "attribution": {
-                "url": "https://www.usgs.gov/nhd",
-                "description": "USGS National Hydrography Dataset",
-                "license": "https://www.usgs.gov/nhd/license",
-                "citation": "USGS NHD"
-              },
-              "type": "inlet",
-              "out_layer": "creeks",
-              "config_def": "nhd_creeks"
+                "data_root": "/root/swales_dev",
+                "shared_dir": "/root/data",
+                "base_url": "https://fireatlas.org/south_fork_eel",
+                "port": 9000,
+                "admin_emails": [],
+                "logo_url": "",
+                "layers": {
+                    "basemap": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "display_name": "LIDAR Hillshade",
+                        "qgis_opacity": 0.5,
+                        "paint": {
+                            "raster-opacity": 1.0
+                        },
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "fhe_canopy_density": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "cog_color": "BrewerBuGn9,0,50,c",
+                        "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/canopy_density/canopy_density.cog.tif",
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "fhe_ladder_fuel_density": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "cog_color": "BrewerOrRd9,0,20,c",
+                        "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/ladder_fuel_density/ladder_fuel_density.cog.tif",
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "fhe_flow_accumulation": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "cog_color": "BrewerPuBu9,6.9088,11.0904,c",
+                        "cog_url": "https://fireatlas.org/fhe/CURRENT/layers/flow_accumulation/flow_accumulation.cog.tif",
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "regions": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            255,
+                            0,
+                            144
+                        ],
+                        "fill_color": [
+                            255,
+                            0,
+                            0
+                        ],
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "name": "regions",
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "unique name"
+                            },
+                            {
+                                "name": "description",
+                                "type": "string",
+                                "default": "Text describing the region"
+                            },
+                            {
+                                "name": "caption",
+                                "type": "string",
+                                "default": "Displayed Title"
+                            }
+                        ],
+                        "fill_opacity": 0.23,
+                        "add_labels": true,
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "paint": {
+                            "circle-opacity": 0.72,
+                            "circle-color": "#ff0090",
+                            "fill-opacity": 0.23,
+                            "fill-outline-color": "#ff0090",
+                            "fill-color": "#ff0000"
+                        },
+                        "polygon_shape": "square",
+                        "layer_def": "regions"
+                    },
+                    "roads_primary": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            40,
+                            40,
+                            40
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "vector_width": true,
+                        "qgis_width_units": "mm",
+                        "qgis_width_scale": 1.25,
+                        "label_color": [
+                            30,
+                            30,
+                            30
+                        ],
+                        "label_buffer": true,
+                        "vis": {
+                            "minzoom": 10,
+                            "maxzoom": 22
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Road"
+                            },
+                            {
+                                "name": "class",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "roads_secondary": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            90,
+                            90,
+                            90
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "vector_width": true,
+                        "qgis_width_units": "mm",
+                        "qgis_width_scale": 1.25,
+                        "label_color": [
+                            30,
+                            30,
+                            30
+                        ],
+                        "label_buffer": true,
+                        "vis": {
+                            "minzoom": 11,
+                            "maxzoom": 22
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Road"
+                            },
+                            {
+                                "name": "class",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "roads_tertiary": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            150,
+                            120,
+                            90
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "vector_width": true,
+                        "qgis_width_units": "mm",
+                        "qgis_width_scale": 1.25,
+                        "label_color": [
+                            30,
+                            30,
+                            30
+                        ],
+                        "label_buffer": true,
+                        "vis": {
+                            "minzoom": 16,
+                            "maxzoom": 22
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Road"
+                            },
+                            {
+                                "name": "class",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "creeks": {
+                        "layer_def": "creeks",
+                        "qgis_width_units": "mm",
+                        "qgis_width_scale": 1.5,
+                        "label_color": [
+                            30,
+                            60,
+                            170
+                        ],
+                        "label_buffer": true,
+                        "vis": {
+                            "minzoom": 10,
+                            "maxzoom": 22
+                        },
+                        "paint": {
+                            "line-opacity": [
+                                "step",
+                                [
+                                    "zoom"
+                                ],
+                                [
+                                    "case",
+                                    [
+                                        ">=",
+                                        [
+                                            "get",
+                                            "vector_width"
+                                        ],
+                                        3
+                                    ],
+                                    1,
+                                    0
+                                ],
+                                13,
+                                [
+                                    "case",
+                                    [
+                                        ">=",
+                                        [
+                                            "get",
+                                            "vector_width"
+                                        ],
+                                        2
+                                    ],
+                                    1,
+                                    0
+                                ],
+                                16,
+                                1
+                            ]
+                        },
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "landmarks": {
+                        "layer_def": "poi",
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "photos": {
+                        "geometry_type": "point",
+                        "label_text_minzoom": 16,
+                        "conversations_enabled": true,
+                        "color": [
+                            255,
+                            100,
+                            0
+                        ],
+                        "fill_color": [
+                            255,
+                            255,
+                            255
+                        ],
+                        "add_labels": true,
+                        "label_background": true,
+                        "symbol": {
+                            "png": "camera.png",
+                            "icon": "camera"
+                        },
+                        "icon-size": 1.0,
+                        "interaction": "interface",
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Photo"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "inaturalist": {
+                        "geometry_type": "point",
+                        "color": [
+                            60,
+                            160,
+                            60
+                        ],
+                        "add_labels": true,
+                        "show_attributes": true,
+                        "symbol": {
+                            "png": "flower.png",
+                            "icon": "flower"
+                        },
+                        "icon-size": 1.5,
+                        "interaction": "interface",
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "common_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "taxon_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "iconic_taxon",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "observed_on",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "username",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "quality_grade",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "inaturalist_threatened": {
+                        "geometry_type": "point",
+                        "color": [
+                            230,
+                            160,
+                            20
+                        ],
+                        "add_labels": true,
+                        "show_attributes": true,
+                        "symbol": {
+                            "png": "flower.png",
+                            "icon": "flower"
+                        },
+                        "icon-size": 1.7,
+                        "interaction": "interface",
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "common_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "taxon_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "iconic_taxon",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "observed_on",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "username",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "quality_grade",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "hargus_processing_sites": {
+                        "name": "hargus_processing_sites",
+                        "geometry_type": "point",
+                        "display_name": "Hargus Processing Sites",
+                        "conversations_enabled": true,
+                        "color": [
+                            140,
+                            60,
+                            170
+                        ],
+                        "fill_color": [
+                            255,
+                            255,
+                            255
+                        ],
+                        "add_labels": true,
+                        "symbol": {
+                            "png": "camera.png",
+                            "icon": "camera"
+                        },
+                        "icon-size": 1.0,
+                        "interaction": "interface",
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Processing site photo"
+                            },
+                            {
+                                "name": "datetime",
+                                "type": "string"
+                            },
+                            {
+                                "name": "model",
+                                "type": "string"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ],
+                        "vis": {
+                            "layout": {
+                                "visibility": "visible"
+                            }
+                        },
+                        "paint": {
+                            "circle-opacity": 1.0,
+                            "circle-radius": 0,
+                            "circle-color": "#8c3caa"
+                        }
+                    },
+                    "driving_route": {
+                        "name": "driving_route",
+                        "geometry_type": "linestring",
+                        "color": [
+                            255,
+                            0,
+                            255
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff00ff",
+                            "line-width": 7
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
+                    },
+                    "mileage_zones": {
+                        "geometry_type": "polygon",
+                        "display_name": "Mileage Zones (control layer)",
+                        "color": [
+                            255,
+                            140,
+                            0
+                        ],
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "anchor",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "roads",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "vis": {
+                            "layout": {
+                                "visibility": "none"
+                            }
+                        },
+                        "paint": {
+                            "fill-color": "#ff8c00",
+                            "fill-opacity": 0.15,
+                            "fill-outline-color": "#ff8c00"
+                        }
+                    },
+                    "road_mileage": {
+                        "geometry_type": "linestring",
+                        "display_name": "Route Mileage",
+                        "color": [
+                            255,
+                            140,
+                            0
+                        ],
+                        "interaction": "interface",
+                        "access": [
+                            "public"
+                        ],
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "route_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "m_start",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "m_end",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "paint": {
+                            "line-color": [
+                                "interpolate",
+                                [
+                                    "linear"
+                                ],
+                                [
+                                    "/",
+                                    [
+                                        "min",
+                                        [
+                                            "coalesce",
+                                            [
+                                                "get",
+                                                "m_start"
+                                            ],
+                                            1000000
+                                        ],
+                                        [
+                                            "coalesce",
+                                            [
+                                                "get",
+                                                "m_end"
+                                            ],
+                                            1000000
+                                        ]
+                                    ],
+                                    1609.34
+                                ],
+                                0,
+                                "#00c800",
+                                11,
+                                "#ffff00",
+                                22,
+                                "#ffa500",
+                                33,
+                                "#c80000",
+                                100,
+                                "#888888"
+                            ],
+                            "line-width": 10,
+                            "line-opacity": 1.0
+                        },
+                        "qgis_color_stops": {
+                            "expression": "min(coalesce(\"m_start\", 1000000), coalesce(\"m_end\", 1000000)) / 1609.34",
+                            "stops": [
+                                [
+                                    0,
+                                    "#00a000"
+                                ],
+                                [
+                                    11,
+                                    "#999900"
+                                ],
+                                [
+                                    22,
+                                    "#cc8400"
+                                ],
+                                [
+                                    33,
+                                    "#a00000"
+                                ],
+                                [
+                                    100,
+                                    "#6c6c6c"
+                                ]
+                            ]
+                        },
+                        "vector_width": true,
+                        "qgis_width_units": "mm",
+                        "qgis_width_scale": 3.0
+                    },
+                    "mileage_markers": {
+                        "geometry_type": "point",
+                        "display_name": "Mile Markers",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            255,
+                            255,
+                            255
+                        ],
+                        "fill_color": [
+                            50,
+                            50,
+                            50
+                        ],
+                        "add_labels": true,
+                        "symbol": {
+                            "png": "map_marker.png"
+                        },
+                        "icon-size": 1.5,
+                        "icon-anchor": "bottom",
+                        "interaction": "interface",
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "route_name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_mi",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_m",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "d_km",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "label_color": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "qgis_label_scale": 2.0
+                    },
+                    "buildings": {
+                        "layer_def": "buildings",
+                        "add_labels": false,
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "h3_grid_r8": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            150,
+                            150,
+                            150
+                        ],
+                        "fill_opacity": 0.2,
+                        "access": [
+                            "admin"
+                        ]
+                    },
+                    "buildings_count_h3_r8": {
+                        "geometry_type": "polygon",
+                        "display_name": "Building Density",
+                        "color": [
+                            120,
+                            120,
+                            120
+                        ],
+                        "fill_opacity": 0.6,
+                        "paint": {
+                            "fill-color": [
+                                "step",
+                                [
+                                    "get",
+                                    "buildings_count"
+                                ],
+                                "rgba(0,0,0,0)",
+                                1,
+                                "rgb(255,237,160)",
+                                5,
+                                "rgb(254,178,76)",
+                                20,
+                                "rgb(240,59,32)",
+                                50,
+                                "rgb(128,0,38)"
+                            ]
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "buildings_count",
+                                "type": "number"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "h3_grid_r9": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            150,
+                            150,
+                            150
+                        ],
+                        "fill_opacity": 0.2,
+                        "access": [
+                            "admin"
+                        ]
+                    },
+                    "inaturalist_threatened_count_h3_r9": {
+                        "geometry_type": "polygon",
+                        "display_name": "Threatened Species Observations",
+                        "color": [
+                            120,
+                            120,
+                            120
+                        ],
+                        "fill_opacity": 0.6,
+                        "paint": {
+                            "fill-color": [
+                                "step",
+                                [
+                                    "get",
+                                    "inaturalist_threatened_count"
+                                ],
+                                "rgba(0,0,0,0)",
+                                1,
+                                "rgb(237,248,233)",
+                                2,
+                                "rgb(186,228,179)",
+                                5,
+                                "rgb(116,196,118)",
+                                10,
+                                "rgb(49,163,84)",
+                                25,
+                                "rgb(0,109,44)"
+                            ]
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "inaturalist_threatened_count",
+                                "type": "number"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "inaturalist_threatened_count_h3_r8": {
+                        "geometry_type": "polygon",
+                        "display_name": "Threatened Species Observations (r8)",
+                        "color": [
+                            120,
+                            120,
+                            120
+                        ],
+                        "fill_opacity": 0.6,
+                        "paint": {
+                            "fill-color": [
+                                "step",
+                                [
+                                    "get",
+                                    "inaturalist_threatened_count"
+                                ],
+                                "rgba(0,0,0,0)",
+                                1,
+                                "rgb(242,240,247)",
+                                2,
+                                "rgb(203,201,226)",
+                                5,
+                                "rgb(158,154,200)",
+                                15,
+                                "rgb(117,107,177)",
+                                40,
+                                "rgb(84,39,143)"
+                            ]
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "inaturalist_threatened_count",
+                                "type": "number"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    }
+                },
+                "assets": {
+                    "regions_import": {
+                        "type": "inlet",
+                        "out_layer": "regions",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "sfe_regions_20260921.geojson"
+                    },
+                    "road_lrs": {
+                        "type": "eddy",
+                        "config_def": "road_lrs",
+                        "in_layers": [
+                            "roads_primary",
+                            "roads_secondary",
+                            "roads_tertiary"
+                        ],
+                        "lrs_zones_layer": "mileage_zones",
+                        "out_layer": "road_mileage"
+                    },
+                    "road_lrs_markers": {
+                        "type": "eddy",
+                        "config_def": "road_lrs_markers",
+                        "in_layer": "road_mileage",
+                        "out_layer": "mileage_markers",
+                        "marker_interval_mi": 5,
+                        "label_template": "{d_mi:.0f} mi"
+                    },
+                    "public_buildings": {
+                        "type": "inlet",
+                        "out_layer": "buildings",
+                        "config_def": "overture_buildings"
+                    },
+                    "h3_grid_r8": {
+                        "type": "inlet",
+                        "config_def": "h3_grid",
+                        "resolution": 8,
+                        "out_layer": "h3_grid_r8"
+                    },
+                    "buildings_count_h3": {
+                        "type": "eddy",
+                        "config_def": "h3_count",
+                        "in_layer": "h3_grid_r8",
+                        "in_layers": [
+                            "buildings"
+                        ],
+                        "out_layer": "buildings_count_h3_r8"
+                    },
+                    "h3_grid_r9": {
+                        "type": "inlet",
+                        "config_def": "h3_grid",
+                        "resolution": 9,
+                        "out_layer": "h3_grid_r9"
+                    },
+                    "inaturalist_threatened_count_h3": {
+                        "type": "eddy",
+                        "config_def": "h3_count",
+                        "in_layer": "h3_grid_r9",
+                        "in_layers": [
+                            "inaturalist_threatened"
+                        ],
+                        "out_layer": "inaturalist_threatened_count_h3_r9"
+                    },
+                    "inaturalist_threatened_count_h3_r8": {
+                        "type": "eddy",
+                        "config_def": "h3_count",
+                        "in_layer": "h3_grid_r8",
+                        "in_layers": [
+                            "inaturalist_threatened"
+                        ],
+                        "out_layer": "inaturalist_threatened_count_h3_r8"
+                    },
+                    "fhe_photos_import": {
+                        "type": "inlet",
+                        "out_layer": "photos",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-internal",
+                        "s3_key": "fhe_photos_snapshot_20260921.geojson"
+                    },
+                    "hillshade_source": {
+                        "type": "inlet",
+                        "out_layer": "basemap",
+                        "config_def": "cog_source",
+                        "url": "https://scs-atlas-data.s3.us-east-1.amazonaws.com/sources/rasters/mendocino_coast_hillshade_2m/mendocino_coast_hillshade_2m.cog.tif",
+                        "attribution": {
+                            "description": "2m lidar hillshade, Mendocino coast",
+                            "url": "https://portal.opentopography.org/api/terms",
+                            "license": "https://portal.opentopography.org/api/terms",
+                            "citation": "OpenTopography"
+                        }
+                    },
+                    "basemap_cog": {
+                        "type": "eddy",
+                        "in_layer": "basemap",
+                        "out_layer": "basemap",
+                        "config_def": "tiff_to_cog",
+                        "stats": false
+                    },
+                    "public_roads_primary": {
+                        "type": "inlet",
+                        "out_layer": "roads_primary",
+                        "config_def": "overture_roads",
+                        "alterations": {
+                            "canonicalize": [
+                                {
+                                    "to": "name",
+                                    "from": [
+                                        "primary_name",
+                                        "FULLRDNAME"
+                                    ],
+                                    "remove_prefix": []
+                                }
+                            ],
+                            "filter": [
+                                [
+                                    "require",
+                                    "class",
+                                    [
+                                        "primary",
+                                        "motorway",
+                                        "trunk"
+                                    ]
+                                ]
+                            ],
+                            "vector_width": {
+                                "default": 9
+                            }
+                        },
+                        "name": "public_roads_primary",
+                        "config": {
+                            "asset_type": "inlet",
+                            "fetch_type": "overture_duckdb",
+                            "interaction": "import",
+                            "data_type": "geojson",
+                            "out_layer": "roads_primary",
+                            "color": [
+                                110,
+                                110,
+                                255
+                            ],
+                            "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+                            "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+                            "outpath_template": "overture_roads.geojson",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "alterations": {
+                                "canonicalize": [
+                                    {
+                                        "to": "name",
+                                        "from": [
+                                            "primary_name",
+                                            "FULLRDNAME"
+                                        ],
+                                        "remove_prefix": []
+                                    }
+                                ],
+                                "filter": [
+                                    [
+                                        "require",
+                                        "class",
+                                        [
+                                            "primary",
+                                            "motorway",
+                                            "trunk"
+                                        ]
+                                    ]
+                                ],
+                                "vector_width": {
+                                    "default": 9
+                                }
+                            },
+                            "type": "inlet",
+                            "config_def": "overture_roads",
+                            "name": "public_roads_primary"
+                        }
+                    },
+                    "public_roads_secondary": {
+                        "type": "inlet",
+                        "out_layer": "roads_secondary",
+                        "config_def": "overture_roads",
+                        "alterations": {
+                            "canonicalize": [
+                                {
+                                    "to": "name",
+                                    "from": [
+                                        "primary_name",
+                                        "FULLRDNAME"
+                                    ],
+                                    "remove_prefix": []
+                                }
+                            ],
+                            "filter": [
+                                [
+                                    "require",
+                                    "class",
+                                    [
+                                        "secondary",
+                                        "residential",
+                                        "service"
+                                    ]
+                                ]
+                            ],
+                            "vector_width": {
+                                "default": 6
+                            }
+                        },
+                        "name": "public_roads_secondary",
+                        "config": {
+                            "asset_type": "inlet",
+                            "fetch_type": "overture_duckdb",
+                            "interaction": "import",
+                            "data_type": "geojson",
+                            "out_layer": "roads_secondary",
+                            "color": [
+                                110,
+                                110,
+                                255
+                            ],
+                            "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+                            "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+                            "outpath_template": "overture_roads.geojson",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "alterations": {
+                                "canonicalize": [
+                                    {
+                                        "to": "name",
+                                        "from": [
+                                            "primary_name",
+                                            "FULLRDNAME"
+                                        ],
+                                        "remove_prefix": []
+                                    }
+                                ],
+                                "filter": [
+                                    [
+                                        "require",
+                                        "class",
+                                        [
+                                            "secondary",
+                                            "residential",
+                                            "service"
+                                        ]
+                                    ]
+                                ],
+                                "vector_width": {
+                                    "default": 6
+                                }
+                            },
+                            "type": "inlet",
+                            "config_def": "overture_roads",
+                            "name": "public_roads_secondary"
+                        }
+                    },
+                    "public_roads_tertiary": {
+                        "type": "inlet",
+                        "out_layer": "roads_tertiary",
+                        "config_def": "overture_roads",
+                        "alterations": {
+                            "canonicalize": [
+                                {
+                                    "to": "name",
+                                    "from": [
+                                        "primary_name",
+                                        "FULLRDNAME"
+                                    ],
+                                    "remove_prefix": []
+                                }
+                            ],
+                            "filter": [
+                                [
+                                    "remove",
+                                    "class",
+                                    [
+                                        "trunk",
+                                        "primary",
+                                        "motorway",
+                                        "secondary",
+                                        "residential",
+                                        "service"
+                                    ]
+                                ]
+                            ],
+                            "vector_width": {
+                                "default": 3
+                            }
+                        },
+                        "name": "public_roads_tertiary",
+                        "config": {
+                            "asset_type": "inlet",
+                            "fetch_type": "overture_duckdb",
+                            "interaction": "import",
+                            "data_type": "geojson",
+                            "out_layer": "roads_tertiary",
+                            "color": [
+                                110,
+                                110,
+                                255
+                            ],
+                            "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+                            "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+                            "outpath_template": "overture_roads.geojson",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "alterations": {
+                                "canonicalize": [
+                                    {
+                                        "to": "name",
+                                        "from": [
+                                            "primary_name",
+                                            "FULLRDNAME"
+                                        ],
+                                        "remove_prefix": []
+                                    }
+                                ],
+                                "filter": [
+                                    [
+                                        "remove",
+                                        "class",
+                                        [
+                                            "trunk",
+                                            "primary",
+                                            "secondary",
+                                            "motorway",
+                                            "residential",
+                                            "service"
+                                        ]
+                                    ]
+                                ],
+                                "vector_width": {
+                                    "default": 3
+                                }
+                            },
+                            "type": "inlet",
+                            "config_def": "overture_roads",
+                            "name": "public_roads_tertiary"
+                        }
+                    },
+                    "public_creeks": {
+                        "type": "inlet",
+                        "out_layer": "creeks",
+                        "config_def": "nhd_creeks",
+                        "name": "public_creeks",
+                        "config": {
+                            "asset_type": "inlet",
+                            "fetch_type": "local_ogr",
+                            "interaction": "import",
+                            "data_type": "geojson",
+                            "name": "public_creeks",
+                            "description": "External creek vector source",
+                            "feature_type": "linestring",
+                            "color": [
+                                110,
+                                110,
+                                255
+                            ],
+                            "source_sublayer": "NHDFlowline",
+                            "inpath_template": "NHD_H_California_State_GPKG.gpkg",
+                            "geometry": "dataswale",
+                            "alterations": {
+                                "canonicalize": [
+                                    {
+                                        "to": "name",
+                                        "from": [
+                                            "gnis_name"
+                                        ],
+                                        "remove_prefix": []
+                                    }
+                                ],
+                                "vector_width": {
+                                    "attribute": "fcode_description",
+                                    "map": {
+                                        "Stream/River: Hydrographic Category = Ephemeral": 2,
+                                        "Stream/River: Hydrographic Category = Perennial": 3,
+                                        "Stream/River: Hydrographic Category = Intermittent": 1,
+                                        "Artificial Path": 1
+                                    },
+                                    "default": 1
+                                },
+                                "filter": [
+                                    [
+                                        "remove",
+                                        "fcode_description",
+                                        []
+                                    ]
+                                ]
+                            },
+                            "attribution": {
+                                "url": "https://www.usgs.gov/nhd",
+                                "description": "USGS National Hydrography Dataset",
+                                "license": "https://www.usgs.gov/nhd/license",
+                                "citation": "USGS NHD"
+                            },
+                            "type": "inlet",
+                            "out_layer": "creeks",
+                            "config_def": "nhd_creeks"
+                        }
+                    },
+                    "public_landmarks": {
+                        "type": "inlet",
+                        "out_layer": "landmarks",
+                        "config_def": "osm_poi",
+                        "name": "public_landmarks",
+                        "config": {
+                            "name": "public_landmarks",
+                            "asset_type": "inlet",
+                            "data_type": "geojson",
+                            "feature_type": "point",
+                            "add_labels": true,
+                            "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
+                            "fetch_type": "fetch_osm",
+                            "type": "inlet",
+                            "out_layer": "landmarks",
+                            "config_def": "osm_poi"
+                        }
+                    },
+                    "inat_obs": {
+                        "type": "inlet",
+                        "out_layer": "inaturalist",
+                        "config_def": "inaturalist",
+                        "time_range": [
+                            "2024-01-01",
+                            null
+                        ],
+                        "quality_grade": "research",
+                        "name": "inat_obs",
+                        "config": {
+                            "name": "inat_obs",
+                            "asset_type": "inlet",
+                            "fetch_type": "inaturalist",
+                            "data_type": "geojson",
+                            "feature_type": "point",
+                            "regions": [],
+                            "users": [],
+                            "time_range": [
+                                "2024-01-01",
+                                null
+                            ],
+                            "quality_grade": "research",
+                            "attribution": {
+                                "url": "https://www.inaturalist.org",
+                                "description": "iNaturalist observations",
+                                "license": "CC BY-NC"
+                            },
+                            "type": "inlet",
+                            "out_layer": "inaturalist",
+                            "config_def": "inaturalist"
+                        }
+                    },
+                    "webmap": {
+                        "type": "outlet",
+                        "name": "webmap",
+                        "config_def": "webmap",
+                        "in_layers": [
+                            "basemap",
+                            "fhe_canopy_density",
+                            "fhe_ladder_fuel_density",
+                            "fhe_flow_accumulation",
+                            "buildings_count_h3_r8",
+                            "inaturalist_threatened_count_h3_r9",
+                            "inaturalist_threatened_count_h3_r8",
+                            "regions",
+                            "buildings",
+                            "roads_tertiary",
+                            "roads_secondary",
+                            "roads_primary",
+                            "creeks",
+                            "road_mileage",
+                            "mileage_markers",
+                            "mileage_zones",
+                            "landmarks",
+                            "photos",
+                            "hargus_processing_sites",
+                            "inaturalist",
+                            "inaturalist_threatened",
+                            "driving_route"
+                        ],
+                        "access": [
+                            "public",
+                            "internal",
+                            "admin"
+                        ],
+                        "config": {
+                            "asset_type": "outlet",
+                            "name": "webmap",
+                            "fetch_type": "webmap",
+                            "interaction": "interface",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "default_view": "",
+                            "type": "outlet",
+                            "config_def": "webmap",
+                            "in_layers": [
+                                "fhe_canopy_density",
+                                "fhe_ladder_fuel_density",
+                                "fhe_flow_accumulation",
+                                "roads_tertiary",
+                                "roads_secondary",
+                                "roads_primary",
+                                "creeks",
+                                "landmarks",
+                                "photos",
+                                "inaturalist",
+                                "inaturalist_threatened"
+                            ],
+                            "access": [
+                                "public",
+                                "internal",
+                                "admin"
+                            ]
+                        }
+                    },
+                    "webedit": {
+                        "type": "outlet",
+                        "name": "webedit",
+                        "config_def": "webedit",
+                        "in_layers": [
+                            "regions",
+                            "roads_tertiary",
+                            "roads_secondary",
+                            "roads_primary",
+                            "creeks",
+                            "landmarks",
+                            "photos"
+                        ],
+                        "access": [
+                            "internal",
+                            "admin"
+                        ],
+                        "config": {
+                            "asset_type": "outlet",
+                            "name": "webedit",
+                            "fetch_type": "webedit",
+                            "access": [
+                                "internal",
+                                "admin"
+                            ],
+                            "interaction": "backend",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "type": "outlet",
+                            "config_def": "webedit",
+                            "in_layers": [
+                                "regions",
+                                "roads_tertiary",
+                                "roads_secondary",
+                                "roads_primary",
+                                "creeks",
+                                "landmarks",
+                                "photos"
+                            ]
+                        }
+                    },
+                    "3dview": {
+                        "type": "outlet",
+                        "name": "3dview",
+                        "config_def": "3dview",
+                        "access": [
+                            "public",
+                            "internal",
+                            "admin"
+                        ],
+                        "config": {
+                            "asset_type": "outlet",
+                            "name": "3dview",
+                            "fetch_type": "3dview",
+                            "interaction": "interface",
+                            "attribution": {
+                                "description": "3D terrain view using MapLibre GL JS and terrain-RGB PMTiles"
+                            },
+                            "type": "outlet",
+                            "config_def": "3dview",
+                            "access": [
+                                "public",
+                                "internal",
+                                "admin"
+                            ]
+                        }
+                    },
+                    "console": {
+                        "config_def": "console"
+                    },
+                    "html": {
+                        "type": "outlet",
+                        "name": "html",
+                        "config_def": "static_html",
+                        "access": [
+                            "public",
+                            "internal",
+                            "admin",
+                            "technical"
+                        ],
+                        "config": {
+                            "asset_type": "outlet",
+                            "fetch_type": "html",
+                            "interaction": "backend",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "type": "outlet",
+                            "name": "html",
+                            "config_def": "static_html",
+                            "access": [
+                                "public",
+                                "internal",
+                                "admin",
+                                "technical"
+                            ]
+                        }
+                    },
+                    "notebook": {
+                        "type": "outlet",
+                        "name": "notebook",
+                        "config_def": "jupyter_notebook",
+                        "access": [
+                            "technical"
+                        ],
+                        "config": {
+                            "asset_type": "outlet",
+                            "name": "notebook",
+                            "fetch_type": "jupyter_notebook",
+                            "interaction": "interface",
+                            "attribution": {
+                                "url": "https://portal.opentopography.org/api/terms",
+                                "description": "Open Topography's Global DEM",
+                                "license": "https://portal.opentopography.org/api/terms",
+                                "citation": "https://portal.opentopography.org/api/terms"
+                            },
+                            "type": "outlet",
+                            "config_def": "jupyter_notebook",
+                            "access": [
+                                "technical"
+                            ]
+                        }
+                    },
+                    "inat_threatened": {
+                        "type": "inlet",
+                        "out_layer": "inaturalist_threatened",
+                        "config_def": "inaturalist",
+                        "quality_grade": "research",
+                        "api_params": {
+                            "threatened": true
+                        },
+                        "name": "inat_threatened",
+                        "config": {
+                            "name": "inat_threatened",
+                            "asset_type": "inlet",
+                            "fetch_type": "inaturalist",
+                            "data_type": "geojson",
+                            "feature_type": "point",
+                            "regions": [],
+                            "users": [],
+                            "time_range": null,
+                            "quality_grade": "research",
+                            "attribution": {
+                                "url": "https://www.inaturalist.org",
+                                "description": "iNaturalist observations",
+                                "license": "CC BY-NC"
+                            },
+                            "type": "inlet",
+                            "out_layer": "inaturalist_threatened",
+                            "config_def": "inaturalist",
+                            "api_params": {
+                                "threatened": true
+                            }
+                        }
+                    },
+                    "qgis_runbook": {
+                        "type": "outlet",
+                        "name": "qgis_runbook",
+                        "config_def": "qgis_runbook",
+                        "regions_layer": "regions",
+                        "base_url": "individual_pages",
+                        "concat_pdf": true,
+                        "feature_scale": 0.5,
+                        "blend_percent": 50,
+                        "in_layers": [
+                            "basemap",
+                            "creeks",
+                            "road_mileage",
+                            "roads_tertiary",
+                            "roads_secondary",
+                            "roads_primary",
+                            "landmarks",
+                            "photos",
+                            "mileage_markers"
+                        ],
+                        "access": [
+                            "public",
+                            "internal",
+                            "admin"
+                        ],
+                        "regions": [],
+                        "config": {
+                            "name": "qgis_runbook",
+                            "asset_type": "outlet",
+                            "fetch_type": "outlet_runbook_qgis_atlas",
+                            "interaction": "interface",
+                            "base_url": "individual_pages",
+                            "data_type": "geopdf",
+                            "page_size": "A4",
+                            "page_orientation": "Portrait",
+                            "dpi": 300,
+                            "attribution": {
+                                "url": "https://www.scvfd.fireatlas.org",
+                                "description": "QGIS-generated GeoPDF region maps with layer structure retained.",
+                                "license": "https://www.scvfd.fireatlas.org",
+                                "citation": "https://www.scvfd.fireatlas.org"
+                            },
+                            "type": "outlet",
+                            "config_def": "qgis_runbook",
+                            "regions_layer": "regions",
+                            "concat_pdf": true,
+                            "feature_scale": 0.5,
+                            "blend_percent": 50,
+                            "in_layers": [
+                                "roads_primary",
+                                "roads_secondary",
+                                "roads_tertiary",
+                                "creeks",
+                                "landmarks",
+                                "photos"
+                            ],
+                            "access": [
+                                "public",
+                                "internal",
+                                "admin"
+                            ],
+                            "regions": []
+                        }
+                    }
+                }
             }
-          },
-          "public_landmarks": {
-            "type": "inlet",
-            "out_layer": "landmarks",
-            "config_def": "osm_poi",
-            "name": "public_landmarks",
-            "config": {
-              "name": "public_landmarks",
-              "asset_type": "inlet",
-              "data_type": "geojson",
-              "feature_type": "point",
-              "add_labels": true,
-              "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
-              "fetch_type": "fetch_osm",
-              "type": "inlet",
-              "out_layer": "landmarks",
-              "config_def": "osm_poi"
-            }
-          },
-          "inat_obs": {
-            "type": "inlet",
-            "out_layer": "inaturalist",
-            "config_def": "inaturalist",
-            "time_range": [
-              "2024-01-01",
-              null
-            ],
-            "quality_grade": "research",
-            "name": "inat_obs",
-            "config": {
-              "name": "inat_obs",
-              "asset_type": "inlet",
-              "fetch_type": "inaturalist",
-              "data_type": "geojson",
-              "feature_type": "point",
-              "regions": [],
-              "users": [],
-              "time_range": [
-                "2024-01-01",
-                null
-              ],
-              "quality_grade": "research",
-              "attribution": {
-                "url": "https://www.inaturalist.org",
-                "description": "iNaturalist observations",
-                "license": "CC BY-NC"
-              },
-              "type": "inlet",
-              "out_layer": "inaturalist",
-              "config_def": "inaturalist"
-            }
-          },
-          "webmap": {
-            "type": "outlet",
-            "name": "webmap",
-            "config_def": "webmap",
-            "in_layers": [
-              "basemap",
-              "fhe_canopy_density", "fhe_ladder_fuel_density", "fhe_flow_accumulation",
-              "buildings_count_h3_r8",
-              "inaturalist_threatened_count_h3_r9",
-              "inaturalist_threatened_count_h3_r8",
-              "regions",
-              "buildings",
-              "roads_tertiary",
-              "roads_secondary",
-              "roads_primary",
-              "creeks",
-              "road_mileage",
-              "mileage_markers",
-              "mileage_zones",
-              "landmarks",
-              "photos",
-              "hargus_processing_sites",
-              "inaturalist",
-              "inaturalist_threatened",
-              "driving_route"
-            ],
-            "access": [
-              "public",
-              "internal",
-              "admin"
-            ],
-            "config": {
-              "asset_type": "outlet",
-              "name": "webmap",
-              "fetch_type": "webmap",
-              "interaction": "interface",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "default_view": "",
-              "type": "outlet",
-              "config_def": "webmap",
-              "in_layers": [
-                "fhe_canopy_density", "fhe_ladder_fuel_density", "fhe_flow_accumulation",
-                "roads_tertiary",
-                "roads_secondary",
-                "roads_primary",
-                "creeks",
-                "landmarks",
-                "photos",
-                "inaturalist",
-                "inaturalist_threatened"
-              ],
-              "access": [
-                "public",
-                "internal",
-                "admin"
-              ]
-            }
-          },
-          "webedit": {
-            "type": "outlet",
-            "name": "webedit",
-            "config_def": "webedit",
-            "in_layers": [
-              "regions",
-              "roads_tertiary",
-              "roads_secondary",
-              "roads_primary",
-              "creeks",
-              "landmarks",
-              "photos"
-            ],
-            "access": [
-              "internal",
-              "admin"
-            ],
-            "config": {
-              "asset_type": "outlet",
-              "name": "webedit",
-              "fetch_type": "webedit",
-              "access": [
-                "internal",
-                "admin"
-              ],
-              "interaction": "backend",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "type": "outlet",
-              "config_def": "webedit",
-              "in_layers": [
-                "regions",
-                "roads_tertiary",
-                "roads_secondary",
-                "roads_primary",
-                "creeks",
-                "landmarks",
-                "photos"
-              ]
-            }
-          },
-          "3dview": {
-            "type": "outlet",
-            "name": "3dview",
-            "config_def": "3dview",
-            "access": [
-              "public",
-              "internal",
-              "admin"
-            ],
-            "config": {
-              "asset_type": "outlet",
-              "name": "3dview",
-              "fetch_type": "3dview",
-              "interaction": "interface",
-              "attribution": {
-                "description": "3D terrain view using MapLibre GL JS and terrain-RGB PMTiles"
-              },
-              "type": "outlet",
-              "config_def": "3dview",
-              "access": [
-                "public",
-                "internal",
-                "admin"
-              ]
-            }
-          },
-          "console": {
-            "config_def": "console"
-          },
-          "html": {
-            "type": "outlet",
-            "name": "html",
-            "config_def": "static_html",
-            "access": [
-              "public",
-              "internal",
-              "admin",
-              "technical"
-            ],
-            "config": {
-              "asset_type": "outlet",
-              "fetch_type": "html",
-              "interaction": "backend",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "type": "outlet",
-              "name": "html",
-              "config_def": "static_html",
-              "access": [
-                "public",
-                "internal",
-                "admin",
-                "technical"
-              ]
-            }
-          },
-          "notebook": {
-            "type": "outlet",
-            "name": "notebook",
-            "config_def": "jupyter_notebook",
-            "access": [
-              "technical"
-            ],
-            "config": {
-              "asset_type": "outlet",
-              "name": "notebook",
-              "fetch_type": "jupyter_notebook",
-              "interaction": "interface",
-              "attribution": {
-                "url": "https://portal.opentopography.org/api/terms",
-                "description": "Open Topography's Global DEM",
-                "license": "https://portal.opentopography.org/api/terms",
-                "citation": "https://portal.opentopography.org/api/terms"
-              },
-              "type": "outlet",
-              "config_def": "jupyter_notebook",
-              "access": [
-                "technical"
-              ]
-            }
-          },
-          "inat_threatened": {
-            "type": "inlet",
-            "out_layer": "inaturalist_threatened",
-            "config_def": "inaturalist",
-            "quality_grade": "research",
-            "api_params": {
-              "threatened": true
-            },
-            "name": "inat_threatened",
-            "config": {
-              "name": "inat_threatened",
-              "asset_type": "inlet",
-              "fetch_type": "inaturalist",
-              "data_type": "geojson",
-              "feature_type": "point",
-              "regions": [],
-              "users": [],
-              "time_range": null,
-              "quality_grade": "research",
-              "attribution": {
-                "url": "https://www.inaturalist.org",
-                "description": "iNaturalist observations",
-                "license": "CC BY-NC"
-              },
-              "type": "inlet",
-              "out_layer": "inaturalist_threatened",
-              "config_def": "inaturalist",
-              "api_params": {
-                "threatened": true
-              }
-            }
-          },
-          "qgis_runbook": {
-            "type": "outlet",
-            "name": "qgis_runbook",
-            "config_def": "qgis_runbook",
-            "regions_layer": "regions",
-            "base_url": "individual_pages",
-            "concat_pdf": true,
-            "feature_scale": 0.5,
-            "blend_percent": 50,
-            "in_layers": [
-              "basemap",
-              "creeks",
-              "road_mileage",
-              "roads_tertiary",
-              "roads_secondary",
-              "roads_primary",
-              "landmarks",
-              "photos",
-              "mileage_markers"
-            ],
-            "access": [
-              "public",
-              "internal",
-              "admin"
-            ],
-            "regions": [],
-            "config": {
-              "name": "qgis_runbook",
-              "asset_type": "outlet",
-              "fetch_type": "outlet_runbook_qgis_atlas",
-              "interaction": "interface",
-              "base_url": "individual_pages",
-              "data_type": "geopdf",
-              "page_size": "A4",
-              "page_orientation": "Portrait",
-              "dpi": 300,
-              "attribution": {
-                "url": "https://www.scvfd.fireatlas.org",
-                "description": "QGIS-generated GeoPDF region maps with layer structure retained.",
-                "license": "https://www.scvfd.fireatlas.org",
-                "citation": "https://www.scvfd.fireatlas.org"
-              },
-              "type": "outlet",
-              "config_def": "qgis_runbook",
-              "regions_layer": "regions",
-              "concat_pdf": true,
-              "feature_scale": 0.5,
-              "blend_percent": 50,
-              "in_layers": [
-                "roads_primary",
-                "roads_secondary",
-                "roads_tertiary",
-                "creeks",
-                "landmarks",
-                "photos"
-              ],
-              "access": [
-                "public",
-                "internal",
-                "admin"
-              ],
-              "regions": []
-            }
-          }
         }
-      }
-    }
-  ]
+    ]
 }
