@@ -335,3 +335,24 @@ class TestRegionsPanel(unittest.TestCase):
         # generate_map_page substitutes it into a str.format template.
         out = map_style.regions_panel_html([self._feature('A', 'u')])
         self.assertNotIn('{', out)
+
+
+class TestEditPageLayers(unittest.TestCase):
+    """An edit page must show the layer it edits (south_fork_eel's Hargus page
+    showed only `photos`, whose identical camera icons got selected instead)."""
+
+    def test_missing_edit_layer_is_added_on_top(self):
+        self.assertEqual(map_style.edit_page_layers(['creeks', 'photos'], 'hargus'),
+                         ['creeks', 'photos', 'hargus'])
+
+    def test_listed_edit_layer_keeps_its_place(self):
+        self.assertEqual(map_style.edit_page_layers(['photos', 'creeks'], 'photos'),
+                         ['photos', 'creeks'])
+
+    def test_does_not_mutate_the_outlet_list(self):
+        in_layers = ['creeks']
+        map_style.edit_page_layers(in_layers, 'hargus')
+        self.assertEqual(in_layers, ['creeks'])
+
+    def test_empty_in_layers(self):
+        self.assertEqual(map_style.edit_page_layers(None, 'hargus'), ['hargus'])

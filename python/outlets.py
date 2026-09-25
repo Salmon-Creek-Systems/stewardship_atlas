@@ -99,8 +99,11 @@ def _layer_data_url(layer_name: str, filename: str) -> str:
     return atlas_catalog.layer_data_url(layer_name, filename)
 
 
-def webmap_json(config, name, sprite_json=None):
+def webmap_json(config, name, sprite_json=None, edit_layer=None):
     """Generate a JSON object for a web map in MapLibre.
+
+    edit_layer: for a webedit page, the layer being edited — always shown, on
+    top, and never starting hidden, whatever the outlet's in_layers say.
     We will set up sources and layers as static content loaded initially in HTML where possible.
     Layers which invole dynamic content - marker images for example - will be added seperately 
     since the layer must be set up inside the callback for the image load.
@@ -135,6 +138,8 @@ def webmap_json(config, name, sprite_json=None):
 
     # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
     in_layers_list = outlet_config['in_layers']
+    if edit_layer:
+        in_layers_list = map_style.edit_page_layers(in_layers_list, edit_layer)
     cog_before_ids = {}
     for i, ln in enumerate(in_layers_list):
         lyr = layers_dict.get(ln, {})
@@ -483,7 +488,7 @@ def webmap_json(config, name, sprite_json=None):
                     dynamic_layers.append(label_layer)
     
     # Apply hidden_layers: start with visibility off but remain accessible in legend
-    hidden_layers_set = set(outlet_config.get('hidden_layers', []))
+    hidden_layers_set = set(outlet_config.get('hidden_layers', [])) - {edit_layer}
     if hidden_layers_set:
         for ml in map_layers:
             if ml.get('source') in hidden_layers_set:
@@ -1062,11 +1067,17 @@ def outlet_webmap_edit(config: dict, name: str):
     # Copy the JS file
     # subprocess.run(['cp', '../templates/js/edit_map.js', f"{webedit_dir}/js/"])
     
-    # Generate edit pages for each editable asset
+    # Generate edit pages for each editable asset. Each page shows the layer it
+    # edits even when webedit's in_layers leave it out.
+    in_layers = config['assets'][name].get('in_layers', [])
+    hidden_layers = config['assets'][name].get('hidden_layers', [])
     for ea in config['dataswale']['layers']:
         if ea.get('editable_columns'):
+            shown_already = ea['name'] in in_layers and ea['name'] not in hidden_layers
+            page_map_config = (map_config if shown_already
+                               else webmap_json(config, name, sprite_json, edit_layer=ea['name']))
             for action in ['create', 'annotate']:
-                html_content = generate_edit_page(config, ea, name, map_config, action)
+                html_content = generate_edit_page(config, ea, name, page_map_config, action)
                 output_path = webedit_dir /   f"{ea['name']}_{action}.html"
                 logger.debug(f"Generated WEBEDIT for {ea} | {action} into {output_path}")            
                 with open(output_path, 'w') as f:

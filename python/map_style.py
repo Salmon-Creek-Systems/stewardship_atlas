@@ -302,3 +302,12 @@ def regions_panel_html(features):
             + ''.join(f'                    {o}\n' for o in options) +
             '                </select>\n'
             '            </div>')
+
+
+def edit_page_layers(in_layers, edit_layer):
+    """An edit page's layers: the outlet's, with the layer being edited drawn
+    on top when the outlet leaves it out. Every editable layer gets an edit
+    page, but webedit's in_layers need not list it — and a page that cannot
+    show its own layer invites selecting another layer's look-alike features."""
+    layers = list(in_layers or [])
+    return layers if edit_layer in layers else layers + [edit_layer]
