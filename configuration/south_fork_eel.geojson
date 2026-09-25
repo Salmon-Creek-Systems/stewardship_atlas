@@ -1588,12 +1588,11 @@
                         "in_layers": [
                             "basemap",
                             "creeks",
-                            "road_mileage",
                             "roads_tertiary",
                             "roads_secondary",
                             "roads_primary",
                             "landmarks",
-                            "photos",
+			    "road_mileage",
                             "mileage_markers"
                         ],
                         "access": [
