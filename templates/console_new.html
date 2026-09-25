@@ -288,6 +288,24 @@
   </div>
 </div>
 
+<div id="delete-layer-modal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-labelledby="dl-title">
+    <h3 id="dl-title" class="modal-title">Delete Layer</h3>
+    <div id="dl-plan"></div>
+    <div id="dl-confirm-box" hidden>
+      <label class="field-label" for="dl-confirm">Type <b id="dl-name"></b> to confirm</label>
+      <input id="dl-confirm" class="field-input" type="text" autocomplete="off" oninput="dlSyncConfirm()">
+      <div class="field-hint">The layer's data is archived on the server, not destroyed.
+        The config change is not committed to git — commit it on the server (#195).</div>
+    </div>
+    <div id="dl-status" class="modal-status"></div>
+    <div class="modal-actions">
+      <button onclick="closeDeleteLayerModal()" class="btn btn-sm">Cancel</button>
+      <button id="dl-delete" onclick="submitDeleteLayer()" class="btn btn-danger btn-sm" disabled>Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Globals ──────────────────────────────────────────────
 let swalename, baseurl, atlasappport, apiurl;
@@ -688,6 +706,97 @@ function copyLayer(layerName) {
         .catch(function() { showToast('Copy error', true); });
 }
 
+// ── Delete layer: show the server's plan, then require the name typed back ──
+let dlLayer = null;
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+function dlList(title, items) {
+    if (!items.length) return '';
+    return '<div class="field-label">' + title + '</div><ul>' +
+        items.map(function(t) { return '<li>' + escapeHtml(t) + '</li>'; }).join('') + '</ul>';
+}
+
+function openDeleteLayer(layerName) {
+    dlLayer = layerName;
+    document.getElementById('dl-title').textContent = 'Delete “' + layerName + '”';
+    document.getElementById('dl-plan').innerHTML = 'Checking what depends on this layer…';
+    document.getElementById('dl-confirm-box').hidden = true;
+    document.getElementById('dl-confirm').value = '';
+    document.getElementById('dl-name').textContent = layerName;
+    document.getElementById('dl-status').textContent = '';
+    document.getElementById('dl-status').className = 'modal-status';
+    document.getElementById('dl-delete').disabled = true;
+    document.getElementById('delete-layer-modal').hidden = false;
+
+    fetch(apiurl + '/delete_layer/' + swalename + '/' + encodeURIComponent(layerName), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: true})
+    })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
+        .then(function(res) {
+            if (!res.ok) throw new Error(res.d.detail || 'Unknown');
+            var p = res.d.plan;
+            var html = '';
+            if (p.blockers.length) {
+                html += '<p><b>This layer can’t be deleted yet.</b> Other parts of the atlas depend on it:</p>';
+                html += dlList('Blocked by', p.blockers);
+            } else {
+                html += '<p>This removes the layer’s definition and archives its data.</p>';
+                html += dlList('Assets that build it, also removed', p.remove_assets);
+                html += dlList('Also removed from', p.list_edits.map(function(e) { return e[0] + ' → ' + e[1]; }));
+                document.getElementById('dl-confirm-box').hidden = false;
+                document.getElementById('dl-confirm').focus();
+            }
+            document.getElementById('dl-plan').innerHTML = html;
+        })
+        .catch(function(err) {
+            document.getElementById('dl-plan').textContent = '';
+            dlStatus('Could not plan the delete: ' + err.message, true);
+        });
+}
+
+function dlStatus(message, isError) {
+    var el = document.getElementById('dl-status');
+    el.textContent = message;
+    el.className = 'modal-status' + (isError ? ' is-error' : '');
+}
+
+function dlSyncConfirm() {
+    document.getElementById('dl-delete').disabled =
+        document.getElementById('dl-confirm').value.trim() !== dlLayer;
+}
+
+function closeDeleteLayerModal() {
+    document.getElementById('delete-layer-modal').hidden = true;
+    dlLayer = null;
+}
+
+function submitDeleteLayer() {
+    var btn = document.getElementById('dl-delete');
+    btn.disabled = true;
+    dlStatus('Deleting “' + dlLayer + '” and rebuilding the maps… this can take a minute.');
+    fetch(apiurl + '/delete_layer/' + swalename + '/' + encodeURIComponent(dlLayer), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({confirm: document.getElementById('dl-confirm').value.trim()})
+    })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
+        .then(function(res) {
+            if (!res.ok) throw new Error(res.d.detail || 'Unknown');
+            showToast(res.d.message + ' ' + res.d.note);
+            closeDeleteLayerModal();
+            setTimeout(function() { location.reload(); }, 1500);  // the console itself was rebuilt
+        })
+        .catch(function(err) {
+            dlStatus('Delete failed: ' + err.message, true);
+            dlSyncConfirm();
+        });
+}
+
 // ── Use cases ────────────────────────────────────────────
 function renderUseCases(useCases) {
     var container = document.getElementById('usecases-container');
@@ -907,6 +1016,7 @@ function initializePage(data) {
                     { type: 'button', text: 'Replace with File', onclick: function() { uploadGeoJSON(name); } },
                     { type: 'button', text: 'Copy Layer…', onclick: function() { copyLayer(name); } },
                     { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
+                    { type: 'button', text: 'Delete Layer…', danger: true, onclick: function() { openDeleteLayer(name); } },
                     { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
                 ]));
             })(item.name);

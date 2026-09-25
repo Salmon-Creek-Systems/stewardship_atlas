@@ -476,6 +476,42 @@ async def edit_layer_post(swalename: str, layer_name: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/delete_layer/{swalename}/{layer_name}")
+async def delete_layer_post(swalename: str, layer_name: str, request: Request):
+    """Delete a layer and every reference to it, from the console.
+
+    JSON body: {"dry_run": true} returns the plan (assets removed, lists edited,
+    blockers) and changes nothing. A real delete needs {"confirm": layer_name} —
+    the name typed back — and is refused (400) while the plan has blockers.
+    Data is archived under {atlas}/deleted_layers/, not removed.
+    """
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"No atlas named {swalename!r}.")
+        ac = json.load(open(config_path))
+        if body.get('dry_run'):
+            plan = atlas.delete_layer(ac, layer_name, dry_run=True)
+            return {"status": "success", "dry_run": True, "plan": plan}
+        if body.get('confirm') != layer_name:
+            raise ValueError(f"Type the layer name ('{layer_name}') to confirm.")
+        plan = await run_in_threadpool(atlas.delete_layer, ac, layer_name)
+        return {
+            "status": "success",
+            "message": f"Layer '{layer_name}' deleted.",
+            "plan": plan,
+            "note": "Not committed: commit configuration/{0}.geojson on the box (#195).".format(swalename),
+        }
+    except (ValueError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"delete_layer failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     try:

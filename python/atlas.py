@@ -25,6 +25,7 @@ import geojson
 # Our imports
 import utils
 import map_style
+import layer_plans
 import outlets
 import outlets_qgis_atlas
 import vector_inlets
@@ -1230,6 +1231,88 @@ def edit_layer(config, layer_name, changes, rebuild=True, run_materialize=True):
             materialize(fresh, outlet)
             materialized.append(outlet)
     return geojson_path, materialized
+
+
+def delete_layer_outlets(config, layer_name):
+    """Outlets to re-materialize after deleting a layer: the webmaps that showed
+    it, and the console/html pages, which list every layer in the config."""
+    names = styling_outlets(config, layer_name)
+    for asset_name, asset in config.get('assets', {}).items():
+        if asset.get('config', asset).get('fetch_type') in ('console', 'html'):
+            names.append(asset_name)
+    return names
+
+
+def delete_layer(config, layer_name, dry_run=False, run_materialize=True):
+    """Delete a layer and every trace of it from an atlas's configuration.
+
+    Removes the layer definition, the inlet/eddy assets that produce it, and its
+    name from every other asset's layer lists (webmap in_layers, hidden_layers,
+    sqldb layers...), per layer_plans.plan_layer_delete. Refuses — changing
+    nothing — while anything else depends on it: an eddy reading it to build
+    another layer, a runbook using it as regions_layer, the email default layer.
+
+    The data is archived, not deleted: staging/layers/{name} and
+    staging/deltas/{name} move to {atlas}/deleted_layers/{name}__{timestamp}/,
+    outside staging so publish never copies it and nginx never serves it.
+
+    Like the other console edits this writes the box's working-tree
+    {atlas}.geojson and does not commit it (#195).
+
+    Returns the plan, plus 'archived' and 'materialized' when not a dry run.
+    """
+    name = config['name']
+    data_root = config['data_root']
+    staging_path = Path(data_root) / name / 'staging'
+    geojson_path = Path(data_root) / name / 'app' / 'configuration' / f'{name}.geojson'
+    if not geojson_path.exists():
+        raise FileNotFoundError(
+            f"Source GeoJSON not found: {geojson_path}. delete_layer supports the "
+            f"single-file GeoJSON config format only.")
+
+    gj = json.load(open(geojson_path))
+    props = gj['features'][0]['properties']
+    if 'layers' not in props or 'assets' not in props:
+        raise ValueError(f"{geojson_path.name} does not use the single-file format.")
+
+    plan = layer_plans.plan_layer_delete(props, config['assets'], layer_name)
+    if dry_run:
+        return plan
+    if plan['blockers']:
+        raise ValueError(f"Cannot delete '{layer_name}': " + ' '.join(plan['blockers']))
+
+    to_materialize = delete_layer_outlets(config, layer_name)
+
+    # Config first: if writing it fails, no data has moved. Data left behind
+    # after a config change is harmless; config pointing at archived data is not.
+    layer_plans.apply_layer_delete(props, config['assets'], plan)
+    with open(geojson_path, 'w') as f:
+        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+    print(f"Deleted '{layer_name}' from {geojson_path.name}: assets {plan['remove_assets']}, "
+          f"lists {plan['list_edits']}")
+
+    archive = (Path(data_root) / name / 'deleted_layers'
+               / f"{layer_name}__{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    for kind in ('layers', 'deltas'):
+        src = staging_path / kind / layer_name
+        if src.exists():
+            archive.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(archive / kind))
+            print(f"  archived {src} -> {archive / kind}")
+    plan['archived'] = str(archive) if archive.exists() else None
+
+    print("Rebuilding config (config_only)...")
+    build_atlas_from_geojson(geojson_path, config_only=True)
+
+    plan['materialized'] = []
+    if run_materialize:
+        fresh = json.load(open(staging_path / 'atlas_config.json'))
+        for outlet in to_materialize:
+            if outlet in fresh.get('assets', {}):
+                print(f"  materializing {outlet}")
+                materialize(fresh, outlet)
+                plan['materialized'].append(outlet)
+    return plan
 
 
 def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',

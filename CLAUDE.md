@@ -180,6 +180,7 @@ On the deployed server:
 | `GET /publish?swale={name}` | Async publish — materializes versioned outlets, creates snapshot, updates `CURRENT` |
 | `GET /publish-status?swale={name}` | Poll publish job progress |
 | `POST /save_config/{swalename}` | Persist config changes |
+| `POST /delete_layer/{swalename}/{layer}` | Delete a layer + every reference (`layer_plans`). `{"dry_run": true}` returns the plan; a real delete needs `{"confirm": layer}` and refuses while anything depends on it. Data archived to `{atlas}/deleted_layers/`. Not committed (#195) |
 | `POST /import_sheet`, `GET /export_gsheet` | Google Sheets import/export |
 | `POST /sql_query` | DuckDB query across layers |
 
