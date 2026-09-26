@@ -463,57 +463,6 @@
                             "public"
                         ]
                     },
-                    "hargus_processing_sites": {
-                        "name": "hargus_processing_sites",
-                        "geometry_type": "point",
-                        "display_name": "Hargus Processing Sites",
-                        "conversations_enabled": true,
-                        "color": [
-                            140,
-                            60,
-                            170
-                        ],
-                        "fill_color": [
-                            255,
-                            255,
-                            255
-                        ],
-                        "add_labels": true,
-                        "symbol": {
-                            "png": "camera.png",
-                            "icon": "camera"
-                        },
-                        "icon-size": 1.0,
-                        "interaction": "interface",
-                        "editable_columns": [
-                            {
-                                "name": "name",
-                                "type": "string",
-                                "default": "Processing site photo"
-                            },
-                            {
-                                "name": "datetime",
-                                "type": "string"
-                            },
-                            {
-                                "name": "model",
-                                "type": "string"
-                            }
-                        ],
-                        "access": [
-                            "public"
-                        ],
-                        "vis": {
-                            "layout": {
-                                "visibility": "visible"
-                            }
-                        },
-                        "paint": {
-                            "circle-opacity": 1.0,
-                            "circle-radius": 0,
-                            "circle-color": "#8c3caa"
-                        }
-                    },
                     "driving_route": {
                         "name": "driving_route",
                         "geometry_type": "linestring",
@@ -1370,7 +1319,6 @@
                             "mileage_zones",
                             "landmarks",
                             "photos",
-                            "hargus_processing_sites",
                             "inaturalist",
                             "inaturalist_threatened",
                             "driving_route"
@@ -1592,7 +1540,7 @@
                             "roads_secondary",
                             "roads_primary",
                             "landmarks",
-			    "road_mileage",
+                            "road_mileage",
                             "mileage_markers"
                         ],
                         "access": [
