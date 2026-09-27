@@ -18,6 +18,7 @@ from deltas_geojson import (
     apply_deltas,
     InvalidDelta,
     _apply_delete_delta,
+    extract_intersecting_features,
     layer_polygon_shape,
 )
 
@@ -377,3 +378,48 @@ class TestPolygonShapeOnApply(unittest.TestCase):
         dlon, dlat = self._apply('square_degrees')
         self.assertAlmostEqual(dlon, dlat, places=6)
 
+
+
+
+class TestExtractIntersectingFeatures(unittest.TestCase):
+    """extract_intersecting_features() is the predicate behind Move and the
+    webedit selection preview: ST_Intersects against any drawn shape."""
+
+    SQUARE = [[[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0], [0.0, 0.0]]]
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.layer_path = Path(self.tmp) / 'layer.geojson'
+        features = [
+            geojson.Feature(geometry=geojson.Point([1.0, 1.0]), properties={'name': 'inside'}),
+            geojson.Feature(geometry=geojson.Point([2.0, 1.0]), properties={'name': 'on_edge'}),
+            geojson.Feature(geometry=geojson.Point([5.0, 5.0]), properties={'name': 'outside'}),
+            geojson.Feature(geometry=geojson.LineString([[-1.0, 1.0], [3.0, 1.0]]),
+                            properties={'name': 'crossing_line'}),
+            geojson.Feature(geometry=geojson.Polygon([[[2.0, 0.0], [3.0, 0.0], [3.0, 1.0], [2.0, 1.0], [2.0, 0.0]]]),
+                            properties={'name': 'touching_polygon'}),
+        ]
+        with open(self.layer_path, 'w') as f:
+            geojson.dump(geojson.FeatureCollection(features), f)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp)
+
+    def _names(self, *polygons):
+        fc = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'properties': {}, 'geometry': {'type': 'Polygon', 'coordinates': p}}
+            for p in polygons]}
+        return sorted(f['properties']['name'] for f in extract_intersecting_features(self.layer_path, fc))
+
+    def test_boundary_contact_counts_as_intersecting(self):
+        self.assertEqual(self._names(self.SQUARE),
+                         ['crossing_line', 'inside', 'on_edge', 'touching_polygon'])
+
+    def test_any_of_several_shapes(self):
+        far = [[[4.0, 4.0], [6.0, 4.0], [6.0, 6.0], [4.0, 6.0], [4.0, 4.0]]]
+        self.assertIn('outside', self._names(self.SQUARE, far))
+
+    def test_no_duplicates_when_shapes_overlap(self):
+        names = self._names(self.SQUARE, self.SQUARE)
+        self.assertEqual(len(names), len(set(names)))

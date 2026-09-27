@@ -25,6 +25,41 @@ function showSuccessNotification(message, duration = 2000) {
     }, duration);
 }
 
+// Escape a value for safe insertion into innerHTML.
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Render a feature's properties as a two-column table. editableCols are listed
+// first and marked; every other property follows in stored order.
+function renderPropertiesTable(props, editableCols = []) {
+    props = props || {};
+    const formatValue = (v) => {
+        if (v === null || v === undefined || v === '') return '<span class="prop-empty">—</span>';
+        if (typeof v === 'object') v = JSON.stringify(v);
+        const text = String(v);
+        if (/^https?:\/\/\S+$/.test(text.trim())) {
+            const url = escapeHtml(text.trim());
+            return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+        }
+        return escapeHtml(text);
+    };
+    const row = (key, editable) => `<tr class="${editable ? 'prop-editable' : ''}">
+            <th>${escapeHtml(key)}${editable ? ' <span class="prop-editable-mark" title="editable">✎</span>' : ''}</th>
+            <td>${formatValue(props[key])}</td>
+        </tr>`;
+    const otherKeys = Object.keys(props).filter(k => !editableCols.includes(k) && !k.startsWith('_sel_'));
+    return `<table class="prop-table">
+        ${editableCols.map(k => row(k, true)).join('')}
+        ${otherKeys.map(k => row(k, false)).join('')}
+    </table>`;
+}
+
 // Function to parse degrees format coordinates (async to handle URL dereferencing)
 async function parseDegreesFormat(input) {
     console.log('Parsing input:', input);

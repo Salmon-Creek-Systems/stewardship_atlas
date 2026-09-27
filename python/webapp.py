@@ -103,6 +103,10 @@ class MovePayload(BaseModel):
     target_layer: str
     selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of selection polygon(s)
 
+class SelectPayload(BaseModel):
+    layer: str
+    selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of drawn shape(s)
+
 class CommentPayload(BaseModel):
     text: str
     author: str
@@ -553,6 +557,45 @@ async def json_upload(payload: JSONPayload, swalename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _selection_to_fc(sel: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalise a drawn selection (Feature or FeatureCollection) to a FeatureCollection."""
+    if sel.get("type") == "Feature":
+        return {"type": "FeatureCollection", "features": [sel]}
+    if sel.get("type") == "FeatureCollection":
+        return sel
+    raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+
+
+@app.post("/select_features/{swalename}")
+async def select_features(payload: SelectPayload, swalename: str):
+    """Preview which features of a layer a drawn selection hits.
+
+    Read-only. Uses the same predicate (extract_intersecting_features,
+    ST_Intersects against any drawn shape) as annotate, delete and move, so
+    the webedit highlight shows exactly what those actions would touch.
+    """
+    try:
+        sel_fc = _selection_to_fc(payload.selection)
+        config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
+        ac = json.load(open(config_path))
+        layer_path = versioning.atlas_path(ac, "layers") / payload.layer / f"{payload.layer}.geojson"
+        if not layer_path.exists():
+            raise HTTPException(status_code=404, detail=f"layer not found: {payload.layer}")
+        if not sel_fc.get("features"):
+            return {"type": "FeatureCollection", "features": []}
+
+        selected = deltas_geojson.extract_intersecting_features(layer_path, sel_fc)
+        return json.loads(json.dumps(
+            {"type": "FeatureCollection", "features": [dict(f) for f in selected]},
+            default=utils.json_serial))
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(f"ERROR in select_features: {e}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/move_features/{swalename}")
 async def move_features(payload: MovePayload, swalename: str):
     try:
@@ -565,13 +608,7 @@ async def move_features(payload: MovePayload, swalename: str):
         source_snapshot = source_path.read_text()
         target_snapshot = target_path.read_text() if target_path.exists() else None
 
-        sel = payload.selection
-        if sel.get("type") == "Feature":
-            sel_fc = {"type": "FeatureCollection", "features": [sel]}
-        elif sel.get("type") == "FeatureCollection":
-            sel_fc = sel
-        else:
-            raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+        sel_fc = _selection_to_fc(payload.selection)
 
         moved = deltas_geojson.extract_intersecting_features(source_path, sel_fc)
         if not moved:

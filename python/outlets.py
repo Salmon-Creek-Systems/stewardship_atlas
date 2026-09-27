@@ -935,8 +935,13 @@ def candidate_move_targets(config: dict, source_layer_name: str) -> list:
     ]
 
 
-def generate_edit_controls_html(editable_attributes, geometry_type='point'):
-    """Generate HTML for edit controls based on attribute configuration"""
+def generate_edit_controls_html(editable_attributes, geometry_type='point', action='create'):
+    """Generate HTML for edit controls based on attribute configuration.
+
+    On annotate pages the inputs are followed by a hint and an empty
+    #selection-panel, which edit_map.js fills with the properties of the
+    features the drawn polygon selects.
+    """
     select_html = ""
     string_html = ""
     
@@ -963,6 +968,19 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
                 # {str_value} {value[ edit_att['name'] ] }
             select_html += "</select></div>"
             
+    selection_html = ''
+    if action == 'annotate':
+        selection_html = """
+                <p class="selection-hint">Blank fields keep existing values.</p>"""
+    selection_panel_html = ''
+    if action == 'annotate':
+        selection_panel_html = """
+        <div id="selection-panel">
+            <div id="selection-header">No features selected. Draw a polygon over features to edit.</div>
+            <div id="selection-tabs"></div>
+            <div id="selection-body"></div>
+        </div>"""
+
     photo_button = '<button id="upload-photo-button" class="button">Upload Photo</button>\n            ' \
         if geometry_type == 'point' else ''
 
@@ -978,7 +996,7 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
             <button id="delete-button" class="warning-button">Delete Features in Area</button>
         </div>
         <div id="delete-confirm" style="display:none; margin-top: 8px;">
-            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Delete features in selected area?<br>This cannot be undone.</p>
+            <p style="margin: 0 0 8px 0; font-size: 0.9em;"><span id="delete-count-text">Delete features in selected area?</span><br>This cannot be undone.</p>
             <button id="delete-cancel-button" class="button">Cancel</button>
             <button id="delete-confirm-button" class="warning-button">Delete</button>
         </div>
@@ -986,14 +1004,14 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
             <button id="move-button" class="button">Move to Layer</button>
         </div>
         <div id="move-confirm" style="display:none; margin-top: 8px;">
-            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
+            <p id="move-count-text" style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
             <select id="move-target-select" class="input-field" style="margin-bottom: 8px;"></select>
             <button id="move-cancel-button" class="button">Cancel</button>
             <button id="move-confirm-button" class="button">Move Features</button>
         </div>
     """
 
-    return select_html + string_html + buttons_html
+    return select_html + string_html + selection_html + selection_panel_html + buttons_html
 
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
@@ -1003,7 +1021,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         template = f.read()
         
     # Generate controls HTML
-    controls_html = generate_edit_controls_html(ea.get('editable_columns', []), ea.get('geometry_type', 'point'))
+    controls_html = generate_edit_controls_html(ea.get('editable_columns', []), ea.get('geometry_type', 'point'), action)
     
     # Prepare mode string
     mode_string = {

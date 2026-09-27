@@ -360,3 +360,89 @@
 .warning-button:hover {
     background: #ffe0e0;
 }
+
+/* Webedit selection preview (annotate pages) */
+.selection-hint {
+    margin: -4px 0 10px 0;
+    font-size: 0.8em;
+    color: #666;
+}
+
+#selection-panel {
+    margin-bottom: 12px;
+    border-top: 1px solid #ddd;
+    padding-top: 8px;
+}
+
+#selection-header {
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+#selection-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    margin-bottom: 6px;
+}
+
+.selection-tab {
+    flex: 0 0 auto;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f7f7f7;
+    cursor: pointer;
+}
+
+.selection-tab.active {
+    background: #ffd400;
+    border-color: #c9a800;
+    font-weight: 600;
+}
+
+#selection-body {
+    max-height: 35vh;
+    overflow-y: auto;
+}
+
+.prop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8em;
+    table-layout: fixed;
+}
+
+.prop-table th,
+.prop-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 3px 4px;
+    border-bottom: 1px solid #eee;
+    word-break: break-word;
+}
+
+.prop-table th {
+    width: 40%;
+    font-weight: normal;
+    color: #555;
+}
+
+.prop-table tr.prop-editable th {
+    font-weight: 600;
+    color: #222;
+}
+
+.prop-editable-mark {
+    color: #c9a800;
+}
+
+.prop-empty {
+    color: #aaa;
+}
