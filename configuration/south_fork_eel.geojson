@@ -182,11 +182,12 @@
                         ]
                     },
                     "roads_secondary": {
+                        "name": "roads_secondary",
                         "geometry_type": "linestring",
                         "color": [
-                            90,
-                            90,
-                            90
+                            0,
+                            0,
+                            0
                         ],
                         "add_labels": true,
                         "interaction": "interface",
@@ -201,7 +202,10 @@
                         "label_buffer": true,
                         "vis": {
                             "minzoom": 11,
-                            "maxzoom": 22
+                            "maxzoom": 22,
+                            "layout": {
+                                "visibility": "visible"
+                            }
                         },
                         "editable_columns": [
                             {
@@ -217,7 +221,12 @@
                         ],
                         "access": [
                             "public"
-                        ]
+                        ],
+                        "paint": {
+                            "line-opacity": 1.0,
+                            "line-width": 1,
+                            "line-color": "#000000"
+                        }
                     },
                     "roads_tertiary": {
                         "geometry_type": "linestring",
@@ -863,6 +872,41 @@
                         "access": [
                             "public"
                         ]
+                    },
+                    "mtbs_sample": {
+                        "name": "mtbs_sample",
+                        "geometry_type": "point",
+                        "color": [
+                            252,
+                            46,
+                            0
+                        ],
+                        "interaction": "interface",
+                        "add_labels": true,
+                        "paint": {
+                            "circle-radius": 0,
+                            "circle-stroke-width": 1.5,
+                            "circle-stroke-color": "#063c1c",
+                            "circle-opacity": 1.0,
+                            "circle-color": "#fc2e00"
+                        },
+                        "symbol": {
+                            "png": "eye.png",
+                            "icon": "eye"
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ],
+                        "icon-size": 1.33,
+                        "vis": {
+                            "layout": {
+                                "visibility": "visible"
+                            }
+                        }
                     }
                 },
                 "assets": {
@@ -1354,7 +1398,8 @@
                             "photos",
                             "inaturalist",
                             "inaturalist_threatened",
-                            "driving_route"
+                            "driving_route",
+                            "mtbs_sample"
                         ],
                         "access": [
                             "public",
@@ -1406,7 +1451,8 @@
                             "roads_primary",
                             "creeks",
                             "landmarks",
-                            "photos"
+                            "photos",
+                            "mtbs_sample"
                         ],
                         "access": [
                             "internal",
