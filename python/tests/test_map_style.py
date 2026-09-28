@@ -179,6 +179,49 @@ class TestLocalBasemapOption(unittest.TestCase):
         self.assertFalse(map_style.has_local_basemap(None, {}))
 
 
+class TestMergeVis(unittest.TestCase):
+    """A `vis.layout` must merge into a style layer's layout, not replace it —
+    otherwise a label layer loses its text-field and draws nothing."""
+
+    def _label_layer(self):
+        return {'id': 'roads-label-layer', 'type': 'symbol', 'minzoom': 10, 'maxzoom': 24,
+                'layout': {'symbol-placement': 'line', 'text-font': ['Open Sans Regular'],
+                           'text-field': ['get', 'name'], 'text-size': 20}}
+
+    def test_label_layout_survives_vis_layout(self):
+        layer = map_style.merge_vis(self._label_layer(),
+                                    {'minzoom': 11, 'layout': {'visibility': 'visible'}})
+        self.assertEqual(layer['layout']['text-field'], ['get', 'name'])
+        self.assertEqual(layer['layout']['symbol-placement'], 'line')
+        self.assertEqual(layer['layout']['visibility'], 'visible')
+
+    def test_visibility_none_reaches_label_layer(self):
+        layer = map_style.merge_vis(self._label_layer(), {'layout': {'visibility': 'none'}})
+        self.assertEqual(layer['layout']['visibility'], 'none')
+        self.assertIn('text-field', layer['layout'])
+
+    def test_zoom_range_still_applies(self):
+        layer = map_style.merge_vis(self._label_layer(), {'minzoom': 11, 'maxzoom': 22})
+        self.assertEqual(layer['minzoom'], 11)
+        self.assertEqual(layer['maxzoom'], map_style.NO_ZOOM_LIMIT)
+
+    def test_layer_without_layout_gets_vis_layout(self):
+        layer = map_style.merge_vis({'id': 'x', 'type': 'line'}, {'layout': {'visibility': 'none'}})
+        self.assertEqual(layer['layout'], {'visibility': 'none'})
+
+    def test_no_layout_added_when_neither_has_one(self):
+        layer = map_style.merge_vis({'id': 'x', 'type': 'line'}, {'minzoom': 12})
+        self.assertNotIn('layout', layer)
+
+    def test_layouts_are_not_shared_between_layers(self):
+        vis = {'layout': {'visibility': 'visible'}}
+        line = map_style.merge_vis({'id': 'x', 'type': 'line'}, vis)
+        label = map_style.merge_vis(self._label_layer(), vis)
+        line['layout']['icon-image'] = 'x'
+        self.assertNotIn('icon-image', label['layout'])
+        self.assertEqual(vis, {'layout': {'visibility': 'visible'}})
+
+
 if __name__ == '__main__':
     unittest.main()
 

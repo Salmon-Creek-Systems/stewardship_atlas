@@ -261,9 +261,7 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
 
 
         if vis := layer.get('vis'):
-            map_layer |= map_style.visibility(vis)
-            if 'layout' in map_layer:
-                map_layer['layout'] = dict(map_layer['layout'])  # break shared ref with label_layer
+            map_style.merge_vis(map_layer, vis)
         if paint := layer.get('paint'):
             if not 'paint' in map_layer:
                 map_layer['paint'] = {}
@@ -304,7 +302,7 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
                     'metadata': {'legend': {'hidden': True}, 'conversations_enabled': True}
                 }
                 if vis := layer.get('vis'):
-                    badge_layer |= map_style.visibility(vis)
+                    map_style.merge_vis(badge_layer, vis)
                 map_layers.append(badge_layer)
             else:
                 # Fallback: two circle layers (no sprite available)
@@ -337,7 +335,7 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
                     },
                 ]:
                     if vis := layer.get('vis'):
-                        badge_layer |= map_style.visibility(vis)
+                        map_style.merge_vis(badge_layer, vis)
                     map_layers.append(badge_layer)
 
         # Maybe add label/icon layer:
@@ -379,7 +377,7 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
             #label_layer['paint'] |=  layer.get('paint', {})                
             #XSXSXblabel_layer |=  layer.get('vis', {})
             if vis := layer.get('vis'):
-                label_layer |= map_style.visibility(vis)
+                map_style.merge_vis(label_layer, vis)
             if 'label_minzoom' in layer:
                 label_layer['minzoom'] = layer['label_minzoom']
             if 'label_maxzoom' in layer:
