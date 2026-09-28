@@ -292,9 +292,9 @@
                                         ">=",
                                         [
                                             "get",
-                                            "vector_width"
+                                            "visibilityfilter"
                                         ],
-                                        3
+                                        100000
                                     ],
                                     1,
                                     0
@@ -306,9 +306,9 @@
                                         ">=",
                                         [
                                             "get",
-                                            "vector_width"
+                                            "visibilityfilter"
                                         ],
-                                        2
+                                        24000
                                     ],
                                     1,
                                     0
@@ -327,20 +327,20 @@
                                 "default": ""
                             },
                             {
-                                "name": "vector_width",
+                                "name": "visibilityfilter",
                                 "type": "radio",
                                 "values": [
                                     {
-                                        "vector_width": ""
+                                        "visibilityfilter": ""
                                     },
                                     {
-                                        "vector_width": 1
+                                        "visibilityfilter": 100000
                                     },
                                     {
-                                        "vector_width": 2
+                                        "visibilityfilter": 24000
                                     },
                                     {
-                                        "vector_width": 3
+                                        "visibilityfilter": 1
                                     }
                                 ]
                             }
