@@ -310,6 +310,31 @@
                         },
                         "access": [
                             "public"
+                        ],
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            },
+                            {
+                                "name": "vector_width",
+                                "type": "radio",
+                                "values": [
+                                    {
+                                        "vector_width": ""
+                                    },
+                                    {
+                                        "vector_width": 1
+                                    },
+                                    {
+                                        "vector_width": 2
+                                    },
+                                    {
+                                        "vector_width": 3
+                                    }
+                                ]
+                            }
                         ]
                     },
                     "landmarks": {
