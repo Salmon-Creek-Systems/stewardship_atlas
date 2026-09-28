@@ -1040,8 +1040,9 @@
                                     "class",
                                     [
                                         "secondary",
-                                        "residential",
-                                        "service"
+                                        "tertiary",
+                                        "unclassified",
+                                        "residential"
                                     ]
                                 ]
                             ],
@@ -1087,8 +1088,9 @@
                                         "class",
                                         [
                                             "secondary",
-                                            "residential",
-                                            "service"
+                                            "tertiary",
+                                            "unclassified",
+                                            "residential"
                                         ]
                                     ]
                                 ],
@@ -1125,8 +1127,9 @@
                                         "primary",
                                         "motorway",
                                         "secondary",
-                                        "residential",
-                                        "service"
+                                        "tertiary",
+                                        "unclassified",
+                                        "residential"
                                     ]
                                 ]
                             ],
@@ -1173,10 +1176,11 @@
                                         [
                                             "trunk",
                                             "primary",
-                                            "secondary",
                                             "motorway",
-                                            "residential",
-                                            "service"
+                                            "secondary",
+                                            "tertiary",
+                                            "unclassified",
+                                            "residential"
                                         ]
                                     ]
                                 ],
