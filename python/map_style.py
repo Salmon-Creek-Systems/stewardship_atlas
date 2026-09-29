@@ -34,6 +34,24 @@ def visibility(vis):
     return vis
 
 
+def merge_vis(style_layer, vis):
+    """Apply a layer's `vis` block to a style layer, in place.
+
+    `vis.layout` is merged into the style layer's own `layout` rather than
+    replacing it. A plain `|=` swapped the whole dict, so a label layer given
+    `vis.layout = {'visibility': ...}` (the console Style form writes one on
+    every save) lost its text-field, font and placement and drew nothing.
+    The merged layout is a fresh dict, so it is never shared between the
+    geometry, label and badge layers built from the same `vis`.
+    """
+    vis = visibility(vis)
+    vis_layout = vis.pop('layout', None)
+    style_layer |= vis
+    if vis_layout is not None or 'layout' in style_layer:
+        style_layer['layout'] = {**style_layer.get('layout', {}), **(vis_layout or {})}
+    return style_layer
+
+
 # ---------------------------------------------------------------------------
 # COG addressing. A raster layer normally reads its COG out of its own atlas,
 # but `cog_url` lets it name one published by another atlas — so a wider atlas

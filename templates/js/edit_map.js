@@ -45,6 +45,169 @@ td.start();
 // Set the mode, defaulting to point mode if not found
 td.setMode(EDIT_CONFIG.mode || 'TerraDrawPointMode');
 
+// ---- Selection preview ------------------------------------------------------
+// Annotate, Delete and Move all act on the features of the edited layer that
+// intersect the drawn shapes. The server computes that set (/select_features,
+// same predicate as the actions themselves); we highlight it on the map and,
+// on annotate pages, list each feature's properties under the form.
+
+const IS_ANNOTATE = EDIT_CONFIG.action === 'annotate';
+const EDITABLE_COLS = EDIT_CONFIG.controls.map(c => c.name);
+const EMPTY_FC = {type: 'FeatureCollection', features: []};
+let selectionFeatures = [];
+let activeSelectionIdx = 0;
+let selectionRequestId = 0;
+
+// Ask the server which features the current drawing selects. Resolves to the
+// feature list, or null when a newer request has superseded this one.
+async function refreshSelection() {
+    const drawn = td.getSnapshot();
+    const requestId = ++selectionRequestId;
+    if (drawn.length === 0) {
+        setSelection([]);
+        return [];
+    }
+    try {
+        const response = await fetch(EDIT_CONFIG.appUrl + '/select_features/' + EDIT_CONFIG.swalename, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                layer: EDIT_CONFIG.layerName,
+                selection: {type: 'FeatureCollection', features: drawn}
+            })
+        });
+        const data = await response.json();
+        if (requestId !== selectionRequestId) return null;
+        if (!response.ok) throw new Error(data.detail || response.statusText);
+        setSelection(data.features || []);
+        return selectionFeatures;
+    } catch (err) {
+        if (requestId !== selectionRequestId) return null;
+        console.error('Selection preview failed:', err);
+        setSelection([]);
+        setSelectionHeader('Could not load the selection: ' + err.message);
+        return null;
+    }
+}
+
+function clearSelection() {
+    selectionRequestId++;  // drop any in-flight response
+    setSelection([]);
+}
+
+function setSelection(features) {
+    selectionFeatures = features.map((f, i) => ({
+        ...f,
+        properties: {...(f.properties || {}), _sel_idx: i}
+    }));
+    activeSelectionIdx = 0;
+    updateSelectionHighlight();
+    renderSelectionPanel();
+}
+
+function updateSelectionHighlight() {
+    const source = map.getSource('selection-highlight');
+    if (!source) return;  // map not loaded yet; the load handler adds it with current data
+    source.setData({type: 'FeatureCollection', features: selectionFeatures});
+    SELECTION_ACTIVE_LAYERS.forEach(id => {
+        if (map.getLayer(id)) map.setFilter(id, activeSelectionFilter(id));
+    });
+}
+
+const SELECTION_COLOR = '#ff00c8';
+const SELECTION_ACTIVE_COLOR = '#ffd400';
+const SELECTION_ACTIVE_LAYERS = ['selection-active-line', 'selection-active-circle'];
+
+function activeSelectionFilter(layerId) {
+    const geomFilter = layerId === 'selection-active-circle'
+        ? ['==', '$type', 'Point']
+        : ['!=', '$type', 'Point'];
+    return ['all', geomFilter, ['==', '_sel_idx', IS_ANNOTATE ? activeSelectionIdx : -1]];
+}
+
+// Highlight layers sit above the data layers but below TerraDraw's own, so the
+// shape being drawn stays on top.
+function addSelectionHighlightLayers() {
+    map.addSource('selection-highlight', {
+        type: 'geojson',
+        data: {type: 'FeatureCollection', features: selectionFeatures}
+    });
+    const tdLayer = map.getStyle().layers.find(l => l.id.startsWith('td-'));
+    const before = tdLayer ? tdLayer.id : undefined;
+    map.addLayer({
+        id: 'selection-fill', type: 'fill', source: 'selection-highlight',
+        filter: ['==', '$type', 'Polygon'],
+        paint: {'fill-color': SELECTION_COLOR, 'fill-opacity': 0.2}
+    }, before);
+    map.addLayer({
+        id: 'selection-line', type: 'line', source: 'selection-highlight',
+        filter: ['!=', '$type', 'Point'],
+        paint: {'line-color': SELECTION_COLOR, 'line-width': 4, 'line-opacity': 0.9}
+    }, before);
+    map.addLayer({
+        id: 'selection-circle', type: 'circle', source: 'selection-highlight',
+        filter: ['==', '$type', 'Point'],
+        paint: {'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)',
+                'circle-stroke-color': SELECTION_COLOR, 'circle-stroke-width': 3}
+    }, before);
+    map.addLayer({
+        id: 'selection-active-line', type: 'line', source: 'selection-highlight',
+        filter: activeSelectionFilter('selection-active-line'),
+        paint: {'line-color': SELECTION_ACTIVE_COLOR, 'line-width': 6}
+    }, before);
+    map.addLayer({
+        id: 'selection-active-circle', type: 'circle', source: 'selection-highlight',
+        filter: activeSelectionFilter('selection-active-circle'),
+        paint: {'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)',
+                'circle-stroke-color': SELECTION_ACTIVE_COLOR, 'circle-stroke-width': 4}
+    }, before);
+}
+
+function selectionTabLabel(feature, i) {
+    const p = feature.properties || {};
+    const label = p.name || p.atlas_id;
+    return (label !== undefined && label !== null && label !== '') ? String(label) : '#' + (i + 1);
+}
+
+function setSelectionHeader(text) {
+    const header = document.getElementById('selection-header');
+    if (header) header.textContent = text;
+}
+
+function renderSelectionPanel() {
+    const tabs = document.getElementById('selection-tabs');
+    const body = document.getElementById('selection-body');
+    if (!tabs || !body) return;  // no panel on create pages
+
+    const n = selectionFeatures.length;
+    if (n === 0) {
+        setSelectionHeader('No features selected. Draw a polygon over features to edit.');
+        tabs.innerHTML = '';
+        body.innerHTML = '';
+        return;
+    }
+    setSelectionHeader(n === 1 ? '1 feature selected' : `${n} features selected`);
+    tabs.innerHTML = n === 1 ? '' : selectionFeatures.map((f, i) =>
+        `<button type="button" class="selection-tab${i === activeSelectionIdx ? ' active' : ''}" data-idx="${i}">${escapeHtml(selectionTabLabel(f, i))}</button>`
+    ).join('');
+    body.innerHTML = renderPropertiesTable(selectionFeatures[activeSelectionIdx].properties, EDITABLE_COLS);
+}
+
+const selectionTabsEl = document.getElementById('selection-tabs');
+if (selectionTabsEl) {
+    selectionTabsEl.addEventListener('click', (e) => {
+        const tab = e.target.closest('.selection-tab');
+        if (!tab) return;
+        activeSelectionIdx = Number(tab.dataset.idx);
+        updateSelectionHighlight();
+        renderSelectionPanel();
+    });
+}
+
+if (IS_ANNOTATE) {
+    td.on('finish', () => { refreshSelection(); });
+}
+
 // Add satellite source and layer
 map.on('load', () => {
     // Get the first layer ID from the style to ensure basemaps are at the bottom
@@ -100,6 +263,8 @@ map.on('load', () => {
     // Initialize basemap switching
     initializeBasemapSwitching(map);
 
+    addSelectionHighlightLayers();
+
     // Show the basemap matching the dropdown's initial selection on load.
     // Without this, all basemaps start hidden and only switch on a dropdown
     // 'change' event, leaving the edit map blank until the user interacts
@@ -127,6 +292,7 @@ map.on('load', () => {
             <li><strong>Reset:</strong> Click "Reset Drawing" to clear all features</li>
             <li><strong>Upload:</strong> Use "Upload GeoJSON" to import existing features</li>
             <li><strong>Save:</strong> Click "Save Features" when done to submit your work</li>
+            <li><strong>Selection:</strong> Features your polygon selects are highlighted; on annotate pages their properties are listed below the form</li>
             <li><strong>Location:</strong> Use the location input to navigate to specific coordinates</li>
             <li><strong>Basemap:</strong> Switch between different map backgrounds</li>
         </ul>
@@ -268,6 +434,7 @@ map.on('load', () => {
 document.getElementById('reset-button').addEventListener('click', function() {
     if (confirm('Are you sure you want to reset? This will remove all features drawn in this session.')) {
         td.clear();
+        clearSelection();
         showSuccessNotification('Drawing reset successfully!');
     }
 });
@@ -319,6 +486,8 @@ document.getElementById('save-button').addEventListener('click', function() {
     xmlhttp.onreadystatechange = function() {
         if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
             showSuccessNotification('Upload successful!');
+            // The delta is applied on upload, so re-query to show the new values.
+            if (IS_ANNOTATE) refreshSelection();
         } else if (xmlhttp.readyState == 4 && xmlhttp.status !== 200) {
             showErrorPopup('Upload failed. Please try again.');
         }
@@ -333,10 +502,12 @@ document.getElementById('delete-button').addEventListener('click', function() {
         return;
     }
     document.getElementById('delete-confirm').style.display = 'block';
+    showSelectionCount('delete-count-text', 'Delete', 'in selected area?');
 });
 
 document.getElementById('delete-cancel-button').addEventListener('click', function() {
     document.getElementById('delete-confirm').style.display = 'none';
+    if (!IS_ANNOTATE) clearSelection();
 });
 
 document.getElementById('delete-confirm-button').addEventListener('click', function() {
@@ -359,6 +530,7 @@ document.getElementById('delete-confirm-button').addEventListener('click', funct
             if (xmlhttp.status === 200) {
                 document.getElementById('delete-confirm').style.display = 'none';
                 td.clear();
+                clearSelection();
                 showSuccessNotification('Features deleted successfully.');
             } else {
                 showErrorPopup('Delete failed. Please try again.');
@@ -433,11 +605,23 @@ document.getElementById('move-button').addEventListener('click', function() {
         return;
     }
     document.getElementById('move-confirm').style.display = 'block';
+    showSelectionCount('move-count-text', 'Move', 'to:');
 });
 
 document.getElementById('move-cancel-button').addEventListener('click', function() {
     document.getElementById('move-confirm').style.display = 'none';
+    if (!IS_ANNOTATE) clearSelection();
 });
+
+// Fill a Delete/Move confirm prompt with how many features the action will hit.
+async function showSelectionCount(elementId, verb, suffix) {
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = `${verb} features ${suffix} (checking selection…)`;
+    const features = await refreshSelection();
+    if (!el || features === null) return;
+    const n = features.length;
+    el.textContent = `${verb} ${n} feature${n === 1 ? '' : 's'} ${suffix}`;
+}
 
 document.getElementById('move-confirm-button').addEventListener('click', function() {
     const features = td.getSnapshot();
@@ -471,6 +655,7 @@ document.getElementById('move-confirm-button').addEventListener('click', functio
         if (result.ok) {
             document.getElementById('move-confirm').style.display = 'none';
             td.clear();
+            clearSelection();
             showSuccessNotification('Moved ' + result.data.moved + ' feature(s) to ' + targetLayer);
         } else {
             showErrorPopup('Move failed: ' + (result.data.detail || 'unknown error'));

@@ -342,3 +342,28 @@ class TestLabelTextMinzoom(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main() 
+
+
+class TestEditControlsSelectionPanel(unittest.TestCase):
+    """Annotate pages get the blank-fields hint and the #selection-panel that
+    edit_map.js fills; create pages don't."""
+
+    COLS = [{'name': 'status', 'type': 'string'}]
+
+    def test_annotate_has_panel_and_hint(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'annotate')
+        self.assertIn('id="selection-panel"', html)
+        self.assertIn('Blank fields keep existing values', html)
+
+    def test_create_has_neither(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'create')
+        self.assertNotIn('selection-panel', html)
+        self.assertNotIn('Blank fields keep existing values', html)
+
+    def test_delete_and_move_prompts_have_count_targets(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'create')
+        self.assertIn('id="delete-count-text"', html)
+        self.assertIn('id="move-count-text"', html)

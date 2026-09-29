@@ -12,6 +12,50 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 CONFIG_DIR = REPO_ROOT / 'configuration'
 
 
+def illegal_zoom_positions(node, path='', top=False):
+    """Yield the path of every ["zoom"] that is NOT a legal top-level input.
+
+    From the MapLibre style spec: "in layout or paint properties, ["zoom"]
+    may appear only as the input to an outer interpolate or step
+    expression". So ["case", [">=", ["zoom"], ...]] silently breaks the style.
+    """
+    if not isinstance(node, list) or not node:
+        return
+    if node[0] == 'zoom':
+        if not top:
+            yield path
+        return
+    legal_input = node[0] in ('step', 'interpolate', 'interpolate-hcl',
+                              'interpolate-lab')
+    for i, child in enumerate(node[1:], start=1):
+        # only the operator's input slot may be a bare ["zoom"]
+        is_input = legal_input and (i == 1 if node[0] == 'step' else i == 2)
+        yield from illegal_zoom_positions(child, f'{path}[{i}]', top=is_input)
+
+
+def eval_expr(node, zoom, props):
+    """Evaluate the small subset of MapLibre expressions the zoom bands use."""
+    if not isinstance(node, list):
+        return node
+    op = node[0]
+    if op == 'zoom':
+        return zoom
+    if op == 'get':
+        return props[node[1]]
+    if op == '>=':
+        return eval_expr(node[1], zoom, props) >= eval_expr(node[2], zoom, props)
+    if op == 'case':
+        return (eval_expr(node[2], zoom, props) if eval_expr(node[1], zoom, props)
+                else eval_expr(node[3], zoom, props))
+    if op == 'step':
+        value, out = eval_expr(node[1], zoom, props), node[2]
+        for stop, result in zip(node[3::2], node[4::2]):
+            if value >= stop:
+                out = result
+        return eval_expr(out, zoom, props)
+    raise AssertionError(f"unhandled op {op!r}")
+
+
 class TestJsonConfigs(unittest.TestCase):
     """All config JSON files must parse without error."""
 
@@ -274,27 +318,12 @@ class TestStarterBundles(unittest.TestCase):
         expression". So ["case", [">=", ["zoom"], ...]] silently breaks the
         style. Guards every paint block in every starter.
         """
-        def zoom_positions(node, path='', top=True):
-            """Yield the path of every ["zoom"] that is NOT a legal top-level input."""
-            if not isinstance(node, list) or not node:
-                return
-            if node[0] == 'zoom':
-                if not top:
-                    yield path
-                return
-            legal_input = node[0] in ('step', 'interpolate', 'interpolate-hcl',
-                                      'interpolate-lab')
-            for i, child in enumerate(node[1:], start=1):
-                # only the operator's input slot may be a bare ["zoom"]
-                is_input = legal_input and (i == 1 if node[0] == 'step' else i == 2)
-                yield from zoom_positions(child, f'{path}[{i}]', top=is_input)
-
         for path in self._starter_files():
             data = self._load(path)
             for lname, ldef in data['layers'].items():
                 for prop, expr in (ldef.get('paint') or {}).items():
                     with self.subTest(starter=path.name, layer=lname, prop=prop):
-                        bad = list(zoom_positions(expr, top=False))
+                        bad = list(illegal_zoom_positions(expr))
                         self.assertEqual(bad, [],
                             f"{lname}.{prop}: ['zoom'] used outside a top-level "
                             f"step/interpolate input at {bad}")
@@ -309,27 +338,6 @@ class TestStarterBundles(unittest.TestCase):
         creeks = self._load(CONFIG_DIR / 'fieldtrip_starter.json')['layers']['creeks']
         expr = creeks['paint']['line-opacity']
 
-        def ev(node, zoom, props):
-            if not isinstance(node, list):
-                return node
-            op = node[0]
-            if op == 'zoom':
-                return zoom
-            if op == 'get':
-                return props[node[1]]
-            if op == '>=':
-                return ev(node[1], zoom, props) >= ev(node[2], zoom, props)
-            if op == 'case':
-                return (ev(node[2], zoom, props) if ev(node[1], zoom, props)
-                        else ev(node[3], zoom, props))
-            if op == 'step':
-                value, out = ev(node[1], zoom, props), node[2]
-                for stop, result in zip(node[3::2], node[4::2]):
-                    if value >= stop:
-                        out = result
-                return ev(out, zoom, props)
-            raise AssertionError(f"unhandled op {op!r}")
-
         # (zoom, tier) -> visible?   tier 3 perennial, 2 ephemeral, 1 intermittent
         cases = {
             (11, 3): 1, (11, 2): 0, (11, 1): 0,   # zoomed out: perennial only
@@ -338,7 +346,7 @@ class TestStarterBundles(unittest.TestCase):
         }
         for (zoom, tier), expected in cases.items():
             with self.subTest(zoom=zoom, tier=tier):
-                self.assertEqual(ev(expr, zoom, {'vector_width': tier}), expected)
+                self.assertEqual(eval_expr(expr, zoom, {'vector_width': tier}), expected)
 
         # and nothing at all below the layer's own floor
         self.assertEqual(creeks['vis']['minzoom'], 10)
@@ -401,6 +409,99 @@ class TestStarterBundles(unittest.TestCase):
                     self.assertIn('canonicalize', a['alterations'],
                         f"asset '{aname}' overrides alterations but drops the "
                         f"canonicalize from '{a['config_def']}' — labels will break")
+
+
+
+def _atlas_layer_defs():
+    """(file name, layer name, layer def) for every per-atlas config in the repo:
+    single-file {atlas}.geojson (layers dict) and legacy {atlas}_layers.json."""
+    for path in sorted(CONFIG_DIR.glob('*.geojson')):
+        try:
+            with open(path) as f:
+                props = json.load(f)['features'][0]['properties']
+        except (ValueError, KeyError, IndexError, TypeError):
+            continue
+        for lname, ldef in (props.get('layers') or {}).items():
+            if isinstance(ldef, dict):
+                yield path.name, lname, ldef
+    for path in sorted(CONFIG_DIR.glob('*_layers.json')):
+        with open(path) as f:
+            data = json.load(f)
+        layers = data if isinstance(data, list) else data.get('layers', [])
+        if isinstance(layers, dict):
+            layers = [dict(v, name=k) for k, v in layers.items()]
+        for ldef in layers:
+            if isinstance(ldef, dict):
+                yield path.name, ldef.get('name'), ldef
+
+
+class TestAtlasLayerConfigs(unittest.TestCase):
+    """Style and edit invariants for the per-atlas layer definitions."""
+
+    def test_atlas_paint_zoom_expressions_are_legal(self):
+        """Same MapLibre ["zoom"] rule as the starters, over every atlas config."""
+        checked = 0
+        for fname, lname, ldef in _atlas_layer_defs():
+            for prop, expr in (ldef.get('paint') or {}).items():
+                checked += 1
+                with self.subTest(file=fname, layer=lname, prop=prop):
+                    bad = list(illegal_zoom_positions(expr))
+                    self.assertEqual(bad, [],
+                        f"{lname}.{prop}: ['zoom'] used outside a top-level "
+                        f"step/interpolate input at {bad}")
+        self.assertGreater(checked, 0, "found no atlas paint blocks to check")
+
+    # Pre-existing: "< 10k gals" sets capacity 0, which annotate can't write,
+    # so re-annotating a pond smaller leaves its old capacity (#201).
+    KNOWN_FALSY_OPTIONS = {
+        (fname, 'ponds', 'size', 'capacity')
+        for fname in ('scvfd.geojson', 'scvfd_layers.json',
+                      'kennedy_layers.json', 'samuelsloop_layers.json')
+    }
+
+    def test_radio_edit_options_are_truthy(self):
+        """Annotate skips falsy values (`if v:` in delta_annotate_spatial_duckdb),
+        so a radio option whose value is 0/False/"" can never be written. Only a
+        deliberate blank "keep existing" option may be falsy, and it must be ""."""
+        for fname, lname, ldef in _atlas_layer_defs():
+            for col in ldef.get('editable_columns') or []:
+                if col.get('type') != 'radio':
+                    continue
+                for option in col.get('values', []):
+                    for key, value in option.items():
+                        if (fname, lname, col['name'], key) in self.KNOWN_FALSY_OPTIONS:
+                            continue
+                        with self.subTest(file=fname, layer=lname, column=col['name'], key=key):
+                            self.assertTrue(value or value == '',
+                                f"{lname}.{col['name']}: option {option} sets {key}={value!r}, "
+                                f"which annotate silently skips")
+
+    def test_sfe_creeks_band_by_visibilityfilter(self):
+        """SFE creeks fade in by NHD visibilityfilter in three roughly even bands:
+        >=1:100k from the layer floor, 1:24k from z13, unspecified (0) from z16."""
+        props = json.load(open(CONFIG_DIR / 'south_fork_eel.geojson'))['features'][0]['properties']
+        creeks = props['layers']['creeks']
+        expr = creeks['paint']['line-opacity']
+        cases = {
+            (11, 5000000): 1, (11, 100000): 1, (11, 24000): 0, (11, 0): 0,
+            (13, 5000000): 1, (13, 100000): 1, (13, 24000): 1, (13, 0): 0,
+            (16, 5000000): 1, (16, 100000): 1, (16, 24000): 1, (16, 0): 1,
+        }
+        for (zoom, vf), expected in cases.items():
+            with self.subTest(zoom=zoom, visibilityfilter=vf):
+                self.assertEqual(eval_expr(expr, zoom, {'visibilityfilter': vf}), expected)
+        self.assertEqual(creeks['vis']['minzoom'], 10)
+
+        # Each edit option lands its creek in the band it names.
+        band_start = {100000: 11, 24000: 13, 1: 16}
+        col = next(c for c in creeks['editable_columns'] if c['name'] == 'visibilityfilter')
+        values = [o['visibilityfilter'] for o in col['values'] if o['visibilityfilter'] != '']
+        self.assertEqual(sorted(values), sorted(band_start))
+        for vf, first_zoom in band_start.items():
+            with self.subTest(option=vf):
+                self.assertEqual(eval_expr(expr, first_zoom, {'visibilityfilter': vf}), 1)
+                self.assertEqual(eval_expr(expr, first_zoom - 1, {'visibilityfilter': vf}),
+                                 0 if first_zoom > 11 else 1)
 
 
 if __name__ == '__main__':
