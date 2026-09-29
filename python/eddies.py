@@ -1958,6 +1958,15 @@ def _count_by_h3(features, resolution):
     return counts
 
 
+def _h3_cell_feature(cell, resolution):
+    """A cell as a GeoJSON Feature, in the same shape the h3_grid inlet writes."""
+    coords = [[lng, lat] for lat, lng in h3.cell_to_boundary(cell)]
+    coords.append(coords[0])
+    return {'type': 'Feature',
+            'geometry': {'type': 'Polygon', 'coordinates': [coords]},
+            'properties': {'h3_index': cell, 'h3_resolution': resolution}}
+
+
 def h3_count(config: Dict[str, Any], asset_name: str):
     """
     Summarise layers onto an H3 grid: each cell gets a `{layer}_count` property
@@ -1967,36 +1976,55 @@ def h3_count(config: Dict[str, Any], asset_name: str):
     Writes a new layer rather than enriching the grid in place — the grid is
     delta-built by the h3_grid inlet, so a refresh of it would wipe in-place counts.
 
+    Sparse mode: give `resolution` and no `in_layer`, and only the cells holding
+    at least one feature are written. For fine resolutions, where a full grid
+    over the atlas would be hundreds of thousands of mostly-empty cells.
+
     Config:
-      in_layer: H3 grid layer; features must carry h3_index (required)
+      in_layer: H3 grid layer; features must carry h3_index (required unless sparse)
+      resolution: H3 resolution for sparse mode (only used without in_layer)
       in_layers: list of layer names to count (required). Named in_layers, not
                  something clearer, so Dagster and rename/copy_layer see them as inputs.
       out_layer: output layer name (required)
     """
     asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
-    in_layer = asset_config['in_layer']
+    in_layer = asset_config.get('in_layer')
     count_layers = asset_config['in_layers']
     out_layer = asset_config['out_layer']
 
-    grid = dataswale.layer_as_featurecollection(config, in_layer)
-    if not grid or not grid.get('features'):
-        raise Exception(f"h3_count: could not load H3 grid layer '{in_layer}'")
-    cells = grid['features']
-    first_idx = (cells[0].get('properties') or {}).get('h3_index')
-    if not first_idx:
-        raise Exception(f"h3_count: grid layer '{in_layer}' has no h3_index property")
-    resolution = h3.get_resolution(first_idx)
-    grid_indices = {(f.get('properties') or {}).get('h3_index') for f in cells}
+    if in_layer:
+        grid = dataswale.layer_as_featurecollection(config, in_layer)
+        if not grid or not grid.get('features'):
+            raise Exception(f"h3_count: could not load H3 grid layer '{in_layer}'")
+        cells = grid['features']
+        first_idx = (cells[0].get('properties') or {}).get('h3_index')
+        if not first_idx:
+            raise Exception(f"h3_count: grid layer '{in_layer}' has no h3_index property")
+        resolution = h3.get_resolution(first_idx)
+        grid_indices = {(f.get('properties') or {}).get('h3_index') for f in cells}
+    elif 'resolution' in asset_config:
+        resolution = int(asset_config['resolution'])
+        cells = None  # built below from the occupied cells
+    else:
+        raise Exception(f"h3_count: '{asset_name}' needs in_layer (a grid) or resolution (sparse)")
 
     counts_by_source = {}
     for source in count_layers:
         source_data = dataswale.layer_as_featurecollection(config, source)
         features = (source_data or {}).get('features') or []
         counts = _count_by_h3(features, resolution)
-        off_grid = sum(n for cell, n in counts.items() if cell not in grid_indices)
-        logger.info(f"h3_count: '{source}': {len(features)} features, "
-                    f"{off_grid} outside grid '{in_layer}' (r{resolution})")
+        if in_layer:
+            off_grid = sum(n for cell, n in counts.items() if cell not in grid_indices)
+            logger.info(f"h3_count: '{source}': {len(features)} features, "
+                        f"{off_grid} outside grid '{in_layer}' (r{resolution})")
+        else:
+            logger.info(f"h3_count: '{source}': {len(features)} features in "
+                        f"{len(counts)} cells (r{resolution}, sparse)")
         counts_by_source[source] = counts
+
+    if cells is None:
+        occupied = set().union(*(set(c) for c in counts_by_source.values()))
+        cells = [_h3_cell_feature(cell, resolution) for cell in sorted(occupied)]
 
     out_features = []
     for cell in cells:
@@ -2010,6 +2038,128 @@ def h3_count(config: Dict[str, Any], asset_name: str):
     with open(out_path, 'w') as f:
         geojson.dump(geojson.FeatureCollection(out_features), f)
     logger.info(f"h3_count: wrote {len(out_features)} cells to {out_path}")
+    return str(out_path)
+
+
+def _raster_source(config, layer_name):
+    """Where to read a raster layer from: its external cog_url, else its local COG or tiff."""
+    layer = {l['name']: l for l in config['dataswale']['layers']}.get(layer_name, {})
+    if layer.get('cog_url'):
+        return f"/vsicurl/{layer['cog_url']}"
+    layer_dir = versioning.atlas_path(config, 'layers') / layer_name
+    for suffix in ('.cog.tif', '.tiff'):
+        if (layer_dir / f'{layer_name}{suffix}').exists():
+            return str(layer_dir / f'{layer_name}{suffix}')
+    raise Exception(f"h3_raster_stats: raster layer '{layer_name}' has no cog_url and no local file")
+
+
+def _zonal_stats(values, n_in_cell, percentile=95):
+    """Summarise the valid pixels of one cell.
+
+    values: 1-D array of the valid (non-nodata) pixel values inside the cell.
+    n_in_cell: how many pixels the cell covers in total, valid or not — so a
+               cell half off the raster's edge, or half nodata, has coverage 0.5.
+    """
+    coverage = len(values) / n_in_cell if n_in_cell else 0.0
+    if len(values) == 0:
+        return {'mean': None, f'p{percentile}': None, 'coverage': round(coverage, 3)}
+    return {'mean': round(float(np.mean(values)), 2),
+            f'p{percentile}': round(float(np.percentile(values, percentile)), 2),
+            'coverage': round(coverage, 3)}
+
+
+def h3_raster_stats(config: Dict[str, Any], asset_name: str):
+    """
+    Summarise raster layers onto an H3 grid: each cell gets `{layer}_mean`,
+    `{layer}_p{percentile}` and `{layer}_coverage` for every raster in in_layers.
+
+    Pixels count toward a cell when their centre falls inside it (a rasterize
+    mask per cell, full resolution, read by window) — the raster counterpart of
+    h3_count's one-centroid-one-cell rule. Only cells whose bbox meets the
+    raster are read, so a small raster on a big grid costs its own footprint.
+
+    Cells where no raster reaches min_coverage are left out entirely: an edge
+    cell averaged over a sliver of pixels reads as if it were a real value.
+
+    Config:
+      in_layer: H3 grid layer; features must carry h3_index (required)
+      in_layers: raster layer names (required). A layer with cog_url is read
+                 remotely over /vsicurl/, otherwise its local .cog.tif/.tiff.
+      out_layer: output layer name (required)
+      percentile: which upper percentile to report (default 95)
+      min_coverage: fraction of a cell that must hold valid pixels (default 0.5)
+    """
+    from rasterio import features as rio_features, windows as rio_windows
+    from rasterio.warp import transform_geom
+
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config['in_layer']
+    raster_layers = asset_config['in_layers']
+    out_layer = asset_config['out_layer']
+    percentile = asset_config.get('percentile', 95)
+    min_coverage = asset_config.get('min_coverage', 0.5)
+
+    grid = dataswale.layer_as_featurecollection(config, in_layer)
+    if not grid or not grid.get('features'):
+        raise Exception(f"h3_raster_stats: could not load H3 grid layer '{in_layer}'")
+    cells = grid['features']
+
+    stats_by_raster = {}  # raster -> {h3_index: stats}
+    for raster in raster_layers:
+        source = _raster_source(config, raster)
+        logger.info(f"h3_raster_stats: '{raster}' from {source}")
+        stats = {}
+        # EMPTY_DIR stops GDAL listing the whole S3 prefix before opening a /vsicurl/ file.
+        with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR'), rasterio.open(source) as ds:
+            left, bottom, right, top = ds.bounds
+            raster_window = rio_windows.Window(0, 0, ds.width, ds.height)
+            for cell in cells:
+                geom = transform_geom('EPSG:4326', ds.crs, cell['geometry'])
+                xs = [x for x, _ in geom['coordinates'][0]]
+                ys = [y for _, y in geom['coordinates'][0]]
+                if max(xs) < left or min(xs) > right or max(ys) < bottom or min(ys) > top:
+                    continue
+                cell_window = rio_windows.from_bounds(min(xs), min(ys), max(xs), max(ys),
+                                                      transform=ds.transform)
+                cell_window = cell_window.round_offsets().round_lengths()
+                # Pixels the whole cell covers, on or off the raster: coverage's denominator.
+                n_in_cell = int(rio_features.geometry_mask(
+                    [geom], out_shape=(cell_window.height, cell_window.width),
+                    transform=ds.window_transform(cell_window), invert=True).sum())
+                try:
+                    window = cell_window.intersection(raster_window)
+                except rio_windows.WindowError:
+                    continue
+                block = ds.read(1, window=window, masked=True)
+                inside = rio_features.geometry_mask(
+                    [geom], out_shape=block.shape,
+                    transform=ds.window_transform(window), invert=True)
+                valid = block[inside].compressed()
+                stats[cell['properties']['h3_index']] = _zonal_stats(valid, n_in_cell, percentile)
+        logger.info(f"h3_raster_stats: '{raster}': {len(stats)} cells meet the raster")
+        stats_by_raster[raster] = stats
+
+    out_features = []
+    for cell in cells:
+        idx = (cell.get('properties') or {}).get('h3_index')
+        per_raster = {r: s.get(idx) for r, s in stats_by_raster.items()}
+        if not any(s and s['coverage'] >= min_coverage for s in per_raster.values()):
+            continue
+        props = dict(cell['properties'])
+        for raster, s in per_raster.items():
+            # A cell kept for one raster may be thin on another: keep its
+            # coverage, blank its values.
+            enough = bool(s) and s['coverage'] >= min_coverage
+            props[f'{raster}_mean'] = s['mean'] if enough else None
+            props[f'{raster}_p{percentile}'] = s[f'p{percentile}'] if enough else None
+            props[f'{raster}_coverage'] = s['coverage'] if s else 0.0
+        out_features.append({'type': 'Feature', 'geometry': cell['geometry'], 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(geojson.FeatureCollection(out_features), f)
+    logger.info(f"h3_raster_stats: wrote {len(out_features)} cells to {out_path}")
     return str(out_path)
 
 
@@ -2230,5 +2380,6 @@ asset_methods = {
     "ssurgo_enrich": ssurgo_enrich,
     "merge_h3": merge_h3,
     "h3_count": h3_count,
+    "h3_raster_stats": h3_raster_stats,
     "dst_match_simplified": dst_match_simplified,
 }

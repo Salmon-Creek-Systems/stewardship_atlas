@@ -479,6 +479,52 @@ class TestH3Count(unittest.TestCase):
         with self.assertRaises(Exception):
             self._run()
 
+    def test_sparse_mode_writes_only_occupied_cells(self):
+        self.config['assets']['counts']['config'] = {
+            'resolution': self.RES, 'in_layers': ['buildings', 'photos'], 'out_layer': 'out'}
+        by_cell = {f['properties']['h3_index']: f for f in self._run()}
+        far = h3.latlng_to_cell(self.LAT, self.LNG + 1.0, self.RES)
+        # No grid, so the far-off building is not "off grid" — it gets its own cell.
+        self.assertEqual(set(by_cell), {self.center, far})
+        self.assertEqual(by_cell[self.center]['properties']['buildings_count'], 2)
+        self.assertEqual(by_cell[far]['properties']['photos_count'], 0)
+        self.assertEqual(by_cell[far]['properties']['h3_resolution'], self.RES)
+        ring = by_cell[far]['geometry']['coordinates'][0]
+        self.assertEqual(ring[0], ring[-1])
+        # [lng, lat] order, matching the h3_grid inlet
+        self.assertAlmostEqual(ring[0][0], self.LNG + 1.0, delta=0.05)
+
+    def test_neither_grid_nor_resolution_raises(self):
+        self.config['assets']['counts']['config'] = {
+            'in_layers': ['buildings'], 'out_layer': 'out'}
+        with self.assertRaises(Exception):
+            self._run()
+
+
+class TestZonalStats(unittest.TestCase):
+    """_zonal_stats: mean and upper percentile of a cell's valid pixels, plus coverage."""
+
+    def test_values_and_coverage(self):
+        s = eddies._zonal_stats(np.arange(1, 101, dtype=float), n_in_cell=200)
+        self.assertEqual(s['mean'], 50.5)
+        self.assertAlmostEqual(s['p95'], 95.05)
+        self.assertEqual(s['coverage'], 0.5)
+
+    def test_percentile_is_configurable(self):
+        s = eddies._zonal_stats(np.arange(1, 101, dtype=float), n_in_cell=100, percentile=50)
+        self.assertIn('p50', s)
+        self.assertNotIn('p95', s)
+
+    def test_no_valid_pixels_gives_nulls_not_zeros(self):
+        # 0 would read as "bare ground"; an unmeasured cell must be null.
+        s = eddies._zonal_stats(np.array([]), n_in_cell=50)
+        self.assertIsNone(s['mean'])
+        self.assertIsNone(s['p95'])
+        self.assertEqual(s['coverage'], 0.0)
+
+    def test_empty_cell_has_zero_coverage(self):
+        self.assertEqual(eddies._zonal_stats(np.array([]), n_in_cell=0)['coverage'], 0.0)
+
 
 if __name__ == '__main__':
     unittest.main()

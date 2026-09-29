@@ -650,6 +650,10 @@ atlas.materialize(config, "webmap")    # outlet
 
 **`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: its deltas are `assetless__…` and a re-run appends a duplicate grid.
 
+**`h3_count` sparse mode** — give `resolution` and no `in_layer` and only occupied cells are written. Use it for fine resolutions: a full r11 grid over SFE would be ~370k cells / ~190 MB, while sparse `buildings_count_h3_r11` is 3,142 cells.
+
+**`h3_raster_stats`** (`eddies.py`) — raster counterpart of `h3_count`. `in_layer` is a grid, `in_layers` lists raster layers; each cell gets `{layer}_mean`, `{layer}_p{percentile}` (default 95) and `{layer}_coverage`. Pixels are assigned by centre-in-cell mask at full resolution, read per cell by window, and only cells whose bbox meets the raster are read. Cells below `min_coverage` (default 0.5) are dropped. A layer with `cog_url` is read remotely over `/vsicurl/`. Reference: SFE `canopy_height_lidar_h3_r9` (coloured by p95 — mean mixes canopy gaps with height).
+
 **`h3_cells`** (`eddies.py`) — indexes an existing vector layer by H3 cells. Takes `in_layer`, produces a new polygon layer of hex geometries, one per H3 cell, with all original feature properties copied. Use `h3_grid` instead if you just want a blank coverage grid.
 
 ## Current Atlases

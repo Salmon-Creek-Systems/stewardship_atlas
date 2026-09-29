@@ -185,6 +185,17 @@
             "citation": "Uber H3"
         }
     },
+    "h3_raster_stats": {
+        "type": "eddy",
+        "fetch_type": "h3_raster_stats",
+        "interaction": "backend",
+        "attribution": {
+            "url": "https://h3geo.org/",
+            "description": "Raster statistics per H3 cell",
+            "license": "Apache 2.0",
+            "citation": "Uber H3"
+        }
+    },
     "biochar_simulation": {
         "type": "eddy",
         "fetch_type": "biochar_simulation",
