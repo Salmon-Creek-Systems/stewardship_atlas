@@ -92,6 +92,25 @@
                             "public"
                         ]
                     },
+                    "canopy_height_lidar": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "display_name": "Canopy Height Lidar",
+                        "cog_color": "BrewerYlGn9,0,45,c",
+                        "cog_url": "https://scs-atlas-data.s3.us-east-1.amazonaws.com/sources/rasters/sfe_canopy_height_lidar/sfe_canopy_height_lidar.cog.tif",
+                        "access": [
+                            "public"
+                        ]
+                    },
+                    "mtbs": {
+                        "geometry_type": "raster",
+                        "cog": true,
+                        "display_name": "MTBS",
+                        "cog_url": "https://scs-atlas-data.s3.us-east-1.amazonaws.com/sources/rasters/sfe_mtbs/sfe_mtbs.cog.tif",
+                        "access": [
+                            "public"
+                        ]
+                    },
                     "regions": {
                         "geometry_type": "polygon",
                         "color": [
@@ -1382,6 +1401,8 @@
                             "fhe_canopy_density",
                             "fhe_ladder_fuel_density",
                             "fhe_flow_accumulation",
+                            "canopy_height_lidar",
+                            "mtbs",
                             "buildings_count_h3_r8",
                             "inaturalist_threatened_count_h3_r9",
                             "inaturalist_threatened_count_h3_r8",
