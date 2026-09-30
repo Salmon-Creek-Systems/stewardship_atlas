@@ -222,9 +222,6 @@ class TestMergeVis(unittest.TestCase):
         self.assertEqual(vis, {'layout': {'visibility': 'visible'}})
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 class TestPaintFor(unittest.TestCase):
     """MapLibre refuses a whole style over one paint property that does not
     belong to the layer type, so each generated layer keeps only its own."""
@@ -399,3 +396,20 @@ class TestEditPageLayers(unittest.TestCase):
 
     def test_empty_in_layers(self):
         self.assertEqual(map_style.edit_page_layers(None, 'hargus'), ['hargus'])
+
+
+class TestLegendHidden(unittest.TestCase):
+    """Sublayers marked legend-hidden (conversation badges) must not get a legend row."""
+
+    def test_badge_metadata_is_hidden(self):
+        badge = {'id': 'photos-conv-badge',
+                 'metadata': {'legend': {'hidden': True}, 'conversations_enabled': True}}
+        self.assertTrue(map_style.legend_hidden(badge))
+
+    def test_ordinary_layers_are_shown(self):
+        self.assertFalse(map_style.legend_hidden({'id': 'photos-layer'}))
+        self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': {'legend': {'name': 'x'}}}))
+        self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': None}))
+
+if __name__ == '__main__':
+    unittest.main()

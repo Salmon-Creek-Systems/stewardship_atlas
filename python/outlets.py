@@ -505,7 +505,10 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
         # Skip label layers - they'll be handled as children
         if layer_id.endswith('-label-layer'):
             continue
-            
+        # Sublayers that ride on another layer's entry (conversation badges)
+        if map_style.legend_hidden(layer):
+            continue
+
         # Check if this layer has a label layer
         layer_name = layer_id.replace('-layer', '')
         label_layer_id = f"{layer_name}-label-layer"

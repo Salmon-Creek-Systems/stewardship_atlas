@@ -329,3 +329,13 @@ def edit_page_layers(in_layers, edit_layer):
     show its own layer invites selecting another layer's look-alike features."""
     layers = list(in_layers or [])
     return layers if edit_layer in layers else layers + [edit_layer]
+
+
+def legend_hidden(style_layer):
+    """Whether a style layer asked to stay out of the legend.
+
+    Set on sublayers that belong to another layer's legend entry, like the
+    conversation badges. The legend control shows every id in its targets, so
+    this has to be honoured where the targets are built.
+    """
+    return bool(((style_layer.get('metadata') or {}).get('legend') or {}).get('hidden'))
