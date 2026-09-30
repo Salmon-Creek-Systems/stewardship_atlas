@@ -800,6 +800,44 @@
                             "public"
                         ]
                     },
+                    "buildings_count_h3_r10": {
+                        "geometry_type": "polygon",
+                        "display_name": "Building Density (medium)",
+                        "color": [
+                            120,
+                            120,
+                            120
+                        ],
+                        "fill_opacity": 0.6,
+                        "paint": {
+                            "fill-color": [
+                                "step",
+                                [
+                                    "get",
+                                    "buildings_count"
+                                ],
+                                "rgba(0,0,0,0)",
+                                1,
+                                "rgb(255,237,160)",
+                                2,
+                                "rgb(254,178,76)",
+                                4,
+                                "rgb(240,59,32)",
+                                8,
+                                "rgb(128,0,38)"
+                            ]
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {
+                                "name": "buildings_count",
+                                "type": "number"
+                            }
+                        ],
+                        "access": [
+                            "public"
+                        ]
+                    },
                     "buildings_count_h3_r11": {
                         "geometry_type": "polygon",
                         "display_name": "Building Density (fine)",
@@ -1067,6 +1105,15 @@
                             "buildings"
                         ],
                         "out_layer": "buildings_count_h3_r8"
+                    },
+                    "buildings_count_h3_r10": {
+                        "type": "eddy",
+                        "config_def": "h3_count",
+                        "resolution": 10,
+                        "in_layers": [
+                            "buildings"
+                        ],
+                        "out_layer": "buildings_count_h3_r10"
                     },
                     "buildings_count_h3_r11": {
                         "type": "eddy",
@@ -1515,6 +1562,7 @@
                             "canopy_height_lidar",
                             "mtbs",
                             "buildings_count_h3_r8",
+                            "buildings_count_h3_r10",
                             "buildings_count_h3_r11",
                             "canopy_height_lidar_h3_r9",
                             "inaturalist_threatened_count_h3_r9",
