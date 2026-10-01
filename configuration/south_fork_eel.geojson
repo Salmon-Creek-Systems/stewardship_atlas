@@ -1085,6 +1085,10 @@
                             {
                                 "name": "understory_lai_2018",
                                 "type": "number"
+                            },
+                            {
+                                "name": "data_note",
+                                "type": "string"
                             }
                         ],
                         "icon-size": 1.33,
