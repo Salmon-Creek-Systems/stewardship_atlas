@@ -29,6 +29,7 @@ import duckdb
 import versioning
 import utils
 import eddies
+import reshape
 import utils
 
 # Configure logging
@@ -307,6 +308,21 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
                     for k, v in delta_by_id[fid]['properties'].items():
                         if k != 'atlas_id' and v is not None:
                             feature.setdefault('properties', {})[k] = v
+            with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
+                geojson.dump(FeatureCollection(features=layer['features']), outfile)
+            filepath.rename(filepath.parent / 'work' / filepath.name)
+
+        # ID-based geometry replacement (webedit Reshape) — properties untouched
+        elif action == "reshape":
+            with open(layer_filepath, mode="rt") as infile:
+                layer = geojson.load(infile)
+            with open(filepath, mode="rt") as infile:
+                delta = geojson.load(infile)
+            polygon_shape = layer_polygon_shape(config, layer_name)
+            shape_fn = ((lambda f: utils.shape_feature(f, polygon_shape))
+                        if polygon_shape != 'raw' else None)
+            reshaped, skipped = reshape.apply_reshape(layer['features'], delta['features'], shape_fn)
+            logger.info(f"Reshape delta {filepath}: {len(reshaped)} reshaped, {len(skipped)} skipped")
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
                 geojson.dump(FeatureCollection(features=layer['features']), outfile)
             filepath.rename(filepath.parent / 'work' / filepath.name)

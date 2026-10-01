@@ -217,72 +217,8 @@ map.on('load', () => {
     // Initialize enhanced progress tracking
     const updateProgress = initializeProgressTracking(map, 5); // hillshade + 4 basemaps
 
-    // Add sources
-    map.addSource('satellite', SATELLITE_SOURCE);
-    map.addSource('usgs', USGS_SOURCE);
-    map.addSource('terrain', TERRAIN_SOURCE);
-    map.addSource('shaded-relief', SHADED_RELIEF_SOURCE);
-
-    // Add layers before the first existing layer to ensure they're at the bottom
-    map.addLayer({
-        'id': 'satellite-layer',
-        'type': 'raster',
-        'source': 'satellite',
-        'layout': {
-            'visibility': 'none'
-        }
-    }, firstLayerId);
-
-    map.addLayer({
-        'id': 'usgs-layer',
-        'type': 'raster',
-        'source': 'usgs',
-        'layout': {
-            'visibility': 'none'
-        }
-    }, firstLayerId);
-
-    map.addLayer({
-        'id': 'terrain-layer',
-        'type': 'raster',
-        'source': 'terrain',
-        'layout': {
-            'visibility': 'none'
-        }
-    }, firstLayerId);
-
-    map.addLayer({
-        'id': 'shaded-relief-layer',
-        'type': 'raster',
-        'source': 'shaded-relief',
-        'layout': {
-            'visibility': 'none'
-        }
-    }, firstLayerId);
-
-    // Initialize basemap switching
-    initializeBasemapSwitching(map);
-
+    addEditBasemaps(map, firstLayerId);
     addSelectionHighlightLayers();
-
-    // Show the basemap matching the dropdown's initial selection on load.
-    // Without this, all basemaps start hidden and only switch on a dropdown
-    // 'change' event, leaving the edit map blank until the user interacts
-    // (mirrors webmap.js behavior; see issue #134).
-    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer',
-                                'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
-    allBasemapLayerIds.forEach(id => {
-        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch (e) {}
-    });
-    const basemapValueToLayer = {
-        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
-        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
-        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
-    };
-    const initialBasemap = document.getElementById('basemap-select').value;
-    if (basemapValueToLayer[initialBasemap] && map.getLayer(basemapValueToLayer[initialBasemap])) {
-        map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
-    }
 
     // Initialize help popup
     const helpContent = `

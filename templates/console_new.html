@@ -993,11 +993,12 @@ function initializePage(data) {
                 actions.appendChild(makeLayerDropdown('Refresh', entries));
             })(item.name, item.has_rebuild);
 
-            // Alter: Draw, Edit, Style
+            // Alter: Draw, Edit, Reshape, Style
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Alter', [
                     { type: 'link', href: '../../webedit/' + name + '_create.html', text: 'Draw' },
                     { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' },
+                    { type: 'link', href: '../../webedit/' + name + '_reshape.html', text: 'Reshape' },
                     { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } }
                 ]));
             })(item.name);

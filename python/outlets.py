@@ -936,6 +936,19 @@ def candidate_move_targets(config: dict, source_layer_name: str) -> list:
     ]
 
 
+# Reshape pages edit one existing feature's geometry: no attribute form, no
+# selection polygon — click a feature, drag its vertices, save or cancel.
+RESHAPE_CONTROLS_HTML = """
+        <p id="reshape-status" class="selection-hint">Click a feature to reshape it.</p>
+        <p class="selection-hint">Drag vertices to move them, drag a midpoint to add one,
+            right-click a vertex to delete it. Drag inside the feature to move it whole.</p>
+        <div class="button-group">
+            <button id="reshape-cancel-button" class="warning-button" disabled>Cancel</button>
+            <button id="reshape-save-button" class="button" disabled>Save Shape</button>
+        </div>
+    """
+
+
 def generate_edit_controls_html(editable_attributes, geometry_type='point', action='create'):
     """Generate HTML for edit controls based on attribute configuration.
 
@@ -943,6 +956,9 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point', acti
     #selection-panel, which edit_map.js fills with the properties of the
     features the drawn polygon selects.
     """
+    if action == 'reshape':
+        return RESHAPE_CONTROLS_HTML
+
     select_html = ""
     string_html = ""
     
@@ -1062,7 +1078,8 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         controls_config=json.dumps(controls_config),
         legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2),
         lidar_basemap_option=lidar_basemap_option,
-        move_targets=json.dumps(move_targets))
+        move_targets=json.dumps(move_targets),
+        edit_script='reshape_map.js' if action == 'reshape' else 'edit_map.js')
 
 def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
@@ -1095,7 +1112,7 @@ def outlet_webmap_edit(config: dict, name: str):
             shown_already = ea['name'] in in_layers and ea['name'] not in hidden_layers
             page_map_config = (map_config if shown_already
                                else webmap_json(config, name, sprite_json, edit_layer=ea['name']))
-            for action in ['create', 'annotate']:
+            for action in ['create', 'annotate', 'reshape']:
                 html_content = generate_edit_page(config, ea, name, page_map_config, action)
                 output_path = webedit_dir /   f"{ea['name']}_{action}.html"
                 logger.debug(f"Generated WEBEDIT for {ea} | {action} into {output_path}")            

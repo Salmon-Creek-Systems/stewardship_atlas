@@ -49,9 +49,14 @@ DEFAULT_MATERIALIZERS = (
 
 ### Deltas
 
-Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Two actions:
+Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Actions:
 - `"create"` — append new features
-- `"annotate"` — update properties on existing features
+- `"annotate"` — update properties on existing features (spatial: features the drawn polygon intersects)
+- `"match"` — update properties by `atlas_id`
+- `"reshape"` — replace geometry by `atlas_id`, properties untouched (webedit Reshape page; `python/reshape.py`)
+- `"delete"` — remove features the drawn polygon intersects
+
+`atlas_id` is stable: it lives in the layer file, an update applies deltas on top of it, and a rebuild re-runs inlets without replaying archived `work/` deltas.
 
 Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
 
