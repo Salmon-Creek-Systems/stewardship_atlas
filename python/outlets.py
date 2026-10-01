@@ -3170,6 +3170,10 @@ This is a minimal notebook intended as a starting point for working with a speci
   * web edit
   * html console
   * sql query
+
+The other notebooks in this directory are worked examples of offline analyses whose results feed
+the atlas (e.g. `raster_derivations.ipynb`, `lidar_analyses.ipynb`). They come from
+`templates/notebooks/` in the repo and are refreshed every time this outlet is materialized.
 """))
     
     python_path = str(versioning.atlas_path(config, version='app') / 'python')
@@ -3208,11 +3212,19 @@ atlas.materialize(c, 'webedit')
 
     
 
-    nb_path = versioning.atlas_path(config) / 'outlets' / 'notebook'/ f"{outlet_name}-{config['name']}.ipynb"
+    nb_dir = versioning.atlas_path(config) / 'outlets' / 'notebook'
+    nb_dir.mkdir(parents=True, exist_ok=True)
+    nb_path = nb_dir / f"{outlet_name}-{config['name']}.ipynb"
     with open(nb_path, 'w', encoding='utf-8') as f:
         nbformat.write(notebook, f)
     print(f"Notebook: wrote to {nb_path}...")
-    
+
+    # Worked-example analysis notebooks ship with every atlas. Overwritten on each
+    # materialize: templates/notebooks/ in the repo is their source of truth.
+    for template in sorted((versioning.atlas_path(config, version='app') / 'templates' / 'notebooks').glob('*.ipynb')):
+        shutil.copy(template, nb_dir / template.name)
+        print(f"Notebook: copied {template.name}")
+
 
 def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""

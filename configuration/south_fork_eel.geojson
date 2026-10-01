@@ -1049,6 +1049,182 @@
                                 "name": "name",
                                 "type": "string",
                                 "default": ""
+                            },
+                            {
+                                "name": "mtbs_severity",
+                                "type": "string"
+                            },
+                            {
+                                "name": "gedi_years",
+                                "type": "string"
+                            },
+                            {
+                                "name": "gedi_source",
+                                "type": "string"
+                            },
+                            {
+                                "name": "gedi_notes",
+                                "type": "string"
+                            },
+                            {
+                                "name": "gedi_rh25_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh50_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh75_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh95_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh100_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_cover_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_fhd_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_ground_elev_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_0_10_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_10_20_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_20_30_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_30_40_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_ground_elev_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_slope_deg_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_p50_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_p95_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_max_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_cover_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_ladder_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_returns_2009",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh25_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh50_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh75_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh95_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_rh100_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_cover_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_fhd_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_ground_elev_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_0_10_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_10_20_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_20_30_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "gedi_lai_30_40_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_ground_elev_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_slope_deg_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_p50_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_p95_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_max_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_cover_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_ladder_2018",
+                                "type": "number"
+                            },
+                            {
+                                "name": "als_returns_2018",
+                                "type": "number"
                             }
                         ],
                         "icon-size": 1.33,
@@ -1056,7 +1232,8 @@
                             "layout": {
                                 "visibility": "visible"
                             }
-                        }
+                        },
+                        "show_attributes": true
                     }
                 },
                 "assets": {
