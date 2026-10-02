@@ -1825,6 +1825,7 @@
                         "regions_layer": "regions",
                         "base_url": "individual_pages",
                         "concat_pdf": true,
+                        "multipage_pdf": false,
                         "feature_scale": 0.5,
                         "blend_percent": 50,
                         "in_layers": [
