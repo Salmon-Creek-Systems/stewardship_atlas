@@ -1653,7 +1653,8 @@
                                 "internal",
                                 "admin"
                             ]
-                        }
+                        },
+                        "show_user_location": true
                     },
                     "webedit": {
                         "type": "outlet",
