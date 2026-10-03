@@ -304,7 +304,20 @@ map.on('load', async () => {
     }
 
     // Add legend after all layers exist (including dynamically-added COG layers)
-    map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
+    const legendControl = new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false, title: 'Visibility'});
+    map.addControl(legendControl, 'bottom-left');
+
+    // Move the basemap picker into the Visibility panel, under its title. Moving the
+    // node keeps the change listener initializeBasemapSwitching already attached.
+    const basemapControl = document.getElementById('basemap-control');
+    const legendTitle = legendControl.legendContainer &&
+        legendControl.legendContainer.querySelector('.maplibregl-legend-title-label');
+    if (basemapControl && legendTitle) {
+        // The title is followed by a <br>; insert after it so the picker sits on its own line.
+        const anchor = legendTitle.nextSibling || legendTitle;
+        anchor.after(basemapControl);
+    }
+    if (basemapControl) basemapControl.style.display = '';
 
     // layers we need to load dynamically follow:
     // {dynamic_layers}
@@ -312,7 +325,7 @@ map.on('load', async () => {
     // Add click handler for features and coordinates
     map.on('click', (e) => {
         if (e.originalEvent.metaKey || e.originalEvent.altKey || e.originalEvent.ctrlKey) {
-            handleLocationShare(e.lngLat, true);
+            openSharePopup(e.lngLat, true);
             return;
         }
 
@@ -331,6 +344,14 @@ map.on('load', async () => {
                 window.open(url, '_blank');
                 return;
             }
+        }
+    });
+
+    // On a Mac, Ctrl-click is delivered as a right-click (contextmenu), not a click.
+    map.on('contextmenu', (e) => {
+        if (e.originalEvent.ctrlKey) {
+            e.originalEvent.preventDefault();
+            openSharePopup(e.lngLat, true);
         }
     });
 
@@ -515,7 +536,7 @@ map.on('load', async () => {
             try {
                 // Convert screen coordinates directly to map coordinates
                 const lngLat = map.unproject([touchStartPos.x, touchStartPos.y]);
-                handleLocationShare(lngLat, true);
+                openSharePopup(lngLat, true);
             } catch (error) {
                 console.error('Error in coordinate conversion:', error);
             }
@@ -588,56 +609,83 @@ map.on('load', async () => {
         }
     });
 
-    // Function to handle location sharing. isPoint=true adds a marker for the recipient (alt-click use case).
-    function handleLocationShare(lngLat, isPoint = false) {
-        console.log('Location sharing triggered at:', lngLat);
-        
-        const coords = {
-            latitude: lngLat.lat,
-            longitude: lngLat.lng
-        };
-        
-        const format = document.getElementById('coords-format-select').value;
-        let textToCopy;
+    // Share pop-up. Every share route lands here: the Share button (map centre, view
+    // link) and modifier-click / long press (clicked point, link carries a pin marker).
+    // shareTarget holds what the pop-up is sharing while it is open.
+    const sharePopup = document.getElementById('share-popup');
+    const shareFormatSelect = document.getElementById('share-format-select');
+    const shareLinkText = document.getElementById('share-link-text');
+    let shareTarget = null;
 
+    function buildShareText(lngLat, isPoint, format) {
         if (format === 'json') {
-            textToCopy = JSON.stringify(coords, null, 2);
-        } else if (format === 'google') { // Google Maps link with pin
-            textToCopy = `https://www.google.com/maps?q=${lngLat.lat},${lngLat.lng}`;
-        } else if (format === 'internal') { // Internal map link
-            const basemap = document.getElementById('basemap-select').value;
-            const visibleLayers = [];
-            for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
-                // MapLibre returns undefined for layers whose visibility was never
-                // explicitly set; those are visible-by-default. Treat anything that
-                // isn't explicitly 'none' as visible so default-on layers are captured.
-                if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') !== 'none') {
-                    visibleLayers.push(layerName);
-                }
-            }
-            const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers, isPoint);
-            textToCopy = `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
+            return JSON.stringify({latitude: lngLat.lat, longitude: lngLat.lng}, null, 2);
         }
-        
-        console.log('Text to copy:', textToCopy);
-        
-        // Try to copy to clipboard (works for desktop Alt+click)
+        if (format === 'google') {
+            return `https://www.google.com/maps?q=${lngLat.lat},${lngLat.lng}`;
+        }
+        // Internal map link
+        const basemap = document.getElementById('basemap-select').value;
+        const visibleLayers = [];
+        for (const [layerId, layerName] of Object.entries(LEGEND_TARGETS)) {
+            // MapLibre returns undefined for layers whose visibility was never
+            // explicitly set; those are visible-by-default. Treat anything that
+            // isn't explicitly 'none' as visible so default-on layers are captured.
+            if (map.getLayer(layerId) && map.getLayoutProperty(layerId, 'visibility') !== 'none') {
+                visibleLayers.push(layerName);
+            }
+        }
+        const state = encodeMapState(lngLat.lat, lngLat.lng, map.getZoom(), basemap, visibleLayers, isPoint);
+        return `https://${window.location.hostname}${window.location.pathname}?s=${state}`;
+    }
+
+    function renderShareText() {
+        if (!shareTarget) return;
+        shareLinkText.value = buildShareText(shareTarget.lngLat, shareTarget.isPoint, shareFormatSelect.value);
+    }
+
+    function openSharePopup(lngLat, isPoint = false) {
+        shareTarget = {lngLat, isPoint};
+        shareFormatSelect.value = 'internal';  // always the default; the others are rarely wanted
+        document.getElementById('share-popup-title').textContent = isPoint ? 'Share pin' : 'Share view';
+        renderShareText();
+        sharePopup.style.display = 'flex';
+    }
+
+    shareFormatSelect.addEventListener('change', renderShareText);
+
+    document.getElementById('share-copy-btn').addEventListener('click', () => {
+        const textToCopy = shareLinkText.value;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy).then(() => {
-                console.log('Successfully copied to clipboard');
-                showSuccessNotification('Location copied to clipboard!');
+                sharePopup.style.display = 'none';
+                showSuccessNotification('Copied to clipboard!');
             }).catch(err => {
-                console.error('Failed to copy coordinates:', err);
-                // Fallback: show the text in an alert
-                alert(`Select, Copy, and Share:\n\n${textToCopy}`);
+                // Leave the pop-up open with the text selected so it can be copied by hand
+                console.error('Failed to copy to clipboard:', err);
+                shareLinkText.select();
+                showErrorPopup('Could not copy automatically &mdash; the link is selected in the share box; copy it from there.');
             });
         } else {
-            // Fallback for browsers that don't support clipboard API
-            console.log('Clipboard API not supported, showing alert');
-            alert(`Select, Copy, and Share:\n\n${textToCopy}`);
+            shareLinkText.select();
+            showErrorPopup('Clipboard not available &mdash; the link is selected in the share box; copy it from there.');
         }
-    }
-    
+    });
+
+    // Share pop-up and go-to pop-up close on their x, a backdrop click, or Escape
+    document.querySelectorAll('.map-popup').forEach(popup => {
+        popup.addEventListener('click', (e) => {
+            if (e.target === popup || e.target.hasAttribute('data-close-popup')) {
+                popup.style.display = 'none';
+            }
+        });
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.map-popup').forEach(popup => { popup.style.display = 'none'; });
+        }
+    });
+
     // Function to go to location
     async function goToLocation() {
         const input = document.getElementById('location-input').value.trim();
@@ -664,14 +712,17 @@ map.on('load', async () => {
         window.location.href = url;
     }
     
-    // Share button — same formats as alt-click point share, but using map center as coordinates
-    const shareViewBtn = document.getElementById('share-view-btn');
-    if (shareViewBtn) {
-        shareViewBtn.addEventListener('click', () => {
-            const center = map.getCenter();
-            handleLocationShare(center);
-        });
-    }
+    // Share button — same pop-up as modifier-click, but a view link from the map centre (no pin)
+    document.getElementById('share-view-btn').addEventListener('click', () => {
+        openSharePopup(map.getCenter());
+    });
+
+    // Go to button — opens the go-to pop-up
+    const gotoPopup = document.getElementById('goto-popup');
+    document.getElementById('goto-btn').addEventListener('click', () => {
+        gotoPopup.style.display = 'flex';
+        document.getElementById('location-input').focus();
+    });
 
     // Regions dropdown — each option is the region's stored webmap_url. Its ?s=
     // view is opened on *this* page, so the staging, CURRENT or experimental map

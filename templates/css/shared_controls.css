@@ -446,3 +446,70 @@
 .prop-empty {
     color: #aaa;
 }
+
+/* Webmap sharing panel: Share and Go to side by side, each opening a pop-up */
+.sharing-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.sharing-button-cell {
+    flex: 1;
+    text-align: center;
+}
+
+.sharing-button-cell .button {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sharing-hint {
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+}
+
+/* Share / go-to pop-ups (reuse the help-popup modal) */
+.map-popup .help-body label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.map-popup .input-field {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+
+.map-popup textarea.input-field {
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+.map-popup .help-body .button {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px;
+}
+
+/* Basemap picker, once moved into the Visibility (legend) panel */
+.maplibregl-legend-list .basemap-control {
+    margin: 4px 0 6px 0;
+}
+
+.maplibregl-legend-list .basemap-control label {
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.maplibregl-legend-list .basemap-control select {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 2px 4px;
+    margin: 2px 0 0 0;
+}
