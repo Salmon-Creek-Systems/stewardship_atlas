@@ -513,3 +513,65 @@
     padding: 2px 4px;
     margin: 2px 0 0 0;
 }
+
+/* Webmap header row: atlas name, QR, Home/3D/? and the collapse toggle on one line.
+   Fixed px sizes: the panel inherits a large base font from console.css. */
+.webmap-controls .header-row {
+    gap: 6px;
+    padding: 6px 8px;
+}
+
+.webmap-controls .header-row h4 {
+    min-width: 0;
+    text-align: left;
+    font-size: 15px;
+    line-height: 1.2;  /* a long name wraps onto a second line */
+}
+
+.webmap-controls .header-row .qr-toggle {
+    font-size: 11px;
+}
+
+.webmap-controls .header-links {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.webmap-controls .header-link {
+    font-size: 12px;
+    padding: 2px 6px;
+    border: 1px solid #bbb;
+    border-radius: 3px;
+    background: #e8e8e8;
+    color: #333;
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+.webmap-controls .header-link:hover {
+    background: #d4d4d4;
+}
+
+.webmap-controls #help-link {
+    font-size: 12px;
+    color: #007bff;
+}
+
+/* Collapsed: hide everything but the toggle, which stays at the top-right.
+   #controls in the selector so it outranks the base #controls width/background. */
+#controls.webmap-controls.collapsed {
+    width: auto;
+    padding: 0;
+    background: none;
+}
+
+#controls.webmap-controls.collapsed .header-row {
+    padding: 4px 8px;
+    margin: 0;
+    background: rgba(255, 255, 255, 0.85);
+}
+
+#controls.webmap-controls.collapsed .header-row > :not(#nav-collapse-btn) {
+    display: none;
+}

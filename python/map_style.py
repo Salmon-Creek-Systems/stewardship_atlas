@@ -322,6 +322,21 @@ def regions_panel_html(features):
             '            </div>')
 
 
+# atlas.DEFAULT_CONFIG's description, which every atlas created without one inherits.
+PLACEHOLDER_DESCRIPTION = "Underscripted"
+
+
+def atlas_display_name(config):
+    """The atlas's human-readable name, for page titles and headers.
+
+    /create stores the name the user typed as `description`; atlases without one
+    (or with the DEFAULT_CONFIG placeholder) fall back to the slug, `name`."""
+    description = (config.get('description') or '').strip()
+    if description and description != PLACEHOLDER_DESCRIPTION:
+        return description
+    return config.get('name', '')
+
+
 def edit_page_layers(in_layers, edit_layer):
     """An edit page's layers: the outlet's, with the layer being edited drawn
     on top when the outlet leaves it out. Every editable layer gets an edit

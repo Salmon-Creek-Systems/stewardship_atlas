@@ -14,11 +14,16 @@
 
 </head>
 <body>
-    <div id="controls" class="loading">
-        <!-- Title Panel -->
-        <div class="control-panel title-panel">
+    <div id="controls" class="webmap-controls loading">
+        <!-- Header row: atlas name, QR, nav links and the collapse toggle -->
+        <div class="control-panel title-panel header-row">
             <h4>{title}</h4>
             {qr_code}
+            <nav class="header-links">
+                <a href="../html/admin" class="header-link">Home</a>
+                <a href="../3dview/" class="header-link">3D</a>
+                <a href="#" class="header-link" id="help-link">?</a>
+            </nav>
             <button id="nav-collapse-btn" class="nav-collapse-btn" title="Collapse panel">▾</button>
         </div>
 
@@ -43,12 +48,6 @@
                 </div>
             </div>
 
-            <!-- Navigation Panel -->
-            <div class="control-panel nav-panel">
-                <a href="../html/admin" class="button link-button">Home</a>
-                <a href="../3dview/" class="button link-button">3D</a>
-                <a href="#" class="button link-button" id="help-link">?</a>
-            </div>
         </div>
     </div>
     <div id="map"></div>
@@ -61,6 +60,7 @@
             <option value="satellite">Satellite (ESRI)</option>
             <option value="terrain">OpenMapTiles Terrain</option>
             <option value="shaded-relief">USGS Shaded Relief (WMS)</option>
+            <option value="none">None</option>
         </select>
     </div>
 

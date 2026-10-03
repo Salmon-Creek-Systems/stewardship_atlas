@@ -7,7 +7,7 @@
 
 ## Layer Management
 - **control layer visibility** in the Visibility box
-- **select basemap** with the dropdown at the top of the Visibility box
+- **select basemap** with the dropdown at the top of the Visibility box (choose **None** to hide it)
 
 ## Location Sharing
 - **Share** shares the current view; **Ctrl/⌘+click** on the map shares a pin at that spot

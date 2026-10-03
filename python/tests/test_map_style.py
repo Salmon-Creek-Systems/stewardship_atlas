@@ -411,5 +411,26 @@ class TestLegendHidden(unittest.TestCase):
         self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': {'legend': {'name': 'x'}}}))
         self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': None}))
 
+
+class TestAtlasDisplayName(unittest.TestCase):
+    """atlas_display_name: the /create name (stored as description), else the slug."""
+
+    def test_description_is_used(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'king_range', 'description': 'King Range'}),
+            'King Range')
+
+    def test_missing_description_falls_back_to_slug(self):
+        self.assertEqual(map_style.atlas_display_name({'name': 'kennedy'}), 'kennedy')
+
+    def test_blank_description_falls_back_to_slug(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'kennedy', 'description': '  '}), 'kennedy')
+
+    def test_default_config_placeholder_falls_back_to_slug(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'scvfd', 'description': 'Underscripted'}), 'scvfd')
+
+
 if __name__ == '__main__':
     unittest.main()
