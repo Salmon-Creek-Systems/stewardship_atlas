@@ -371,6 +371,11 @@ class TestRegionsPanel(unittest.TestCase):
         self.assertIn('&lt;b&gt;', out)
         self.assertIn('&amp;b=&quot;2&quot;', out)
 
+    def test_dropdown_is_named_preset_views_with_no_separate_label(self):
+        out = map_style.regions_panel_html([self._feature('A', 'u')])
+        self.assertIn('<option value="">Preset Views</option>', out)
+        self.assertNotIn('<label', out)
+
     def test_panel_has_no_format_braces(self):
         # generate_map_page substitutes it into a str.format template.
         out = map_style.regions_panel_html([self._feature('A', 'u')])

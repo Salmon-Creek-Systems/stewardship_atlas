@@ -319,6 +319,17 @@ map.on('load', async () => {
     }
     if (basemapControl) basemapControl.style.display = '';
 
+    // Collapse toggle, matching the nav panel's: the library's close button becomes
+    // ▾ and the button it shows while collapsed becomes ▸ (in place of its legend icon).
+    if (legendControl.closeButton) {
+        legendControl.closeButton.textContent = '▾';
+        legendControl.closeButton.title = 'Collapse panel';
+    }
+    if (legendControl.legendButton) {
+        legendControl.legendButton.textContent = '▸';
+        legendControl.legendButton.title = 'Expand panel';
+    }
+
     // layers we need to load dynamically follow:
     // {dynamic_layers}
 

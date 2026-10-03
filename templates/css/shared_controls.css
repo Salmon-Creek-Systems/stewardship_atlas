@@ -562,14 +562,39 @@
    #controls in the selector so it outranks the base #controls width/background. */
 #controls.webmap-controls.collapsed {
     width: auto;
-    padding: 0;
-    background: none;
+    background: none !important;  /* beats the shared #controls.collapsed !important */
+    /* padding kept, so the toggle doesn't move */
 }
 
 #controls.webmap-controls.collapsed .header-row {
-    padding: 4px 8px;
     margin: 0;
     background: rgba(255, 255, 255, 0.85);
+}
+
+/* Sit below MapLibre's top-right controls (e.g. Go to current location) */
+#controls.webmap-controls {
+    top: 40px;
+    right: 0;
+}
+
+/* Visibility panel collapse toggle: the legend library's close / reopen buttons
+   restyled as the nav panel's ▾ / ▸ */
+.maplibregl-legend-list .maplibregl-legend-close-button {
+    font-size: 16px;
+    color: #666;
+    padding: 5px 6px 0 0;
+}
+
+.maplibregl-ctrl-group button.maplibregl-legend-switcher {
+    background-image: none;
+    font-size: 16px;
+    color: #666;
+    line-height: 1;
+}
+
+.maplibregl-legend-list .maplibregl-legend-close-button:hover,
+.maplibregl-ctrl-group button.maplibregl-legend-switcher:hover {
+    color: #000;
 }
 
 #controls.webmap-controls.collapsed .header-row > :not(#nav-collapse-btn) {
