@@ -34,17 +34,11 @@
                 "name": "south_fork_eel",
                 "description": "south_fork_eel",
                 "app_url": "https://fireatlas.org:9000",
-                "versioned_outlets": [
-                    "html",
-                    "webmap"
-                ],
+                "versioned_outlets": [],
                 "default_h3_resolution": 9,
                 "email_photo_default_layer": "photos",
                 "cloud": {
-                    "outlets": [
-                        "webmap",
-                        "html"
-                    ]
+                    "outlets": ["webmap", "console"]
                 },
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data",
@@ -1753,37 +1747,6 @@
                     },
                     "console": {
                         "config_def": "console"
-                    },
-                    "html": {
-                        "type": "outlet",
-                        "name": "html",
-                        "config_def": "static_html",
-                        "access": [
-                            "public",
-                            "internal",
-                            "admin",
-                            "technical"
-                        ],
-                        "config": {
-                            "asset_type": "outlet",
-                            "fetch_type": "html",
-                            "interaction": "backend",
-                            "attribution": {
-                                "url": "https://portal.opentopography.org/api/terms",
-                                "description": "Open Topography's Global DEM",
-                                "license": "https://portal.opentopography.org/api/terms",
-                                "citation": "https://portal.opentopography.org/api/terms"
-                            },
-                            "type": "outlet",
-                            "name": "html",
-                            "config_def": "static_html",
-                            "access": [
-                                "public",
-                                "internal",
-                                "admin",
-                                "technical"
-                            ]
-                        }
                     },
                     "notebook": {
                         "type": "outlet",

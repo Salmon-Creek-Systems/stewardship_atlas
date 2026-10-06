@@ -1,0 +1,1031 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.995650554,
+              40.214832473
+            ],
+            [
+              -123.954058441,
+              40.214832473
+            ],
+            [
+              -123.954058441,
+              40.253395301
+            ],
+            [
+              -123.995650554,
+              40.253395301
+            ],
+            [
+              -123.995650554,
+              40.214832473
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "nfsc_refugia",
+        "description": "NFSC_refugia",
+        "app_url": "https://fireatlas.org:9000",
+        "versioned_outlets": [],
+        "default_h3_resolution": 11,
+        "data_root": "/root/swales_dev",
+        "shared_dir": "/root/data",
+        "base_url": "https://fireatlas.org/nfsc_refugia",
+        "port": 9000,
+        "admin_emails": [],
+        "logo_url": "",
+        "cloud": {"outlets": ["webmap", "console", "3dview"]},
+        "layers": {
+          "regions": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              50,
+              50
+            ],
+            "fill_opacity": 0.3,
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "roads": {
+            "geometry_type": "linestring",
+            "color": [
+              20,
+              20,
+              20
+            ],
+            "add_labels": true,
+            "label_color": [
+              220,
+              0,
+              0
+            ],
+            "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
+            "interaction": "interface",
+            "vector_width": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Road"
+              },
+              {
+                "name": "STREETTYPE",
+                "type": "radio",
+                "values": [
+                  {
+                    "STREETTYPE": "RD",
+                    "vector_width": 15
+                  },
+                  {
+                    "STREETTYPE": "ST",
+                    "vector_width": 10
+                  },
+                  {
+                    "STREETTYPE": "Other",
+                    "vector_width": 8
+                  }
+                ],
+                "default": {
+                  "STREETTYPE": "RD",
+                  "vector_width": 15
+                }
+              }
+            ]
+          },
+          "creeks": {
+            "geometry_type": "linestring",
+            "add_labels": true,
+            "color": [
+              50,
+              50,
+              200
+            ],
+            "interaction": "interface",
+            "vector_width": true,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "landmarks": {
+            "geometry_type": "point",
+            "color": [
+              20,
+              155,
+              200
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "inaturalist": {
+            "geometry_type": "point",
+            "color": [
+              0,
+              180,
+              100
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "show_attributes": true,
+            "symbol": {
+              "png": "flower.png",
+              "icon": "flower"
+            },
+            "icon-size": 1.5,
+            "vis": {
+              "minzoom": 10
+            },
+            "label_minzoom": 16,
+            "editable_columns": [
+              {
+                "name": "common_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "taxon_name",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "iconic_taxon",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "observed_on",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "username",
+                "type": "string",
+                "default": ""
+              },
+              {
+                "name": "quality_grade",
+                "type": "string",
+                "default": ""
+              }
+            ]
+          },
+          "canopy_density": {
+            "geometry_type": "raster",
+            "cog": true,
+            "cog_color": "BrewerBuGn9,0,50,c",
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "raster-opacity": 0.7
+            }
+          },
+          "ladder_fuel_density": {
+            "geometry_type": "raster",
+            "cog": true,
+            "cog_color": "BrewerOrRd9,0,20,c",
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "raster-opacity": 0.7
+            }
+          },
+          "landfire_evc": {
+            "geometry_type": "raster",
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "raster-opacity": 0.5
+            }
+          },
+          "landfire_evt": {
+            "geometry_type": "raster",
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "raster-opacity": 0.5
+            }
+          },
+          "terrain_dem": {
+            "geometry_type": "raster"
+          },
+          "basemap": {
+            "geometry_type": "raster"
+          },
+          "hillshade_tiles": {
+            "geometry_type": "raster"
+          },
+          "roads_index": {
+            "geometry_type": "polygon",
+            "color": [
+              100,
+              55,
+              50
+            ],
+            "fill_color": [
+              100,
+              55,
+              50
+            ],
+            "fill_opacity": 0.3,
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            }
+          },
+          "creeks_index": {
+            "geometry_type": "polygon",
+            "color": [
+              50,
+              55,
+              255
+            ],
+            "fill_color": [
+              50,
+              55,
+              255
+            ],
+            "fill_opacity": 0.3,
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            }
+          },
+          "burns_index": {
+            "geometry_type": "polygon",
+            "color": [
+              200,
+              55,
+              55
+            ],
+            "fill_color": [
+              200,
+              55,
+              55
+            ],
+            "fill_opacity": 0.3,
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            }
+          },
+          "processing_sites_index": {
+            "geometry_type": "polygon",
+            "color": [
+              128,
+              0,
+              128
+            ],
+            "fill_color": [
+              128,
+              0,
+              128
+            ],
+            "fill_opacity": 0.3,
+            "vis": {
+              "layout": {
+                "visibility": "none"
+              }
+            }
+          },
+          "burns": {
+            "geometry_type": "polygon",
+            "color": [
+              155,
+              5,
+              5
+            ],
+            "fill_color": [
+              255,
+              50,
+              50
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "fill_opacity": 0.4,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Treatment Area"
+              }
+            ]
+          },
+          "processing_sites": {
+            "geometry_type": "point",
+            "color": [
+              128,
+              0,
+              128
+            ],
+            "add_labels": true,
+            "interaction": "interface",
+            "access": [
+              "admin"
+            ],
+            "label_minzoom": 16,
+            "editable_columns": [
+              {
+                "name": "name",
+                "type": "string",
+                "default": "Processing Site"
+              }
+            ]
+          }
+        },
+        "assets": {
+          "console": {"type": "outlet", "name": "console", "config_def": "console"},
+          "public_roads": {
+            "type": "inlet",
+            "out_layer": "roads",
+            "config_def": "overture_roads",
+            "name": "public_roads",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "overture_duckdb",
+              "interaction": "import",
+              "data_type": "geojson",
+              "out_layer": "roads",
+              "color": [
+                110,
+                110,
+                255
+              ],
+              "inpath_template": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n",
+              "inpath_template_with_filter": "SET s3_region='us-west-2';\nSELECT\n  * EXCLUDE geometry, names.primary AS primary_name, ST_AsGeoJSON(ST_GeomFromWKB(geometry)) as geom\nFROM\n  read_parquet('s3://overturemaps-us-west-2/release/2026-08-19.0/theme=transportation/type=segment/*', filename=true, hive_partitioning=1)\nWHERE\n  bbox.xmin > {west}\n  AND bbox.xmax < {east}\n  AND bbox.ymin > {south}\n  AND bbox.ymax < {north}\n  AND\n  LIST_CONTAINS(['primary', 'secondary', 'tertiary', 'service', 'residential'], class)\n",
+              "outpath_template": "overture_roads.geojson",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "alterations": {
+                "canonicalize": [
+                  {
+                    "to": "name",
+                    "from": [
+                      "primary_name",
+                      "FULLRDNAME"
+                    ],
+                    "remove_prefix": []
+                  }
+                ],
+                "vector_width": {
+                  "attribute": "class",
+                  "map": {
+                    "primary": 15,
+                    "secondary": 11,
+                    "tertiary": 9
+                  },
+                  "default": 7
+                }
+              },
+              "type": "inlet",
+              "config_def": "overture_roads",
+              "name": "public_roads"
+            }
+          },
+          "public_creeks": {
+            "type": "inlet",
+            "out_layer": "creeks",
+            "config_def": "nhd_creeks",
+            "name": "public_creeks",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "local_ogr",
+              "interaction": "import",
+              "data_type": "geojson",
+              "name": "public_creeks",
+              "description": "External creek vector source",
+              "feature_type": "linestring",
+              "color": [
+                110,
+                110,
+                255
+              ],
+              "source_sublayer": "NHDFlowline",
+              "inpath_template": "NHD_H_California_State_GPKG.gpkg",
+              "geometry": "dataswale",
+              "alterations": {
+                "canonicalize": [
+                  {
+                    "to": "name",
+                    "from": [
+                      "gnis_name"
+                    ],
+                    "remove_prefix": []
+                  }
+                ],
+                "vector_width": {
+                  "attribute": "fcode_description",
+                  "map": {
+                    "Stream/River: Hydrographic Category = Ephemeral": 2,
+                    "Stream/River: Hydrographic Category = Perennial": 3,
+                    "Stream/River: Hydrographic Category = Intermittent": 1,
+                    "Artificial Path": 1
+                  },
+                  "default": 1
+                },
+                "filter": [
+                  [
+                    "remove",
+                    "fcode_description",
+                    []
+                  ]
+                ]
+              },
+              "attribution": {
+                "url": "https://www.usgs.gov/nhd",
+                "description": "USGS National Hydrography Dataset",
+                "license": "https://www.usgs.gov/nhd/license",
+                "citation": "USGS NHD"
+              },
+              "type": "inlet",
+              "out_layer": "creeks",
+              "config_def": "nhd_creeks"
+            }
+          },
+          "public_landmarks": {
+            "type": "inlet",
+            "out_layer": "landmarks",
+            "config_def": "osm_poi",
+            "name": "public_landmarks",
+            "config": {
+              "name": "public_landmarks",
+              "asset_type": "inlet",
+              "data_type": "geojson",
+              "feature_type": "point",
+              "add_labels": true,
+              "template": "node[\"natural\"]({south},{west},{north},{east});out geom",
+              "fetch_type": "fetch_osm",
+              "type": "inlet",
+              "out_layer": "landmarks",
+              "config_def": "osm_poi"
+            }
+          },
+          "inat_obs": {
+            "type": "inlet",
+            "out_layer": "inaturalist",
+            "config_def": "inaturalist",
+            "time_range": null,
+            "name": "inat_obs",
+            "config": {
+              "name": "inat_obs",
+              "asset_type": "inlet",
+              "fetch_type": "inaturalist",
+              "data_type": "geojson",
+              "feature_type": "point",
+              "regions": [],
+              "users": [],
+              "time_range": null,
+              "quality_grade": null,
+              "attribution": {
+                "url": "https://www.inaturalist.org",
+                "description": "iNaturalist observations",
+                "license": "CC BY-NC"
+              },
+              "type": "inlet",
+              "out_layer": "inaturalist",
+              "config_def": "inaturalist"
+            }
+          },
+          "canopy_density": {
+            "type": "inlet",
+            "out_layer": "canopy_density",
+            "config_def": "s3_geotiff",
+            "s3_bucket": "scs-internal",
+            "s3_key": "starters/foresthealth/canopy_density_2m.tif",
+            "name": "canopy_density",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "s3_raster",
+              "interaction": "import",
+              "data_type": "tiff",
+              "type": "inlet",
+              "out_layer": "canopy_density",
+              "config_def": "s3_geotiff",
+              "s3_bucket": "scs-internal",
+              "s3_key": "starters/foresthealth/canopy_density_2m.tif",
+              "name": "canopy_density"
+            }
+          },
+          "canopy_density_cog": {
+            "type": "eddy",
+            "config_def": "tiff_to_cog",
+            "in_layer": "canopy_density",
+            "out_layer": "canopy_density",
+            "name": "canopy_density_cog",
+            "config": {
+              "asset_type": "eddy",
+              "fetch_type": "tiff_to_cog",
+              "data_type": "tiff",
+              "type": "eddy",
+              "config_def": "tiff_to_cog",
+              "in_layer": "canopy_density",
+              "out_layer": "canopy_density",
+              "name": "canopy_density_cog"
+            }
+          },
+          "canopy_density_s3": {
+            "type": "outlet",
+            "config_def": "s3_upload",
+            "in_layer": "canopy_density",
+            "name": "canopy_density_s3",
+            "config": {
+              "asset_type": "outlet",
+              "fetch_type": "s3_upload",
+              "s3_bucket": "scs-atlas-data",
+              "type": "outlet",
+              "config_def": "s3_upload",
+              "in_layer": "canopy_density",
+              "name": "canopy_density_s3"
+            }
+          },
+          "ladder_fuel_density": {
+            "type": "inlet",
+            "out_layer": "ladder_fuel_density",
+            "config_def": "s3_geotiff",
+            "s3_bucket": "scs-internal",
+            "s3_key": "starters/foresthealth/ladder_fuel_density_2m.tif",
+            "name": "ladder_fuel_density",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "s3_raster",
+              "interaction": "import",
+              "data_type": "tiff",
+              "type": "inlet",
+              "out_layer": "ladder_fuel_density",
+              "config_def": "s3_geotiff",
+              "s3_bucket": "scs-internal",
+              "s3_key": "starters/foresthealth/ladder_fuel_density_2m.tif",
+              "name": "ladder_fuel_density"
+            }
+          },
+          "ladder_fuel_density_cog": {
+            "type": "eddy",
+            "config_def": "tiff_to_cog",
+            "in_layer": "ladder_fuel_density",
+            "out_layer": "ladder_fuel_density",
+            "name": "ladder_fuel_density_cog",
+            "config": {
+              "asset_type": "eddy",
+              "fetch_type": "tiff_to_cog",
+              "data_type": "tiff",
+              "type": "eddy",
+              "config_def": "tiff_to_cog",
+              "in_layer": "ladder_fuel_density",
+              "out_layer": "ladder_fuel_density",
+              "name": "ladder_fuel_density_cog"
+            }
+          },
+          "ladder_fuel_density_s3": {
+            "type": "outlet",
+            "config_def": "s3_upload",
+            "in_layer": "ladder_fuel_density",
+            "name": "ladder_fuel_density_s3",
+            "config": {
+              "asset_type": "outlet",
+              "fetch_type": "s3_upload",
+              "s3_bucket": "scs-atlas-data",
+              "type": "outlet",
+              "config_def": "s3_upload",
+              "in_layer": "ladder_fuel_density",
+              "name": "ladder_fuel_density_s3"
+            }
+          },
+          "landfire_evc": {
+            "type": "inlet",
+            "out_layer": "landfire_evc",
+            "config_def": "landfire_evc",
+            "name": "landfire_evc",
+            "config": {
+              "name": "landfire_evc",
+              "asset_type": "inlet",
+              "fetch_type": "fetch_url",
+              "interaction": "import",
+              "data_type": "tiff",
+              "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVC_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
+              "attribution": {
+                "url": "https://www.landfire.gov/",
+                "description": "LANDFIRE 2024 Existing Vegetation Cover (EVC) \u2014 percent canopy cover by lifeform",
+                "license": "Public Domain"
+              },
+              "type": "inlet",
+              "out_layer": "landfire_evc",
+              "config_def": "landfire_evc"
+            }
+          },
+          "landfire_evt": {
+            "type": "inlet",
+            "out_layer": "landfire_evt",
+            "config_def": "landfire_evt",
+            "name": "landfire_evt",
+            "config": {
+              "name": "landfire_evt",
+              "asset_type": "inlet",
+              "fetch_type": "fetch_url",
+              "interaction": "import",
+              "data_type": "tiff",
+              "inpath_template": "https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF2024/LF2024_EVT_CONUS/ImageServer/exportImage?bbox={west},{south},{east},{north}&bboxSR=4326&imageSR=4326&size=2048,2048&format=tiff&pixelType=S16&noDataInterpretation=esriNoDataMatchAny&f=image",
+              "attribution": {
+                "url": "https://www.landfire.gov/",
+                "description": "LANDFIRE 2024 Existing Vegetation Type (EVT) \u2014 vegetation community classification",
+                "license": "Public Domain"
+              },
+              "type": "inlet",
+              "out_layer": "landfire_evt",
+              "config_def": "landfire_evt"
+            }
+          },
+          "terrain_dem": {
+            "type": "inlet",
+            "out_layer": "terrain_dem",
+            "config_def": "terrain_dem",
+            "name": "terrain_dem",
+            "config": {
+              "asset_type": "inlet",
+              "fetch_type": "terrain_dem",
+              "interaction": "import",
+              "data_type": "tiff",
+              "inpath_template": "https://portal.opentopography.org/API/globaldem?demtype=COP30&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff&API_Key=b53534ba23d967feedbae2c7f85bfc4b",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "COP30 DEM expanded to tile-aligned bbox for terrain-RGB tiling"
+              },
+              "type": "inlet",
+              "out_layer": "terrain_dem",
+              "config_def": "terrain_dem",
+              "name": "terrain_dem"
+            }
+          },
+          "roads_h3": {
+            "type": "eddy",
+            "config_def": "h3_cells",
+            "in_layer": "roads",
+            "out_layer": "roads_index",
+            "starting_resolution": 11,
+            "name": "roads_h3",
+            "config": {
+              "type": "eddy",
+              "fetch_type": "h3_cells",
+              "in_layer": "roads",
+              "out_layer": "roads_index",
+              "starting_resolution": 11,
+              "algorithm": "max_num_cells",
+              "max_cells": 10,
+              "swap_coordinates": true,
+              "attribution": {
+                "url": "https://h3geo.org/",
+                "description": "H3 hexagonal hierarchical geospatial indexing system",
+                "license": "Apache 2.0",
+                "citation": "Uber H3"
+              },
+              "config_def": "h3_cells",
+              "name": "roads_h3"
+            }
+          },
+          "creeks_h3": {
+            "type": "eddy",
+            "config_def": "h3_cells",
+            "in_layer": "creeks",
+            "out_layer": "creeks_index",
+            "starting_resolution": 11,
+            "max_cells": 100,
+            "name": "creeks_h3",
+            "config": {
+              "type": "eddy",
+              "fetch_type": "h3_cells",
+              "in_layer": "creeks",
+              "out_layer": "creeks_index",
+              "starting_resolution": 11,
+              "algorithm": "max_num_cells",
+              "max_cells": 100,
+              "swap_coordinates": true,
+              "attribution": {
+                "url": "https://h3geo.org/",
+                "description": "H3 hexagonal hierarchical geospatial indexing system",
+                "license": "Apache 2.0",
+                "citation": "Uber H3"
+              },
+              "config_def": "h3_cells",
+              "name": "creeks_h3"
+            }
+          },
+          "derived_hillshade": {
+            "type": "eddy",
+            "in_layer": "terrain_dem",
+            "out_layer": "basemap",
+            "config_def": "derived_hillshade",
+            "name": "derived_hillshade",
+            "config": {
+              "name": "derived_hillshade",
+              "asset_type": "eddy",
+              "fetch_type": "derived_hillshade",
+              "data_type": "tiff",
+              "resample": 5000,
+              "intensity": 0.5,
+              "inpath_template": "/staging/dem.tiff",
+              "outpath_template": "/staging/hillshade.tiff",
+              "attribution": {
+                "url": "https://www.scvfd.fireatlas.org",
+                "description": "Hillshade derived from DEM",
+                "license": "https://www.scvfd.fireatlas.org",
+                "citation": "https://www.scvfd.fireatlas.org"
+              },
+              "type": "eddy",
+              "in_layer": "terrain_dem",
+              "out_layer": "basemap",
+              "config_def": "derived_hillshade"
+            }
+          },
+          "hillshade_tiles": {
+            "type": "eddy",
+            "in_layer": "basemap",
+            "out_layer": "hillshade_tiles",
+            "config_def": "hillshade_tiles",
+            "name": "hillshade_tiles",
+            "config": {
+              "asset_type": "eddy",
+              "fetch_type": "hillshade_tiles",
+              "data_type": "pmtiles",
+              "min_zoom": 8,
+              "max_zoom": 18,
+              "attribution": {
+                "description": "Hillshade raster tiles (PMTiles) for web map basemap"
+              },
+              "type": "eddy",
+              "in_layer": "basemap",
+              "out_layer": "hillshade_tiles",
+              "config_def": "hillshade_tiles",
+              "name": "hillshade_tiles"
+            }
+          },
+          "3dview": {
+            "type": "outlet",
+            "name": "3dview",
+            "config_def": "3dview",
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "3dview",
+              "fetch_type": "3dview",
+              "interaction": "interface",
+              "attribution": {
+                "description": "3D terrain view using MapLibre GL JS and terrain-RGB PMTiles"
+              },
+              "type": "outlet",
+              "config_def": "3dview",
+              "access": [
+                "public",
+                "internal",
+                "admin"
+              ]
+            }
+          },
+          "webmap": {
+            "show_user_location": true,
+            "type": "outlet",
+            "name": "webmap",
+            "config_def": "webmap",
+            "in_layers": [
+              "regions",
+              "roads",
+              "creeks",
+              "landmarks",
+              "inaturalist",
+              "landfire_evc",
+              "landfire_evt",
+              "canopy_density",
+              "ladder_fuel_density",
+              "roads_index",
+              "creeks_index",
+              "processing_sites_index",
+              "processing_sites"
+            ],
+            "access": [
+              "public",
+              "internal",
+              "admin"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "webmap",
+              "fetch_type": "webmap",
+              "interaction": "interface",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "default_view": "",
+              "type": "outlet",
+              "config_def": "webmap",
+              "in_layers": [
+                "regions",
+                "roads",
+                "creeks",
+                "landmarks",
+                "inaturalist",
+                "landfire_evc",
+                "landfire_evt",
+                "canopy_density",
+                "ladder_fuel_density",
+                "roads_index",
+                "creeks_index",
+                "processing_sites_index",
+                "processing_sites"
+              ],
+              "access": [
+                "public",
+                "internal",
+                "admin"
+              ]
+            }
+          },
+          "webedit": {
+            "type": "outlet",
+            "name": "webedit",
+            "config_def": "webedit",
+            "in_layers": [
+              "regions",
+              "roads",
+              "creeks",
+              "landmarks",
+              "processing_sites"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "webedit",
+              "fetch_type": "webedit",
+              "access": [
+                "admin"
+              ],
+              "interaction": "backend",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "type": "outlet",
+              "config_def": "webedit",
+              "in_layers": [
+                "regions",
+                "roads",
+                "creeks",
+                "landmarks",
+                "processing_sites"
+              ]
+            }
+          },
+          "notebook": {
+            "type": "outlet",
+            "name": "notebook",
+            "config_def": "jupyter_notebook",
+            "access": [
+              "technical"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "notebook",
+              "fetch_type": "jupyter_notebook",
+              "interaction": "interface",
+              "attribution": {
+                "url": "https://portal.opentopography.org/api/terms",
+                "description": "Open Topography's Global DEM",
+                "license": "https://portal.opentopography.org/api/terms",
+                "citation": "https://portal.opentopography.org/api/terms"
+              },
+              "type": "outlet",
+              "config_def": "jupyter_notebook",
+              "access": [
+                "technical"
+              ]
+            }
+          },
+          "sqldb": {
+            "type": "outlet",
+            "config_def": "sqldb",
+            "layers": [
+              "roads",
+              "creeks",
+              "burns",
+              "processing_sites"
+            ],
+            "name": "sqldb",
+            "config": {
+              "asset_type": "outlet",
+              "name": "sqldb",
+              "fetch_type": "sql_duckdb",
+              "type": "outlet",
+              "config_def": "sqldb",
+              "layers": [
+                "roads",
+                "creeks",
+                "burns",
+                "processing_sites"
+              ]
+            }
+          },
+          "sqlquery": {
+            "type": "outlet",
+            "name": "sqlquery",
+            "config_def": "sqlquery",
+            "access": [
+              "admin"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "sqlquery",
+              "fetch_type": "sqlquery",
+              "interaction": "interface",
+              "data_type": "html",
+              "access": [
+                "admin"
+              ],
+              "attribution": {
+                "url": "https://www.scvfd.fireatlas.org",
+                "description": "SQL Query Interface",
+                "license": "https://www.scvfd.fireatlas.org",
+                "citation": "https://www.scvfd.fireatlas.org"
+              },
+              "type": "outlet",
+              "config_def": "sqlquery"
+            }
+          },
+          "config_edit": {
+            "type": "outlet",
+            "name": "config_edit",
+            "config_def": "config_editor",
+            "interaction": "interface",
+            "access": [
+              "technical"
+            ],
+            "config": {
+              "asset_type": "outlet",
+              "name": "config_edit",
+              "fetch_type": "config_editor",
+              "interaction": "interface",
+              "access": [
+                "technical"
+              ],
+              "type": "outlet",
+              "config_def": "config_editor"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -8,19 +8,9 @@
                 "app_url": "https://fireatlas.org:9000",
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data/",
-                "versioned_outlets": [
-                    "html",
-                    "webmap",
-                    "private_webmap",
-                    "webedit",
-                    "gazetteer"
-                ],
+                "versioned_outlets": [],
                 "cloud": {
-                    "outlets": [
-                        "webmap",
-                        "html",
-                        "gazetteer"
-                    ]
+                    "outlets": ["webmap", "console", "gazetteer"]
                 },
                 "admin_emails": [
                     "gateless@gmail.com",
@@ -1119,6 +1109,7 @@
                         "config_def": "local_turnouts"
                     },
                     "webmap": {
+                        "show_user_location": true,
                         "type": "outlet",
                         "name": "webmap",
                         "in_layers": [
@@ -1179,6 +1170,7 @@
                         ]
                     },
                     "private_webmap": {
+                        "show_user_location": true,
                         "type": "outlet",
                         "name": "private_webmap",
                         "in_layers": [
@@ -1292,11 +1284,6 @@
                         "access": [
                             "technical"
                         ]
-                    },
-                    "html": {
-                        "type": "outlet",
-                        "name": "html",
-                        "config_def": "static_html"
                     },
                     "sqldb": {
                         "type": "outlet",

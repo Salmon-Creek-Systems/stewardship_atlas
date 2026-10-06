@@ -101,21 +101,33 @@ class TestJsonConfigs(unittest.TestCase):
             self.assertIn(lname, layer_names,
                 f"webmap in_layers references '{lname}' not in starter_layers.json")
 
-    def test_mineral_kinsey_assets_webmap_layers_exist(self):
-        """MineralKinsey webmap in_layers must not reference undefined layers."""
-        assets = self._load(CONFIG_DIR / 'MineralKinsey_assets.json')
-        layers_path = CONFIG_DIR / 'MineralKinsey_layers.json'
-        if not layers_path.exists():
-            self.skipTest("MineralKinsey_layers.json not found")
-        layers = self._load(layers_path)
-        layer_names = {l['name'] if isinstance(l, dict) else l for l in layers}
-        webmap_in_layers = assets['webmap']['in_layers']
-        # We only check that referenced layers are in shared_layers_config or atlas layers
+    def test_active_atlas_configs_are_current(self):
+        """Every active atlas is single-file, builds the new console (not the
+        retired html one), and its webmaps and cloud allowlist reference only
+        things it defines."""
         shared_layers = self._load(CONFIG_DIR / 'shared_layers_config.json')
-        all_known = layer_names | set(shared_layers.keys())
-        for lname in webmap_in_layers:
-            self.assertIn(lname, all_known,
-                f"MineralKinsey webmap in_layers references '{lname}' not in any layer config")
+        for atlas in ACTIVE_ATLASES:
+            with self.subTest(atlas=atlas):
+                props = self._load(CONFIG_DIR / f'{atlas}.geojson')['features'][0]['properties']
+                self.assertNotIn('layers_path', props)
+                self.assertNotIn('assets_path', props)
+                layers, assets = props['layers'], props['assets']
+                self.assertIn('console', assets)
+                self.assertNotIn('html', assets)
+                # versioned_outlets filters the publish snapshot; a stale
+                # ["html", "webmap"] would leave the console out.
+                self.assertEqual(props.get('versioned_outlets', []), [])
+                for name, asset in assets.items():
+                    if asset.get('config_def') != 'webmap':
+                        continue
+                    self.assertTrue(asset.get('show_user_location'), f"{name} lacks show_user_location")
+                    for lname in asset.get('in_layers', []):
+                        self.assertTrue(lname in layers or lname in shared_layers,
+                                        f"{name} in_layers references undefined '{lname}'")
+                outlets = props.get('cloud', {}).get('outlets')
+                self.assertIsNotNone(outlets, "no cloud.outlets allowlist")
+                for o in outlets:
+                    self.assertIn(o, assets, f"cloud.outlets names '{o}', which is not an asset")
 
     def test_treatments_file(self):
         data = self._load(CONFIG_DIR / 'treatments' / 'default_treatments.json')
@@ -132,6 +144,14 @@ class TestJsonConfigs(unittest.TestCase):
         data = self._load(CONFIG_DIR / 'landfire_evc_fuel_loads.json')
         self.assertIn('_default', data)
 
+
+# Atlases kept current (the rest — samuelsloop, layt1, king_range_hike,
+# wildwood, the ft* field-trip tests — are abandoned).
+ACTIVE_ATLASES = [
+    'scvfd', 'kennedy', 'westport', 'fhe', 'gilhamhike', 'king_range', 'napachar',
+    'south_fork_eel', 'abi_demo', 'mineralkinsey', 'isf_920', 'nfsc_refugia',
+    'mather', 'angelo', 'sherwood_ranch', 'laytonville', 'cahto_creek_ranch',
+]
 
 CORE_OUTLETS = {'console', 'webmap', 'webedit', 'notebook', '3dview'}
 

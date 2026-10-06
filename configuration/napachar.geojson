@@ -34,15 +34,9 @@
         "name": "napachar",
         "description": "napachar",
         "app_url": "https://fireatlas.org:9000",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "cloud": {
-          "outlets": [
-            "webmap",
-            "html"
-          ]
+          "outlets": ["webmap", "console"]
         },
         "default_h3_resolution": 8,
         "data_root": "/root/swales_dev",
@@ -367,6 +361,7 @@
             ]
           },
           "webmap": {
+            "show_user_location": true,
             "type": "outlet",
             "name": "webmap",
             "in_layers": [
@@ -396,11 +391,6 @@
               "burn_areas"
             ],
             "config_def": "webedit"
-          },
-          "html": {
-            "type": "outlet",
-            "name": "html",
-            "config_def": "static_html"
           },
           "notebook": {
             "type": "outlet",

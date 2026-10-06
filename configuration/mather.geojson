@@ -8,73 +8,56 @@
         "coordinates": [
           [
             [
-              -124.208973666,
-              40.099869743
+              -119.88029041,
+              37.86931945
             ],
             [
-              -124.062314021,
-              40.099869743
+              -119.82805056,
+              37.86931945
             ],
             [
-              -124.062314021,
-              40.196835009
+              -119.82805056,
+              37.90667091
             ],
             [
-              -124.208973666,
-              40.196835009
+              -119.88029041,
+              37.90667091
             ],
             [
-              -124.208973666,
-              40.099869743
+              -119.88029041,
+              37.86931945
             ]
           ]
         ]
       },
       "properties": {
-        "name": "king_range",
-        "description": "King Range",
+        "name": "mather",
+        "description": "mather",
         "app_url": "https://fireatlas.org:9000",
         "versioned_outlets": [],
-        "cloud": {
-          "outlets": ["webmap", "console"]
-        },
-        "default_h3_resolution": 10,
+        "default_h3_resolution": 11,
         "email_photo_default_layer": "photos",
         "data_root": "/root/swales_dev",
         "shared_dir": "/root/data",
-        "base_url": "https://fireatlas.org/king_range",
+        "base_url": "https://fireatlas.org/mather",
         "port": 9000,
         "admin_emails": [],
         "logo_url": "",
+        "cloud": {"outlets": ["webmap", "console", "3dview"]},
         "layers": {
           "regions": {
-            "layer_def": "regions",
-            "access": [
-              "public"
-            ]
+            "layer_def": "regions"
           },
           "roads": {
-            "access": [
-              "public"
-            ],
             "layer_def": "roads"
           },
           "creeks": {
-            "access": [
-              "public"
-            ],
             "layer_def": "creeks"
           },
           "landmarks": {
-            "layer_def": "poi",
-            "access": [
-              "public"
-            ]
+            "layer_def": "poi"
           },
           "photos": {
-            "access": [
-              "public"
-            ],
             "geometry_type": "point",
             "conversations_enabled": true,
             "color": [
@@ -104,9 +87,6 @@
             ]
           },
           "inaturalist": {
-            "access": [
-              "public"
-            ],
             "geometry_type": "point",
             "color": [
               60,
@@ -158,78 +138,6 @@
                 "default": ""
               }
             ]
-          },
-          "geology": {
-            "access": [
-              "public"
-            ],
-            "geometry_type": "polygon",
-            "color": [90, 70, 50],
-            "fill_color": [200, 190, 170],
-            "fill_opacity": 0.45,
-            "show_attributes": true,
-            "interaction": "interface",
-            "editable_columns": [
-              { "name": "PTYPE", "type": "string", "default": "" }
-            ],
-            "paint": {
-              "fill-color": ["match", ["slice", ["to-string", ["get", "PTYPE"]], 0, 1],
-                "Q", "#e15ad0",
-                "T", "#9b5de5",
-                "K", "#5a7be8",
-                "J", "#2b2f9e",
-                "#00b4c4"]
-            }
-          },
-          "faults": {
-            "access": [
-              "public"
-            ],
-            "geometry_type": "linestring",
-            "color": [200, 30, 30],
-            "show_attributes": true,
-            "interaction": "interface",
-            "editable_columns": [
-              { "name": "LTYPE", "type": "string", "default": "" }
-            ],
-            "paint": {
-              "line-color": ["case",
-                [">=", ["index-of", "thrust", ["get", "LTYPE"]], 0], "#8c2d04",
-                [">=", ["index-of", "reverse", ["get", "LTYPE"]], 0], "#e6550d",
-                [">=", ["index-of", "normal", ["get", "LTYPE"]], 0], "#3182bd",
-                [">=", ["index-of", "s.s.", ["get", "LTYPE"]], 0], "#31a354",
-                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], "#e7298a",
-                "#d62728"],
-              "line-width": ["case",
-                [">=", ["index-of", "1906", ["get", "LTYPE"]], 0], 7.5,
-                4.5]
-            }
-          },
-          "trails": {
-            "access": [
-              "public"
-            ],
-            "geometry_type": "linestring",
-            "color": [153, 91, 40],
-            "add_labels": true,
-            "interaction": "interface",
-            "editable_columns": [
-              { "name": "name", "type": "string", "default": "Trail" }
-            ],
-            "paint": { "line-color": "#995b28", "line-width": 1.5, "line-dasharray": [1, 2] }
-          },
-          "hike": {
-            "access": [
-              "public"
-            ],
-            "geometry_type": "linestring",
-            "color": [165, 90, 20],
-            "add_labels": true,
-            "interaction": "interface",
-            "editable_columns": [
-              { "name": "name", "type": "string", "default": "Trail" }
-            ],
-            "paint": { "line-width": 3, "line-dasharray": [2, 2] }
           }
         },
         "assets": {
@@ -237,7 +145,7 @@
           "public_roads": {
             "type": "inlet",
             "out_layer": "roads",
-            "config_def": "roads_overture",
+            "config_def": "overture_roads",
             "name": "public_roads",
             "config": {
               "asset_type": "inlet",
@@ -284,12 +192,6 @@
               "config_def": "overture_roads",
               "name": "public_roads"
             }
-          },
-          "public_trails": {
-            "type": "inlet",
-            "out_layer": "trails",
-            "config_def": "trails_overture",
-            "name": "public_trails"
           },
           "public_creeks": {
             "type": "inlet",
@@ -395,31 +297,15 @@
               "config_def": "inaturalist"
             }
           },
-          "public_geology": {
-            "type": "inlet",
-            "out_layer": "geology",
-            "config_def": "geology_units",
-            "inpath_template": "mf2336_king_range.gpkg"
-          },
-          "public_faults": {
-            "type": "inlet",
-            "out_layer": "faults",
-            "config_def": "geology_faults",
-            "inpath_template": "mf2336_king_range.gpkg"
-          },
           "webmap": {
             "show_user_location": true,
             "type": "outlet",
             "name": "webmap",
             "config_def": "webmap",
             "in_layers": [
-              "geology",
-              "faults",
               "regions",
               "roads",
               "creeks",
-              "trails",
-              "hike",
               "landmarks",
               "photos",
               "inaturalist"
@@ -444,13 +330,9 @@
               "type": "outlet",
               "config_def": "webmap",
               "in_layers": [
-                "geology",
-                "faults",
                 "regions",
                 "roads",
                 "creeks",
-                "trails",
-                "hike",
                 "landmarks",
                 "photos",
                 "inaturalist"
@@ -470,8 +352,6 @@
               "regions",
               "roads",
               "creeks",
-              "trails",
-              "hike",
               "landmarks",
               "photos"
             ],
@@ -495,8 +375,6 @@
                 "regions",
                 "roads",
                 "creeks",
-                "trails",
-                "hike",
                 "landmarks",
                 "photos"
               ]

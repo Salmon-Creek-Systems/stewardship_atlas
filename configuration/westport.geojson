@@ -8,15 +8,9 @@
         "app_url": "https://fireatlas.org:9000",
         "data_root": "/root/swales_dev",
         "shared_dir": "/root/data/",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "cloud": {
-          "outlets": [
-            "webmap",
-            "html"
-          ]
+          "outlets": ["webmap", "console"]
         },
         "admin_emails": [
           "westportfire1@gmail.com",
@@ -848,6 +842,7 @@
             "config_def": "local_milemarkers"
           },
           "webmap": {
+            "show_user_location": true,
             "type": "outlet",
             "name": "webmap",
             "in_layers": [
@@ -909,6 +904,7 @@
             "config_def": "config_editor"
           },
           "private_webmap": {
+            "show_user_location": true,
             "type": "outlet",
             "name": "private_webmap",
             "in_layers": [
@@ -998,11 +994,6 @@
                 "text": "Golf Courses"
               }
             ]
-          },
-          "html": {
-            "type": "outlet",
-            "name": "html",
-            "config_def": "static_html"
           },
           "sqldb": {
             "type": "outlet",
