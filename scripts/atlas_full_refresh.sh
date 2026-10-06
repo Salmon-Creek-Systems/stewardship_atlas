@@ -93,7 +93,7 @@ sys.exit(0 if r.get('status') == 'success' else 1)
 " || die "refresh of '$asset' failed"
 }
 
-# webmap before html: the console HTML checks whether the webmap exists at
+# webmap before console: the console checks whether the webmap exists at
 # generation time, so the order is load-bearing.
 step "2/5  materializing webmap"
 refresh webmap
@@ -111,8 +111,8 @@ else
   step "3/5  skipping staging check (-y)"
 fi
 
-step "4/5  materializing console html"
-refresh html
+step "4/5  materializing console"
+refresh console
 
 step "5/5  publishing"
 curl -sS --max-time 60 "$API_URL/publish?swale=$ATLAS" >/dev/null || die "publish request failed"

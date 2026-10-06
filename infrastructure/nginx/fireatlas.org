@@ -61,9 +61,9 @@ server {
       return 302 https://fireatlas.org/abi_demo/staging/outlets/biochar_webedit/;
     }
 
-    # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/html/public
+    # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/console/public
     location ~ ^/([a-zA-Z0-9_-]+)/?$ {
-        return 302 https://fireatlas.org/$1/staging/outlets/html/public;
+        return 302 https://fireatlas.org/$1/staging/outlets/console/public/;
     }
 
     # Shared local data (CSS, JS, images) — mirrors the per-atlas local/ symlink
@@ -79,7 +79,9 @@ server {
         add_header 'Access-Control-Allow-Origin' '*';
     }
 
-    # Per-atlas auth — admin and internal paths.
+    # Per-atlas auth — admin and internal paths of both consoles: the new
+    # `console` outlet and the retired `html` one (its directories stay on disk
+    # for old bookmarks, so they stay gated too).
     # Add a block per atlas. No changes needed for new atlases if they
     # follow the same htpasswd path convention.
 
@@ -92,19 +94,19 @@ location ~ ^/samuelsloop/staging/outlets/html/internal/ {
     auth_basic_user_file /root/swales_dev/roles/samuelsloop/internal.htpasswd;
 }
 
-    location ~ ^/scvfd/staging/outlets/html/admin/ {
+    location ~ ^/scvfd/staging/outlets/(html|console)/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
     }
-    location ~ ^/scvfd/staging/outlets/html/internal/ {
+    location ~ ^/scvfd/staging/outlets/(html|console)/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/scvfd/internal.htpasswd;
     }
-    location ~ ^/kennedy/staging/outlets/html/admin/ {
+    location ~ ^/kennedy/staging/outlets/(html|console)/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/kennedy/admin.htpasswd;
     }
-    location ~ ^/kennedy/staging/outlets/html/internal/ {
+    location ~ ^/kennedy/staging/outlets/(html|console)/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/kennedy/internal.htpasswd;
     }
@@ -116,11 +118,11 @@ location ~ ^/samuelsloop/staging/outlets/html/internal/ {
     # shared.htpasswd contains default admin:admin and internal:internal credentials.
     # Create it on the server: htpasswd -bc /root/swales_dev/roles/shared.htpasswd admin admin
     #                          htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
-    location ~ /outlets/html/admin/ {
+    location ~ /outlets/(html|console)/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
     }
-    location ~ /outlets/html/internal/ {
+    location ~ /outlets/(html|console)/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
     }

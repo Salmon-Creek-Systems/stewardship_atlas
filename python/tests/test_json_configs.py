@@ -133,7 +133,7 @@ class TestJsonConfigs(unittest.TestCase):
         self.assertIn('_default', data)
 
 
-CORE_OUTLETS = {'html', 'webmap', 'webedit', 'notebook', '3dview'}
+CORE_OUTLETS = {'console', 'webmap', 'webedit', 'notebook', '3dview'}
 
 
 class TestStarterBundles(unittest.TestCase):
@@ -194,6 +194,8 @@ class TestStarterBundles(unittest.TestCase):
                 outlet_names = {n for n, a in assets.items() if a.get('type') == 'outlet'}
                 self.assertTrue(CORE_OUTLETS.issubset(outlet_names),
                     f"missing core outlets: {CORE_OUTLETS - outlet_names}")
+                # The old html console is retired; starters build the new one.
+                self.assertNotIn('html', outlet_names)
 
     def test_starter_config_defs_resolve(self):
         """Every config_def must exist in the shared configs.

@@ -89,10 +89,10 @@ import atlas, versioning
 name = sys.argv[1]
 cfg_path = os.path.join(os.environ['SWALES_ROOT'], name, 'staging', 'atlas_config.json')
 config = json.load(open(cfg_path))
-# webmap before html: the console checks for outlets/webmap/index.html at
+# webmap before console: the console checks for outlets/webmap/index.html at
 # generation time, so the reverse order silently produces a console with no
 # map link.
-for asset in ('webmap', 'html'):
+for asset in ('webmap', 'console'):
     if asset in config.get('assets', {}):
         print(f"  materializing {asset}")
         atlas.materialize(config, asset)

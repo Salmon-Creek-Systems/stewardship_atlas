@@ -6,7 +6,7 @@
     "cloud": {
       "outlets": [
         "webmap",
-        "html"
+        "console"
       ]
     }
   },
@@ -491,10 +491,10 @@
         "admin"
       ]
     },
-    "html": {
+    "console": {
       "type": "outlet",
-      "name": "html",
-      "config_def": "static_html",
+      "name": "console",
+      "config_def": "console",
       "access": [
         "public",
         "internal",

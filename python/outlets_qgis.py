@@ -1607,7 +1607,7 @@ def _gazetteer_grid_index_html(config, outlet_name, features):
     <span class="atlas-name">{atlas_name}</span>
     <span class="page-type">Gazetteer</span>
   </div>
-  <a class="top-bar-home" href="../../html/">← Home</a>
+  <a class="top-bar-home" href="../../console/public/">← Home</a>
 </header>
 
 <div class="content">

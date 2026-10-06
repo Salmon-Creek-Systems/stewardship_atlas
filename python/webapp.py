@@ -1102,6 +1102,11 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
         raise HTTPException(status_code=400, detail="slug must start with a letter and contain only letters, numbers, and underscores")
     if (Path(SWALES_ROOT) / slug).exists():
         raise HTTPException(status_code=409, detail=f"Atlas '{slug}' already exists")
+    # The new atlas's source config goes to configuration/{slug}.geojson in the
+    # shared checkout; never overwrite one that is already there (e.g. a retired
+    # atlas whose directory was removed but whose config is still in git).
+    if (Path(SWALES_ROOT) / "app" / "configuration" / f"{slug}.geojson").exists():
+        raise HTTPException(status_code=409, detail=f"A config for '{slug}' already exists in configuration/")
 
     starter = _load_starter(payload.starter)
     starter_props = starter.get("properties", {})
@@ -1163,7 +1168,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 "name": slug,
                 "description": payload.name,
                 "app_url": "https://fireatlas.org:9000",
-                "versioned_outlets": ["html", "webmap"],
+                "versioned_outlets": ["console", "webmap"],
                 "default_h3_resolution": _default_h3_resolution,
                 **starter_props,
             }
@@ -1199,10 +1204,14 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 logging.warning(f"Could not configure SES for {slug}: {ses_err}")
                 create_statuses[slug]["log"].append([f"Warning: email ingest not configured ({ses_err})", datetime.now().isoformat()])
 
-            # Write a self-contained single-file atlas.geojson: the starter's
+            # Write a self-contained single-file {slug}.geojson: the starter's
             # layers/assets are embedded inline so future config rebuilds
             # (build_atlas_from_geojson) don't depend on the starter file.
-            atlas_geojson_path = Path(SWALES_ROOT) / slug / "staging" / "atlas.geojson"
+            # It goes where every console layer action (add/edit/copy/delete
+            # layer) and atlas_full_refresh.sh look for an atlas's source:
+            # {atlas}/app/configuration/, i.e. the shared checkout. Like console
+            # edits, it is not committed there (#195).
+            atlas_geojson_path = Path(SWALES_ROOT) / slug / "app" / "configuration" / f"{slug}.geojson"
             atlas_geojson = json.loads(json.dumps(feature_collection))
             atlas_geojson['features'][0]['properties'].update({
                 "data_root": SWALES_ROOT,
@@ -1269,9 +1278,9 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 else:
                     create_statuses[slug]["log"].append([f"Layer {layer_name} {action}", datetime.now().isoformat()])
 
-            # Outlets: webmap must precede html (console HTML checks for the
-            # webmap output); notebook first, html last.
-            _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
+            # Outlets: webmap must precede the console (it checks for the
+            # webmap output); notebook first, console last.
+            _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "console": 9}
             # QGIS PDF outlets are deferred for the same reason eddies are: a
             # runbook render is slow and memory-hungry, and at create time it
             # would run over regions that were only just imported. Materialize

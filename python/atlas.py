@@ -526,7 +526,8 @@ def build_atlas(
             feature_collection=feature_collection,
         )
         materialize(config, 'notebook')
-        materialize(config, 'html')
+        if 'console' in config.get('assets', {}):
+            materialize(config, 'console')
 
     return config, config_path
 
@@ -610,7 +611,7 @@ def rename_layer(config, old_name, new_name, dry_run=False):
 
     After running (non-dry-run):
       1. python scripts/build_atlas.py config_only
-      2. Rematerialize 'webmap' and 'html'
+      2. Rematerialize 'webmap' and 'console'
       3. grep -r '<old_name>' configuration/  (sanity check on built config)
 
     Note: shared_*.json updates affect all atlases using those templates.
@@ -649,7 +650,7 @@ def rename_layer(config, old_name, new_name, dry_run=False):
     if not dry_run:
         print(f"\nNext steps:")
         print(f"  1. python scripts/build_atlas.py config_only")
-        print(f"  2. Rematerialize 'webmap' and 'html'")
+        print(f"  2. Rematerialize 'webmap' and 'console'")
         print(f"  3. grep -r '{old_name}' {config_dir}")
 
 
@@ -709,7 +710,7 @@ def copy_layer(config, old_name, new_name, rebuild=True):
       - rebuilds atlas_config.json (config_only) so the change takes effect
 
     Single-file GeoJSON config format only. After running, rematerialize
-    'webmap', 'webedit', and 'html' on the server for the new layer to appear.
+    'webmap', 'webedit', and 'console' on the server for the new layer to appear.
     """
     import dataswale_geojson
 
@@ -781,7 +782,7 @@ def copy_layer(config, old_name, new_name, rebuild=True):
         build_atlas_from_geojson(geojson_path, config_only=True)
 
     print(f"\nNext steps (on server):")
-    print(f"  1. Rematerialize 'webmap', 'webedit', and 'html'")
+    print(f"  1. Rematerialize 'webmap', 'webedit', and 'console'")
     print(f"  2. grep -r '{new_name}' {config_dir}  (sanity check)")
 
 
