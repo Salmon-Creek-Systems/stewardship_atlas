@@ -300,6 +300,29 @@
                             "maxzoom": 22
                         },
                         "paint": {
+                            "line-width": [
+                                "interpolate",
+                                [
+                                    "linear"
+                                ],
+                                [
+                                    "zoom"
+                                ],
+                                11,
+                                [
+                                    "get",
+                                    "vector_width"
+                                ],
+                                18,
+                                [
+                                    "*",
+                                    [
+                                        "get",
+                                        "vector_width"
+                                    ],
+                                    3
+                                ]
+                            ],
                             "line-opacity": [
                                 "step",
                                 [
