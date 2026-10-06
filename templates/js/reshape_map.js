@@ -181,18 +181,6 @@ map.on('load', () => {
 
     loadLayerFeatures().catch(err => showErrorPopup('Could not load layer features: ' + err.message));
 
-    initializeHelpPopup(`
-        <h3>Reshape Help</h3>
-        <ul>
-            <li><strong>Pick:</strong> Click a feature of this layer to load it for reshaping</li>
-            <li><strong>Vertices:</strong> Drag a vertex to move it; drag a midpoint handle to add a vertex; right-click a vertex to delete it</li>
-            <li><strong>Move:</strong> Drag inside the feature (or drag a point) to move it whole</li>
-            <li><strong>Save:</strong> Replaces the feature's geometry; its properties are unchanged</li>
-            <li><strong>Cancel:</strong> Discards the edit</li>
-        </ul>
-        <p>Layers with a polygon shape (e.g. square regions) are re-shaped after saving.</p>
-    `);
-
     const goBtn = document.getElementById('go-location-btn');
     const locationInput = document.getElementById('location-input');
     async function goToLocation() {

@@ -1,12 +1,13 @@
 # View and Edit Configuration
+<!-- audience: admin -->
 
 The Technical Console provides access to your atlas configuration, allowing administrators to view and modify settings directly.
 
 ## Accessing the Configuration Editor
 
-1. Go to the **Admin Console** (typically at `/staging/outlets/html/admin`)
-2. Click **"Admin"** or **"Technical"** in the Help and Links section
-3. Navigate to the **Configuration Editor** link
+1. In the Admin Console, open the configuration editor from the **Maps** list
+   (it's listed as `config_edit` on atlases that have it)
+2. Or go straight to `/staging/outlets/config_edit/` under your atlas's address
 
 ## Using the Configuration Editor
 
@@ -28,7 +29,8 @@ The editor provides a visual interface for editing your atlas configuration JSON
 **Modify Asset/Outlet Settings:**
 1. Expand `assets`
 2. Select the outlet (e.g., `runbook`, `gazetteer`)
-3. Adjust properties like `in_layers`, `page_size`, `feature_scale`
+3. Adjust properties like `in_layers` or `feature_scale`. (Runbooks always
+   print Letter landscape; a `page_size` setting is ignored.)
 
 **Update Bounding Box:**
 1. Expand `dataswale` → `bbox`
@@ -43,6 +45,9 @@ The editor provides a visual interface for editing your atlas configuration JSON
 ### Important Notes
 
 - ⚠️ Changes are saved to **staging only** - they won't affect published versions
+- ⚠️ The editor changes the *built* configuration. The next full configuration
+  rebuild replaces it from the atlas's source settings, so treat edits here as
+  temporary unless SCS also makes them permanent
 - Use **"✓ Validate"** to check for errors before saving
 - Use **"🔄 Reload from Server"** to discard unsaved changes
 - Invalid JSON will not be saved - fix errors first

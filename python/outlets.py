@@ -22,6 +22,7 @@ import dataswale_geojson
 import federation
 import atlas_catalog
 import map_style
+import help_docs
 import utils
 # from outlets_mapnik import build_region_map_mapnik
 
@@ -595,12 +596,6 @@ def generate_map_page(config, title, map_config_data, output_path, sprite_json=N
         template = f.read()
     logger.debug(f"About to generate HTML to {output_path}: {template}.")
     
-    # Read and convert markdown help content
-    import markdown
-    with open(source_root / 'documents' / 'help' / 'webmap_help.md', 'r') as f:
-        help_markdown = f.read()
-    help_html = markdown.markdown(help_markdown)
-    
     # Generate JavaScript for dynamic layers
     js_bit = ""
     if map_config_data['dynamic_layers']:
@@ -690,7 +685,6 @@ void await map.loadImage('{im_uri}',
             cog_sources=json.dumps(map_config_data.get('cog_sources', {}), indent=2),
             cog_layers=json.dumps(map_config_data.get('cog_layers', []), indent=2),
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
-            webmap_help=help_html,
             app_url=app_url,
             swalename=config.get('name', ''),
             lidar_basemap_option=lidar_basemap_option,
@@ -1019,6 +1013,7 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point', acti
         </div>
         <div class="button-group" id="move-button-group">
             <button id="move-button" class="button">Move to Layer</button>
+            <a href="/local/documents/help/move_features.html" target="_blank" class="help-icon" title="Help: moving features to another layer">?</a>
         </div>
         <div id="move-confirm" style="display:none; margin-top: 8px;">
             <p id="move-count-text" style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
@@ -1079,6 +1074,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2),
         lidar_basemap_option=lidar_basemap_option,
         move_targets=json.dumps(move_targets),
+        help_url=help_docs.help_url(help_docs.EDIT_PAGE_HELP.get(action, 'draw_vector')),
         edit_script='reshape_map.js' if action == 'reshape' else 'edit_map.js')
 
 def outlet_webmap_edit(config: dict, name: str):
@@ -2493,57 +2489,25 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         # and ac.get('interaction') == 'interface'
     ]
     
-    # Define use cases
+    # Help pages: each documents/help/*.md carries an audience tag (help_docs).
     app_docs_path = versioning.atlas_path(config, version='app') / 'documents' / 'help'
     use_case_paths = list(app_docs_path.glob('*.md'))
-    use_cases = { path.stem: [path.read_text().splitlines()[0].replace('# ', ''), str("/local/documents/help/" + path.name).replace('.md', '.html')] for path in use_case_paths}
-    
-    # Convert markdown files to HTML and write to local documents/help directory
-    import markdown
+    help_pages = help_docs.read_help_pages(app_docs_path)
+
     local_docs_path = versioning.atlas_path(config, "local") / "documents" / "help"
     local_docs_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Generating help into docs dir: {str(local_docs_path)}: {use_case_paths}")
 
-    # Read the help template
-
     template_dir = versioning.atlas_path(config, version='app') / 'templates'
-    help_template_path = Path(template_dir / 'help.html')
-    
-    #help_template_path = Path("../templates/help.html")
-    help_template = help_template_path.read_text()
+    help_template = Path(template_dir / 'help.html').read_text()
 
-    # Track titles and filenames for index generation
-    page_list = []
-    
+    # render_styled_doc gives every heading an anchor and rewrites links
+    # between pages from .md to .html, so help pages can link to each other.
     for path in use_case_paths:
-        # Read markdown content
         logger.info(f"Converting {path.name} to HTML...")
-        markdown_content = path.read_text()
-        
-        # Convert to HTML
-        html_content = markdown.markdown(markdown_content)
-        
-        # Extract title from first line (remove "# " prefix)
-        title = markdown_content.splitlines()[0].replace('# ', '') if markdown_content.startswith('#') else path.stem
-        
-        # Generate styled HTML using template
-        styled_html = help_template.format(
-            atlas_name=config['name'],
-            title=title,
-            content=html_content,
-            base_url=config.get('base_url', '')
-        )
-        
-        # Write HTML file
-        html_filename = path.stem + ".html"
-        html_path = local_docs_path / html_filename
-        with open(html_path, 'w', encoding='utf-8') as f:
+        styled_html = render_styled_doc(path.read_text(), help_template, config)
+        with open(local_docs_path / (path.stem + ".html"), 'w', encoding='utf-8') as f:
             f.write(styled_html)
-        
-        # Store for index generation
-        page_list.append((title, html_filename))
-        
-        logger.info(f"Converted {path.name} to {html_filename}")
 
     # Render top-level manuals (documents/*.md) alongside about/contact, one
     # level up from help/. These link into help/*.md, rewritten to .html.
@@ -2560,39 +2524,18 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         manual_links.append((m_title, f'../{manual}.html'))
         logger.info(f"Rendered manual {manual}.md")
 
-    # Generate index.html with list of all help pages
-    if page_list:
-        # Create list items for all pages
-        page_links = "\n".join([f'        <li><a href="{filename}">{title}</a></li>' for title, filename in sorted(page_list)])
-
-        manuals_section = ""
-        if manual_links:
-            manual_items = "\n".join(f'        <li><a href="{href}">{t}</a></li>' for t, href in manual_links)
-            manuals_section = f"        <h2>Manuals</h2>\n        <ul>\n{manual_items}\n        </ul>\n"
-
-        index_content = f"""
-{manuals_section}        <h2>Help Topics</h2>
-        <p>Browse the available help documentation:</p>
-        <ul>
-{page_links}
-        </ul>
-        """
-        
-        # Generate styled HTML using template
+    # Generate index.html: the manuals, then help pages grouped by audience
+    if help_pages:
         index_html = help_template.format(
             atlas_name=config['name'],
             title="Help Index",
-            content=index_content,
+            content=help_docs.help_index_content(help_pages, manual_links),
             base_url=config.get('base_url', '')
         )
-        
-        # Write index.html
-        index_path = local_docs_path / "index.html"
-        with open(index_path, 'w', encoding='utf-8') as f:
+        with open(local_docs_path / "index.html", 'w', encoding='utf-8') as f:
             f.write(index_html)
-        
-        logger.info(f"Generated index.html with {len(page_list)} help pages")
-    
+        logger.info(f"Generated index.html with {len(help_pages)} help pages")
+
     # Generate contact page in documents directory (one level up from help)
     contact_content = """
         <h2>Contact Information</h2>
@@ -2676,36 +2619,11 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
     
     logger.info(f"Generated about page at {about_path}")
 
-    # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
-    #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
-    #              "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
-    #              "download_gpkg": ["Howto: Download atlas as GeoPKG", "https://internal.fireatlas.org/documentation/"],
-    #              "download_runbook": ["Howto: download Run Book","https://internal.fireatlas.org/documentation/"],
-    #              "download_runbook": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-    #              "hide_layers": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-    #              "upload_geojson": ["Howto: Add a GeoJSON file to an existing vector layer.","https://internal.fireatlas.org/documentation/"],
-    #              "platform_overview": ["Overview of Stewardship Atlas Platform","https://internal.fireatlas.org/documentation/"],
-    #              "python_overview": ["Python Documentation","https://internal.fireatlas.org/documentation/"],
-    #              "schema_overview": ["Schema Documentation","https://internal.fireatlas.org/documentation/"]
-                 
-    #              }
-                                   
-    user_cases_config = [
-        #{"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
-        #{"name": "GIS Practitioner", "cases": ["Download Layer GeoJSON", "Download GeoPKG", "Add a layer as GeoJSON"]},
-        #{"name": "Administrator", "cases": ["Go to Admin interface", "Switch Version"]},
-        {"name": "VFD Member", "cases": ["download_runbook", "download_gpkg", "hide_layers"]},
-        {"name": "VFD Administrator", "cases": ['add_road', 'add_building', 'download_gpkg']},
-        {"name": "GIS Practitioner", "cases": ["platform_overview",'download_geojson', 'download_gpkg', 'add_road', 'add_building', "upload_geojson", "schema_overview"]},
-        {"name": "Developer", "cases": ["platform_overview", "python_overview", "schema_overview", "download_gpkg"]}
-        ]
-    user_cases = []
-    for u in user_cases_config:
-        uc = [{'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in u['cases'] if label in use_cases]
-        user_cases.append( {'name': u['name'], 'cases': uc} )
-    user_cases.append( {"name": "All Users", "cases": [ {'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in use_cases.keys()]})
-    logger.info(f"Generated User Cases: {user_cases}")
-         
+    # Console help lists, by audience: the internal console shows the
+    # user-facing pages, the admin console the user and admin ones.
+    user_cases = help_docs.use_case_groups(help_pages, ('user',))
+    admin_cases = help_docs.use_case_groups(help_pages, ('user', 'admin'))
+
     # Generate technical view — log panel is populated live via /log endpoint on page load
     technical_html = make_console_html(
         config,
@@ -2739,7 +2657,7 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         spreadsheets = config['spreadsheets'],
         displayed_versions=[str(v)for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=[],
+        use_cases=admin_cases,
         template_name=template_name
     )
     

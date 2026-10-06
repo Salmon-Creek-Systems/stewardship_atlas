@@ -220,27 +220,6 @@ map.on('load', () => {
     addEditBasemaps(map, firstLayerId);
     addSelectionHighlightLayers();
 
-    // Initialize help popup
-    const helpContent = `
-        <h3>Edit Layer Help</h3>
-        <ul>
-            <li><strong>Drawing:</strong> Click to start drawing, double-click to finish</li>
-            <li><strong>Reset:</strong> Click "Reset Drawing" to clear all features</li>
-            <li><strong>Upload:</strong> Use "Upload GeoJSON" to import existing features</li>
-            <li><strong>Save:</strong> Click "Save Features" when done to submit your work</li>
-            <li><strong>Selection:</strong> Features your polygon selects are highlighted; on annotate pages their properties are listed below the form</li>
-            <li><strong>Location:</strong> Use the location input to navigate to specific coordinates</li>
-            <li><strong>Basemap:</strong> Switch between different map backgrounds</li>
-        </ul>
-        <h4>Supported Location Formats:</h4>
-        <ul>
-            <li>Degrees: 40°14′18″ N 123°57′39″ W</li>
-            <li>JSON: {"latitude": 37.7749, "longitude": -122.4194}</li>
-            <li>Google Maps: https://maps.google.com/... (including shortened goo.gl links)</li>
-            <li>Plain: 37.7749, -122.4194</li>
-        </ul>
-    `;
-    initializeHelpPopup(helpContent);
 
     // Initialize location input functionality
     const goBtn = document.getElementById('go-location-btn');

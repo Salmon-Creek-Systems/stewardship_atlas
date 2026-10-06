@@ -1,4 +1,5 @@
 # Export, Edit, and Import Spreadsheets
+<!-- audience: admin -->
 
 The spreadsheet workflow allows you to edit layer attributes in Google Sheets, making bulk edits easier than using the map interface. This is ideal for:
 
@@ -16,9 +17,8 @@ The workflow has three steps:
 
 ## Step 1: Export to Google Sheets
 
-1. Go to the **Admin Console** (`/staging/outlets/html/admin`)
-2. Find your layer in the **Layer Operations** panel
-3. Click **"(export sheet)"** next to the layer name
+1. In the Admin Console, find your layer
+2. Open **Spreadsheets → Export to Sheet**
 4. Wait for the export to complete (status shows "exporting...")
 5. A new browser tab opens with the Google Sheet
 
@@ -55,9 +55,8 @@ To add a new feature via spreadsheet:
 
 ## Step 3: Import from Google Sheets
 
-1. Return to the **Admin Console**
-2. Find the same layer in the Layer Operations panel
-3. Click **"(import sheet)"** next to the layer name
+1. Return to the Admin Console
+2. Open **Spreadsheets → Import from Sheet** on the same layer
 4. Wait for the import to complete
 5. Confirm the success message
 

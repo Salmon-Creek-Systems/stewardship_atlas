@@ -20,9 +20,9 @@ The interactive web map provides a browser-based view of all atlas layers with c
 1. Navigate to the atlas webmap URL (e.g., `https://youratlas.fireatlas.org/webmap/`)
 2. Use the layer toggles to show/hide data layers
 3. Click features to view their properties
-4. Use the location sharing dropdown to copy coordinates or Google Maps links
+4. Use **Share** (or Ctrl/⌘-click for a pin) to copy a map link, Google Maps link or coordinates
 
-See: [Webmap Help](webmap_help.md)
+See: [User Manual → The Web Map](user_manual.md#the-web-map)
 
 ---
 

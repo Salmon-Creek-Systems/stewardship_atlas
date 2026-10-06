@@ -140,7 +140,10 @@ def _build_toggle_panel_html(toggle_list: list) -> str:
     # there are toggleable layers.
     lines = [
         '<div class="layer-panel">',
-        '    <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
+        '    <div class="share-row">',
+        '        <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
+        '        <a href="/local/documents/help/3d_terrain_view.html" target="_blank" class="help-icon" title="Help: 3D view">?</a>',
+        '    </div>',
     ]
     if toggle_list:
         lines += [
@@ -416,6 +419,30 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         }}
         .share-view-btn:hover {{
             background: #e0e0e0;
+        }}
+        .share-row {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }}
+        .share-row .share-view-btn {{
+            margin-bottom: 0;
+        }}
+        .help-icon {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            border: 1px solid #9ab;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            color: #007bff;
+            background: #fff;
+            text-decoration: none;
         }}
         .success-notification {{
             position: fixed;

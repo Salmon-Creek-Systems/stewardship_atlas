@@ -319,6 +319,8 @@ def regions_panel_html(features):
             '                    <option value="">Preset Views</option>\n'
             + ''.join(f'                    {o}\n' for o in options) +
             '                </select>\n'
+            '                <a href="/local/documents/help/preset_views.html" target="_blank"'
+            ' class="help-icon" title="Help: preset views">?</a>\n'
             '            </div>')
 
 

@@ -1,29 +1,38 @@
-# Gazetteer Map Book
+# Printable Map Books
+<!-- audience: user -->
 
-The gazetteer is a printable PDF map book that divides your atlas coverage area into a
-numbered grid. Each page covers one grid cell at a consistent scale, with neighboring
-grid numbers labeled on each edge so you can navigate from page to page.
+Atlases can produce print-ready PDF map books for vehicles, field kits and
+offline use. Look for them in the **Downloads** section of the console.
 
-## Accessing the Gazetteer
+## Runbook
 
-From the Admin Console, click the **Gazetteer** link in the Outlets section. This opens
-the PDF in your browser, ready to save or print.
+The runbook has one page per named region of the atlas — a response zone, a
+preserve, a neighbourhood. Each page:
 
-## What's in the Gazetteer
+- prints on **Letter, landscape**, with the map beside a side panel
+- shows the region exactly as it's drawn on the web map
+- links to the same area on the live web map (see [Preset Views](preset_views.md))
 
-- **Grid pages** — one page per grid cell, sized to fit standard paper
-- **Neighbor labels** — adjacent grid numbers printed on each edge, so you can find
-  the next page when a road or feature crosses a boundary
-- **Grid index** — an overview page showing the full coverage area with all grid
-  numbers, useful as a table of contents
+You can download each region's page on its own, or the whole runbook as a single
+combined PDF.
 
-## Printing Tips
+## Gazetteer
 
-Print double-sided and in color for best readability. The pages are designed for
-standard letter paper (8.5" × 11") in landscape orientation.
+The gazetteer divides the whole atlas into a numbered grid, one page per cell at
+a consistent scale:
 
-## Keeping It Current
+- **Neighbour labels** on each edge give the number of the next page, so you can
+  follow a road across pages.
+- A **grid index** page shows the whole area with every page number — a table of
+  contents.
 
-The gazetteer reflects the data at the time it was last generated. To get an up-to-date
-version after data changes, republish the atlas from the Admin Console — this regenerates
-all outlets including the gazetteer.
+## Printing tips
+
+Print in colour, double-sided. Lines and labels are sized for paper, so roads
+and creeks stay readable whatever the page's scale.
+
+## Keeping them current
+
+Map books show the data as it was when they were last built — they aren't
+updated automatically when the data changes. Atlas administrators rebuild them
+with **Build** (see [Build an Output](build_outputs.md)).

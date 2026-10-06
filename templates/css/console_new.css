@@ -691,3 +691,40 @@ a:hover { text-decoration: underline; }
 .modal-status { min-height: 1.2em; margin-top: 12px; color: var(--text-label); }
 .modal-status.is-error { color: var(--red); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* ── In-app help: "?" links to the matching help page (new tab) ─────────── */
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--blue);
+  background: var(--bg);
+  text-decoration: none;
+}
+.help-icon:hover { background: var(--surface-2); text-decoration: none; }
+
+/* Sidebar sections: the "?" sits on the header row, left of the chevron */
+.sb-section { position: relative; }
+.sb-section > .sb-help {
+  position: absolute;
+  top: 8px;
+  right: 32px;
+}
+
+/* Layers panel label: "?" beside the "+" */
+.panel-tools { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Modals: title and "?" on one row */
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.modal-head .modal-title { margin-right: auto; }
+
+.dd-item-help { color: var(--blue); border-top: 1px solid var(--border); }

@@ -156,61 +156,6 @@ function validateCoordinates(lat, lng) {
     return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
-// Function to initialize help popup functionality
-function initializeHelpPopup(helpContent) {
-    // Create help popup HTML if it doesn't exist
-    if (!document.getElementById('help-popup')) {
-        const helpPopup = document.createElement('div');
-        helpPopup.id = 'help-popup';
-        helpPopup.className = 'help-popup';
-        helpPopup.style.display = 'none';
-        helpPopup.innerHTML = `
-            <div class="help-content">
-                <div class="help-header">
-                    <h2>Help</h2>
-                    <button id="close-help" class="close-button">&times;</button>
-                </div>
-                <div class="help-body">
-                    ${helpContent}
-                </div>
-            </div>
-        `;
-        document.body.appendChild(helpPopup);
-    }
-
-    // Add event listeners
-    const helpLink = document.getElementById('help-link');
-    const closeHelp = document.getElementById('close-help');
-    const helpPopup = document.getElementById('help-popup');
-
-    if (helpLink) {
-        helpLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            helpPopup.style.display = 'flex';
-        });
-    }
-
-    if (closeHelp) {
-        closeHelp.addEventListener('click', () => {
-            helpPopup.style.display = 'none';
-        });
-    }
-
-    // Close popup when clicking outside
-    helpPopup.addEventListener('click', (e) => {
-        if (e.target.id === 'help-popup') {
-            helpPopup.style.display = 'none';
-        }
-    });
-
-    // Close popup with Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            helpPopup.style.display = 'none';
-        }
-    });
-}
-
 // Function to initialize enhanced progress tracking
 function initializeProgressTracking(map, totalLayers) {
     const progressBar = document.getElementById('loading-progress');

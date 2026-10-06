@@ -1,4 +1,5 @@
 # Add a Location by Emailing a Geotagged Photo to the Atlas
+<!-- audience: user -->
 
 You can add a geotagged photo to the atlas by emailing it from your smartphone. The photo's GPS location is automatically extracted and a new point feature is created in the layer you specify.
 
@@ -7,17 +8,19 @@ You can add a geotagged photo to the atlas by emailing it from your smartphone. 
 ## Requirements
 
 - An iPhone or Android phone with location services enabled for the camera app (see below)
-- Your email address must be on the admin list for the atlas
+- Your email address may need to be on the atlas's list of approved senders —
+  ask your atlas administrator
 
 ## How to Submit
 
 1. **Take a photo** with your phone's camera outdoors, so your phone has a GPS fix.
 
-2. **Send the photo as an email attachment** to the atlas email address:
-   - SCVFD: `scvfd@fireatlas.org`
+2. **Send the photo as an email attachment** to your atlas's address, which is
+   its ID followed by `@fireatlas.org` — for example `scvfd@fireatlas.org`.
+   Attach one photo per email.
 
 3. **Write a subject line** describing what you're documenting:
-   - Just a description (goes to the default `poi` layer):
+   - Just a description (goes to the atlas's default photo layer):
      ```
      Locked gate on Miller Road
      ```
@@ -26,11 +29,12 @@ You can add a geotagged photo to the atlas by emailing it from your smartphone. 
      hydrants: New hydrant at staging area
      private_notes: Check drainage here next season
      ```
-   The layer name must match an existing layer in your atlas. If you omit the colon and layer name, the feature goes to `poi` automatically.
+   The layer name must match an existing layer in your atlas. If you leave out the colon and layer name, the feature goes to the default photo layer.
 
 4. **Send the email.** The feature will appear in the atlas within a minute or two.
 
-If something goes wrong, you will receive an automatic reply explaining what happened.
+Automatic replies for failed submissions are turned off for now, so if nothing
+appears after a few minutes, check the troubleshooting list below.
 
 ## Making Sure Location Services Are On
 
@@ -63,13 +67,13 @@ A new point feature is placed at the GPS coordinates from the photo, with:
 
 ## Troubleshooting
 
-**Nothing appeared and I didn't get a bounce email**
-- Check that your email address is on the admin list
+**Nothing appeared**
+- Check that your email address is on the atlas's approved senders list
 - Make sure the photo was sent as an attachment (not pasted inline)
 - Check the layer name spelling in your subject line (case doesn't matter)
 
-**I got a bounce saying "No GPS data"**
-- The photo doesn't have location data. Follow the location services steps above, retake the photo, and resend.
+**The photo has no location**
+- The photo doesn't have location data — submissions without it are rejected. Follow the location services steps above, retake the photo, and resend.
 - Note: some apps (WhatsApp, Slack) strip GPS when sharing — attach the photo directly from your Camera Roll or Photos app instead.
 
 **The feature appeared but in the wrong place**

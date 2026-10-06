@@ -1,14 +1,14 @@
-# Export Layer
+# Export a Layer
+<!-- audience: admin -->
 
-Exporting a layer allows you to work on it in other software or incorporate it in other maps and datasets. If you’d like to export more than a single layer, look into “Export Atlas as GeoPKG”.
+Download a single layer to use in other software or combine with other data.
+(For every layer at once, see [Download the Atlas as a GeoPackage](download_gpkg.md).)
 
-* Go to the Admin page
-* Find the Layer you’re interested in on the right hand side”Layer Operations” panel.
-* Click the Layer name.
-  * Raster layers will download as TIFF
-  * Vector layers will download as GeoJSON
-* Select “Save As…” or “Allow Download” if prompted.
-* The file will be named “LAYERNAME_TIMESTAMP.EXTENSION” where
-  * LAYERNAME is just that
-  * TIMESTAMP is the date the layer was generated or last modified 
-  * EXTENSION is the filetype as above.
+1. In the Admin Console, find the layer.
+2. Open **Dataset → Directory**. This lists the layer's files.
+3. Click the file to download it:
+   - vector layers are **GeoJSON** (`.geojson`)
+   - raster layers are **GeoTIFF** (`.tif`)
+
+To edit a layer's attributes in a spreadsheet and bring them back, use the
+[spreadsheet workflow](spreadsheet_workflow.md) instead.

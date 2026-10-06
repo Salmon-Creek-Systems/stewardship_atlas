@@ -1,12 +1,12 @@
 # 3D Terrain View
+<!-- audience: user -->
 
 The 3D terrain view lets you explore your atlas area as an interactive 3D map, with
 real elevation data derived from the same DEM used for the atlas hillshade.
 
 ## Opening the 3D View
 
-Click the **3D** button in the navigation panel of the interactive webmap. It opens in
-a new tab.
+Click **3D** in the header of the web map.
 
 ## Controls
 
@@ -17,6 +17,11 @@ a new tab.
 
 The map starts in a slightly tilted overhead view. Drag to tilt further to see terrain
 relief clearly.
+
+## Sharing a 3D view
+
+Click **Share view** to copy a link that opens the 3D view exactly as you have
+it — the same spot, camera angle and tilt, and the same layers showing.
 
 ## Notes
 

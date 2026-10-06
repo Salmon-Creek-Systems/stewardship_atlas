@@ -1,16 +1,12 @@
-# Replace a Layer with an Upload
+# Clear a Layer
+<!-- audience: admin -->
 
-## Overview
-* From Admin page
-    * find the layer you want to replace in the list at right
-    * click "Clear" on row for Layer to remove all existing data
-* Prepare a standard GeoJSON file
-    * nice Properties to have set on each feature:
-        * name
-        * vector_width
-     * CRS will be set to standard XXX
-* click "Upload" on layer 
+**Dataset → Clear Layer** removes every feature from a layer but keeps the layer
+itself — its styling, its place on the maps, its edit pages.
 
+Use it to start a layer over — for example, clear it and then
+[load features from a file](upload_vector.md) to replace its contents.
 
-Remember that new data will only visible in "dynamic" Staging outlets (like the Webmap) until you regenerate an Outlet, or generate a new Version which will refresh all configured Outlets.
-
+To remove the layer completely, use [Delete a Layer](delete_layer.md). If you
+clear a layer by mistake, the data can be recovered from the last published
+version — ask your atlas administrator or SCS.

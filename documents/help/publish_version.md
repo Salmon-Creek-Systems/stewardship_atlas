@@ -1,4 +1,5 @@
 # Publish a New Version
+<!-- audience: admin -->
 
 Publishing creates a permanent snapshot of your atlas data that can be referenced and shared. This is how you release changes from the staging environment to production.
 
@@ -21,9 +22,8 @@ Publish a new version when:
 
 ### From the Admin Console
 
-1. Go to the **Admin Console** (`/staging/outlets/html/admin`)
-2. Scroll to the **VERSIONS** section
-3. Click **"Publish Atlas"**
+1. In the Admin Console, go to the **Versions** section
+2. Click **Publish**
 4. Wait for the publishing process to complete
    - Status updates will appear showing progress
    - This may take a few minutes depending on data size
@@ -43,15 +43,15 @@ Outputs are **not** rebuilt at publish time — build any that need it first (se
 
 ## After Publishing
 
-- The new version appears in the VERSIONS list on the Admin Console
-- Each version has its own URL: `/{version}/outlets/html/admin`
+- The new version appears in the **Versions** list on the Admin Console
+- Each version has its own URL: `/{version}/outlets/console/admin/`
 - You can switch between versions to compare data
 - The staging area is ready for new edits
 
 ## Version URLs
 
 Published versions are accessible at:
-- Admin console: `/{version}/outlets/html/admin`
+- Admin console: `/{version}/outlets/console/admin/`
 - Webmap: `/{version}/outlets/webmap/`
 - Downloads: `/{version}/outlets/{outlet_name}/`
 

@@ -1,4 +1,5 @@
 # Refresh a Layer
+<!-- audience: admin -->
 
 Edits — whether drawn on the map, imported from a spreadsheet, or emailed in as
 photos — are stored as **pending changes** and applied to the layer when you

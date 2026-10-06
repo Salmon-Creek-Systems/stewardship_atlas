@@ -95,11 +95,11 @@ Not in `scs-internal`, which is public-read.
 - **Feature popups:** the layer shows in the console but click-popups are off
   until you add `show_attributes` + `editable_columns` to the layer definition
   (you need to know the data's fields first). See
-  [Layer Interaction Options](user_guide.md#layer-interaction-options).
+  [Layer Interaction Options](developers_guide.md#layer-interaction-options).
 
 ## Under the hood
 
 `add_layer` automates the manual config described under **Vector GeoJSON layers
-from S3** in the [User Guide](user_guide.md#adding-private-s3-data-layers). Reach
+from S3** in the [Developer's Guide](developers_guide.md#adding-private-s3-data-layers). Reach
 for the manual approach when you need field-level control the tool doesn't expose
 (custom styling, non-default inlet options).

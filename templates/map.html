@@ -22,7 +22,7 @@
             <nav class="header-links">
                 <a href="../console/public/" class="header-link">Home</a>
                 <a href="../3dview/" class="header-link">3D</a>
-                <a href="#" class="header-link" id="help-link">?</a>
+                <a href="/local/documents/user_manual.html#the-web-map" target="_blank" class="header-link" id="help-link" title="Help: using the web map">?</a>
             </nav>
             <button id="nav-collapse-btn" class="nav-collapse-btn" title="Collapse panel">▾</button>
         </div>
@@ -69,6 +69,7 @@
         <div class="help-content">
             <div class="help-header">
                 <h2 id="share-popup-title">Share view</h2>
+                <a href="/local/documents/help/share_location.html" target="_blank" class="help-icon" title="Help: sharing a view or a pin">?</a>
                 <button class="close-button" data-close-popup>&times;</button>
             </div>
             <div class="help-body">
@@ -89,6 +90,7 @@
         <div class="help-content">
             <div class="help-header">
                 <h2>Go to location</h2>
+                <a href="/local/documents/help/go_to_location.html" target="_blank" class="help-icon" title="Help: going to a location">?</a>
                 <button class="close-button" data-close-popup>&times;</button>
             </div>
             <div class="help-body">
@@ -99,18 +101,6 @@
         </div>
     </div>
     
-    <!-- Help popup -->
-    <div id="help-popup" class="help-popup" style="display: none;">
-        <div class="help-content">
-            <div class="help-header">
-                <h2>Interactive Web Map Help</h2>
-                <button id="close-help" class="close-button">&times;</button>
-            </div>
-            <div class="help-body">
-                {webmap_help}
-            </div>
-        </div>
-    </div>
     <script src="js/shared_utils.js"></script>
     <script>
         maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);

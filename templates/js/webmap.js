@@ -329,6 +329,15 @@ map.on('load', async () => {
         legendControl.legendButton.textContent = '▸';
         legendControl.legendButton.title = 'Expand panel';
     }
+    if (legendTitle) {
+        const visibilityHelp = document.createElement('a');
+        visibilityHelp.href = '/local/documents/help/visibility_panel.html';
+        visibilityHelp.target = '_blank';
+        visibilityHelp.className = 'help-icon';
+        visibilityHelp.title = 'Help: layers and basemaps';
+        visibilityHelp.textContent = '?';
+        legendTitle.after(visibilityHelp);
+    }
 
     // layers we need to load dynamically follow:
     // {dynamic_layers}
@@ -425,6 +434,7 @@ map.on('load', async () => {
                     <input id="conv-author" placeholder="Your name" style="width:100%;box-sizing:border-box;margin-top:4px;font-size:0.85em">
                     <button id="conv-submit" style="margin-top:6px;padding:4px 12px;cursor:pointer">Submit</button>
                     <span id="conv-status" style="font-size:0.8em;margin-left:8px;color:#666"></span>
+                    <a href="/local/documents/help/conversations.html" target="_blank" class="help-icon" style="float:right;margin-top:6px" title="Help: conversations">?</a>
                 </div>
             </div>`;
 
@@ -765,9 +775,6 @@ map.on('load', async () => {
             }
         });
     }
-
-    // Initialize help popup
-    initializeHelpPopup(document.getElementById('help-popup').querySelector('.help-body').innerHTML);
 
     // Collapse toggle
     const collapseBtn = document.getElementById('nav-collapse-btn');

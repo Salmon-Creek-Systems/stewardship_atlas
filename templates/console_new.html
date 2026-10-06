@@ -28,6 +28,7 @@
                 <span>Maps</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/user_manual.html#the-web-map" target="_blank" class="help-icon sb-help" title="Help: using the web map">?</a>
             <ul class="sb-list" id="sb-maps-list"></ul>
         </div>
 
@@ -36,6 +37,7 @@
                 <span>Downloads</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/help/download_gpkg.html" target="_blank" class="help-icon sb-help" title="Help: downloads">?</a>
             <ul class="sb-list" id="sb-downloads-list"></ul>
         </div>
 
@@ -58,6 +60,7 @@
                 <span>Versions</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/help/publish_version.html" target="_blank" class="help-icon sb-help" title="Help: publishing and versions">?</a>
             <div class="sb-body">
                 <div class="version-badge" id="sb-version-badge"></div>
                 <div class="version-actions">
@@ -152,7 +155,10 @@
 <!-- Add Layer modal (administration + technical views) -->
 <div id="add-layer-modal" class="modal-backdrop" hidden>
   <div class="modal" role="dialog" aria-labelledby="al-title">
-    <h3 id="al-title" class="modal-title">Add Layer</h3>
+    <div class="modal-head">
+      <h3 id="al-title" class="modal-title">Add Layer</h3>
+      <a id="al-help" href="/local/documents/help/add_layer.html" target="_blank" class="help-icon" title="Help">?</a>
+    </div>
 
     <div id="al-name-box">
       <label class="field-label" for="al-name">Layer name</label>
@@ -289,7 +295,10 @@
 
 <div id="delete-layer-modal" class="modal-backdrop" hidden>
   <div class="modal" role="dialog" aria-labelledby="dl-title">
-    <h3 id="dl-title" class="modal-title">Delete Layer</h3>
+    <div class="modal-head">
+      <h3 id="dl-title" class="modal-title">Delete Layer</h3>
+      <a href="/local/documents/help/delete_layer.html" target="_blank" class="help-icon" title="Help: deleting a layer">?</a>
+    </div>
     <div id="dl-plan"></div>
     <div id="dl-confirm-box" hidden>
       <label class="field-label" for="dl-confirm">Type <b id="dl-name"></b> to confirm</label>
@@ -479,10 +488,11 @@ function makeLayerDropdown(label, items) {
     menu.setAttribute('role', 'menu');
     items.forEach(function(item) {
         var el;
-        if (item.type === 'link') {
+        if (item.type === 'link' || item.type === 'help') {
             el = document.createElement('a');
             el.href = item.href;
-            el.className = 'dd-item';
+            el.className = item.type === 'help' ? 'dd-item dd-item-help' : 'dd-item';
+            if (item.type === 'help') el.target = '_blank';
         } else {
             el = document.createElement('button');
             el.className = 'dd-item' + (item.danger ? ' dd-item-danger' : '');
@@ -831,7 +841,17 @@ function initializePage(data) {
             plus.title = 'Add layer';
             plus.setAttribute('aria-label', 'Add layer');
             plus.onclick = openAddLayerModal;
-            lbl.appendChild(plus);
+            var layersHelp = document.createElement('a');
+            layersHelp.className = 'help-icon panel-help';
+            layersHelp.href = '/local/documents/admin_manual.html#working-with-layers';
+            layersHelp.target = '_blank';
+            layersHelp.title = 'Help: working with layers';
+            layersHelp.textContent = '?';
+            var tools = document.createElement('span');
+            tools.className = 'panel-tools';
+            tools.appendChild(layersHelp);
+            tools.appendChild(plus);
+            lbl.appendChild(tools);
         }
     }
     alPalettes = data.palettes || {};
@@ -903,6 +923,8 @@ function initializePage(data) {
         });
         var mapsSection = document.getElementById('sb-maps-section');
         if (mapsSection) mapsSection.style.display = '';
+        // Admins see Build buttons here, so their "?" explains building.
+        if (mapsSection && showBuild) mapsSection.querySelector('.sb-help').href = '/local/documents/help/build_outputs.html';
     }
 
     // Downloads
@@ -932,6 +954,7 @@ function initializePage(data) {
         });
         var dlSection = document.getElementById('sb-downloads-section');
         if (dlSection) dlSection.style.display = '';
+        if (dlSection && showDlBuild) dlSection.querySelector('.sb-help').href = '/local/documents/help/build_outputs.html';
     }
 
     // PUBLIC: embed webmap
@@ -972,6 +995,7 @@ function initializePage(data) {
                 if (hasRebuild) {
                     entries.push({ type: 'button', text: 'Rebuild from source', onclick: function(btn) { refreshLayer(name, 'rebuild', btn); } });
                 }
+                entries.push({ type: 'help', href: '/local/documents/help/refresh_layer.html', text: '? Help' });
                 actions.appendChild(makeLayerDropdown('Refresh', entries));
             })(item.name, item.has_rebuild);
 
@@ -981,7 +1005,8 @@ function initializePage(data) {
                     { type: 'link', href: '../../webedit/' + name + '_create.html', text: 'Draw' },
                     { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' },
                     { type: 'link', href: '../../webedit/' + name + '_reshape.html', text: 'Reshape' },
-                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } }
+                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } },
+                    { type: 'help', href: '/local/documents/admin_manual.html#editing-data', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -989,7 +1014,8 @@ function initializePage(data) {
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Spreadsheets', [
                     { type: 'button', text: 'Import from Sheet', onclick: function(btn) { importFromSheet(name, btn); } },
-                    { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } }
+                    { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } },
+                    { type: 'help', href: '/local/documents/help/spreadsheet_workflow.html', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -1000,7 +1026,8 @@ function initializePage(data) {
                     { type: 'button', text: 'Copy Layer…', onclick: function() { copyLayer(name); } },
                     { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
                     { type: 'button', text: 'Delete Layer…', danger: true, onclick: function() { openDeleteLayer(name); } },
-                    { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
+                    { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' },
+                    { type: 'help', href: '/local/documents/admin_manual.html#working-with-layers', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -1065,6 +1092,7 @@ function openAddLayerModal() {
     alUpload = null; alProps = []; alNumeric = {};
     alSetStatus('');
     document.getElementById('al-title').textContent = 'Add Layer';
+    document.getElementById('al-help').href = '/local/documents/help/add_layer.html';
     document.getElementById('al-create').textContent = 'Add';
     document.getElementById('al-name').value = '';
     // Reset everything a previous Edit may have left behind.
@@ -1114,6 +1142,7 @@ function alOpenEditLayerModal(layerName) {
     alUpload = null; alProps = []; alNumeric = {};
     alSetStatus('');
     document.getElementById('al-title').textContent = 'Style: ' + layerName;
+    document.getElementById('al-help').href = '/local/documents/help/edit_layer_style.html';
     document.getElementById('al-create').textContent = 'Save';
     document.getElementById('al-geometry').value = layer.geometry_type || 'point';
 
