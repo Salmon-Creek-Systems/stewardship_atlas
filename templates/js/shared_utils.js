@@ -294,6 +294,8 @@ function initializeBasemapSwitching(map) {
             case 'shaded-relief':
                 targetLayer = 'shaded-relief-layer';
                 break;
+            case 'none':
+                return;  // every basemap is already hidden
         }
         
         if (targetLayer && map.getLayer(targetLayer)) {

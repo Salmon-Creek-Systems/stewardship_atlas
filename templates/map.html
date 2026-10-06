@@ -14,11 +14,16 @@
 
 </head>
 <body>
-    <div id="controls" class="loading">
-        <!-- Title Panel -->
-        <div class="control-panel title-panel">
+    <div id="controls" class="webmap-controls loading">
+        <!-- Header row: atlas name, QR, nav links and the collapse toggle -->
+        <div class="control-panel title-panel header-row">
             <h4>{title}</h4>
             {qr_code}
+            <nav class="header-links">
+                <a href="../html/admin" class="header-link">Home</a>
+                <a href="../3dview/" class="header-link">3D</a>
+                <a href="#" class="header-link" id="help-link">?</a>
+            </nav>
             <button id="nav-collapse-btn" class="nav-collapse-btn" title="Collapse panel">▾</button>
         </div>
 
@@ -27,42 +32,72 @@
             <!-- Loading overlay (covers nav-body while tiles load; position:absolute so doesn't affect flow) -->
             <div id="nav-loading-overlay"><span>Loading layers...</span></div>
 
-            <!-- View Panel -->
-            <div class="control-panel view-panel">
-                <label>Basemap:</label>
-                <select id="basemap-select" class="input-field">
-                    {lidar_basemap_option}<option value="usgs">USGS Topo</option>
-                    <option value="satellite">Satellite (ESRI)</option>
-                    <option value="terrain">OpenMapTiles Terrain</option>
-                    <option value="shaded-relief">USGS Shaded Relief (WMS)</option>
-                </select>
-            </div>
-
             <!-- Regions Panel (only when the atlas has a regions layer) -->
             {regions_panel}
 
-            <!-- Sharing Panel -->
+            <!-- Sharing Panel: both buttons open a pop-up (share-popup / goto-popup below) -->
             <div class="control-panel sharing-panel">
-                <button id="share-view-btn" class="button" style="width: 100%; padding: 5px; margin-bottom: 5px;">Share</button>
-                <label>Share format:</label>
-                <select id="coords-format-select" class="input-field">
-                    <option value="json">JSON coordinates</option>
-                    <option value="google">Google Maps link</option>
-                    <option value="internal">Internal map link</option>
-                </select>
-                <input type="text" id="location-input" class="input-field" placeholder="paste location here" style="width: calc(100% - 50px); display: inline-block;">
-                <button id="go-location-btn" class="button" style="width: 40px; margin-left: 5px; padding: 5px;">Go</button>
+                <div class="sharing-buttons">
+                    <div class="sharing-button-cell">
+                        <button id="share-view-btn" class="button">Share</button>
+                        <div class="sharing-hint">(Ctrl/&#8984;-click to share pin)</div>
+                    </div>
+                    <div class="sharing-button-cell">
+                        <button id="goto-btn" class="button">Go to&hellip;</button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Navigation Panel -->
-            <div class="control-panel nav-panel">
-                <a href="../html/admin" class="button link-button">Home</a>
-                <a href="../3dview/" class="button link-button">3D</a>
-                <a href="#" class="button link-button" id="help-link">?</a>
-            </div>
         </div>
     </div>
     <div id="map"></div>
+
+    <!-- Basemap picker: webmap.js moves this into the Visibility (legend) panel once it exists -->
+    <div id="basemap-control" class="basemap-control" style="display: none;">
+        <label for="basemap-select">Basemap</label>
+        <select id="basemap-select" class="input-field">
+            {lidar_basemap_option}<option value="usgs">USGS Topo</option>
+            <option value="satellite">Satellite (ESRI)</option>
+            <option value="terrain">OpenMapTiles Terrain</option>
+            <option value="shaded-relief">USGS Shaded Relief (WMS)</option>
+            <option value="none">None</option>
+        </select>
+    </div>
+
+    <!-- Share pop-up: opened by the Share button (view link) and by modifier-click / long press (pin link) -->
+    <div id="share-popup" class="help-popup map-popup" style="display: none;">
+        <div class="help-content">
+            <div class="help-header">
+                <h2 id="share-popup-title">Share view</h2>
+                <button class="close-button" data-close-popup>&times;</button>
+            </div>
+            <div class="help-body">
+                <label for="share-format-select">Link type</label>
+                <select id="share-format-select" class="input-field">
+                    <option value="internal">Internal map link</option>
+                    <option value="google">Google Maps link</option>
+                    <option value="json">JSON coordinates</option>
+                </select>
+                <textarea id="share-link-text" class="input-field" rows="3" readonly></textarea>
+                <button id="share-copy-btn" class="button">Copy to clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Go-to pop-up -->
+    <div id="goto-popup" class="help-popup map-popup" style="display: none;">
+        <div class="help-content">
+            <div class="help-header">
+                <h2>Go to location</h2>
+                <button class="close-button" data-close-popup>&times;</button>
+            </div>
+            <div class="help-body">
+                <label for="location-input">Paste a location or link</label>
+                <input type="text" id="location-input" class="input-field" placeholder="40.24, -123.96 &middot; Google Maps link &middot; JSON">
+                <button id="go-location-btn" class="button">Go to</button>
+            </div>
+        </div>
+    </div>
     
     <!-- Help popup -->
     <div id="help-popup" class="help-popup" style="display: none;">

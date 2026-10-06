@@ -299,7 +299,8 @@ def region_view_url(bbox, base_url, atlas_layer_names):
 
 
 def regions_panel_html(features):
-    """The webmap's Regions dropdown, or '' when there are no linked regions.
+    """The webmap's Preset Views dropdown (one view per region), or '' when there
+    are no linked regions. No label: the placeholder option names it.
 
     Each option's value is the region feature's stored `webmap_url`, so an
     edited link (webmap_url_override) is what the dropdown follows too."""
@@ -314,12 +315,26 @@ def regions_panel_html(features):
     if not options:
         return ''
     return ('<div class="control-panel regions-panel">\n'
-            '                <label>Regions:</label>\n'
-            '                <select id="regions-select" class="input-field">\n'
-            '                    <option value="">Go to region…</option>\n'
+            '                <select id="regions-select" class="input-field" aria-label="Preset Views">\n'
+            '                    <option value="">Preset Views</option>\n'
             + ''.join(f'                    {o}\n' for o in options) +
             '                </select>\n'
             '            </div>')
+
+
+# atlas.DEFAULT_CONFIG's description, which every atlas created without one inherits.
+PLACEHOLDER_DESCRIPTION = "Underscripted"
+
+
+def atlas_display_name(config):
+    """The atlas's human-readable name, for page titles and headers.
+
+    /create stores the name the user typed as `description`; atlases without one
+    (or with the DEFAULT_CONFIG placeholder) fall back to the slug, `name`."""
+    description = (config.get('description') or '').strip()
+    if description and description != PLACEHOLDER_DESCRIPTION:
+        return description
+    return config.get('name', '')
 
 
 def edit_page_layers(in_layers, edit_layer):

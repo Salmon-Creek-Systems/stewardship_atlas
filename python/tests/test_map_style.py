@@ -371,6 +371,11 @@ class TestRegionsPanel(unittest.TestCase):
         self.assertIn('&lt;b&gt;', out)
         self.assertIn('&amp;b=&quot;2&quot;', out)
 
+    def test_dropdown_is_named_preset_views_with_no_separate_label(self):
+        out = map_style.regions_panel_html([self._feature('A', 'u')])
+        self.assertIn('<option value="">Preset Views</option>', out)
+        self.assertNotIn('<label', out)
+
     def test_panel_has_no_format_braces(self):
         # generate_map_page substitutes it into a str.format template.
         out = map_style.regions_panel_html([self._feature('A', 'u')])
@@ -410,6 +415,27 @@ class TestLegendHidden(unittest.TestCase):
         self.assertFalse(map_style.legend_hidden({'id': 'photos-layer'}))
         self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': {'legend': {'name': 'x'}}}))
         self.assertFalse(map_style.legend_hidden({'id': 'x', 'metadata': None}))
+
+
+class TestAtlasDisplayName(unittest.TestCase):
+    """atlas_display_name: the /create name (stored as description), else the slug."""
+
+    def test_description_is_used(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'king_range', 'description': 'King Range'}),
+            'King Range')
+
+    def test_missing_description_falls_back_to_slug(self):
+        self.assertEqual(map_style.atlas_display_name({'name': 'kennedy'}), 'kennedy')
+
+    def test_blank_description_falls_back_to_slug(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'kennedy', 'description': '  '}), 'kennedy')
+
+    def test_default_config_placeholder_falls_back_to_slug(self):
+        self.assertEqual(
+            map_style.atlas_display_name({'name': 'scvfd', 'description': 'Underscripted'}), 'scvfd')
+
 
 if __name__ == '__main__':
     unittest.main()

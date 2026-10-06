@@ -675,7 +675,7 @@ void await map.loadImage('{im_uri}',
             qr_img.save(buf, format='PNG')
             b64 = base64.b64encode(buf.getvalue()).decode()
             qr_code_html = (
-                f'<button class="qr-toggle" id="qr-toggle">(QR)</button>'
+                f'<button class="qr-toggle" id="qr-toggle" title="QR code for this map">QR</button>'
                 f'<div class="qr-popup" id="qr-popup">'
                 f'<img src="data:image/png;base64,{b64}" alt="QR code" title="{page_url}">'
                 f'</div>'
@@ -684,7 +684,7 @@ void await map.loadImage('{im_uri}',
             logger.warning('qrcode package not installed; skipping QR code generation')
 
     processed_template = template.format(
-            title=title,
+            title=html_escape(title),
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
             cog_sources=json.dumps(map_config_data.get('cog_sources', {}), indent=2),
@@ -912,7 +912,7 @@ def outlet_webmap(config, name):
     if regions_path.exists():
         with open(regions_path) as f:
             regions_features = json.load(f).get('features', [])
-    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json,
+    html_path = generate_map_page(config, map_style.atlas_display_name(config), map_config, output_path, sprite_json,
                                   page_url=page_url, default_view=default_view,
                                   show_user_location=show_user_location,
                                   regions_panel=map_style.regions_panel_html(regions_features))
