@@ -228,12 +228,7 @@ If no colon present, the whole subject is used as the title and the layer defaul
 
 ### Authorized Senders
 
-`admin_emails` in atlas config controls who can submit:
-- **Non-empty list** → only those addresses accepted (403 otherwise, no bounce)
-- **Empty list `[]`** → open ingest mode (all senders accepted)
-- **Missing entirely** → treated as non-empty (safe default, allowlist behavior)
-
-Add new senders to `{atlas}.geojson`, commit, pull on server, rebuild config.
+**Anyone can submit** — `/ingest/email_photo` has no sender check (since 8f303be). `admin_emails` no longer gates email ingest; it still controls spreadsheet sharing. Per-purpose sender auth is #61 (and the field split #98).
 
 ### GPS Requirement
 
