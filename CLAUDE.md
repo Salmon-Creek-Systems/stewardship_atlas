@@ -17,6 +17,15 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Cloud-Native Plan**: `documents/cloud_native_plan.md` - Phased migration to S3/CloudFront + Lambda; Phase 1 done
 - **CDK Runbook**: `infrastructure/cdk/README.md` - Stacks, toolchain, first-deploy steps
 
+## Decisions & Constraints (2026-10)
+
+- **The old `html` console is retired.** Every atlas builds `console`; starters, `/create`, full builds and `atlas_full_refresh.sh` materialize it instead. nginx 301-redirects `…/outlets/html/…` → `…/outlets/console/…` (old bookmarks, QR codes, printed runbooks) and gates `console/(admin|internal)` with the same htpasswd files the html console used. The stale `html/` dirs stay on disk until the cloud cutover — don't delete them, don't link to them. Home links go to `../console/public/` (incl. webedit, for now).
+- **`versioned_outlets` must stay `[]`** on every atlas. It is a publish *copy filter* (#131 C9); the old `["html", "webmap"]` would drop the console from every version and the S3 push. `tests/test_json_configs.py::test_active_atlas_configs_are_current` enforces it.
+- **Active atlases** (kept current; listed in that test): scvfd, kennedy, westport, fhe, gilhamhike, king_range, napachar, south_fork_eel, abi_demo, mineralkinsey, isf_920, nfsc_refugia, mather, angelo, sherwood_ranch, laytonville, cahto_creek_ranch. **Abandoned — don't update:** samuelsloop, layt1, king_range_hike, wildwood, ft*, south_fork_eel_2026_10_02, and the box's backup/test dirs. All active atlases are single-file `configuration/{atlas}.geojson`, have `show_user_location` on every webmap, and a `cloud.outlets` allowlist.
+- **`/create` writes `configuration/{slug}.geojson`** in the shared checkout (not `staging/atlas.geojson`), because every console layer action and `atlas_full_refresh.sh` read the source from there. Still uncommitted on the box like other console edits (#195). On older `/create` atlases, `staging/atlas.geojson` is a stale birth copy — the repo file is the source.
+- **Help pages:** every `documents/help/*.md` starts `# Title` then `<!-- audience: user|admin|developer -->` (`python/help_docs.py`). The manuals (`user_manual.md`, `admin_manual.md`) are short narrative that links to help pages instead of repeating them; `user_guide.md` is now `developers_guide.md`. In-app `?` links open the most specific page in a new tab (`/local/documents/help/{page}.html` or a manual `#section`). `tests/test_help_docs.py` fails on a missing tag, an unlinked page, or any `?` whose target or anchor doesn't exist — add the page and a manual link together.
+- **Customer-facing copy uses US spelling.**
+
 ## Core Architecture Concepts
 
 The system uses a water/flow metaphor:
@@ -154,7 +163,14 @@ uvicorn --port 9000 --host 0.0.0.0 webapp:app --reload \
   --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
 ```
 
-**`--reload` has a race condition.** If the service was mid-flight during a `git pull`, `--reload` may not pick up the new code. Hard restart (kill screen session + relaunch) is required to guarantee new code is running.
+**`--reload` has a race condition.** If the service was mid-flight during a `git pull`, `--reload` may not pick up the new code. Hard restart (kill screen session + relaunch) is required to guarantee new code is running (#214 drops `--reload`). Deploy loop: pull → hard restart → materialize. Restart from the laptop:
+
+```bash
+ssh -i ~/.ssh/SCSProd.pem ubuntu@54.241.152.98 'sudo pkill -f "[u]vicorn.*webapp:app"; sudo screen -S app -X quit'
+ssh -i ~/.ssh/SCSProd.pem ubuntu@54.241.152.98 'cd /root/swales_dev/app/python && sudo screen -S app -d -m bash ../scripts/start_app.sh'
+```
+
+The `[u]` bracket matters: a bare `pkill -f "uvicorn.*webapp:app"` inside `ssh … bash -c "…"` matches and kills its own shell, leaving the API down. Always confirm `curl https://fireatlas.org:9000/publish-status?swale=kennedy` returns 200 afterwards.
 
 **Ghostty + screen**: The server doesn't have Ghostty's terminfo. Run `TERM=xterm-256color screen` or add `export TERM=xterm-256color` to `~/.bashrc` on the server.
 
@@ -330,7 +346,7 @@ Stacks (all **us-east-1**, since CloudFront requires its ACM cert there):
   "enabled": true,
   "outlets_bucket": "scs-atlas-outlets-prod",
   "distribution_id": "E1A5S5MB0K3FZG",
-  "outlets": ["webmap", "console", "html", "3dview", "runbook"]
+  "outlets": ["webmap", "console", "3dview", "runbook"]
 }
 ```
 
@@ -360,9 +376,9 @@ Until Phase 6 retires the box, its EBS volume `vol-09ea03f2f799ff5c6` is the **o
 
 **Phase 2a–2c complete (2026-08-21).** All eight atlases publish their public outlets to `scs-atlas-outlets-prod`, served by CloudFront at `next.fireatlas.org`. **No traffic goes there yet** — the box still serves everything.
 
-Use `scripts/atlas_full_refresh.sh <atlas>` for the per-atlas sequence (config rebuild → webmap → staging check → html → publish → verify). It encodes the ordering and runs a role-variant leak check on every publish. `-y` skips the staging prompt.
+Use `scripts/atlas_full_refresh.sh <atlas>` for the per-atlas sequence (config rebuild → webmap → staging check → console → publish → verify). It encodes the ordering and runs a role-variant leak check on every publish. `-y` skips the staging prompt.
 
-**`html` and `console` have no root `index.html`** — all four role variants are subdirectories, so the public entry point is `html/public/`. Checking `html/` always 403s.
+**`console` has no root `index.html`** — all four role variants are subdirectories, so the public entry point is `console/public/`. Checking `console/` always 403s.
 
 **2d moved to Phase 4** (#160). Its stated deliverable, "box goes private", is unreachable while protected outlets and the `:9000` API still live on the box. Next up is **Phase 3** (#159) — the S3 data-layer refactor; that issue's comment carries the full starting context.
 
@@ -635,7 +651,7 @@ atlas.materialize(config, "webmap")    # outlet
 
 | Key | What it generates |
 |-----|-------------------|
-| `html` | All console HTML variants (technical, admin, internal, public) — all four generated together. **Do not use `technical_console`, `admin_console`, etc. — they don't exist.** |
+| `console` | All console variants (technical, admin, internal, public) — all four generated together. Also renders the shared help pages and manuals into `/local/documents/`. **Do not use `technical_console`, `admin_console`, etc. — they don't exist.** The old `html` outlet is retired (see Decisions). |
 | `webmap` | MapLibre webmap |
 | `webmap_private` | Private variant of webmap |
 | `webedit` | Web editing interface |
@@ -645,7 +661,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
 
-**Outlet build order**: `webmap` must come before `html` — the console HTML checks if `outlets/webmap/index.html` exists at generation time.
+**Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
 ### Notable fetch_types
 
