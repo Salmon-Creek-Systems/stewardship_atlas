@@ -220,11 +220,9 @@ Keep commits focused — the deployed server may have uncommitted local changes.
 
 Pipeline: `scvfd@fireatlas.org` → SES → S3 `atlas-ingress/incoming/` → Lambda `atlas-email-photo-handler` → POST `/ingest/email_photo` on webapp → delta written → layer refreshed
 
-### Subject Line Format
+### Subject and Body Format
 
-`<layer>: <title>` — e.g. `hydrants: New hydrant on Miller Rd`
-
-If no colon present, the whole subject is used as the title and the layer defaults to `processing_sites`. Override the default per-atlas with `email_photo_default_layer` in the atlas GeoJSON.
+The whole subject is the feature title (`email_inlet.parse_subject`). The layer comes from the **body**: a `layer: <name>` (or `layer=<name>`) line, or a first line that is just a layer name; other `field: value` lines set editable columns (`email_inlet.parse_body`). No layer, or an unknown one, falls back to `email_photo_default_layer` in the atlas GeoJSON (default `processing_sites`).
 
 ### Authorized Senders
 
