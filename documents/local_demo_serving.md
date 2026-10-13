@@ -1,110 +1,40 @@
-# Local / Offline Atlas Serving
+# Local / Offline Atlas Demo
 
 ## Purpose
 
-Run a single atlas locally for demos, field use, or development without access to the production server. Provides read-only access to all pre-generated outputs: webmap, runbook, gazetteer, and the admin console.
+Run one atlas on a laptop with **no network**, for a live demo: webmap, 3D view, console, runbook PDFs, and the edit pages (drawing works; submitting shows "Offline demo: changes are not saved"). Nothing is written anywhere.
 
-## What works in read-only mode
+This is a deliberately minimal stopgap. The long-term version is "offline as an outlet artifact" (see `roadmap.md`).
 
-| Feature | Works offline? | Notes |
-|---|---|---|
-| Webmap | ✓ | Vector layers and PMTiles load from local files |
-| Runbook (PDFs + index) | ✓ | Fully static |
-| Gazetteer (PDFs + index) | ✓ | Fully static |
-| Admin console (view layers, versions) | ✓ | HTML is static; data is baked in |
-| 3D view (PMTiles terrain) | ✓ | If PMTiles are in the outlet dir |
-| Base map imagery (satellite, street) | ⚠ | Loads from external tile service — needs internet |
-| Delta upload / layer editing | ✗ | Requires server + QGIS |
-| Publish / rollback | ✗ | Requires server |
-| Refresh / materialize assets | ✗ | Requires server + QGIS |
-| SQL query | ✗ | Requires server + DuckDB |
-| Location sharing | Possible | One small read-only endpoint; see below |
-
-Write operations return a clear "read-only mode" response rather than silently failing.
-
-## Setup
-
-### 1. Sync atlas files from the server
+## Steps
 
 ```bash
-scripts/sync_atlas_local.sh scvfd ~/atlas_demo
+scripts/sync_atlas_local.sh south_fork_eel ~/atlas_demo     # ~5 min, ~370 MB
+python3 scripts/offline_bundle.py ~/atlas_demo south_fork_eel   # ~4 min, ~520 MB more
+python3 scripts/serve_local.py ~/atlas_demo
 ```
 
-This rsyncs only what's needed for serving:
-- `staging/outlets/` — all generated outputs
-- `staging/layers/` — GeoJSON layers (needed by webmap)
-- `staging/atlas_config.json`
-- `staging/local/` (resolving the symlink) — CSS, logo, documents
+Open `http://localhost:8080/south_fork_eel/staging/outlets/console/public/` (the server prints the webmap and 3D URLs too). Then **turn wifi off and click through everything** — that is the real test.
 
-Skips: `staging/deltas/`, raster source files, large DEMs.
+All three are stdlib Python / rsync; no installs needed.
 
-Estimated size: a few hundred MB depending on atlas (PDFs are the bulk).
+## What each script does
 
-### 2. Start the local server
+- **`sync_atlas_local.sh`** — rsyncs one atlas's `staging/` from the box as `ubuntu@` with `sudo rsync` (root SSH is blocked). Takes outlets (minus the retired `html/`, `work/`, notebooks), layer GeoJSON + `*.cog.tif` + sidecars (not raw `.tiff` sources), and only `documents/` and `css/` from `local/` — the `local` symlink is 25 GB of shared data. Lays files out like production (`/<atlas>/staging/…`, `/local/…`) so root-relative links work.
+- **`offline_bundle.py`** — downloads into `~/atlas_demo/_offline/`: the unpkg JS libraries the pages use, Open Sans glyphs (Latin ranges), the atlas's own COGs on `scs-atlas-data`, and AWS terrarium tiles z8–15 over the atlas extent +30%. Then rewrites the *copy*: box URLs → `localhost`, the API → `localhost/_api/`, externals → `_offline/`, the 3D view's Esri drape → the local basemap COG. Injects an "OFFLINE DEMO" banner and an alert on any attempted change. Ends by listing every external host still referenced.
+- **`serve_local.py`** — static server rooted at the demo dir, with HTTP Range support (the COG/PMTiles readers need it). `/_api/*` and any non-GET return 503 `{"error": "offline demo"}`.
 
-```bash
-python scripts/serve_local.py --data-dir ~/atlas_demo --atlas scvfd --port 8080
-```
+## Known gaps (acceptable for a demo)
 
-Open: `http://localhost:8080/staging/outlets/html/admin/`
+- Alternate basemaps (Esri, USGS, OpenTopo) are blank; the default LIDAR hillshade works.
+- Rasters borrowed from another atlas (SFE's three `fhe_*` layers) 404. Download them and add a rewrite if needed.
+- Photo popups load images from S3 — broken offline.
+- Google Fonts fall back to system fonts.
+- Read-only API features (SQL query, publish status, logs, annotate selection preview) fail quietly.
+- Glyphs cover Latin only; other characters in labels won't render.
 
-### 3. Verify
+## Gotchas
 
-- Webmap loads and layers are visible
-- Gazetteer and runbook index pages open
-- Admin console shows layer list (action buttons will show "read-only" if clicked)
-
----
-
-## How it works
-
-`serve_local.py` is a small FastAPI app (same dependency as the production webapp) that:
-
-1. **Serves static files** from the synced directory tree, matching the same URL paths the production server uses (`/staging/`, `/local/`).
-
-2. **Rewrites the console HTML** — the admin console has `baseurl` and `atlasappport` baked in pointing at production. The server intercepts requests to `*/html/admin/` and rewrites those values to `localhost:{port}` before sending.
-
-3. **Stubs read-only API calls** — returns live data from local files for:
-   - `/status` → reads `atlas_config.json`
-   - `/publish-status` → returns idle/read-only status
-
-4. **Returns 503 for write operations** with a JSON body `{"error": "read-only mode"}` — publish, delta upload, refresh, rollback, reset-staging.
-
----
-
-## Known limitations
-
-**Base map tiles**: the webmap base layer (satellite imagery, street map) loads from an external tile service and won't work without internet. The vector data layers and PMTiles terrain/hillshade load from local files and will work. Consider switching the base map style to a simple blank or minimal offline-capable style for offline demos.
-
-**Symlinks**: the production `staging/local/` is a symlink. The sync script resolves it with `rsync --copy-links`. On macOS this works fine.
-
-**URL rewriting is fragile**: the console HTML rewrite assumes the structure of the generated HTML. If `outlet_html` changes how it embeds `baseurl`/`atlasappport`, the rewrite regex needs updating.
-
-**atlas_config.json must be current**: the console reads config from the baked-in HTML (generated at outlet time), not from a live API call. If the atlas was last published a while ago, the displayed data reflects that state.
-
----
-
-## Relation to containerization
-
-This local server is essentially a preview of what a container-based deployment looks like:
-
-| Layer | Now | Container target |
-|---|---|---|
-| Code | Git checkout per atlas (`app/`) | Single shared image |
-| Data | Server filesystem + S3 partial | S3 backend (layers + outlets) |
-| Serving | uvicorn + full webapp | Lightweight static server + minimal read API |
-| Compute | QGIS on EC2, always on | Lambda/Fargate, triggered only for publish |
-
-The local demo mode makes the static-data boundary concrete: **everything in `outlets/` is truly static** and can be served from S3/CloudFront with zero compute. The only things that need compute are the write endpoints (delta upload, materialize, publish).
-
-A container for the write-path API would only need Python + the non-QGIS dependencies for most operations; QGIS-specific operations (PDF generation) could be a separate container or Lambda layer triggered by publish.
-
-The `serve_local.py` script is a useful artifact beyond just demos — it's a testbed for the minimal API surface that a production static-serving setup would need to stub or implement via Lambda.
-
----
-
-## Location sharing (optional)
-
-The production webapp has a `/location` endpoint for real-time crew location sharing. For demos this is a nice-to-have — if the demo involves multiple devices showing locations on the webmap.
-
-This could be added to `serve_local.py` as a small in-memory store (no persistence needed for a demo). One endpoint to store, one to retrieve. This is a few lines of FastAPI code and no additional dependencies.
+- **The port is baked in.** URLs are absolute (MapLibre sprite/glyph URLs must be), so `serve_local.py --port` must match `offline_bundle.py --port`. To change it: re-run the sync (rsync restores the original pages), then the bundle.
+- **Bundle edits the copy in place.** Re-running it is safe (idempotent, downloads are skipped), but a fresh sync is the clean reset.
+- The data is a snapshot of `staging/` at sync time — re-sync before the demo if the atlas changed.
