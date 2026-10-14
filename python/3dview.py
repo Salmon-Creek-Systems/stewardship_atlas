@@ -4,11 +4,13 @@
 Uses MapLibre GL JS to create 3D terrain visualization from existing elevation data.
 """
 
+import html
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 import versioning
 import utils
+import map_style
 
 
 _VECTOR_INCLUDE_TYPES = {'linestring', 'point', 'polygon'}
@@ -140,34 +142,50 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
     return sources, polygon_layers + line_layers + point_layers, toggle_list
 
 
-def _build_toggle_panel_html(toggle_list: list) -> str:
-    # The panel always renders so the Share view button is available, even for
-    # atlases with no overlay layers. The Layers header/list only appears when
-    # there are toggleable layers.
+_COLLAPSE_BTN = '<button class="panel-collapse-btn" title="Collapse panel">&#x25be;</button>'
+
+
+def _build_view_panel_html(toggle_list: list) -> str:
+    """Bottom-left View panel: Share view, the layer toggles, then the terrain sliders.
+
+    Always renders, so Share view and the sliders are there even for atlases
+    with no overlay layers; the Layers list only appears when there are some.
+    """
     lines = [
-        '<div class="layer-panel">',
-        '    <div class="share-row">',
+        '<div class="panel view-panel">',
+        '    <div class="panel-head">',
+        f'        {_COLLAPSE_BTN}',
         '        <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
         '        <a href="/local/documents/help/3d_terrain_view.html" target="_blank" class="help-icon" title="Help: 3D view">?</a>',
         '    </div>',
+        '    <div class="panel-body">',
     ]
     if toggle_list:
         lines += [
-            '    <div class="layer-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">',
-            '        Layers <span class="layer-panel-arrow">&#x25be;</span>',
-            '    </div>',
-            '    <div class="layer-panel-list">',
+            '        <div class="panel-heading">Layers</div>',
+            '        <div class="layer-panel-list">',
         ]
         for t in toggle_list:
             ids_attr = ','.join(t['ids'])
             checked = ' checked' if t['visible'] else ''
             lines.append(
-                f'        <label>'
+                f'            <label>'
                 f'<input type="checkbox" data-layers="{ids_attr}" data-name="{t["name"]}"{checked}> '
                 f'{t["label"]}</label>'
             )
-        lines += ['    </div>']
-    lines += ['</div>']
+        lines += ['        </div>']
+    lines += [
+        '        <div class="terrain-controls">',
+        '            <label>Exaggeration',
+        '                <input type="range" id="exaggeration" min="0.1" max="3" step="0.1" value="1.5">',
+        '                <span id="exaggeration-value">1.5x</span></label>',
+        '            <label>Pitch',
+        '                <input type="range" id="pitch" min="0" max="85" step="5" value="60">',
+        '                <span id="pitch-value">60&deg;</span></label>',
+        '        </div>',
+        '    </div>',
+        '</div>',
+    ]
     return '\n'.join(lines)
 
 
@@ -476,6 +494,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     Generate a 3D terrain HTML page using MapLibre GL JS with AWS Open Data terrain.
     """
     atlas_name = config['name']
+    display_name = map_style.atlas_display_name(config)
 
     bbox = config['dataswale']['bbox']
     center_lng = (bbox['west'] + bbox['east']) / 2
@@ -483,7 +502,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     in_layers = config.get('assets', {}).get('3dview', {}).get('in_layers')
     vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers)
-    toggle_panel_html = _build_toggle_panel_html(toggle_list)
+    view_panel_html = _build_view_panel_html(toggle_list)
 
     route_layers = [t for t in toggle_list if t['geometry_type'] == 'linestring']
     route_panel_html = _build_route_panel_html(route_layers)
@@ -625,7 +644,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>3D Terrain - {atlas_name.title()}</title>
+    <title>{html.escape(display_name)} 3D View</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
@@ -647,41 +666,74 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             width: 100%;
             height: 100%;
         }}
-        .info-panel {{
+        /* Panels mirror the web map's: 80%-opaque white, a ▾/▸ collapse toggle top-left. */
+        .panel {{
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 10px;
+            border-radius: 6px;
             z-index: 1000;
-            max-width: 300px;
-        }}
-        .info-panel h3 {{
-            margin: 0 0 10px 0;
-            color: #333;
-        }}
-        .info-panel p {{
-            margin: 5px 0;
             font-size: 14px;
         }}
-        .terrain-controls {{
-            position: absolute;
+        .panel-head {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .panel-collapse-btn {{
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            padding: 0 2px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            line-height: 1;
+        }}
+        .panel-collapse-btn:hover {{
+            color: #000;
+        }}
+        .panel.collapsed .panel-body {{
+            display: none;
+        }}
+        .title-panel {{
             top: 10px;
             right: 54px;  /* clear of MapLibre's zoom/compass/terrain buttons */
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
+            max-width: 300px;
+        }}
+        .title-panel h3 {{
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }}
+        .title-panel p {{
+            margin: 6px 0 0 0;
+            font-size: 13px;
+        }}
+        .view-panel {{
+            bottom: 10px;
+            left: 10px;
+            max-width: 240px;
+        }}
+        .panel-heading {{
+            font-weight: bold;
+            margin: 8px 0 4px 0;
+        }}
+        .terrain-controls {{
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid #ccc;
         }}
         .terrain-controls label {{
-            display: block;
-            margin: 5px 0;
-            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 4px 0;
+            font-size: 13px;
         }}
         .terrain-controls input {{
-            width: 100px;
-            margin-left: 10px;
+            flex: 1;
+            min-width: 0;
         }}
         .route-controls {{
             margin-top: 8px;
@@ -726,33 +778,6 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             font-size: 12px;
             color: #555;
         }}
-        .layer-panel {{
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
-            max-width: 200px;
-        }}
-        .layer-panel-header {{
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            margin-bottom: 6px;
-            user-select: none;
-        }}
-        .layer-panel-arrow {{
-            display: inline-block;
-            transition: transform 0.15s;
-        }}
-        .layer-panel.collapsed .layer-panel-list {{
-            display: none;
-        }}
-        .layer-panel.collapsed .layer-panel-arrow {{
-            transform: rotate(-90deg);
-        }}
         .layer-panel-list {{
             max-height: 300px;
             overflow-y: auto;
@@ -768,10 +793,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             cursor: pointer;
         }}
         .share-view-btn {{
-            display: block;
-            width: 100%;
-            margin-bottom: 8px;
-            padding: 6px 10px;
+            flex: 1;
+            padding: 5px 10px;
             background: #f0f0f0;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -782,15 +805,6 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         }}
         .share-view-btn:hover {{
             background: #e0e0e0;
-        }}
-        .share-row {{
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 8px;
-        }}
-        .share-row .share-view-btn {{
-            margin-bottom: 0;
         }}
         .help-icon {{
             display: inline-flex;
@@ -823,7 +837,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             position: absolute;
             bottom: 10px;
             right: 10px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.8);
             padding: 8px 15px;
             border-radius: 5px;
             z-index: 1000;
@@ -840,26 +854,17 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <div class="map-container">
         <div id="map"></div>
 
-        <div class="info-panel">
-            <h3>3D Terrain View</h3>
-            <p><strong>Atlas:</strong> {atlas_name.title()}</p>
-            <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>{route_panel_html}
+        <div class="panel title-panel">
+            <div class="panel-head">
+                {_COLLAPSE_BTN}
+                <h3>{html.escape(display_name)} 3D View</h3>
+            </div>
+            <div class="panel-body">
+                <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>{route_panel_html}
+            </div>
         </div>
 
-        <div class="terrain-controls">
-            <label>
-                Terrain Exaggeration:
-                <input type="range" id="exaggeration" min="0.1" max="3" step="0.1" value="1.5">
-                <span id="exaggeration-value">1.5x</span>
-            </label>
-            <label>
-                Pitch:
-                <input type="range" id="pitch" min="0" max="85" step="5" value="60">
-                <span id="pitch-value">60&deg;</span>
-            </label>
-        </div>
-
-        {toggle_panel_html}
+        {view_panel_html}
 
         <a href="#" onclick="history.back(); return false;" class="back-link">&larr; Back</a>
     </div>
@@ -890,6 +895,15 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             source: 'terrain',
             exaggeration: 1.5
         }}));
+
+        // Panel collapse toggles, as on the web map: ▾ open, ▸ collapsed.
+        document.querySelectorAll('.panel-collapse-btn').forEach(btn => {{
+            btn.addEventListener('click', () => {{
+                const collapsed = btn.closest('.panel').classList.toggle('collapsed');
+                btn.textContent = collapsed ? '\u25b8' : '\u25be';
+                btn.title = collapsed ? 'Expand panel' : 'Collapse panel';
+            }});
+        }});
 
         const exaggerationSlider = document.getElementById('exaggeration');
         const exaggerationValue = document.getElementById('exaggeration-value');

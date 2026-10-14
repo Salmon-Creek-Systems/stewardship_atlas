@@ -62,6 +62,15 @@ class TestCameraRoute(unittest.TestCase):
         # Share view still works without the route code.
         self.assertIn("typeof routeShareState === 'function'", html)
 
+    def test_title_uses_display_name(self):
+        cfg = _config(LAYERS)
+        cfg['description'] = 'Kennedy Fire & Rescue'
+        html = dview.generate_3d_terrain_html(cfg)
+        self.assertIn('<h3>Kennedy Fire &amp; Rescue 3D View</h3>', html)
+        self.assertIn('<title>Kennedy Fire &amp; Rescue 3D View</title>', html)
+        # Every panel gets the web map's collapse toggle.
+        self.assertEqual(html.count('class="panel-collapse-btn"'), 2)
+
     def test_placeholders_filled(self):
         html = dview.generate_3d_terrain_html(_config(LAYERS))
         self.assertNotRegex(html, r'__[A-Z_]+__')

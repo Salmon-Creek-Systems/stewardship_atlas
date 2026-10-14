@@ -16,7 +16,9 @@ Click **3D** in the header of the web map.
 - **Pan**: Left-click and drag
 
 The map starts in a slightly tilted overhead view. Drag to tilt further to see terrain
-relief clearly.
+relief clearly. The panel at bottom left also has **Exaggeration** (how strongly hills
+are drawn) and **Pitch** sliders, below the layer list. Click &#x25be; at the top left
+of either panel to fold it away, and &#x25b8; to bring it back.
 
 ## Sharing a 3D view
 
@@ -25,7 +27,7 @@ it — the same spot, camera angle and tilt, and the same layers showing.
 
 ## Animating a camera route
 
-**Animate Camera**, in the 3D Terrain View box (top left), flies the camera along a
+**Animate Camera**, in the 3D View panel (top right), flies the camera along a
 line layer: a road, a creek, or a route you drew for the purpose.
 
 1. Choose a line layer from the dropdown. The map zooms out to show the whole route,
