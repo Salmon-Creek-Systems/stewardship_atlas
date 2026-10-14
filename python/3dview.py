@@ -19,7 +19,7 @@ _AWS_TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z
 # Camera route animation defaults: height above the aimed-at ground point (m),
 # camera angle (MapLibre pitch: 0 = straight down, 85 = MapLibre 4's max), and
 # total duration (s) to traverse every line in the layer.
-_ROUTE_DEFAULTS = {'height': 100, 'angle': 45, 'secs': 60}
+_ROUTE_DEFAULTS = {'height': 300, 'angle': 45, 'secs': 240}
 
 # Layer names containing any of these substrings start visible; all others start hidden.
 _DEFAULT_VISIBLE_PATTERNS = ('road', 'creek', 'stream', 'photo')
@@ -172,7 +172,11 @@ def _build_toggle_panel_html(toggle_list: list) -> str:
 
 
 def _build_route_panel_html(route_layers: list) -> str:
-    """'Animate Camera Route' controls; empty when the 3D view has no line layers."""
+    """'Animate Camera' controls; empty when the 3D view has no line layers.
+
+    One line (label, layer dropdown, help) until a layer is chosen; the camera
+    settings and buttons then appear beneath it.
+    """
     if not route_layers:
         return ''
     options = '\n'.join(
@@ -181,19 +185,22 @@ def _build_route_panel_html(route_layers: list) -> str:
     )
     return f'''
             <div class="route-controls">
-                <div class="route-title">Animate Camera Route
-                    <a href="/local/documents/help/3d_terrain_view.html#animating-a-camera-route" target="_blank" class="help-icon" title="Help: camera routes">?</a>
-                </div>
-                <select id="route-layer">
-                    <option value="">&mdash; choose a line layer &mdash;</option>
+                <div class="route-row">
+                    <span class="route-title">Animate Camera</span>
+                    <select id="route-layer">
+                    <option value="">Choose a layer&hellip;</option>
 {options}
-                </select>
-                <label>Height above ground (m): <input type="number" id="route-height" min="1" step="10" value="{_ROUTE_DEFAULTS['height']}"></label>
-                <label>Camera angle (&deg;): <input type="number" id="route-angle" min="0" max="85" step="5" value="{_ROUTE_DEFAULTS['angle']}"></label>
-                <label>Duration (s): <input type="number" id="route-secs" min="1" step="5" value="{_ROUTE_DEFAULTS['secs']}"></label>
-                <div class="route-buttons">
-                    <button id="route-play" disabled>&#x25b6; Play</button>
-                    <button id="route-stop" disabled>&#x25a0; Stop</button>
+                    </select>
+                    <a href="/local/documents/help/3d_terrain_view.html#animating-a-camera-route" target="_blank" class="help-icon" title="Help: animate camera">?</a>
+                </div>
+                <div id="route-details" hidden>
+                    <label>Height above ground (m): <input type="number" id="route-height" min="1" step="50" value="{_ROUTE_DEFAULTS['height']}"></label>
+                    <label>Camera angle (&deg;): <input type="number" id="route-angle" min="0" max="85" step="5" value="{_ROUTE_DEFAULTS['angle']}"></label>
+                    <label>Duration (s): <input type="number" id="route-secs" min="1" step="10" value="{_ROUTE_DEFAULTS['secs']}"></label>
+                    <div class="route-buttons">
+                        <button id="route-play" disabled>&#x25b6; Play</button>
+                        <button id="route-stop" disabled>&#x25a0; Stop</button>
+                    </div>
                 </div>
                 <div id="route-status" class="route-status"></div>
             </div>'''
@@ -215,6 +222,7 @@ _ROUTE_JS = """
                        startedAt: 0, secs: 60, raf: null, bearing: null};
         const routeEls = {
             layer: document.getElementById('route-layer'),
+            details: document.getElementById('route-details'),
             height: document.getElementById('route-height'),
             angle: document.getElementById('route-angle'),
             secs: document.getElementById('route-secs'),
@@ -383,6 +391,7 @@ _ROUTE_JS = """
             route.legs = [];
             route.total = 0;
             setRouteButtons();
+            routeEls.details.hidden = !name;
             if (!name) { setRouteStatus(''); return false; }
             setRouteStatus('Loading route...');
             let fc;
@@ -678,21 +687,24 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             margin-top: 8px;
             padding-top: 8px;
             border-top: 1px solid #ccc;
-            max-width: 260px;
+            font-size: 14px;
         }}
-        .route-title {{
+        .route-row {{
             display: flex;
             align-items: center;
             gap: 6px;
-            font-weight: bold;
-            font-size: 14px;
-            margin-bottom: 4px;
         }}
-        .route-controls select {{
-            width: 100%;
+        .route-title {{
+            font-weight: bold;
+            white-space: nowrap;
+        }}
+        .route-row select {{
+            flex: 1;
+            min-width: 0;
         }}
         .route-controls label {{
             display: flex;
+            margin: 5px 0;
             justify-content: space-between;
             align-items: center;
         }}
@@ -831,7 +843,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         <div class="info-panel">
             <h3>3D Terrain View</h3>
             <p><strong>Atlas:</strong> {atlas_name.title()}</p>
-            <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>
+            <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>{route_panel_html}
         </div>
 
         <div class="terrain-controls">
@@ -844,7 +856,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                 Pitch:
                 <input type="range" id="pitch" min="0" max="85" step="5" value="60">
                 <span id="pitch-value">60&deg;</span>
-            </label>{route_panel_html}
+            </label>
         </div>
 
         {toggle_panel_html}

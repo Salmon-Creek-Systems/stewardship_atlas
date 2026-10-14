@@ -1,4 +1,4 @@
-"""3D view HTML generation: the Animate Camera Route controls."""
+"""3D view HTML generation: the Animate Camera controls."""
 import importlib
 import json
 import os
@@ -41,7 +41,9 @@ class TestCameraRoute(unittest.TestCase):
 
     def test_dropdown_lists_only_line_layers(self):
         html = dview.generate_3d_terrain_html(_config(LAYERS))
-        self.assertIn('Animate Camera Route', html)
+        self.assertIn('Animate Camera', html)
+        # Only the dropdown row shows until a layer is chosen.
+        self.assertIn('<div id="route-details" hidden>', html)
         options = re.findall(r'<option value="([^"]+)">', html)
         self.assertEqual(options, ['roads', 'evac_route'])
         self.assertEqual(_route_urls(html), {
@@ -55,7 +57,7 @@ class TestCameraRoute(unittest.TestCase):
 
     def test_no_line_layers_no_route_panel(self):
         html = dview.generate_3d_terrain_html(_config([{'name': 'hydrants', 'geometry_type': 'point'}]))
-        self.assertNotIn('Animate Camera Route', html)
+        self.assertNotIn('Animate Camera', html)
         self.assertNotIn('ROUTE_URLS', html)
         # Share view still works without the route code.
         self.assertIn("typeof routeShareState === 'function'", html)

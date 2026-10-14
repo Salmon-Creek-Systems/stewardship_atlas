@@ -25,17 +25,17 @@ it — the same spot, camera angle and tilt, and the same layers showing.
 
 ## Animating a camera route
 
-The **Animate Camera Route** box (top right) flies the camera along a line layer:
-a road, a creek, or a route you drew for the purpose.
+**Animate Camera**, in the 3D Terrain View box (top left), flies the camera along a
+line layer: a road, a creek, or a route you drew for the purpose.
 
 1. Choose a line layer from the dropdown. The map zooms out to show the whole route,
-   and the layer is switched on so you can see it.
+   the layer is switched on so you can see it, and the camera settings appear.
 2. Set the camera:
    - **Height above ground (m)**: how high the camera sits above the point it is
-     looking at. The camera rises and falls with the terrain. Default 100.
+     looking at. The camera rises and falls with the terrain. Default 300.
    - **Camera angle (°)**: 0 looks straight down, 85 looks almost level toward
      the horizon. Default 45.
-   - **Duration (s)**: how long the whole trip takes. Default 60.
+   - **Duration (s)**: how long the whole trip takes. Default 240 (4 minutes).
 3. Press **Play**. **Pause** holds the camera where it is; **Stop** resets to the start.
    You can change the height and angle while it plays.
 
