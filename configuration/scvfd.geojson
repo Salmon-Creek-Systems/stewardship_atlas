@@ -10,7 +10,11 @@
                 "shared_dir": "/root/data/",
                 "versioned_outlets": [],
                 "cloud": {
-                    "outlets": ["webmap", "console", "gazetteer"]
+                    "outlets": [
+                        "webmap",
+                        "console",
+                        "gazetteer"
+                    ]
                 },
                 "admin_emails": [
                     "gateless@gmail.com",
@@ -1007,6 +1011,29 @@
                             0
                         ],
                         "qgis_label_scale": 2.0
+                    },
+                    "circuit": {
+                        "name": "circuit",
+                        "geometry_type": "linestring",
+                        "color": [
+                            255,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff5e2e",
+                            "line-width": 3,
+                            "line-opacity": 1.0
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
                     }
                 },
                 "assets": {
@@ -1122,7 +1149,8 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
-                            "hazards"
+                            "hazards",
+                            "circuit"
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
@@ -1227,7 +1255,8 @@
                             "mileage_markers",
                             "mileage_zones",
                             "mileage_zones_oneloop",
-                            "mileage_markers_oneloop"
+                            "mileage_markers_oneloop",
+                            "circuit"
                         ],
                         "config_def": "webedit"
                     },
@@ -1292,7 +1321,8 @@
                             "basemap",
                             "roads",
                             "creeks",
-                            "culverts"
+                            "culverts",
+                            "circuit"
                         ]
                     },
                     "sqlquery": {
@@ -1307,7 +1337,9 @@
                         "type": "outlet",
                         "name": "config_edit",
                         "config_def": "config_editor",
-                        "access": ["technical"],
+                        "access": [
+                            "technical"
+                        ],
                         "interaction": "interface"
                     },
                     "gazetteer_grid": {

@@ -38,7 +38,10 @@
                 "default_h3_resolution": 9,
                 "email_photo_default_layer": "photos",
                 "cloud": {
-                    "outlets": ["webmap", "console"]
+                    "outlets": [
+                        "webmap",
+                        "console"
+                    ]
                 },
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data",
@@ -1115,6 +1118,29 @@
                             }
                         },
                         "show_attributes": true
+                    },
+                    "camera_tour": {
+                        "name": "camera_tour",
+                        "geometry_type": "linestring",
+                        "color": [
+                            235,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#eb5e2e",
+                            "line-width": 3,
+                            "line-opacity": 0.52
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
                     }
                 },
                 "assets": {
@@ -1631,7 +1657,8 @@
                             "mileage_markers",
                             "photos",
                             "inaturalist_threatened",
-                            "mtbs_sample"
+                            "mtbs_sample",
+                            "camera_tour"
                         ],
                         "access": [
                             "public",
@@ -1685,7 +1712,8 @@
                             "creeks",
                             "landmarks",
                             "photos",
-                            "mtbs_sample"
+                            "mtbs_sample",
+                            "camera_tour"
                         ],
                         "access": [
                             "internal",
