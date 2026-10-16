@@ -1,0 +1,4 @@
+# Hourly usage report → https://fireatlas.org/usage/ (scripts/usage_report.py).
+# Install on the box as a regular root-owned file (cron skips symlinks):
+#   sudo install -m 644 -o root -g root infrastructure/cron/fireatlas-usage /etc/cron.d/
+17 * * * * root /usr/bin/python3 /root/swales_dev/app/scripts/usage_report.py >> /var/log/fireatlas_usage.log 2>&1

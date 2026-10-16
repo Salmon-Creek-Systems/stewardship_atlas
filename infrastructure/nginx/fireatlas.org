@@ -23,6 +23,15 @@
 # To add a new atlas: no nginx changes needed — just add data under SWALES_ROOT/{atlas}/
 
 
+# ── Usage log (scripts/usage_report.py) ─────────────────────────────────────
+# http-level, so every server block on the box writes it alongside the stock
+# access.log: combined format plus the vhost and the owner cookie that
+# /identify_as_scs sets. The report reads only this file.
+log_format usage '$remote_addr - $remote_user [$time_local] "$request" '
+                 '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                 '$host "$cookie_fa_owner"';
+access_log /var/log/nginx/usage.log usage;
+
 # ── Static file server — fireatlas.org ──────────────────────────────────────
 
 server {
@@ -57,6 +66,25 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
     # ABI demo shortcut
+    # Marks this browser as SCS's own so the usage report leaves it out.
+    # Domain covers every *.fireatlas.org site; ten-year lifetime.
+    location = /identify_as_scs {
+        add_header Set-Cookie "fa_owner=1; Domain=.fireatlas.org; Path=/; Max-Age=315360000; Secure; SameSite=Lax";
+        default_type text/html;
+        return 200 '<!doctype html><meta name="viewport" content="width=device-width"><p style="font:16px sans-serif;margin:2em">This browser is now marked as SCS and left out of the <a href="/usage/">usage report</a>.</p>';
+    }
+
+    # Usage report, regenerated hourly by scripts/usage_report.py (cron).
+    # ^~ so the atlas-root redirect regex below doesn't catch /usage/.
+    location = /usage {
+        return 301 /usage/;
+    }
+    location ^~ /usage/ {
+        alias /var/www/usage/;
+        auth_basic "Fire Atlas usage";
+        auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
+    }
+
     location = /biochar_atlas_poc {
       return 302 https://fireatlas.org/abi_demo/staging/outlets/biochar_webedit/;
     }
