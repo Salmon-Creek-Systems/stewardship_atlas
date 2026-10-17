@@ -1377,6 +1377,20 @@
                         "name": "console",
                         "config_def": "console"
                     },
+                    "game_kit": {
+                        "type": "outlet",
+                        "name": "game_kit",
+                        "config_def": "game_kit",
+                        "access": ["admin"],
+                        "title": "Salmon Creek",
+                        "in_layers": ["lidar_basemap", "creeks", "roads", "buildings"],
+                        "roles": {
+                            "roads": ["roads"],
+                            "landmarks": ["poi"],
+                            "hazards": ["hazards"],
+                            "water": ["watertanks"]
+                        }
+                    },
                     "road_lrs_oneloop": {
                         "type": "eddy",
                         "config_def": "road_lrs",

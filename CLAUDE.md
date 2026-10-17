@@ -663,6 +663,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
+| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check); `python/game_kit.py` + `outlets_game_kit.py`. Layers map to game roles via the asset's `roles` |
 
 **Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
