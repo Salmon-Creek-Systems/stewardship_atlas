@@ -88,10 +88,14 @@ So the loop runs **atlas → readiness check → community fixes → game → ne
 
 - The `game_kit` outlet is on branch `feature/game-kit`. It covers the board PDF, the local cards and the readiness page (`python/game_kit.py`, `python/outlets_game_kit.py`); the asset's `roles` setting maps layers to game roles.
 - SCVFD is the first atlas wired up, admin-only because it prints names from admin layers.
+- **Safe locations** are now a point layer, `safe_locations`. A piece that reaches one is saved and leaves the game. The `game_safe_exits` inlet seeds the layer with points where arterial and collector roads leave the atlas; everything else is drawn by hand in webedit.
+- **Roads are filtered** in DuckDB by category (SCVFD keeps arterials, collectors and county local roads). A road outside those categories stays if it serves a safe location, helispot, landmark, or at least 3 buildings, and its shortest connection to the kept network is kept with it. Short dead ends that serve nothing are pruned. On SCVFD this keeps 160 of 336 km.
+- **Spaces** sit at every junction and evenly along the roads between, sized so that the longest trip across the board is about 32 spaces (800 m per space on SCVFD).
+- The readiness check now asks **whether every space has a road to safety**. On SCVFD, 236 of 244 spaces don't: the US 101 piece that leaves the atlas isn't joined to the local network inside the map (a gap of about 430 m at the interchange). Fixing the road data, or drawing a safe location where Salmon Creek Rd meets the highway, closes it.
 - **Next:**
-  - explicit `exits`, `safe_places`, `helispots` and `landmarks` layers for SCVFD;
-  - the outlet reading those in preference to its guesses;
+  - draw SCVFD's real safe locations;
+  - add `helispots` and `landmarks` layers;
   - an alert-system line for the setup sheet.
-- **Later:** road-network checks, such as neighborhoods with only one way out, or a single bridge every route depends on.
+- **Later:** more road-network checks, such as neighborhoods with only one way out, or a single bridge every route depends on.
 
 The game, its rules and its artwork belong to the UC Davis [Prototyping Resilience](https://prototypingresilience.com/diy-game-kit) project. The outlet only links to their kit and adds local pieces. The figures here are made by `images/game_kit/make_figures.py` from SCVFD staging data.

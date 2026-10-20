@@ -5,24 +5,34 @@ Writes outlets/{name}/:
   index.html   readiness check, links to the original kit, board key, sample evacuation order
   cards.html   local chance cards, 9 per Letter page
   board.pdf    36 x 24 in board rendered with QGIS
-  board/*.geojson  the generated overlays (grid, step dots, exits, places...)
+  board/*.geojson  the generated overlays (grid, roads, spaces, safe locations, places...)
 
-The game logic and pages live in game_kit.py (pure Python, tested locally);
-this module reads the layers, writes files and renders the board.
+The board is built in three steps: game_roads.py filters the roads in DuckDB,
+game_board.py turns them into a network of spaces, and game_kit.py adds the
+cards, readiness check and pages. This module reads the layers, writes the
+files and renders the board.
 
 Asset config (on top of the shared `game_kit` def):
-  roles:        {role: [layer, ...]} for roads, landmarks, safe_places, helispots,
-                hazards, water. An unassigned role is reported by the readiness check.
-  in_layers:    atlas layers drawn under the overlays (styled as in the runbook)
-  label_layers: which of those keep their labels (default roads, creeks)
-  title, alert_system, step_m, max_exits, exit_roads, board_size_in, feature_scale
+  roles:          {role: [layer, ...]} for roads, safe_locations, helispots,
+                  landmarks, residences, hazards, water. An unassigned role is
+                  reported by the readiness check.
+  road_filter:    {"field": property, "keep": [values]} — road categories on the
+                  board. Other roads stay only if they serve a safe location,
+                  helispot or landmark, or residence_min residences.
+  residence_min:  buildings a road must pass to be kept for them (default 3)
+  in_layers:      atlas layers drawn under the overlays (styled as in the runbook);
+                  leave roads out, the board draws its own filtered roads
+  label_layers:   which of those keep their labels (default creeks)
+  title, alert_system, step_m, target_spaces, board_size_in, feature_scale
 """
 
 import json
 import logging
 from pathlib import Path
 
+import game_board
 import game_kit
+import game_roads
 import versioning
 
 logger = logging.getLogger(__name__)
@@ -50,7 +60,8 @@ def outlet_game_kit(config, outlet_name):
 
     role_layers = {role: {name: _read_layer(config, name) for name in layers}
                    for role, layers in outlet_config.get('roles', {}).items()}
-    kit = game_kit.build_kit(config['name'], bbox, role_layers, outlet_config)
+    board = build_board(bbox, role_layers, outlet_config)
+    kit = game_kit.build_kit(config['name'], bbox, role_layers, board, outlet_config)
 
     overlay_paths = {}
     for stem, fc in game_kit.overlay_layers(kit).items():
@@ -78,27 +89,49 @@ def outlet_game_kit(config, outlet_name):
             'cards': len(kit['cards']), 'output': str(out_dir)}
 
 
+def build_board(bbox, role_layers, outlet_config):
+    """Filter the roads (DuckDB), then lay out spaces and safe locations (game_board)."""
+    def feats(role):
+        return [f for fs in role_layers.get(role, {}).values() for f in fs]
+
+    targets = {role: (feats(role), 1) for role in ("safe_locations", "helispots", "landmarks")}
+    targets["residences"] = (feats("residences"), outlet_config.get("residence_min", 3))
+    parts = game_roads.road_parts(feats("roads"), bbox, outlet_config.get("road_filter"),
+                                  {kind: t for kind, t in targets.items() if t[0]})
+    board = game_board.build_board(parts, bbox, game_kit.safe_points(feats("safe_locations")),
+                                   step_m=outlet_config.get("step_m"),
+                                   target_spaces=outlet_config.get("target_spaces", game_board.TARGET_SPACES))
+    logger.info(f"game_kit: {len(parts)} road parts -> {len(board['roads'])} board edges, "
+                f"{board['kept_m'] / 1000:.0f}/{board['total_m'] / 1000:.0f} km, step {board['step_m']} m, "
+                f"{len(board['spaces'])} spaces, {len(board['safe'])} safe")
+    return board
+
+
 # ── board rendering (QGIS) ──────────────────────────────────────────────────
 
 def _style_overlay(layer, stem):
     """Marker and label styling for one generated overlay layer."""
-    from qgis.core import QgsFillSymbol, QgsMarkerSymbol, QgsSingleSymbolRenderer
+    from qgis.core import QgsFillSymbol, QgsLineSymbol, QgsMarkerSymbol, QgsSingleSymbolRenderer
 
     if stem == "game_grid":
         symbol = QgsFillSymbol.createSimple({
             'style': 'no', 'outline_color': '60,60,60,200',
             'outline_width': '1.0', 'outline_style': 'dash'})
+    elif stem == "game_roads":
+        symbol = QgsLineSymbol.createSimple({
+            'line_color': '233,196,106', 'line_width': '3.0', 'capstyle': 'round', 'joinstyle': 'round'})
+        casing = QgsLineSymbol.createSimple({
+            'line_color': '255,255,255', 'line_width': '4.6', 'capstyle': 'round', 'joinstyle': 'round'})
+        symbol.insertSymbolLayer(0, casing.symbolLayer(0).clone())
     else:
         marker = {
             "game_grid_labels": {'name': 'circle', 'size': '0', 'outline_style': 'no'},
-            "game_steps": {'name': 'circle', 'size': '3.2', 'color': '255,255,255',
-                           'outline_color': '0,0,0', 'outline_width': '0.45'},
-            "game_exits": {'name': 'triangle', 'size': '11', 'color': '200,30,30',
-                           'outline_color': '255,255,255', 'outline_width': '0.8'},
+            "game_spaces": {'name': 'circle', 'size': '4.5', 'color': '255,255,255',
+                            'outline_color': '60,60,60', 'outline_width': '0.5'},
             "game_places": {'name': 'circle', 'size': '11', 'color': '255,255,255',
                             'outline_color': '0,0,0', 'outline_width': '0.9'},
-            "game_safe": {'name': 'square', 'size': '11', 'color': '30,140,60',
-                          'outline_color': '255,255,255', 'outline_width': '0.8'},
+            "game_safe": {'name': 'circle', 'size': '30', 'color': '40,160,80,110',
+                          'outline_color': '20,110,50', 'outline_width': '1.2'},
             "game_helispots": {'name': 'circle', 'size': '12', 'color': '250,210,40',
                                'outline_color': '0,0,0', 'outline_width': '0.9'},
         }[stem]
@@ -108,9 +141,9 @@ def _style_overlay(layer, stem):
     labels = {
         # stem: (field, size pt, color, around the point rather than on it)
         "game_grid_labels": ("label", 60, (90, 90, 90), False),
-        "game_exits": ("label", 18, (200, 30, 30), True),
+        "game_roads": ("name", 13, (90, 60, 0), False),
         "game_places": ("label", 16, (0, 0, 0), False),
-        "game_safe": ("label", 16, (30, 140, 60), True),
+        "game_safe": ("label", 22, (20, 110, 50), False),
         "game_helispots": ("label", 18, (0, 0, 0), False),
     }
     if stem in labels:
@@ -119,14 +152,17 @@ def _style_overlay(layer, stem):
 
 def _label(layer, field, size_pt, rgb, around):
     from qgis.core import (QgsPalLayerSettings, QgsTextFormat, QgsTextBufferSettings,
-                           QgsVectorLayerSimpleLabeling, QgsUnitTypes)
+                           QgsVectorLayerSimpleLabeling, QgsUnitTypes, QgsWkbTypes)
     from qgis.PyQt.QtGui import QColor, QFont
 
     settings = QgsPalLayerSettings()
     settings.enabled = True
     settings.fieldName = field
-    settings.displayAll = True
-    settings.placement = QgsPalLayerSettings.AroundPoint if around else QgsPalLayerSettings.OverPoint
+    settings.displayAll = layer.geometryType() != QgsWkbTypes.LineGeometry   # road names may collide
+    if layer.geometryType() == QgsWkbTypes.LineGeometry:
+        settings.placement = QgsPalLayerSettings.Curved
+    else:
+        settings.placement = QgsPalLayerSettings.AroundPoint if around else QgsPalLayerSettings.OverPoint
     if around:
         settings.dist = 3
         settings.distUnits = QgsUnitTypes.RenderMillimeters
@@ -151,22 +187,20 @@ def _label(layer, field, size_pt, rgb, around):
 
 
 # Bottom to top.
-OVERLAY_ORDER = ["game_grid", "game_steps", "game_safe", "game_helispots",
-                 "game_places", "game_exits", "game_grid_labels"]
+OVERLAY_ORDER = ["game_grid", "game_roads", "game_safe", "game_spaces", "game_helispots",
+                 "game_places", "game_grid_labels"]
 
 
 def _panel_text(kit):
-    lines = ["EXITS"]
-    lines += [f"  {e['letter']}  {e['name']}" for e in kit['exits']] or ["  none found"]
-    lines += ["", "SAFE PLACES"]
-    lines += [f"  ■  {p['name']}" for p in kit['safe_places']] or ["  none mapped"]
+    lines = ["SAFE LOCATIONS — reach one and you're out: saved"]
+    lines += [f"  ●  {s['name']}" for s in kit['safe']] or ["  none mapped"]
     if kit['helispots']:
         lines += ["", "HELISPOTS"] + [f"  H  {h['name']}" for h in kit['helispots']]
     lines += ["", "NUMBERED PLACES"]
     places = [f"  {p['number']:>2}  {p['name']}" for p in kit['places']]
     lines += (places[:40] + [f"  … and {len(places) - 40} more"]) if len(places) > 40 else places
     lines += [] if places else ["  none mapped"]
-    lines += ["", f"One dot = one step = {kit['step_m']} m of road.",
+    lines += ["", f"One space = about {kit['step_m']} m of road.",
               "Grid cells 1–12 match the Fire Location spinner."]
     gaps = [c for c in kit['readiness'] if c['status'] != 'ok']
     if gaps:
@@ -193,7 +227,7 @@ def render_board(config, outlet_config, kit, overlay_paths, pdf_path):
     try:
         layers_config = {x['name']: x for x in config['dataswale']['layers']}
         feature_scale = outlet_config.get('feature_scale', 1.0)
-        label_layers = outlet_config.get('label_layers', ['roads', 'creeks'])
+        label_layers = outlet_config.get('label_layers', ['creeks'])
         base = []
         for name in outlet_config.get('in_layers', []):
             if name not in layers_config:

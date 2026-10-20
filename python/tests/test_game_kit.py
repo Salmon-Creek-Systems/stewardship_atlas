@@ -4,6 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import game_board as gb
 import game_kit as gk
 
 # ~8.5 km x 11 km around 40.2 N
@@ -20,11 +21,11 @@ def point(lon, lat, name):
             "properties": {"name": name}}
 
 
-# A T: a highway crossing the whole atlas west→east, a dead-end spur north from it,
-# and a back road that leaves through the south edge.
-HIGHWAY = road([[-124.05, 40.2], [-123.95, 40.2], [-123.85, 40.2]], "US HWY 101")
+# A T: a highway across the whole atlas west→east (already clipped to it), a
+# dead-end spur north from it, and a back road to the south edge.
+HIGHWAY = road([[-124.0, 40.2], [-123.95, 40.2], [-123.92, 40.2], [-123.9, 40.2]], "US HWY 101")
 SPUR = road([[-123.95, 40.2], [-123.95, 40.23]], "Spur Rd")
-BACK = road([[-123.92, 40.2], [-123.92, 40.10]], "Back Rd")
+BACK = road([[-123.92, 40.2], [-123.92, 40.15]], "Back Rd")
 
 
 class TestNames(unittest.TestCase):
@@ -53,60 +54,38 @@ class TestBoard(unittest.TestCase):
         self.assertEqual(gk.grid_cell_of([-123.901, 40.151], BBOX), 12)
         self.assertEqual(gk.grid_cell_of([-120, 50], BBOX), 4)     # clamped to the north-east
 
-    def test_exits_where_roads_leave(self):
-        exits = gk.find_exits([HIGHWAY, SPUR, BACK], BBOX)
-        sides = sorted((e["name"], e["side"]) for e in exits)
-        self.assertEqual(sides, [("Back Rd", "south"), ("US Hwy 101", "east"), ("US Hwy 101", "west")])
-        west = next(e for e in exits if e["side"] == "west")
-        self.assertAlmostEqual(west["lonlat"][0], -124.0)
-        self.assertAlmostEqual(west["lonlat"][1], 40.2)
-
-    def test_road_clipped_to_the_edge_still_exits(self):
-        clipped = road([[-123.95, 40.2], [-124.0, 40.2]], "Clipped Rd")
-        self.assertEqual([e["side"] for e in gk.find_exits([clipped], BBOX)], ["west"])
-
-    def test_same_road_same_side_is_one_exit(self):
-        wiggle = road([[-123.95, 40.2], [-124.01, 40.2], [-123.99, 40.18], [-124.01, 40.17]], "Wiggle Rd")
-        self.assertEqual(len(gk.find_exits([wiggle], BBOX)), 1)
-
-    def test_board_exits_prefer_highways_then_length(self):
-        exits = gk.find_exits([HIGHWAY, SPUR, BACK], BBOX)
-        named = {"US Hwy 101": 100.0, "Back Rd": 5000.0}
-        chosen = gk.board_exits(exits, named, max_exits=2)
-        self.assertEqual({e["name"] for e in chosen}, {"US Hwy 101"})
-        self.assertEqual([e["letter"] for e in chosen], ["A", "B"])
-        only_back = gk.board_exits(exits, named, exit_roads=["BACK RD"])
-        self.assertEqual([e["name"] for e in only_back], ["Back Rd"])
-
-    def test_step_dots_spacing_and_clipping(self):
-        k = gk.meters_per_degree(BBOX)
-        dots = gk.step_points([SPUR], BBOX, 500)
-        spur_m = 0.03 * k[1]
-        self.assertEqual(len(dots), int(spur_m // 500))
-        self.assertAlmostEqual((dots[1][1] - dots[0][1]) * k[1], 500, delta=1)
-        # the highway's dots stop at the atlas edge
-        hwy = gk.step_points([HIGHWAY], BBOX, 500)
-        self.assertTrue(all(BBOX["west"] < p[0] < BBOX["east"] for p in hwy))
-
     def test_places_numbered_and_unnamed_dropped(self):
         places = gk.numbered_places([point(-123.95, 40.17, "Store"), point(-123.99, 40.24, "School"),
                                      point(-123.95, 40.2, ""), point(-125, 40.2, "Far away")], BBOX)
         self.assertEqual([(p["number"], p["name"]) for p in places], [(1, "School"), (2, "Store")])
 
 
+def safe(lon, lat, name, source="drawn"):
+    return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            "properties": {"name": name, "source": source}}
+
+
+EDGE_SAFE = [safe(-124.0, 40.2, "US Hwy 101 (west edge)", "edge"),
+             safe(-123.9, 40.2, "US Hwy 101 (east edge)", "edge")]
+
+
 class TestKit(unittest.TestCase):
 
-    def kit(self, **roles):
-        base = {"roads": {"roads": [HIGHWAY, SPUR, BACK]}}
-        return gk.build_kit("test", BBOX, {**base, **roles}, {"alert_system": "Humboldt Alert"})
+    def kit(self, roads=(HIGHWAY, SPUR, BACK), **roles):
+        role_layers = {"roads": {"roads": list(roads)}, **roles}
+        parts = [{"rid": i, "coords": f["geometry"]["coordinates"], "by_class": True, "serves": set()}
+                 for i, f in enumerate(roads)]
+        safe_feats = [f for fs in role_layers.get("safe_locations", {}).values() for f in fs]
+        board = gb.build_board(parts, BBOX, gk.safe_points(safe_feats), step_m=500)
+        return gk.build_kit("test", BBOX, role_layers, board, {"alert_system": "Humboldt Alert"})
 
     def status(self, kit):
         return {c["key"]: c["status"] for c in kit["readiness"]}
 
-    def test_bare_atlas_is_missing_safe_places_and_places(self):
+    def test_bare_atlas_is_missing_safe_locations_and_places(self):
         s = self.status(self.kit())
-        self.assertEqual(s["exits"], "ok")
-        self.assertEqual(s["safe_places"], "missing")
+        self.assertEqual(s["safe_locations"], "missing")
+        self.assertEqual(s["way_out"], "missing")
         self.assertEqual(s["places"], "missing")
         self.assertEqual(s["helispots"], "warn")
         self.assertFalse(gk.ready(self.kit()))
@@ -114,23 +93,31 @@ class TestKit(unittest.TestCase):
     def test_complete_atlas_is_ready(self):
         landmarks = [point(-123.99 + i * 0.01, 40.16 + i * 0.01, f"Place {i}") for i in range(6)]
         kit = self.kit(landmarks={"poi": landmarks},
-                       safe_places={"sites": [point(-123.93, 40.21, "Community Hall")]},
+                       safe_locations={"safe_locations": EDGE_SAFE + [safe(-123.92, 40.151, "Community Hall")]},
                        helispots={"heli": [point(-123.94, 40.22, "Ridge")]},
                        hazards={"hazards": [point(-123.95, 40.21, "One-lane bridge")]})
         self.assertTrue(gk.ready(kit), kit["readiness"])
+        self.assertEqual(self.status(kit)["way_out"], "ok")
         self.assertIn("Community Hall", kit["evacuation_order"])
 
-    def test_one_exit_is_missing(self):
-        kit = gk.build_kit("test", BBOX, {"roads": {"roads": [SPUR, BACK]}})
-        self.assertEqual(self.status(kit)["exits"], "missing")
+    def test_one_safe_location_is_missing(self):
+        kit = self.kit(safe_locations={"safe_locations": EDGE_SAFE[:1]})
+        self.assertEqual(self.status(kit)["safe_locations"], "missing")
+
+    def test_stranded_roads_warn(self):
+        island = road([[-123.99, 40.17], [-123.966, 40.17]], "Island Rd")
+        kit = self.kit(roads=(HIGHWAY, SPUR, BACK, island), safe_locations={"safe_locations": EDGE_SAFE})
+        self.assertEqual(self.status(kit)["way_out"], "warn")
+        self.assertEqual(kit["stranded_spaces"], 5)
 
     def test_cards_use_local_names_and_skip_empty_layers(self):
-        kit = self.kit(hazards={"hazards": [point(-123.95, 40.21, "One-lane bridge")]})
+        kit = self.kit(hazards={"hazards": [point(-123.95, 40.21, "One-lane bridge")]},
+                       safe_locations={"safe_locations": EDGE_SAFE})
         text = " ".join(c["text"] for c in kit["cards"])
         self.assertIn("One-lane bridge on Spur Rd", text)
-        self.assertIn("US Hwy 101", text)
+        self.assertIn("US Hwy 101 (west edge)", text + " ".join(s["name"] for s in kit["safe"]))
         self.assertNotIn("Loved one", " ".join(c["title"] for c in kit["cards"]))
-        self.assertIn("Where do we go?", [c["title"] for c in kit["cards"]])
+        self.assertIn("Where do we go?", [c["title"] for c in kit["cards"]])   # only edge points
 
     def test_cards_are_deterministic(self):
         self.assertEqual(self.kit()["cards"], self.kit()["cards"])
@@ -144,10 +131,11 @@ class TestKit(unittest.TestCase):
         self.assertEqual(gk.cards_html(kit).count("class='card'"), len(kit["cards"]))
 
     def test_overlays_are_feature_collections(self):
-        layers = gk.overlay_layers(self.kit())
+        layers = gk.overlay_layers(self.kit(safe_locations={"safe_locations": EDGE_SAFE}))
         self.assertEqual(len(layers["game_grid"]["features"]), 12)
-        self.assertEqual(len(layers["game_exits"]["features"]), 3)
-        self.assertEqual(layers["game_safe"]["features"], [])
+        self.assertEqual([f["properties"]["label"] for f in layers["game_safe"]["features"]], ["SAFE", "SAFE"])
+        self.assertTrue(layers["game_roads"]["features"])
+        self.assertTrue(layers["game_spaces"]["features"])
 
 
 if __name__ == '__main__':

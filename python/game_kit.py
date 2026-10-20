@@ -6,17 +6,20 @@ design: Tom Maiorana, UC Davis) to one atlas. That kit ships rules, spinners,
 vehicle and generic chance cards, and leaves the board and the place-specific
 cards to each community. This module builds those two from atlas layers:
 
-  - board overlays: the 1-12 fire-location grid, step dots along the roads,
-    exits (roads crossing the atlas edge), numbered places, safe places and
-    helispots;
-  - local chance cards filled in from real road names, hazards, exits and
-    places;
+  - board overlays: the 1-12 fire-location grid, the filtered roads and their
+    spaces, safe locations (reach one and you're out: saved), numbered
+    places and helispots;
+  - local chance cards filled in from real road names, hazards, safe
+    locations and places;
   - a readiness check: what the atlas is missing before the game can be
-    built. A missing ingredient (no safe places, no exits, unnamed roads) is
-    a gap in the atlas worth fixing whether or not anyone plays.
+    built. A missing ingredient (fewer than two safe locations, roads with
+    no way to safety, unnamed roads) is a gap in the atlas worth fixing
+    whether or not anyone plays.
 
-Pure Python on GeoJSON dicts (no shapely/QGIS) so it tests locally;
-outlets_game_kit.py renders the board PDF with QGIS and writes the pages.
+The board itself (which roads, where the spaces go) comes from
+game_roads.py (DuckDB filtering) and game_board.py (graph); build_kit takes
+its result. Pure Python on GeoJSON dicts (no shapely/QGIS) so it tests
+locally; outlets_game_kit.py renders the board PDF with QGIS.
 """
 
 import html
@@ -35,11 +38,11 @@ KIT_FILES = [
 ]
 
 GRID_COLS, GRID_ROWS = 4, 3          # 12 cells, matching the Fire Location spinner
-STEPS_ACROSS = 30                    # default step spacing: long side of the atlas / 30
+STEPS_ACROSS = 30                    # fallback step spacing: long side of the atlas / 30
 EDGE_TOLERANCE_M = 10                # a vertex this close to the atlas edge counts as on it
 EXIT_MERGE_M = 300                   # crossings closer than this are one exit
-MIN_EXITS = 2
-MAX_EXITS = 8                        # exits on the board, longest roads first
+MIN_SAFE = 2                         # safe locations a playable board needs
+MAX_EXITS = 8                        # (board_exits, uncalled) exits on the board, longest roads first
 MIN_PLACES = 6                       # enough numbered places for the "go to ⑰" cards
 
 # Road "names" that aren't: a bare street type or a number.
@@ -197,6 +200,10 @@ def grid_cell_of(lonlat, bbox, cols=GRID_COLS, rows=GRID_ROWS):
     return min(max(r, 0), rows - 1) * cols + min(max(c, 0), cols - 1) + 1
 
 
+# find_exits, board_exits and step_points are not called by the outlet any more:
+# exits are hand-checked safe_locations points (seeded by the game_safe_exits
+# inlet) and spaces come from game_board. Kept as a library for other boards.
+
 def find_exits(road_features, bbox, merge_m=EXIT_MERGE_M):
     """Exits: points where a road leaves the atlas. Nearby crossings merge into one.
 
@@ -333,46 +340,62 @@ def _segment_dist_m(p, a, b, k):
 
 # ── the kit ─────────────────────────────────────────────────────────────────
 
-def build_kit(atlas_name, bbox, role_layers, options=None):
+def build_kit(atlas_name, bbox, role_layers, board, options=None):
     """Everything the outlet writes, from layer features grouped by game role.
 
-    role_layers: {role: {layer_name: [features]}} for roles roads, landmarks,
-    safe_places, helispots, hazards, water. A role with no layers configured is
-    absent; a configured layer that is empty maps to [].
+    role_layers: {role: {layer_name: [features]}} for roles roads,
+    safe_locations, helispots, landmarks, residences, hazards, water. A role
+    with no layers configured is absent; a configured layer that is empty maps
+    to []. board: game_board.build_board()'s result for these roads.
     """
     options = options or {}
     feats = {role: [f for fs in layers.values() for f in fs] for role, layers in role_layers.items()}
     roads = feats.get("roads", [])
-    step_m = options.get("step_m") or default_step_m(bbox)
 
-    named, unnamed_m = named_road_lengths(roads, bbox)
-    all_exits = find_exits(roads, bbox)
-    exits = board_exits(all_exits, named, options.get("max_exits", MAX_EXITS), options.get("exit_roads"))
-    places = numbered_places(feats.get("landmarks", []), bbox)
-    safe = numbered_places(feats.get("safe_places", []), bbox)
-    helis = [{"name": feature_name(f) or "Helispot", "lonlat": _point(f)}
-             for f in feats.get("helispots", []) if _point(f)]
+    board_roads = [{"type": "Feature", "geometry": {"type": "LineString", "coordinates": r["coords"]},
+                    "properties": {"name": feature_name(roads[r["rid"]]) if r["rid"] < len(roads) else None}}
+                   for r in board["roads"]]
+    named, _ = named_road_lengths(board_roads, bbox)
+    all_named, unnamed_m = named_road_lengths(roads, bbox)
+    reachable = [d for d in board["to_safety"] if d is not None]
 
     kit = {
         "atlas": atlas_name,
         "title": options.get("title") or atlas_name,
         "bbox": bbox,
-        "step_m": step_m,
+        "step_m": board["step_m"],
         "grid": grid_cells(bbox),
-        "steps": step_points(roads, bbox, step_m),
-        "exits": exits,
-        "all_exit_count": len(all_exits),
-        "places": places,
-        "safe_places": safe,
-        "helispots": helis,
+        "roads": board_roads,
+        "spaces": board["spaces"],
+        "safe": board["safe"],
+        "unplaced_safe": board["unplaced_safe"],
+        "longest_to_safety": max(reachable) if reachable else None,
+        "stranded_spaces": len(board["to_safety"]) - len(reachable),
+        "places": numbered_places(feats.get("landmarks", []), bbox),
+        "helispots": [{"name": feature_name(f) or "Helispot", "lonlat": _point(f)}
+                      for f in feats.get("helispots", []) if _point(f)],
         "named_roads": named,
+        "all_named_roads": all_named,
         "unnamed_road_m": unnamed_m,
+        "kept_m": board["kept_m"],
+        "total_m": board["total_m"],
         "alert_system": options.get("alert_system"),
     }
     kit["readiness"] = readiness(kit, role_layers, options)
     kit["cards"] = local_cards(kit, feats, options)
     kit["evacuation_order"] = evacuation_order(kit)
     return kit
+
+
+def safe_points(features):
+    """safe_locations features as build_board's safe_points."""
+    return [{"name": feature_name(f) or "Safe", "lonlat": _point(f),
+             "source": (f.get("properties") or {}).get("source") or "drawn"}
+            for f in features if _point(f)]
+
+
+def _drawn(safe):
+    return [s for s in safe if s.get("source") != "edge"]
 
 
 def overlay_layers(kit):
@@ -382,12 +405,11 @@ def overlay_layers(kit):
         "game_grid": g,
         "game_grid_labels": _fc([_pt([c["properties"]["label_x"], c["properties"]["label_y"]],
                                      label=str(c["properties"]["cell"])) for c in g["features"]]),
-        "game_steps": _fc([_pt(p) for p in kit["steps"]]),
-        "game_exits": _fc([_pt(e["lonlat"], label=f"EXIT {e['letter']}", name=e["name"])
-                           for e in kit["exits"]]),
+        "game_roads": _fc(kit["roads"]),
+        "game_spaces": _fc([_pt(p) for p in kit["spaces"]]),
+        "game_safe": _fc([_pt(s["lonlat"], label="SAFE", name=s["name"]) for s in kit["safe"]]),
         "game_places": _fc([_pt(p["lonlat"], label=str(p["number"]), name=p["name"])
                             for p in kit["places"]]),
-        "game_safe": _fc([_pt(p["lonlat"], label=p["name"]) for p in kit["safe_places"]]),
         "game_helispots": _fc([_pt(h["lonlat"], label="H", name=h["name"]) for h in kit["helispots"]]),
     }
 
@@ -413,19 +435,27 @@ def readiness(kit, role_layers, options):
             return "no layer is assigned to this in the game_kit outlet"
         return ", ".join(f"{name} ({len(fs)})" for name, fs in layers.items()) or "no layers"
 
-    n_exits = len(kit["exits"])
+    safe, drawn = kit["safe"], _drawn(kit["safe"])
+    detail = (f"{len(safe)} on the board ({len(safe) - len(drawn)} where a main road leaves the "
+              f"atlas, {len(drawn)} drawn by hand): {layer_note('safe_locations')}")
+    if kit["unplaced_safe"]:
+        detail += f". {len(kit['unplaced_safe'])} too far from any board road to place"
     checks.append(_check(
-        "exits", "Ways out", n_exits >= MIN_EXITS,
-        f"{kit['all_exit_count']} road crossing(s) of the atlas edge; {n_exits} on the board"
-        + (": " + ", ".join(f"{e['letter']} {e['name']}" for e in kit["exits"]) if n_exits else ""),
-        "Fewer than two ways out. Either the road data stops short of the atlas edge, "
-        "or the community really has one road out. Both are worth knowing; check the roads layer.",
+        "safe_locations", "Safe locations", len(safe) >= MIN_SAFE, detail,
+        "A board needs at least two places to get to: where evacuation routes leave the area, "
+        "and safe places inside it. Run the game_safe_exits inlet, then draw the rest in the "
+        "safe_locations layer.",
     ))
+    total_spaces = len(kit["spaces"])
     checks.append(_check(
-        "safe_places", "Safe places to go", bool(kit["safe_places"]),
-        f"{len(kit['safe_places'])} named safe place(s): {layer_note('safe_places')}",
-        "No evacuation sites or temporary refuge areas are mapped. The Fire's evacuation order "
-        "needs somewhere to send people: add a safe-places layer and mark them.",
+        "way_out", "A way out from everywhere", total_spaces > 0 and kit["stranded_spaces"] == 0,
+        (f"{kit['stranded_spaces']} of {total_spaces} board spaces have no road to a safe location"
+         if kit["stranded_spaces"] else
+         f"every space reaches safety; the longest trip is {kit['longest_to_safety']} moves")
+        if total_spaces else "no roads on the board",
+        "Some roads on the board don't connect to any safe location. Either a road is missing "
+        "from the data, or those households really have no way out; both are worth knowing.",
+        warn_only=bool(kit["safe"]),
     ))
     checks.append(_check(
         "helispots", "Helicopter landing spots", bool(kit["helispots"]),
@@ -441,12 +471,12 @@ def readiness(kit, role_layers, options):
         "(school, store, community hall, trailheads). Add names to the landmarks layer.",
         warn_only=n_places > 0,
     ))
-    named_m = sum(kit["named_roads"].values())
+    named_m = sum(kit["all_named_roads"].values())
     total = named_m + kit["unnamed_road_m"]
     share = named_m / total if total else 0.0
     checks.append(_check(
         "road_names", "Named roads", total > 0 and share >= 0.8,
-        f"{share:.0%} of road length has a usable name ({len(kit['named_roads'])} names)",
+        f"{share:.0%} of road length has a usable name ({len(kit['all_named_roads'])} names)",
         "Many roads have no usable name (blank, a number, or only 'DR'/'RD'). Cards and "
         "evacuation orders read badly without names, and so does a radio call. Fix names in the roads layer.",
         warn_only=total > 0,
@@ -499,9 +529,9 @@ def local_cards(kit, feats, options):
         card("Known hazard", f"{name.rstrip('. ')}{where}. Subtract two steps if your route passes it. "
                              "(Disregard if you've driven it this year.)", "hazards")
 
-    for e in kit["exits"][:3]:
-        card("Exit blocked", f"Fire is blocking exit {e['letter']} ({e['name']}). "
-                             "Nobody can leave that way until the Fire's next turn.", "exits")
+    for s in rng.sample(kit["safe"], min(3, len(kit["safe"]))):
+        card("Cut off", f"Fire has reached {s['name']}. Nobody can reach safety there "
+                        "until the Fire's next turn.", "safe_locations")
 
     if kit["places"]:
         for p in rng.sample(kit["places"], min(2, len(kit["places"]))):
@@ -514,26 +544,24 @@ def local_cards(kit, feats, options):
         card("Know your water", f"There are {n_water} water sources mapped in this atlas. If you can "
                                 "name the one nearest your home, add 2 steps.", "water")
 
-    if kit["safe_places"]:
-        s = rng.choice(kit["safe_places"])
-        card("Safe place full", f"{s['name']} is full. The Fire names another safe place; "
-                                "head there instead.", "safe_places")
+    drawn = _drawn(kit["safe"])
+    if drawn:
+        s = rng.choice(drawn)
+        card("Safe place full", f"{s['name']} is full. The Fire names another safe location; "
+                                "head there instead.", "safe_locations")
     else:
         card("Where do we go?", "Nobody at the table can name an official safe place. Everyone loses "
                                 "a turn while you agree on one. (Then go put it in the atlas.)",
-             "safe_places")
+             "safe_locations")
     return cards
 
 
 def evacuation_order(kit):
     """A sample of the Fire's order, filled in with this atlas's places."""
-    exits = kit["exits"]
-    dest = (kit["safe_places"][0]["name"] if kit["safe_places"]
-            else f"exit {exits[0]['letter']} ({exits[0]['name']})" if exits
-            else "[a safe place — none mapped yet]")
-    route = f" by way of exit {exits[0]['letter']}" if exits and kit["safe_places"] else ""
+    safe = _drawn(kit["safe"]) or kit["safe"]
+    dest = safe[0]["name"] if safe else "[a safe place — none mapped yet]"
     return (f"There is a [small/medium/large] fire in cell [1–12] and it is moving [wind direction]. "
-            f"There is an evacuation order for cells [ ]. Everyone should head to {dest}{route}.")
+            f"There is an evacuation order for cells [ ]. Everyone should head to {dest}.")
 
 
 # ── pages ───────────────────────────────────────────────────────────────────
@@ -558,8 +586,7 @@ def index_html(kit, board_ok):
         for c in kit["readiness"])
     files = "".join(f"<li><a href='{e(u)}'>{e(n)}</a></li>" for n, u in KIT_FILES)
     places = "".join(f"<li>({p['number']}) {e(p['name'])}</li>" for p in kit["places"]) or "<li><em>none</em></li>"
-    exits = "".join(f"<li>{e(x['letter'])}: {e(x['name'])} ({e(x['side'])} edge)</li>"
-                    for x in kit["exits"]) or "<li><em>none found</em></li>"
+    safe = "".join(f"<li>{e(x['name'])}</li>" for x in kit["safe"]) or "<li><em>none</em></li>"
     verdict = ("This atlas has what the game needs." if ready(kit)
                else "This atlas is missing something the game needs — see below. "
                     "The board still prints, with the gaps showing.")
@@ -590,8 +617,10 @@ board game</a> (game design: Tom Maiorana, UC Davis), built from this atlas.</p>
 <blockquote>{e(kit['evacuation_order'])}</blockquote>
 
 <h2>Board key</h2>
-<p>One step = {kit['step_m']} m of road. Grid cells 1–12 match the Fire Location spinner.</p>
-<h3>Exits</h3><ul>{exits}</ul>
+<p>One space = about {kit['step_m']} m of road. A piece that reaches a SAFE circle is out of the
+game: saved. Grid cells 1–12 match the Fire Location spinner. The board keeps
+{kit['kept_m'] / 1000:.0f} of {kit['total_m'] / 1000:.0f} km of road.</p>
+<h3>Safe locations</h3><ul>{safe}</ul>
 <h3>Numbered places</h3><ul>{places}</ul>
 </body></html>
 """

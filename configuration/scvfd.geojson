@@ -794,6 +794,27 @@
                         ],
                         "interaction": "interface"
                     },
+                    "safe_locations": {
+                        "geometry_type": "point",
+                        "color": [20, 110, 50],
+                        "fill_color": [40, 160, 80],
+                        "add_labels": true,
+                        "label_color": [20, 110, 50],
+                        "paint": {
+                            "circle-radius": 18,
+                            "circle-color": "#28a050",
+                            "circle-opacity": 0.45,
+                            "circle-stroke-color": "#146e32",
+                            "circle-stroke-width": 2
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {"name": "name", "type": "string", "default": "Safe"},
+                            {"name": "notes", "type": "string", "default": ""}
+                        ],
+                        "access": ["internal", "admin"],
+                        "interaction": "interface"
+                    },
                     "hazards": {
                         "geometry_type": "point",
                         "color": [
@@ -1227,7 +1248,8 @@
                             "mileage_markers",
                             "mileage_zones",
                             "mileage_zones_oneloop",
-                            "mileage_markers_oneloop"
+                            "mileage_markers_oneloop",
+                            "safe_locations"
                         ],
                         "config_def": "webedit"
                     },
@@ -1377,16 +1399,34 @@
                         "name": "console",
                         "config_def": "console"
                     },
+                    "safe_exits": {
+                        "type": "inlet",
+                        "name": "safe_exits",
+                        "config_def": "game_safe_exits",
+                        "in_layer": "roads",
+                        "out_layer": "safe_locations",
+                        "road_filter": {
+                            "field": "FUNCTIONAL",
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors"]
+                        }
+                    },
                     "game_kit": {
                         "type": "outlet",
                         "name": "game_kit",
                         "config_def": "game_kit",
                         "access": ["admin"],
                         "title": "Salmon Creek",
-                        "in_layers": ["lidar_basemap", "creeks", "roads", "buildings"],
+                        "in_layers": ["lidar_basemap", "creeks", "buildings"],
+                        "road_filter": {
+                            "field": "FUNCTIONAL",
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads"]
+                        },
+                        "residence_min": 3,
                         "roles": {
                             "roads": ["roads"],
+                            "safe_locations": ["safe_locations"],
                             "landmarks": ["poi"],
+                            "residences": ["buildings"],
                             "hazards": ["hazards"],
                             "water": ["watertanks"]
                         }

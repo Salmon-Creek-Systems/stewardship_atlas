@@ -778,6 +778,19 @@
             "citation": "U.S. Geological Survey"
         }
     },
+    "game_safe_exits": {
+        "name": "game_safe_exits",
+        "asset_type": "inlet",
+        "fetch_type": "game_safe_exits",
+        "in_layer": "roads",
+        "out_layer": "safe_locations",
+        "attribution": {
+            "url": "https://prototypingresilience.com/diy-game-kit",
+            "description": "Points where main roads leave the atlas, seeded for the game kit's safe locations",
+            "license": "",
+            "citation": "Generated from the atlas roads layer"
+        }
+    },
     "h3_grid": {
         "name": "h3_grid",
         "asset_type": "inlet",

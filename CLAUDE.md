@@ -663,7 +663,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
-| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check); `python/game_kit.py` + `outlets_game_kit.py`. Layers map to game roles via the asset's `roles` |
+| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (main-road edge crossings; re-run skips existing points) |
 
 **Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
