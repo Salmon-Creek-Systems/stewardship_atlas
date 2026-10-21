@@ -84,7 +84,7 @@
       "type": "outlet", "name": "webedit", "config_def": "webedit",
       "in_layers": ["roads", "creeks", "landmarks", "burn_areas", "burn_sites"]
     },
-    "html": { "type": "outlet", "name": "html", "config_def": "static_html" },
+    "console": { "type": "outlet", "name": "console", "config_def": "console" },
     "notebook": {
       "type": "outlet", "name": "notebook", "config_def": "jupyter_notebook",
       "access": ["technical"]

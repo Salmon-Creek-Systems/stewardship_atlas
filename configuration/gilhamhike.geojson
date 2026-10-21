@@ -41,15 +41,9 @@
         "admin_emails": [],
         "logo_url": "",
         "email_photo_default_layer": "photos",
-        "versioned_outlets": [
-          "html",
-          "webmap"
-        ],
+        "versioned_outlets": [],
         "cloud": {
-          "outlets": [
-            "webmap",
-            "html"
-          ]
+          "outlets": ["webmap", "console"]
         },
         "layers": {
           "regions": { "layer_def": "regions", "access": ["public"] },
@@ -109,6 +103,7 @@
           }
         },
         "assets": {
+          "console": {"type": "outlet", "name": "console", "config_def": "console"},
           "public_roads": {
             "type": "inlet",
             "out_layer": "roads",
@@ -131,6 +126,7 @@
             "time_range": null
           },
           "webmap": {
+            "show_user_location": true,
             "type": "outlet",
             "name": "webmap",
             "in_layers": ["regions", "roads", "creeks", "trails", "landmarks", "photos", "inaturalist"],
@@ -148,11 +144,6 @@
             "name": "3dview",
             "config_def": "3dview",
             "access": ["public", "internal", "admin"]
-          },
-          "html": {
-            "type": "outlet",
-            "name": "html",
-            "config_def": "static_html"
           },
           "notebook": {
             "type": "outlet",

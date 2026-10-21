@@ -1,4 +1,12 @@
-# Stewardship Atlas User Guide
+# Stewardship Atlas Developer's Guide
+
+Platform and maintainer reference: creating atlases, adding data sources,
+configuration internals, the email pipeline and infrastructure. (This file was
+`user_guide.md`; it was renamed because that's not who it's for.)
+
+For using an atlas, see the [User Manual](user_manual.md); for looking after
+one from its console, the [Administrator Manual](admin_manual.md). Both link to
+short task pages in [help/](help/).
 
 ## Contents
 
@@ -610,7 +618,7 @@ The atlas uses open, standard formats:
 - [View and download layers](help/export_layer.md)
 - [Edit vector data](help/draw_vector.md)
 - [Upload new data](help/upload_vector.md)
-- [Hide/show layers](help/hide_layers.md)
+- [Choose what the map shows](help/visibility_panel.md)
 - [Replace layer data](help/replace_layer.md)
 
 **Admin Tasks:**

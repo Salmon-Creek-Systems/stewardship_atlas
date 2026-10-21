@@ -158,5 +158,142 @@ class TestWebApp(unittest.TestCase):
         self.assertIn("finished_at", data)
         self.assertIn("log", data)
 
+class TestAddLayerPost(unittest.TestCase):
+    """POST /add_layer — the console Add Layer form. atlas.add_layer and S3
+    are mocked; what is under test is validation order and routing."""
+
+    FC = {'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'properties': {'street': 'Miller Rd'},
+         'geometry': {'type': 'Point', 'coordinates': [-122.8, 38.4]}}]}
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        staging = Path(self.root) / 'testatlas' / 'staging'
+        staging.mkdir(parents=True)
+        (staging / 'atlas_config.json').write_text(json.dumps({'name': 'testatlas'}))
+        self.client = TestClient(app)
+        self.patchers = [patch('webapp.SWALES_ROOT', self.root),
+                         patch('webapp.boto3'),
+                         patch('webapp.atlas.add_layer')]
+        _, self.boto3, self.add_layer = [p.start() for p in self.patchers]
+
+    def tearDown(self):
+        for p in self.patchers:
+            p.stop()
+        shutil.rmtree(self.root)
+
+    def test_upload_goes_to_s3_then_add_layer(self):
+        r = self.client.post('/add_layer/testatlas/hydrants', json={
+            'geometry': 'point', 'source': 'upload', 'data': self.FC,
+            'label_property': 'street', 'width': 6})
+        self.assertEqual(r.status_code, 200, r.text)
+        put = self.boto3.client.return_value.put_object.call_args.kwargs
+        self.assertEqual(put['Bucket'], 'scs-atlas-private-prod')  # not public scs-internal
+        self.assertEqual(put['Key'], 'testatlas/imports/hydrants.geojson')
+        kwargs = self.add_layer.call_args.kwargs
+        self.assertEqual(kwargs['source'], 's3')
+        self.assertEqual(kwargs['s3_key'], 'testatlas/imports/hydrants.geojson')
+        self.assertEqual(kwargs['s3_bucket'], 'scs-atlas-private-prod')
+        self.assertEqual(kwargs['label_property'], 'street')
+
+    def test_empty_source_skips_s3(self):
+        r = self.client.post('/add_layer/testatlas/culverts',
+                             json={'geometry': 'point', 'source': 'empty'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.boto3.client.return_value.put_object.assert_not_called()
+        self.assertEqual(self.add_layer.call_args.kwargs['source'], 'empty')
+
+    def test_bad_name_rejected_before_upload(self):
+        r = self.client.post('/add_layer/testatlas/..%2Fescape',
+                             json={'geometry': 'point', 'source': 'upload', 'data': self.FC})
+        self.assertIn(r.status_code, (400, 404))
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+    def test_wrong_geometry_rejected_before_upload(self):
+        r = self.client.post('/add_layer/testatlas/roads2',
+                             json={'geometry': 'linestring', 'source': 'upload', 'data': self.FC})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('Point', r.json()['detail'])
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+    def test_oversize_rejected(self):
+        with patch('webapp.ADD_LAYER_MAX_BYTES', 100):
+            r = self.client.post('/add_layer/testatlas/big',
+                                 json={'geometry': 'point', 'source': 'upload', 'data': self.FC})
+        self.assertEqual(r.status_code, 413)
+        self.boto3.client.return_value.put_object.assert_not_called()
+
+
+class TestSelectFeatures(unittest.TestCase):
+    """POST /select_features — the webedit selection preview. Runs the real
+    DuckDB predicate against a small layer in a temp staging dir."""
+
+    SQUARE = {'type': 'Feature', 'properties': {},
+              'geometry': {'type': 'Polygon',
+                           'coordinates': [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]]}}
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        staging = Path(self.root) / 'testatlas' / 'staging'
+        layer_dir = staging / 'layers' / 'mixed'
+        layer_dir.mkdir(parents=True)
+        (staging / 'atlas_config.json').write_text(
+            json.dumps({'name': 'testatlas', 'data_root': self.root}))
+        (layer_dir / 'mixed.geojson').write_text(json.dumps({
+            'type': 'FeatureCollection', 'features': [
+                {'type': 'Feature', 'properties': {'name': 'a', 'status': 'ok'},
+                 'geometry': {'type': 'Point', 'coordinates': [0.5, 0.5]}},
+                {'type': 'Feature', 'properties': {'name': 'b', 'status': 'ok'},
+                 'geometry': {'type': 'Point', 'coordinates': [1.5, 1.5]}},
+                {'type': 'Feature', 'properties': {'name': 'c', 'status': 'ok'},
+                 'geometry': {'type': 'Point', 'coordinates': [10, 10]}},
+                # Crosses the square without a vertex inside it.
+                {'type': 'Feature', 'properties': {'name': 'road', 'status': 'ok'},
+                 'geometry': {'type': 'LineString', 'coordinates': [[-1, 1], [3, 1]]}},
+            ]}))
+        self.client = TestClient(app)
+        self.patcher = patch('webapp.SWALES_ROOT', self.root)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        shutil.rmtree(self.root)
+
+    def _post(self, selection, layer='mixed'):
+        return self.client.post('/select_features/testatlas',
+                                json={'layer': layer, 'selection': selection})
+
+    def test_returns_intersecting_features_with_properties(self):
+        r = self._post(self.SQUARE)
+        self.assertEqual(r.status_code, 200)
+        names = sorted(f['properties']['name'] for f in r.json()['features'])
+        self.assertEqual(names, ['a', 'b', 'road'])
+        self.assertTrue(all(f['properties']['status'] == 'ok' for f in r.json()['features']))
+
+    def test_feature_collection_selection(self):
+        r = self._post({'type': 'FeatureCollection', 'features': [self.SQUARE]})
+        self.assertEqual(len(r.json()['features']), 3)
+
+    def test_empty_selection_returns_empty_fc(self):
+        r = self._post({'type': 'FeatureCollection', 'features': []})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {'type': 'FeatureCollection', 'features': []})
+
+    def test_bad_selection_type_is_400(self):
+        r = self._post({'type': 'Polygon', 'coordinates': []})
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_layer_is_404(self):
+        r = self._post(self.SQUARE, layer='nope')
+        self.assertEqual(r.status_code, 404)
+
+    def test_is_read_only(self):
+        layer_file = Path(self.root) / 'testatlas' / 'staging' / 'layers' / 'mixed' / 'mixed.geojson'
+        before = layer_file.read_text()
+        self._post(self.SQUARE)
+        self.assertEqual(layer_file.read_text(), before)
+        self.assertFalse((Path(self.root) / 'testatlas' / 'staging' / 'deltas').exists())
+
+
 if __name__ == '__main__':
     unittest.main() 

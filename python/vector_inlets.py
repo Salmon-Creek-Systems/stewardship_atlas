@@ -249,6 +249,10 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
     """Fetch a GeoJSON file from a private S3 bucket, filter to atlas bbox, write to delta queue.
     Copies image_url → URL on each feature to enable webmap click-to-open behavior.
 
+    squarify: replace each polygon with the square covering it (see
+    utils.squarify_feature). Intended for regions, which are printed one per
+    runbook page.
+
     Geometry handling:
     - null geometry: included unconditionally (tabular layers)
     - Point: bbox-filter on the coordinate
@@ -305,6 +309,18 @@ def s3_geojson(config=None, name=None, delta_queue=DELTA_QUEUE):
         props['name'] = props.get('common_name', props.get('name', ''))
         features.append(feature)
 
+    # After the name defaulting above, so a canonicalize-to-name (the label
+    # property chosen in the console's Add Layer form) wins.
+    if 'alterations' in inlet_config:
+        features = utils.alter_features(features, inlet_config['alterations'])
+
+    # Regions become runbook pages, and a page is a fixed shape, so a region is
+    # stored already squared rather than squared at render time — what the
+    # webmap draws is then what gets printed.
+    if inlet_config.get('squarify'):
+        features = [utils.squarify_feature(f) for f in features]
+        logger.info(f"s3_geojson: squarified {len(features)} feature(s)")
+
     filtered = geojson.FeatureCollection(features)
     logger.info(f"s3_geojson: {len(features)} features within bbox (of {len(fc.get('features', []))} total)")
     delta_queue.add_deltas_from_features(config, name, filtered, 'create')
@@ -338,6 +354,35 @@ def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
     fc = geojson.FeatureCollection(features)
     delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
     logger.info(f"h3_grid_inlet: generated {len(features)} cells at resolution {resolution}")
+
+
+def game_safe_exits(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Seed the safe_locations layer: a point where each main road leaves the atlas.
+
+    Only roads whose `road_filter.field` is in `road_filter.keep` (arterials and
+    collectors, not every back road that happens to touch the rectangle). A
+    crossing that already has a point within the merge distance is skipped, so
+    re-running after the layer is refreshed adds only new ones. Points carry
+    source "edge"; edit or delete them in webedit like any point layer.
+    """
+    import game_roads
+
+    asset = config['assets'][name]
+    inlet_config = {**asset.get('config', {}), **asset}
+    in_layer = inlet_config.get('in_layer', 'roads')
+    out_layer = inlet_config.get('out_layer', 'safe_locations')
+
+    def features(layer):
+        path = versioning.atlas_path(config, 'layers') / layer / f'{layer}.geojson'
+        return geojson.load(open(path))['features'] if path.exists() else []
+
+    points = game_roads.edge_exits(features(in_layer), config['dataswale']['bbox'],
+                                   inlet_config['road_filter'], existing=features(out_layer))
+    if points:
+        delta_queue.add_deltas_from_features(config, name, geojson.FeatureCollection(points), 'create',
+                                             layer_name=out_layer)
+    logger.info(f"game_safe_exits: {len(points)} new edge point(s) for {out_layer}")
+    return {'status': 'success', 'added': len(points)}
 
 
 # Query params inaturalist_inlet owns: the bbox comes from the atlas region and
@@ -547,4 +592,5 @@ asset_methods = {
     "federation": federation_inlet,
     "h3_grid": h3_grid_inlet,
     "inaturalist": inaturalist_inlet,
+    "game_safe_exits": game_safe_exits,
     }

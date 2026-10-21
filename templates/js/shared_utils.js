@@ -25,6 +25,41 @@ function showSuccessNotification(message, duration = 2000) {
     }, duration);
 }
 
+// Escape a value for safe insertion into innerHTML.
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Render a feature's properties as a two-column table. editableCols are listed
+// first and marked; every other property follows in stored order.
+function renderPropertiesTable(props, editableCols = []) {
+    props = props || {};
+    const formatValue = (v) => {
+        if (v === null || v === undefined || v === '') return '<span class="prop-empty">—</span>';
+        if (typeof v === 'object') v = JSON.stringify(v);
+        const text = String(v);
+        if (/^https?:\/\/\S+$/.test(text.trim())) {
+            const url = escapeHtml(text.trim());
+            return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+        }
+        return escapeHtml(text);
+    };
+    const row = (key, editable) => `<tr class="${editable ? 'prop-editable' : ''}">
+            <th>${escapeHtml(key)}${editable ? ' <span class="prop-editable-mark" title="editable">✎</span>' : ''}</th>
+            <td>${formatValue(props[key])}</td>
+        </tr>`;
+    const otherKeys = Object.keys(props).filter(k => !editableCols.includes(k) && !k.startsWith('_sel_'));
+    return `<table class="prop-table">
+        ${editableCols.map(k => row(k, true)).join('')}
+        ${otherKeys.map(k => row(k, false)).join('')}
+    </table>`;
+}
+
 // Function to parse degrees format coordinates (async to handle URL dereferencing)
 async function parseDegreesFormat(input) {
     console.log('Parsing input:', input);
@@ -121,61 +156,6 @@ function validateCoordinates(lat, lng) {
     return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
-// Function to initialize help popup functionality
-function initializeHelpPopup(helpContent) {
-    // Create help popup HTML if it doesn't exist
-    if (!document.getElementById('help-popup')) {
-        const helpPopup = document.createElement('div');
-        helpPopup.id = 'help-popup';
-        helpPopup.className = 'help-popup';
-        helpPopup.style.display = 'none';
-        helpPopup.innerHTML = `
-            <div class="help-content">
-                <div class="help-header">
-                    <h2>Help</h2>
-                    <button id="close-help" class="close-button">&times;</button>
-                </div>
-                <div class="help-body">
-                    ${helpContent}
-                </div>
-            </div>
-        `;
-        document.body.appendChild(helpPopup);
-    }
-
-    // Add event listeners
-    const helpLink = document.getElementById('help-link');
-    const closeHelp = document.getElementById('close-help');
-    const helpPopup = document.getElementById('help-popup');
-
-    if (helpLink) {
-        helpLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            helpPopup.style.display = 'flex';
-        });
-    }
-
-    if (closeHelp) {
-        closeHelp.addEventListener('click', () => {
-            helpPopup.style.display = 'none';
-        });
-    }
-
-    // Close popup when clicking outside
-    helpPopup.addEventListener('click', (e) => {
-        if (e.target.id === 'help-popup') {
-            helpPopup.style.display = 'none';
-        }
-    });
-
-    // Close popup with Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            helpPopup.style.display = 'none';
-        }
-    });
-}
-
 // Function to initialize enhanced progress tracking
 function initializeProgressTracking(map, totalLayers) {
     const progressBar = document.getElementById('loading-progress');
@@ -259,6 +239,8 @@ function initializeBasemapSwitching(map) {
             case 'shaded-relief':
                 targetLayer = 'shaded-relief-layer';
                 break;
+            case 'none':
+                return;  // every basemap is already hidden
         }
         
         if (targetLayer && map.getLayer(targetLayer)) {
@@ -272,4 +254,74 @@ function initializeBasemapSwitching(map) {
             console.warn('Target layer not found:', targetLayer);
         }
     });
+}
+
+// Basemap sources and layers for edit pages (create/annotate and reshape),
+// added under the first style layer, with the dropdown's initial choice shown.
+// The *_SOURCE constants come from the edit_map.html template.
+function addEditBasemaps(map, firstLayerId) {
+    // Add sources
+    map.addSource('satellite', SATELLITE_SOURCE);
+    map.addSource('usgs', USGS_SOURCE);
+    map.addSource('terrain', TERRAIN_SOURCE);
+    map.addSource('shaded-relief', SHADED_RELIEF_SOURCE);
+
+    // Add layers before the first existing layer to ensure they're at the bottom
+    map.addLayer({
+        'id': 'satellite-layer',
+        'type': 'raster',
+        'source': 'satellite',
+        'layout': {
+            'visibility': 'none'
+        }
+    }, firstLayerId);
+
+    map.addLayer({
+        'id': 'usgs-layer',
+        'type': 'raster',
+        'source': 'usgs',
+        'layout': {
+            'visibility': 'none'
+        }
+    }, firstLayerId);
+
+    map.addLayer({
+        'id': 'terrain-layer',
+        'type': 'raster',
+        'source': 'terrain',
+        'layout': {
+            'visibility': 'none'
+        }
+    }, firstLayerId);
+
+    map.addLayer({
+        'id': 'shaded-relief-layer',
+        'type': 'raster',
+        'source': 'shaded-relief',
+        'layout': {
+            'visibility': 'none'
+        }
+    }, firstLayerId);
+
+    // Initialize basemap switching
+    initializeBasemapSwitching(map);
+
+    // Show the basemap matching the dropdown's initial selection on load.
+    // Without this, all basemaps start hidden and only switch on a dropdown
+    // 'change' event, leaving the edit map blank until the user interacts
+    // (mirrors webmap.js behavior; see issue #134).
+    const allBasemapLayerIds = ['basemap-layer', 'hillshade-layer', 'satellite-layer',
+                                'usgs-layer', 'terrain-layer', 'shaded-relief-layer'];
+    allBasemapLayerIds.forEach(id => {
+        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch (e) {}
+    });
+    const basemapValueToLayer = {
+        'basemap': 'basemap-layer', 'hillshade': 'hillshade-layer',
+        'satellite': 'satellite-layer', 'usgs': 'usgs-layer',
+        'terrain': 'terrain-layer', 'shaded-relief': 'shaded-relief-layer'
+    };
+    const initialBasemap = document.getElementById('basemap-select').value;
+    if (basemapValueToLayer[initialBasemap] && map.getLayer(basemapValueToLayer[initialBasemap])) {
+        map.setLayoutProperty(basemapValueToLayer[initialBasemap], 'visibility', 'visible');
+    }
 }

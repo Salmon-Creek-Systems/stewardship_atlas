@@ -1,93 +1,91 @@
 # Atlas User Manual
 
-A short guide for **viewing** a fire atlas — finding your way around the map,
-switching between views, and downloading maps and data. No account or login is
-needed for anything here.
+A short guide to **using** a fire atlas: finding your way around the map,
+sharing what you see, and getting maps and data to take with you. Nothing here
+needs a login.
 
-For maintaining an atlas (editing data, publishing), see the
+Each section is an overview that points to a short how-to page for the details.
+If you look after an atlas — editing its data, publishing it — see the
 [Administrator Manual](admin_manual.md).
 
 ---
 
 ## Opening the Atlas
 
-Your atlas has a web address (for example `https://fireatlas.org/youratlas/`).
-Opening it brings you to the console, where the panel at top left links to the
-available **Maps** and **Downloads**. The interactive web map is the usual
-starting point.
+Your atlas has a web address, such as `https://fireatlas.org/youratlas`. It
+opens the atlas's console, which shows the web map and lists the other
+**Maps** and **Downloads** available in the sidebar.
 
 ---
 
 ## The Web Map
 
-The web map shows all of the atlas layers — roads, water sources, structures,
-hazards, and so on — in your browser, on desktop or phone.
+The web map shows the atlas's layers — roads, water sources, structures,
+hazards and so on — in your browser, on a computer or a phone. Drag to move
+around, scroll or pinch to zoom, and click a feature to see its details or
+photo.
 
-- **Move around**: click and drag to pan, scroll to zoom.
-- **Show and hide layers**: use the legend box to turn layers on and off.
-- **Switch the background**: use the basemap dropdown (aerial imagery, terrain,
-  etc.).
-- **See details**: click a feature to view its information; some features link
-  to photos.
+Down the right-hand side is a small panel with the atlas's name, links back
+**Home** to the console and to the **3D** view, and a **?** that brings you to
+this section. Below it:
 
-Full navigation details: **[Interactive Web Map Help](help/webmap_help.md)** and
-**[Showing and Hiding Layers](help/hide_layers.md)**.
+- **Preset Views** jumps to a named area of the atlas with the right layers
+  turned on — see [Preset Views](help/preset_views.md).
+- **Share** copies a link to what you're looking at; **Ctrl-click** (⌘-click on
+  a Mac, or press and hold on a phone) shares a pin on one spot — see
+  [Share a View or a Pin](help/share_location.md).
+- **Go to…** jumps to coordinates or a Google Maps link someone sent you — see
+  [Go to a Location](help/go_to_location.md).
 
----
+At the bottom left, the **Visibility** panel chooses the basemap (including
+**None**) and which layers are showing — see
+[Choose What the Map Shows](help/visibility_panel.md).
 
-## Sharing and Finding a Location
+On atlases that have it, the **location button** at the top right shows where
+you are as a blue dot — see [Show My Location](help/show_my_location.md).
 
-The web map's location-sharing dropdown copies a spot in whichever form you need
-— plain coordinates, a Google Maps link, or a link back into the atlas map. You
-can also paste coordinates and press **Go** to jump there.
+Some layers take comments on individual features, shown by a speech-bubble
+badge — see [Comment on a Feature](help/conversations.md).
 
-On desktop, **alt+click** a point to copy its location; on a phone, **long
-press**. This is the quick way to read off or share a coordinate in the field.
-
-See **[Interactive Web Map Help](help/webmap_help.md)** for the sharing formats.
+Both panels fold away with their **▾** triangle when you want more map.
 
 ---
 
 ## 3D Terrain View
 
-If your atlas includes it, the 3D view lets you explore the area as an
-interactive 3D landscape with real elevation — useful for understanding slope,
-drainage, and access.
+The 3D view shows the area as a landscape with real elevation — good for
+understanding slope, drainage and access. Its **Share view** button copies a
+link to your exact camera angle. See [3D Terrain View](help/3d_terrain_view.md).
 
-See **[3D Terrain View](help/3d_terrain_view.md)**.
+---
+
+## Adding Photos from the Field
+
+On many atlases, you can add a photo to the map just by emailing it from your
+phone — its GPS location places it on the map. See
+[Add a Location by Emailing a Photo](help/email_photo_submission.md).
 
 ---
 
 ## Printable Maps
 
-Atlases can produce print-ready map products for vehicles, field kits, and
-offline use:
-
-- **Gazetteer map book** — a numbered grid of pages, each covering one cell at a
-  consistent scale, with neighboring cells labeled for page-to-page navigation.
-  See **[Gazetteer Map Book](help/gazetteer.md)**.
-- **Runbook** — region-organized reference maps for field and emergency use.
-
-Look for these in the **Downloads** section of the console.
+Atlases can produce PDF map books for vehicles, field kits and offline use —
+a **runbook** organised by region, and a grid-based **gazetteer**. Find them
+under **Downloads**. See [Printable Map Books](help/gazetteer.md).
 
 ---
 
 ## Downloading Data
 
-For use in other mapping tools (QGIS, ArcGIS) or for your records, atlas data can
-be downloaded in standard GIS formats:
-
-- **GeoPackage** — the whole atlas as a single file. See
-  **[Download Atlas as GeoPackage](help/download_gpkg.md)**.
-- **GeoJSON** — individual layers. See **[Export a Layer](help/export_layer.md)**.
-
-These are reached from the **Downloads** section of the console. Depending on how
-your atlas is shared, some downloads may be provided by your atlas administrator.
+For use in QGIS, ArcGIS or other mapping software, the whole atlas can be
+downloaded as a single GeoPackage file. See
+[Download the Atlas as a GeoPackage](help/download_gpkg.md). Depending on how
+your atlas is shared, some downloads may only be offered to administrators.
 
 ---
 
 ## Getting More Help
 
-Every topic above links to a short how-to page in `help/`. If something looks
-wrong in the data itself, contact whoever administers your atlas — see the
-[Administrator Manual](admin_manual.md).
+Every page in the help index is listed at the
+[Help Index](help/index.html). If something in the data looks wrong, contact
+whoever looks after your atlas.

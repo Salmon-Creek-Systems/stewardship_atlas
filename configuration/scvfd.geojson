@@ -8,17 +8,11 @@
                 "app_url": "https://fireatlas.org:9000",
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data/",
-                "versioned_outlets": [
-                    "html",
-                    "webmap",
-                    "private_webmap",
-                    "webedit",
-                    "gazetteer"
-                ],
+                "versioned_outlets": [],
                 "cloud": {
                     "outlets": [
                         "webmap",
-                        "html",
+                        "console",
                         "gazetteer"
                     ]
                 },
@@ -804,6 +798,27 @@
                         ],
                         "interaction": "interface"
                     },
+                    "safe_locations": {
+                        "geometry_type": "point",
+                        "color": [20, 110, 50],
+                        "fill_color": [40, 160, 80],
+                        "add_labels": true,
+                        "label_color": [20, 110, 50],
+                        "paint": {
+                            "circle-radius": 18,
+                            "circle-color": "#28a050",
+                            "circle-opacity": 0.45,
+                            "circle-stroke-color": "#146e32",
+                            "circle-stroke-width": 2
+                        },
+                        "show_attributes": true,
+                        "editable_columns": [
+                            {"name": "name", "type": "string", "default": "Safe"},
+                            {"name": "notes", "type": "string", "default": ""}
+                        ],
+                        "access": ["internal", "admin"],
+                        "interaction": "interface"
+                    },
                     "hazards": {
                         "geometry_type": "point",
                         "color": [
@@ -1017,6 +1032,29 @@
                             0
                         ],
                         "qgis_label_scale": 2.0
+                    },
+                    "circuit": {
+                        "name": "circuit",
+                        "geometry_type": "linestring",
+                        "color": [
+                            255,
+                            94,
+                            46
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff5e2e",
+                            "line-width": 3,
+                            "line-opacity": 1.0
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
                     }
                 },
                 "assets": {
@@ -1119,6 +1157,7 @@
                         "config_def": "local_turnouts"
                     },
                     "webmap": {
+                        "show_user_location": true,
                         "type": "outlet",
                         "name": "webmap",
                         "in_layers": [
@@ -1131,7 +1170,8 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
-                            "hazards"
+                            "hazards",
+                            "circuit"
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
@@ -1179,6 +1219,7 @@
                         ]
                     },
                     "private_webmap": {
+                        "show_user_location": true,
                         "type": "outlet",
                         "name": "private_webmap",
                         "in_layers": [
@@ -1235,7 +1276,9 @@
                             "mileage_markers",
                             "mileage_zones",
                             "mileage_zones_oneloop",
-                            "mileage_markers_oneloop"
+                            "mileage_markers_oneloop",
+                            "circuit",
+                            "safe_locations"
                         ],
                         "config_def": "webedit"
                     },
@@ -1293,11 +1336,6 @@
                             "technical"
                         ]
                     },
-                    "html": {
-                        "type": "outlet",
-                        "name": "html",
-                        "config_def": "static_html"
-                    },
                     "sqldb": {
                         "type": "outlet",
                         "config_def": "sqldb",
@@ -1305,7 +1343,8 @@
                             "basemap",
                             "roads",
                             "creeks",
-                            "culverts"
+                            "culverts",
+                            "circuit"
                         ]
                     },
                     "sqlquery": {
@@ -1320,7 +1359,9 @@
                         "type": "outlet",
                         "name": "config_edit",
                         "config_def": "config_editor",
-                        "access": ["technical"],
+                        "access": [
+                            "technical"
+                        ],
                         "interaction": "interface"
                     },
                     "gazetteer_grid": {
@@ -1389,6 +1430,38 @@
                         "type": "outlet",
                         "name": "console",
                         "config_def": "console"
+                    },
+                    "safe_exits": {
+                        "type": "inlet",
+                        "name": "safe_exits",
+                        "config_def": "game_safe_exits",
+                        "in_layer": "roads",
+                        "out_layer": "safe_locations",
+                        "road_filter": {
+                            "field": "FUNCTIONAL",
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors"]
+                        }
+                    },
+                    "game_kit": {
+                        "type": "outlet",
+                        "name": "game_kit",
+                        "config_def": "game_kit",
+                        "access": ["admin"],
+                        "title": "Salmon Creek",
+                        "in_layers": ["lidar_basemap", "creeks", "buildings"],
+                        "road_filter": {
+                            "field": "FUNCTIONAL",
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads"]
+                        },
+                        "residence_min": 3,
+                        "roles": {
+                            "roads": ["roads"],
+                            "safe_locations": ["safe_locations"],
+                            "landmarks": ["poi"],
+                            "residences": ["buildings"],
+                            "hazards": ["hazards"],
+                            "water": ["watertanks"]
+                        }
                     },
                     "road_lrs_oneloop": {
                         "type": "eddy",

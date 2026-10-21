@@ -2,11 +2,20 @@
   "label": "Field Trip",
   "description": "Three-tier road and trail network that thins out as you zoom out, plus creeks, landmarks, photo points (email-ingest enabled), recent research-grade iNaturalist observations and a threatened-species layer.",
   "properties": {
-    "email_photo_default_layer": "photos"
+    "email_photo_default_layer": "photos",
+    "cloud": {
+      "outlets": [
+        "webmap",
+        "console"
+      ]
+    }
   },
   "layers": {
     "regions": {
-      "layer_def": "regions"
+      "layer_def": "regions",
+      "access": [
+        "admin"
+      ]
     },
     "roads_primary": {
       "geometry_type": "linestring",
@@ -33,6 +42,9 @@
           "type": "string",
           "default": ""
         }
+      ],
+      "access": [
+        "public"
       ]
     },
     "roads_secondary": {
@@ -60,6 +72,9 @@
           "type": "string",
           "default": ""
         }
+      ],
+      "access": [
+        "public"
       ]
     },
     "roads_tertiary": {
@@ -87,6 +102,9 @@
           "type": "string",
           "default": ""
         }
+      ],
+      "access": [
+        "public"
       ]
     },
     "creeks": {
@@ -96,6 +114,29 @@
         "maxzoom": 22
       },
       "paint": {
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          [
+            "get",
+            "vector_width"
+          ],
+          18,
+          [
+            "*",
+            [
+              "get",
+              "vector_width"
+            ],
+            3
+          ]
+        ],
         "line-opacity": [
           "step",
           [
@@ -114,7 +155,7 @@
             1,
             0
           ],
-          13,
+          12,
           [
             "case",
             [
@@ -128,13 +169,19 @@
             1,
             0
           ],
-          16,
+          14,
           1
         ]
-      }
+      },
+      "access": [
+        "public"
+      ]
     },
     "landmarks": {
-      "layer_def": "poi"
+      "layer_def": "poi",
+      "access": [
+        "public"
+      ]
     },
     "photos": {
       "geometry_type": "point",
@@ -163,6 +210,9 @@
           "type": "string",
           "default": "Photo"
         }
+      ],
+      "access": [
+        "public"
       ]
     },
     "inaturalist": {
@@ -216,6 +266,9 @@
           "type": "string",
           "default": ""
         }
+      ],
+      "access": [
+        "public"
       ]
     },
     "inaturalist_threatened": {
@@ -269,6 +322,9 @@
           "type": "string",
           "default": ""
         }
+      ],
+      "access": [
+        "public"
       ]
     }
   },
@@ -292,7 +348,8 @@
           [
             "require",
             "class",
-            [
+            [ "motorway",
+              "primary",
               "trunk"
             ]
           ]
@@ -321,7 +378,7 @@
           [
             "require",
             "class",
-            [
+            [ "secondary",
               "residential",
               "service"
             ]
@@ -352,7 +409,10 @@
             "remove",
             "class",
             [
+              "motorway",
+              "primary",
               "trunk",
+              "secondary",
               "residential",
               "service"
             ]
@@ -388,7 +448,6 @@
       "name": "webmap",
       "config_def": "webmap",
       "in_layers": [
-        "regions",
         "roads_tertiary",
         "roads_secondary",
         "roads_primary",
@@ -416,6 +475,10 @@
         "creeks",
         "landmarks",
         "photos"
+      ],
+      "access": [
+        "internal",
+        "admin"
       ]
     },
     "3dview": {
@@ -428,10 +491,16 @@
         "admin"
       ]
     },
-    "html": {
+    "console": {
       "type": "outlet",
-      "name": "html",
-      "config_def": "static_html"
+      "name": "console",
+      "config_def": "console",
+      "access": [
+        "public",
+        "internal",
+        "admin",
+        "technical"
+      ]
     },
     "notebook": {
       "type": "outlet",
@@ -449,6 +518,30 @@
       "api_params": {
         "threatened": true
       }
+    },
+    "qgis_runbook": {
+      "type": "outlet",
+      "name": "qgis_runbook",
+      "config_def": "qgis_runbook",
+      "regions_layer": "regions",
+      "base_url": "individual_pages",
+      "concat_pdf": true,
+      "feature_scale": 0.5,
+      "blend_percent": 50,
+      "in_layers": [
+        "roads_primary",
+        "roads_secondary",
+        "roads_tertiary",
+        "creeks",
+        "landmarks",
+        "photos"
+      ],
+      "access": [
+        "public",
+        "internal",
+        "admin"
+      ],
+      "regions": []
     }
   }
 }

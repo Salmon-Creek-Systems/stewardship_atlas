@@ -17,7 +17,6 @@
         <span class="topbar-name" id="swale-name"></span>
         <span class="topbar-type" id="console-type"></span>
     </div>
-    <a id="ab-toggle" class="ab-toggle" href="#" title="Switch between console and HTML view">A/B</a>
 </header>
 
 <div class="layout">
@@ -29,6 +28,7 @@
                 <span>Maps</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/user_manual.html#the-web-map" target="_blank" class="help-icon sb-help" title="Help: using the web map">?</a>
             <ul class="sb-list" id="sb-maps-list"></ul>
         </div>
 
@@ -37,6 +37,7 @@
                 <span>Downloads</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/help/download_gpkg.html" target="_blank" class="help-icon sb-help" title="Help: downloads">?</a>
             <ul class="sb-list" id="sb-downloads-list"></ul>
         </div>
 
@@ -59,6 +60,7 @@
                 <span>Versions</span>
                 <svg class="chevron" width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <a href="/local/documents/help/publish_version.html" target="_blank" class="help-icon sb-help" title="Help: publishing and versions">?</a>
             <div class="sb-body">
                 <div class="version-badge" id="sb-version-badge"></div>
                 <div class="version-actions">
@@ -150,20 +152,164 @@
 <!-- Toast container -->
 <div id="toast-container" class="toast-container"></div>
 
-<!-- Add Layer modal (technical view only) -->
-<div id="add-layer-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-  <div style="background:#fff; color:#111; padding:1.25rem; border-radius:8px; width:min(440px,92vw); box-shadow:0 8px 32px rgba(0,0,0,0.3); font-size:0.9rem;">
-    <h3 style="margin:0 0 0.75rem;">Add Layer</h3>
-    <label style="display:block; margin:0.6rem 0 0.15rem;">Layer name</label>
-    <input id="al-name" type="text" placeholder="e.g. derelicts" style="width:100%; box-sizing:border-box; padding:0.4rem;">
-    <label style="display:block; margin:0.6rem 0 0.15rem;">S3 URL or key</label>
-    <input id="al-s3" type="text" placeholder="s3://scs-internal/atlas/imports/derelicts.geojson" style="width:100%; box-sizing:border-box; padding:0.4rem;">
-    <label style="display:block; margin:0.6rem 0 0.15rem;">Color (hex)</label>
-    <input id="al-color" type="text" value="#0c5e2e" style="width:100%; box-sizing:border-box; padding:0.4rem;">
-    <div id="al-status" style="margin-top:0.6rem; min-height:1.1em; color:#a00;"></div>
-    <div style="margin-top:1rem; display:flex; gap:0.5rem; justify-content:flex-end;">
+<!-- Add Layer modal (administration + technical views) -->
+<div id="add-layer-modal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-labelledby="al-title">
+    <div class="modal-head">
+      <h3 id="al-title" class="modal-title">Add Layer</h3>
+      <a id="al-help" href="/local/documents/help/add_layer.html" target="_blank" class="help-icon" title="Help">?</a>
+    </div>
+
+    <div id="al-name-box">
+      <label class="field-label" for="al-name">Layer name</label>
+      <input id="al-name" class="field-input" type="text" placeholder="e.g. derelicts"
+             autocomplete="off" spellcheck="false">
+      <div class="field-hint">Lowercase letters, digits and underscores.</div>
+    </div>
+
+    <div class="field-row">
+      <div class="field-col" id="al-geometry-col">
+        <label class="field-label" for="al-geometry">Type</label>
+        <select id="al-geometry" class="field-input" onchange="alGeometryChanged()">
+          <option value="point">point</option>
+          <option value="linestring">linestring</option>
+          <option value="polygon">polygon</option>
+        </select>
+      </div>
+      <div class="field-col" id="al-width-col">
+        <label class="field-label" for="al-width" id="al-width-label">Point radius (px)</label>
+        <input id="al-width" class="field-input" type="number" min="1" max="40" step="1" value="9">
+      </div>
+    </div>
+
+    <div id="al-shape-box">
+      <label class="field-label" for="al-shape">Polygon shape</label>
+      <select id="al-shape" class="field-input">
+        <option value="raw">As drawn</option>
+        <option value="bbox">Bounding box</option>
+        <option value="square">Square on paper (runbook regions)</option>
+        <option value="square_degrees">Square in degrees (legacy)</option>
+      </select>
+      <div class="field-hint">Applied to every polygon in the layer each time it
+        refreshes, including ones already drawn. <b>For regions choose square on
+        paper</b>: the runbook squares each region on the page before fitting it,
+        so a paper square prints exactly as drawn. A square in degrees prints
+        about 1.3× taller than wide.</div>
+    </div>
+
+    <div id="al-icon-box">
+      <label class="field-label" for="al-icon">Icon</label>
+      <select id="al-icon" class="field-input" onchange="alSyncForm()"></select>
+      <div class="field-hint">An icon replaces the dot and needs labels on.</div>
+    </div>
+
+    <div id="al-source-box">
+    <span class="field-label">Source</span>
+    <div class="seg" role="radiogroup">
+      <label><input type="radio" name="al-source" value="upload" checked onchange="alSyncForm()"> Upload file</label>
+      <label><input type="radio" name="al-source" value="empty" onchange="alSyncForm()"> Empty</label>
+    </div>
+    <div id="al-upload-box">
+      <input id="al-file" class="field-input" type="file" accept=".geojson,.json,application/geo+json,application/json"
+             onchange="alReadFile(this.files[0])">
+      <div class="field-hint" id="al-file-summary"></div>
+    </div>
+    </div>
+
+    <label class="field-check">
+      <input type="checkbox" id="al-visible-check" checked> Visible by default
+    </label>
+    <div class="field-hint">Webmap only — the PDF outlets draw every layer they are given.</div>
+
+    <label class="field-check">
+      <input type="checkbox" id="al-label-check" onchange="alSyncForm()"> Show labels
+    </label>
+    <div id="al-label-box">
+      <label class="field-label" for="al-label">Label from</label>
+      <select id="al-label" class="field-input"></select>
+      <div class="field-hint">Defaults to <code>name</code>, which is what hand-drawn
+        features carry. Whichever field you pick becomes editable in the edit map.</div>
+    </div>
+
+    <span class="field-label">Colour</span>
+    <div class="seg" role="radiogroup">
+      <label><input type="radio" name="al-color-mode" value="rgb" checked onchange="alSyncForm()"> Single colour</label>
+      <label><input type="radio" name="al-color-mode" value="map" onchange="alSyncForm()"> Colour map</label>
+    </div>
+
+    <div id="al-rgb-box" class="rgb-box">
+      <div class="rgb-swatch" id="al-swatch"></div>
+      <div class="rgb-sliders">
+        <label>R <input type="range" id="al-r" min="0" max="255" value="12" oninput="alSyncSwatch()"></label>
+        <label>G <input type="range" id="al-g" min="0" max="255" value="94" oninput="alSyncSwatch()"></label>
+        <label>B <input type="range" id="al-b" min="0" max="255" value="46" oninput="alSyncSwatch()"></label>
+      </div>
+      <code class="rgb-hex" id="al-hex"></code>
+    </div>
+
+    <label class="field-label" for="al-opacity">Opacity <span id="al-opacity-value" class="rgb-hex"></span></label>
+    <input id="al-opacity" class="field-input" type="range" min="0" max="100" value="100"
+           oninput="alSyncSwatch()">
+
+    <div id="al-outline-box">
+      <span class="field-label">Outline colour</span>
+      <div class="rgb-box">
+        <div class="rgb-swatch" id="al-outline-swatch"></div>
+        <div class="rgb-sliders">
+          <label>R <input type="range" id="al-or" min="0" max="255" value="12" oninput="alSyncSwatch()"></label>
+          <label>G <input type="range" id="al-og" min="0" max="255" value="94" oninput="alSyncSwatch()"></label>
+          <label>B <input type="range" id="al-ob" min="0" max="255" value="46" oninput="alSyncSwatch()"></label>
+        </div>
+        <code class="rgb-hex" id="al-outline-hex"></code>
+      </div>
+    </div>
+
+    <div id="al-map-box" hidden>
+      <div class="palette-picker">
+        <button type="button" class="palette-current field-input" id="al-palette-btn"
+                onclick="alTogglePalettes()" aria-haspopup="listbox"></button>
+        <ul class="palette-list" id="al-palette-list" role="listbox" hidden></ul>
+      </div>
+      <label class="field-label" for="al-map-prop">Colour by property</label>
+      <select id="al-map-prop" class="field-input" onchange="alPrefillRange()"></select>
+      <input id="al-map-prop-text" class="field-input" type="text" placeholder="numeric property name" hidden>
+      <div class="field-row">
+        <div class="field-col">
+          <label class="field-label" for="al-map-min">Min</label>
+          <input id="al-map-min" class="field-input" type="number" step="any">
+        </div>
+        <div class="field-col">
+          <label class="field-label" for="al-map-max">Max</label>
+          <input id="al-map-max" class="field-input" type="number" step="any">
+        </div>
+      </div>
+    </div>
+
+    <div id="al-status" class="modal-status"></div>
+    <div class="modal-actions">
       <button onclick="closeAddLayerModal()" class="btn btn-sm">Cancel</button>
-      <button id="al-create" onclick="submitAddLayer()" class="btn btn-primary btn-sm">Create</button>
+      <button id="al-create" onclick="submitAddLayer()" class="btn btn-primary btn-sm">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="delete-layer-modal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-labelledby="dl-title">
+    <div class="modal-head">
+      <h3 id="dl-title" class="modal-title">Delete Layer</h3>
+      <a href="/local/documents/help/delete_layer.html" target="_blank" class="help-icon" title="Help: deleting a layer">?</a>
+    </div>
+    <div id="dl-plan"></div>
+    <div id="dl-confirm-box" hidden>
+      <label class="field-label" for="dl-confirm">Type <b id="dl-name"></b> to confirm</label>
+      <input id="dl-confirm" class="field-input" type="text" autocomplete="off" oninput="dlSyncConfirm()">
+      <div class="field-hint">The layer's data is archived on the server, not destroyed.
+        The config change is not committed to git — commit it on the server (#195).</div>
+    </div>
+    <div id="dl-status" class="modal-status"></div>
+    <div class="modal-actions">
+      <button onclick="closeDeleteLayerModal()" class="btn btn-sm">Cancel</button>
+      <button id="dl-delete" onclick="submitDeleteLayer()" class="btn btn-danger btn-sm" disabled>Delete</button>
     </div>
   </div>
 </div>
@@ -172,6 +318,9 @@
 // ── Globals ──────────────────────────────────────────────
 let swalename, baseurl, atlasappport, apiurl;
 let activeTab = 'layers';
+let alPalettes = {};
+let alIcons = [];
+let alLayersByName = {};
 
 // ── Toast ────────────────────────────────────────────────
 function showToast(message, isError) {
@@ -200,23 +349,6 @@ function switchTab(tab) {
     });
     main.style.display = (tab === 'layers') ? '' : 'none';
 }
-
-// ── A/B toggle ───────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-    var p = window.location.pathname;
-    var altPath = null;
-    if (p.indexOf('/outlets/console/') !== -1) {
-        altPath = p.replace('/outlets/console/', '/outlets/html/');
-    } else if (p.indexOf('/outlets/html/') !== -1) {
-        altPath = p.replace('/outlets/html/', '/outlets/console/');
-    }
-    var abToggle = document.getElementById('ab-toggle');
-    if (abToggle && altPath) {
-        abToggle.href = altPath;
-    } else if (abToggle) {
-        abToggle.style.display = 'none';
-    }
-});
 
 // ── Sidebar collapse ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
@@ -356,10 +488,11 @@ function makeLayerDropdown(label, items) {
     menu.setAttribute('role', 'menu');
     items.forEach(function(item) {
         var el;
-        if (item.type === 'link') {
+        if (item.type === 'link' || item.type === 'help') {
             el = document.createElement('a');
             el.href = item.href;
-            el.className = 'dd-item';
+            el.className = item.type === 'help' ? 'dd-item dd-item-help' : 'dd-item';
+            if (item.type === 'help') el.target = '_blank';
         } else {
             el = document.createElement('button');
             el.className = 'dd-item' + (item.danger ? ' dd-item-danger' : '');
@@ -565,6 +698,97 @@ function copyLayer(layerName) {
         .catch(function() { showToast('Copy error', true); });
 }
 
+// ── Delete layer: show the server's plan, then require the name typed back ──
+let dlLayer = null;
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+function dlList(title, items) {
+    if (!items.length) return '';
+    return '<div class="field-label">' + title + '</div><ul>' +
+        items.map(function(t) { return '<li>' + escapeHtml(t) + '</li>'; }).join('') + '</ul>';
+}
+
+function openDeleteLayer(layerName) {
+    dlLayer = layerName;
+    document.getElementById('dl-title').textContent = 'Delete “' + layerName + '”';
+    document.getElementById('dl-plan').innerHTML = 'Checking what depends on this layer…';
+    document.getElementById('dl-confirm-box').hidden = true;
+    document.getElementById('dl-confirm').value = '';
+    document.getElementById('dl-name').textContent = layerName;
+    document.getElementById('dl-status').textContent = '';
+    document.getElementById('dl-status').className = 'modal-status';
+    document.getElementById('dl-delete').disabled = true;
+    document.getElementById('delete-layer-modal').hidden = false;
+
+    fetch(apiurl + '/delete_layer/' + swalename + '/' + encodeURIComponent(layerName), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: true})
+    })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
+        .then(function(res) {
+            if (!res.ok) throw new Error(res.d.detail || 'Unknown');
+            var p = res.d.plan;
+            var html = '';
+            if (p.blockers.length) {
+                html += '<p><b>This layer can’t be deleted yet.</b> Other parts of the atlas depend on it:</p>';
+                html += dlList('Blocked by', p.blockers);
+            } else {
+                html += '<p>This removes the layer’s definition and archives its data.</p>';
+                html += dlList('Assets that build it, also removed', p.remove_assets);
+                html += dlList('Also removed from', p.list_edits.map(function(e) { return e[0] + ' → ' + e[1]; }));
+                document.getElementById('dl-confirm-box').hidden = false;
+                document.getElementById('dl-confirm').focus();
+            }
+            document.getElementById('dl-plan').innerHTML = html;
+        })
+        .catch(function(err) {
+            document.getElementById('dl-plan').textContent = '';
+            dlStatus('Could not plan the delete: ' + err.message, true);
+        });
+}
+
+function dlStatus(message, isError) {
+    var el = document.getElementById('dl-status');
+    el.textContent = message;
+    el.className = 'modal-status' + (isError ? ' is-error' : '');
+}
+
+function dlSyncConfirm() {
+    document.getElementById('dl-delete').disabled =
+        document.getElementById('dl-confirm').value.trim() !== dlLayer;
+}
+
+function closeDeleteLayerModal() {
+    document.getElementById('delete-layer-modal').hidden = true;
+    dlLayer = null;
+}
+
+function submitDeleteLayer() {
+    var btn = document.getElementById('dl-delete');
+    btn.disabled = true;
+    dlStatus('Deleting “' + dlLayer + '” and rebuilding the maps… this can take a minute.');
+    fetch(apiurl + '/delete_layer/' + swalename + '/' + encodeURIComponent(dlLayer), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({confirm: document.getElementById('dl-confirm').value.trim()})
+    })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
+        .then(function(res) {
+            if (!res.ok) throw new Error(res.d.detail || 'Unknown');
+            showToast(res.d.message + ' ' + res.d.note);
+            closeDeleteLayerModal();
+            setTimeout(function() { location.reload(); }, 1500);  // the console itself was rebuilt
+        })
+        .catch(function(err) {
+            dlStatus('Delete failed: ' + err.message, true);
+            dlSyncConfirm();
+        });
+}
+
 // ── Use cases ────────────────────────────────────────────
 function renderUseCases(useCases) {
     var container = document.getElementById('usecases-container');
@@ -610,7 +834,29 @@ function initializePage(data) {
         var lbl = document.getElementById('panel-label');
         lbl.textContent = data.panelHeader;
         lbl.style.display = '';
+        if (data.consoleType === 'ADMINISTRATION') {
+            var plus = document.createElement('button');
+            plus.className = 'btn btn-sm panel-add';
+            plus.textContent = '+';
+            plus.title = 'Add layer';
+            plus.setAttribute('aria-label', 'Add layer');
+            plus.onclick = openAddLayerModal;
+            var layersHelp = document.createElement('a');
+            layersHelp.className = 'help-icon panel-help';
+            layersHelp.href = '/local/documents/admin_manual.html#working-with-layers';
+            layersHelp.target = '_blank';
+            layersHelp.title = 'Help: working with layers';
+            layersHelp.textContent = '?';
+            var tools = document.createElement('span');
+            tools.className = 'panel-tools';
+            tools.appendChild(layersHelp);
+            tools.appendChild(plus);
+            lbl.appendChild(tools);
+        }
     }
+    alPalettes = data.palettes || {};
+    alIcons = data.icons || [];
+    (data.layers || []).forEach(function(l) { alLayersByName[l.name] = l; });
 
     // Version badge (both sidebar and mobile)
     ['sb-version-badge', 'mobile-version-badge'].forEach(function(id) {
@@ -634,14 +880,14 @@ function initializePage(data) {
         if (!list) return;
         var stagingLi = document.createElement('li');
         var stagingA = document.createElement('a');
-        stagingA.href = data.baseurl + '/staging/outlets/html/admin';
+        stagingA.href = data.baseurl + '/staging/outlets/console/admin/';
         stagingA.textContent = 'staging';
         stagingLi.appendChild(stagingA);
         list.appendChild(stagingLi);
         (data.versions || []).forEach(function(v) {
             var li = document.createElement('li');
             var a = document.createElement('a');
-            a.href = data.baseurl + '/' + v + '/outlets/html/admin';
+            a.href = data.baseurl + '/' + v + '/outlets/console/admin/';
             // currentVersion = the published version CURRENT points at
             a.textContent = v === data.currentVersion ? v + ' (current)' : v;
             if (v === data.currentVersion) a.className = 'current-version';
@@ -677,6 +923,8 @@ function initializePage(data) {
         });
         var mapsSection = document.getElementById('sb-maps-section');
         if (mapsSection) mapsSection.style.display = '';
+        // Admins see Build buttons here, so their "?" explains building.
+        if (mapsSection && showBuild) mapsSection.querySelector('.sb-help').href = '/local/documents/help/build_outputs.html';
     }
 
     // Downloads
@@ -706,6 +954,7 @@ function initializePage(data) {
         });
         var dlSection = document.getElementById('sb-downloads-section');
         if (dlSection) dlSection.style.display = '';
+        if (dlSection && showDlBuild) dlSection.querySelector('.sb-help').href = '/local/documents/help/build_outputs.html';
     }
 
     // PUBLIC: embed webmap
@@ -746,14 +995,18 @@ function initializePage(data) {
                 if (hasRebuild) {
                     entries.push({ type: 'button', text: 'Rebuild from source', onclick: function(btn) { refreshLayer(name, 'rebuild', btn); } });
                 }
+                entries.push({ type: 'help', href: '/local/documents/help/refresh_layer.html', text: '? Help' });
                 actions.appendChild(makeLayerDropdown('Refresh', entries));
             })(item.name, item.has_rebuild);
 
-            // Alter: Draw, Edit
+            // Alter: Draw, Edit, Reshape, Style
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Alter', [
                     { type: 'link', href: '../../webedit/' + name + '_create.html', text: 'Draw' },
-                    { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' }
+                    { type: 'link', href: '../../webedit/' + name + '_annotate.html', text: 'Edit' },
+                    { type: 'link', href: '../../webedit/' + name + '_reshape.html', text: 'Reshape' },
+                    { type: 'button', text: 'Edit Style…', onclick: function() { openEditLayerModal(name); } },
+                    { type: 'help', href: '/local/documents/admin_manual.html#editing-data', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -761,7 +1014,8 @@ function initializePage(data) {
             (function(name) {
                 actions.appendChild(makeLayerDropdown('Spreadsheets', [
                     { type: 'button', text: 'Import from Sheet', onclick: function(btn) { importFromSheet(name, btn); } },
-                    { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } }
+                    { type: 'button', text: 'Export to Sheet', onclick: function(btn) { exportToSheet(name, btn); } },
+                    { type: 'help', href: '/local/documents/help/spreadsheet_workflow.html', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -771,7 +1025,9 @@ function initializePage(data) {
                     { type: 'button', text: 'Replace with File', onclick: function() { uploadGeoJSON(name); } },
                     { type: 'button', text: 'Copy Layer…', onclick: function() { copyLayer(name); } },
                     { type: 'button', text: 'Clear Layer', danger: true, onclick: function() { clearLayer(name); } },
-                    { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' }
+                    { type: 'button', text: 'Delete Layer…', danger: true, onclick: function() { openDeleteLayer(name); } },
+                    { type: 'link', href: '../../../layers/' + name + '/', text: 'Directory' },
+                    { type: 'help', href: '/local/documents/admin_manual.html#working-with-layers', text: '? Help' }
                 ]));
             })(item.name);
 
@@ -812,49 +1068,469 @@ function initializePage(data) {
     }
 }
 
-// ── Add Layer modal (technical view) ─────────────────────
+// ── Add Layer modal ──────────────────────────────────────
+// Opened from the "+" on the Layers bar (administration) or the "+ Add Layer"
+// button (technical). An uploaded file is parsed here, not on the server: the
+// form needs its properties for the label and colour-map choices anyway, and
+// the parsed GeoJSON is what gets POSTed.
+var LAYER_NAME_RE = /^[a-z][a-z0-9_]{0,48}$/;
+var GEOJSON_TO_GEOMETRY = {
+    Point: 'point', MultiPoint: 'point',
+    LineString: 'linestring', MultiLineString: 'linestring',
+    Polygon: 'polygon', MultiPolygon: 'polygon'
+};
+var alUpload = null;        // parsed FeatureCollection
+var alProps = [];           // property names in the upload
+var alNumeric = {};         // numeric property name -> [min, max]
+var alPalette = null;       // selected palette name
+var alMode = 'add';         // 'add' | 'edit'
+var alEditing = null;       // layer name being restyled
+
 function openAddLayerModal() {
-    document.getElementById('al-status').textContent = '';
-    document.getElementById('add-layer-modal').style.display = 'flex';
+    alMode = 'add';
+    alEditing = null;
+    alUpload = null; alProps = []; alNumeric = {};
+    alSetStatus('');
+    document.getElementById('al-title').textContent = 'Add Layer';
+    document.getElementById('al-help').href = '/local/documents/help/add_layer.html';
+    document.getElementById('al-create').textContent = 'Add';
+    document.getElementById('al-name').value = '';
+    // Reset everything a previous Edit may have left behind.
+    document.getElementById('al-geometry').value = 'point';
+    document.querySelector('input[name="al-source"][value="upload"]').checked = true;
+    document.querySelector('input[name="al-color-mode"][value="rgb"]').checked = true;
+    document.getElementById('al-file').value = '';
+    document.getElementById('al-file-summary').textContent = '';
+    document.getElementById('al-label-check').checked = false;
+    setRgb([12, 94, 46]);
+    setOutlineRgb([6, 60, 28]);
+    document.getElementById('al-visible-check').checked = true;
+    document.getElementById('al-shape').value = 'raw';
+    document.getElementById('al-opacity').value = DEFAULT_OPACITY.point;
+    document.getElementById('al-width').value = 9;
+    if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
+    alRenderIcons('');
+    alRenderPalettes();
+    alFillPropertySelects();
+    alSyncSwatch();
+    alSyncForm();
+    document.getElementById('add-layer-modal').hidden = false;
+    document.getElementById('al-name').focus();
+}
+
+// Restyle an existing layer: same form, prefilled, with the fields that would
+// be disruptive to change (name, geometry, data source) left out. Renaming in
+// particular is refused server-side — the name is the identifier everywhere.
+function openEditLayerModal(layerName) {
+    // The console page is baked when it is materialized, but a restyle only
+    // rebuilds the webmaps — so the embedded layer data goes stale as soon as
+    // you save. Read the live config first, and fall back to what was baked.
+    fetch('../../../atlas_config.json?t=' + Date.now())
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(cfg) {
+            var layers = ((cfg || {}).dataswale || {}).layers || [];
+            layers.forEach(function(l) { if (l.name) alLayersByName[l.name] = l; });
+        })
+        .catch(function() { /* offline or static copy: baked data it is */ })
+        .then(function() { alOpenEditLayerModal(layerName); });
+}
+
+function alOpenEditLayerModal(layerName) {
+    var layer = alLayersByName[layerName] || { name: layerName };
+    alMode = 'edit';
+    alEditing = layerName;
+    alUpload = null; alProps = []; alNumeric = {};
+    alSetStatus('');
+    document.getElementById('al-title').textContent = 'Style: ' + layerName;
+    document.getElementById('al-help').href = '/local/documents/help/edit_layer_style.html';
+    document.getElementById('al-create').textContent = 'Save';
+    document.getElementById('al-geometry').value = layer.geometry_type || 'point';
+
+    var paint = layer.paint || {};
+    var isPolygon = layer.geometry_type === 'polygon';
+    setRgb((isPolygon ? (layer.fill_color || layer.color) : layer.color) || [150, 150, 150]);
+    setOutlineRgb(layer.color || [150, 150, 150]);
+    document.getElementById('al-shape').value = layer.polygon_shape || 'raw';
+    var visibility = ((layer.vis || {}).layout || {}).visibility;
+    document.getElementById('al-visible-check').checked = visibility !== 'none';
+    var key = { point: 'circle-opacity', linestring: 'line-opacity', polygon: 'fill-opacity' }[layer.geometry_type];
+    var opacity = paint[key];
+    if (opacity === undefined) opacity = layer.fill_opacity;
+    document.getElementById('al-opacity').value = Math.round((opacity === undefined ? 1 : opacity) * 100);
+
+    var width = paint['line-width'] || paint['circle-radius'];
+    document.getElementById('al-width').value = (typeof width === 'number') ? width : 9;
+    document.getElementById('al-label-check').checked = !!layer.add_labels;
+    alRenderIcons((layer.symbol && layer.symbol.icon) || '');
+
+    // A colour map already on the layer shows as one; otherwise flat colour.
+    var ramped = Array.isArray(paint['circle-color'] || paint['line-color'] || paint['fill-color']);
+    document.querySelector('input[name="al-color-mode"][value="' + (ramped ? 'map' : 'rgb') + '"]').checked = true;
+    if (!alPalette) alPalette = Object.keys(alPalettes)[0] || null;
+    alRenderPalettes();
+
+    // Offer the layer's own fields for the label, read from its data.
+    alFillPropertySelects(layer.label_field || 'name');
+    alLoadLayerFields(layerName, layer);
+    alSyncSwatch();
+    alSyncForm();
+    document.getElementById('add-layer-modal').hidden = false;
+}
+
+function setRgb(rgb) {
+    ['al-r', 'al-g', 'al-b'].forEach(function(id, i) {
+        document.getElementById(id).value = rgb[i];
+    });
+}
+
+// The layer's properties, for the label dropdown. Layer data is served next to
+// the console, so this reads the real fields rather than guessing from config.
+function alLoadLayerFields(layerName, layer) {
+    var configured = (layer.editable_columns || []).map(function(c) { return c.name; });
+    fetch('../../../layers/' + layerName + '/' + layerName + '.geojson')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(fc) {
+            var props = {};
+            configured.forEach(function(k) { props[k] = true; });
+            ((fc && fc.features) || []).slice(0, 500).forEach(function(f) {
+                Object.keys(f.properties || {}).forEach(function(k) { props[k] = true; });
+            });
+            alProps = Object.keys(props).sort();
+            alFillPropertySelects(layer.label_field || 'name');
+        })
+        .catch(function() {
+            alProps = configured.sort();
+            alFillPropertySelects(layer.label_field || 'name');
+        });
+}
+
+function alRenderIcons(selected) {
+    var sel = document.getElementById('al-icon');
+    sel.innerHTML = '';
+    var dot = document.createElement('option');
+    dot.value = ''; dot.textContent = '(plain dot)';
+    sel.appendChild(dot);
+    alIcons.forEach(function(name) {
+        var o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        sel.appendChild(o);
+    });
+    sel.value = selected || '';
 }
 
 function closeAddLayerModal() {
-    document.getElementById('add-layer-modal').style.display = 'none';
+    document.getElementById('add-layer-modal').hidden = true;
+}
+
+// A new polygon starts half-transparent so the map stays readable underneath —
+// the default a polygon has had all along. Editing an existing layer prefills
+// from that layer instead, so this only applies to Add.
+var DEFAULT_OPACITY = { polygon: 50, point: 100, linestring: 100 };
+
+function alGeometryChanged() {
+    if (alMode === 'add') {
+        document.getElementById('al-opacity').value =
+            DEFAULT_OPACITY[document.getElementById('al-geometry').value];
+        alSyncSwatch();
+    }
+    alSyncForm();
+}
+
+function alSource()    { return document.querySelector('input[name="al-source"]:checked').value; }
+function alColorMode() { return document.querySelector('input[name="al-color-mode"]:checked').value; }
+
+function alSetStatus(text, isError) {
+    var el = document.getElementById('al-status');
+    el.textContent = text;
+    el.classList.toggle('is-error', !!isError);
+}
+
+// Show/hide the parts of the form that depend on type, source and colour mode.
+function alSyncForm() {
+    var geometry = document.getElementById('al-geometry').value;
+    var editing = alMode === 'edit';
+    var upload = !editing && alSource() === 'upload';
+    var map = alColorMode() === 'map';
+    var icon = document.getElementById('al-icon').value;
+
+    // Identity and data source are add-only: a restyle changes appearance.
+    document.getElementById('al-name-box').hidden = editing;
+    document.getElementById('al-geometry-col').hidden = editing;
+    document.getElementById('al-source-box').hidden = editing;
+
+    // One width number, meaning whatever it means for this geometry — and for
+    // a point with an icon, the icon's size.
+    document.getElementById('al-width-col').hidden = geometry === 'polygon';
+    document.getElementById('al-width-label').textContent =
+        geometry === 'linestring' ? 'Line width (px)' :
+        (icon ? 'Icon size (px)' : 'Point radius (px)');
+    document.getElementById('al-icon-box').hidden = geometry !== 'point';
+    document.getElementById('al-shape-box').hidden = geometry !== 'polygon';
+    // A polygon's main colour is its fill; its edge gets its own control.
+    document.getElementById('al-outline-box').hidden = geometry !== 'polygon';
+
+    document.getElementById('al-upload-box').hidden = !upload;
+    // An icon is drawn by the label layer, so labels come with it.
+    var labelCheck = document.getElementById('al-label-check');
+    if (icon && geometry === 'point') labelCheck.checked = true;
+    document.getElementById('al-label-box').hidden = !labelCheck.checked;
+
+    document.getElementById('al-rgb-box').hidden = map;
+    document.getElementById('al-map-box').hidden = !map;
+    // With no file there are no properties to pick from, so type the name.
+    var haveProps = upload && Object.keys(alNumeric).length > 0;
+    document.getElementById('al-map-prop').hidden = !haveProps;
+    document.getElementById('al-map-prop-text').hidden = haveProps;
+}
+
+function alSyncSwatch() {
+    var hex = alRgbHex();
+    var opacity = alOpacity();
+    document.getElementById('al-swatch').style.background = hex;
+    document.getElementById('al-swatch').style.opacity = opacity;
+    document.getElementById('al-hex').textContent = hex;
+    document.getElementById('al-opacity-value').textContent = Math.round(opacity * 100) + '%';
+    var outline = alOutlineHex();
+    document.getElementById('al-outline-swatch').style.background = outline;
+    document.getElementById('al-outline-hex').textContent = outline;
+}
+
+function setOutlineRgb(rgb) {
+    ['al-or', 'al-og', 'al-ob'].forEach(function(id, i) {
+        document.getElementById(id).value = rgb[i];
+    });
+}
+
+function alOpacity() {
+    return parseInt(document.getElementById('al-opacity').value, 10) / 100;
+}
+
+function alRgbHex(ids) {
+    return '#' + (ids || ['al-r', 'al-g', 'al-b']).map(function(id) {
+        var v = parseInt(document.getElementById(id).value, 10);
+        return (v < 16 ? '0' : '') + v.toString(16);
+    }).join('');
+}
+
+function alOutlineHex() {
+    return alRgbHex(['al-or', 'al-og', 'al-ob']);
+}
+
+function alGradient(colors) {
+    return 'linear-gradient(to right, ' + colors.join(', ') + ')';
+}
+
+function alRenderPalettes() {
+    var list = document.getElementById('al-palette-list');
+    list.innerHTML = '';
+    Object.keys(alPalettes).forEach(function(name) {
+        var li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.className = 'palette-option' + (name === alPalette ? ' is-selected' : '');
+        li.innerHTML = '<span class="palette-bar"></span><span class="palette-name"></span>';
+        li.querySelector('.palette-bar').style.background = alGradient(alPalettes[name]);
+        li.querySelector('.palette-name').textContent = name;
+        li.onclick = function() {
+            alPalette = name;
+            list.hidden = true;
+            alRenderPalettes();
+        };
+        list.appendChild(li);
+    });
+    var btn = document.getElementById('al-palette-btn');
+    btn.innerHTML = '<span class="palette-bar"></span><span class="palette-name"></span>';
+    if (alPalette) {
+        btn.querySelector('.palette-bar').style.background = alGradient(alPalettes[alPalette]);
+        btn.querySelector('.palette-name').textContent = alPalette;
+    }
+}
+
+function alTogglePalettes() {
+    var list = document.getElementById('al-palette-list');
+    list.hidden = !list.hidden;
+}
+
+function alReadFile(file) {
+    alUpload = null; alProps = []; alNumeric = {};
+    var summary = document.getElementById('al-file-summary');
+    summary.textContent = '';
+    if (!file) { alFillPropertySelects(); return; }
+    if (!document.getElementById('al-name').value) {
+        // Suggest a name from the file name.
+        document.getElementById('al-name').value = file.name.replace(/\.(geo)?json$/i, '')
+            .toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^[^a-z]+/, '').slice(0, 49);
+    }
+    var reader = new FileReader();
+    reader.onload = function() {
+        var fc;
+        try { fc = JSON.parse(reader.result); }
+        catch (e) { alSetStatus('That file is not valid JSON.', true); return; }
+        if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) {
+            alSetStatus('That file is not a GeoJSON FeatureCollection.', true); return;
+        }
+        alUpload = fc;
+        var types = {}, props = {}, ranges = {};
+        fc.features.forEach(function(f) {
+            if (f.geometry && f.geometry.type) types[f.geometry.type] = true;
+            var p = f.properties || {};
+            Object.keys(p).forEach(function(k) {
+                props[k] = true;
+                var v = p[k];
+                if (typeof v === 'number' && isFinite(v)) {
+                    if (!ranges[k]) ranges[k] = [v, v];
+                    ranges[k][0] = Math.min(ranges[k][0], v);
+                    ranges[k][1] = Math.max(ranges[k][1], v);
+                }
+            });
+        });
+        alProps = Object.keys(props).sort();
+        alNumeric = ranges;
+        // Pick the layer type from the file when it is unambiguous.
+        var geoms = {};
+        Object.keys(types).forEach(function(t) { if (GEOJSON_TO_GEOMETRY[t]) geoms[GEOJSON_TO_GEOMETRY[t]] = true; });
+        var geomList = Object.keys(geoms);
+        if (geomList.length === 1) {
+            document.getElementById('al-geometry').value = geomList[0];
+            alGeometryChanged();
+        }
+        summary.textContent = fc.features.length + ' features · ' +
+            (Object.keys(types).join(', ') || 'no geometry') + ' · ' + alProps.length + ' properties';
+        alSetStatus(geomList.length > 1 ? 'The file mixes geometry types (' + geomList.join(', ') +
+                    '); a layer holds only one.' : '', geomList.length > 1);
+        alFillPropertySelects();
+        alSyncForm();
+    };
+    reader.readAsText(file);
+}
+
+function alFillPropertySelects(selected) {
+    var label = document.getElementById('al-label');
+    label.innerHTML = '';
+    var fields = alProps.slice();
+    if (fields.indexOf('name') < 0) fields.unshift('name');
+    fields.forEach(function(k) {
+        var o = document.createElement('option');
+        o.value = k; o.textContent = k === 'name' ? 'name (default)' : k;
+        label.appendChild(o);
+    });
+    label.value = selected || 'name';
+
+    var mp = document.getElementById('al-map-prop');
+    mp.innerHTML = '';
+    Object.keys(alNumeric).sort().forEach(function(k) {
+        var o = document.createElement('option');
+        o.value = k; o.textContent = k;
+        mp.appendChild(o);
+    });
+    alPrefillRange();
+}
+
+function alPrefillRange() {
+    var r = alNumeric[document.getElementById('al-map-prop').value];
+    if (!r) return;
+    document.getElementById('al-map-min').value = r[0];
+    document.getElementById('al-map-max').value = r[1];
+}
+
+function alStyleFields(geometry) {
+    var body = {};
+    if (geometry !== 'polygon') {
+        var w = parseFloat(document.getElementById('al-width').value);
+        if (!(w > 0)) throw 'Width must be a positive number.';
+        body.width = w;
+    }
+    if (geometry === 'point') body.icon = document.getElementById('al-icon').value || '';
+    if (geometry === 'polygon') body.polygon_shape = document.getElementById('al-shape').value;
+    body.opacity = alOpacity();
+    body.visible = document.getElementById('al-visible-check').checked;
+    body.add_labels = document.getElementById('al-label-check').checked;
+    body.label_field = body.add_labels ? (document.getElementById('al-label').value || 'name') : 'name';
+
+    if (alColorMode() === 'map') {
+        var useSelect = !document.getElementById('al-map-prop').hidden;
+        var prop = (useSelect ? document.getElementById('al-map-prop').value
+                              : document.getElementById('al-map-prop-text').value).trim();
+        var lo = parseFloat(document.getElementById('al-map-min').value);
+        var hi = parseFloat(document.getElementById('al-map-max').value);
+        if (!prop) throw 'Choose the property to colour by.';
+        if (!alPalette) throw 'Choose a colour map.';
+        if (!(isFinite(lo) && isFinite(hi) && lo < hi)) throw 'Colour map needs Min less than Max.';
+        body.colormap = { palette: alPalette, property: prop, min: lo, max: hi };
+    } else if (geometry === 'polygon') {
+        body.fill_color = alRgbHex();       // the main control is the interior
+        body.colormap = null;
+    } else {
+        body.color = alRgbHex();
+        body.colormap = null;
+    }
+    // A polygon's outline always has its own control, colour map or not.
+    if (geometry === 'polygon') body.color = alOutlineHex();
+    return body;
+}
+
+function alBuildRequest() {
+    var geometry = document.getElementById('al-geometry').value;
+    var body = alStyleFields(geometry);
+    if (alMode === 'edit') return body;          // styling only
+
+    var source = alSource();
+    body.geometry = geometry;
+    body.source = source;
+    if (source === 'upload') {
+        if (!alUpload) throw 'Choose a GeoJSON file to upload, or pick Empty.';
+        body.data = alUpload;
+    }
+    if (body.colormap === null) delete body.colormap;   // add: omit rather than clear
+    return body;
 }
 
 function submitAddLayer() {
-    var name = document.getElementById('al-name').value.trim();
-    var s3 = document.getElementById('al-s3').value.trim();
-    var color = document.getElementById('al-color').value.trim();
-    var status = document.getElementById('al-status');
-    if (!name || !s3) { status.textContent = 'Layer name and S3 URL are required.'; return; }
+    var name = alMode === 'edit' ? alEditing : document.getElementById('al-name').value.trim();
+    if (alMode === 'add' && !LAYER_NAME_RE.test(name)) {
+        alSetStatus('Layer name: lowercase letters, digits and underscores, starting with a letter.', true);
+        return;
+    }
+    var body;
+    try { body = alBuildRequest(); }
+    catch (msg) { alSetStatus(msg, true); return; }
 
+    var editing = alMode === 'edit';
     var btn = document.getElementById('al-create');
+    var original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Creating…';
-    status.style.color = '#555';
-    status.textContent = 'Creating layer… this can take a minute.';
+    btn.textContent = editing ? 'Saving…' : 'Adding…';
+    alSetStatus(editing ? 'Restyling and rebuilding the maps…'
+                        : (body.source === 'upload' ? 'Uploading and importing… this can take a minute.'
+                                                    : 'Creating layer…'));
 
-    var url = apiurl + '/add_layer/' + swalename + '/' + encodeURIComponent(name)
-            + '?s3_url=' + encodeURIComponent(s3)
-            + '&color=' + encodeURIComponent(color);
-    fetch(url)
+    var endpoint = editing ? '/edit_layer/' : '/add_layer/';
+    fetch(apiurl + endpoint + swalename + '/' + encodeURIComponent(name), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
         .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
         .then(function(res) {
             if (res.ok && res.body.status === 'success') {
-                showToast('Layer "' + name + '" created');
                 closeAddLayerModal();
+                showToast(editing ? 'Styled "' + name + '" — reload the map to see it'
+                                  : 'Layer "' + name + '" added — reload to see it');
             } else {
-                status.style.color = '#a00';
-                status.textContent = 'Failed: ' + (res.body.detail || 'unknown error');
+                alSetStatus('Failed: ' + (res.body.detail || 'unknown error'), true);
             }
         })
-        .catch(function(err) {
-            status.style.color = '#a00';
-            status.textContent = 'Error: ' + err;
-        })
-        .finally(function() { btn.disabled = false; btn.textContent = 'Create'; });
+        .catch(function(err) { alSetStatus('Error: ' + err, true); })
+        .finally(function() { btn.disabled = false; btn.textContent = original; });
 }
+
+// Escape closes the modal; a click outside the palette list closes the list.
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAddLayerModal();
+});
+document.addEventListener('click', function(e) {
+    var list = document.getElementById('al-palette-list');
+    if (list && !list.hidden && !e.target.closest('.palette-picker')) list.hidden = true;
+});
 </script>
 </body>
 </html>

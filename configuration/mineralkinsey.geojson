@@ -1,0 +1,621 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -123.95,
+                            40.18
+                        ],
+                        [
+                            -123.9,
+                            40.18
+                        ],
+                        [
+                            -123.9,
+                            40.21
+                        ],
+                        [
+                            -123.95,
+                            40.21
+                        ],
+                        [
+                            -123.95,
+                            40.18
+                        ]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "mineralkinsey",
+                "data_root": "/root/swales_dev",
+                "shared_dir": "/root/data",
+                "base_url": "https://fireatlas.org/mineralkinsey",
+                "app_url": "https://fireatlas.org:9000",
+                "port": 9000,
+                "admin_emails": [
+                    "gateless@gmail.com"
+                ],
+                "logo_url": "",
+                "versioned_outlets": [],
+                "cloud": {
+                    "outlets": [
+                        "webmap",
+                        "console"
+                    ]
+                },
+                "layers": {
+                    "regions": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            50,
+                            50,
+                            50
+                        ],
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "unique name"
+                            },
+                            {
+                                "name": "description",
+                                "type": "string",
+                                "default": "Text describing the region"
+                            },
+                            {
+                                "name": "caption",
+                                "type": "string",
+                                "default": "Displayed Title"
+                            }
+                        ]
+                    },
+                    "elevation": {
+                        "geometry_type": "raster"
+                    },
+                    "contours": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            50,
+                            200,
+                            50
+                        ],
+                        "vis": {
+                            "minzoom": 14,
+                            "maxzoom": 22
+                        }
+                    },
+                    "basemap": {
+                        "geometry_type": "raster"
+                    },
+                    "documents": {
+                        "geometry_type": "document"
+                    },
+                    "roads": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            100,
+                            55,
+                            50
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "vector_width": true,
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Road"
+                            },
+                            {
+                                "name": "STREETTYPE",
+                                "type": "radio",
+                                "values": [
+                                    {
+                                        "STREETTYPE": "RD",
+                                        "vector_width": 15
+                                    },
+                                    {
+                                        "STREETTYPE": "ST",
+                                        "vector_width": 13
+                                    },
+                                    {
+                                        "STREETTYPE": "Other",
+                                        "vector_width": 10
+                                    }
+                                ],
+                                "default": {
+                                    "STREETTYPE": "RD",
+                                    "vector_width": 9
+                                }
+                            }
+                        ]
+                    },
+                    "roads_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            100,
+                            55,
+                            50
+                        ],
+                        "fill_color": [
+                            100,
+                            55,
+                            50
+                        ],
+                        "fill_opacity": 0.3,
+                        "add_labels": false,
+                        "access": [
+                            "internal",
+                            "admin"
+                        ]
+                    },
+                    "internal_roads": {
+                        "geometry_type": "linestring",
+                        "color": [
+                            255,
+                            155,
+                            50
+                        ],
+                        "add_labels": true,
+                        "access": [
+                            "admin"
+                        ],
+                        "vector_width": true
+                    },
+                    "burns_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "fill_color": [
+                            200,
+                            55,
+                            55
+                        ],
+                        "fill_opacity": [
+                            "get",
+                            "haul_normalized"
+                        ],
+                        "add_labels": true,
+                        "access": [
+                            "internal",
+                            "public",
+                            "admin"
+                        ]
+                    },
+                    "creeks_index": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_color": [
+                            50,
+                            55,
+                            255
+                        ],
+                        "fill_opacity": 0.3,
+                        "add_labels": false,
+                        "access": [
+                            "internal",
+                            "public",
+                            "admin"
+                        ]
+                    },
+                    "creeks": {
+                        "geometry_type": "linestring",
+                        "add_labels": true,
+                        "color": [
+                            50,
+                            50,
+                            200
+                        ],
+                        "interaction": "interface",
+                        "vector_width": true
+                    },
+                    "hydrants": {
+                        "geometry_type": "point",
+                        "color": [
+                            0,
+                            0,
+                            255
+                        ],
+                        "add_labels": true,
+                        "symbol": {
+                            "png": "hydrant.png",
+                            "icon": "extra/half-circle"
+                        },
+                        "icon-size": 1.0,
+                        "interaction": "interface"
+                    },
+                    "ponds": {
+                        "geometry_type": "polygon",
+                        "fill_color": [
+                            50,
+                            50,
+                            250
+                        ]
+                    },
+                    "conservation_piles": {
+                        "geometry_type": "point",
+                        "color": [
+                            50,
+                            255,
+                            100
+                        ],
+                        "add_labels": false,
+                        "access": [
+                            "public"
+                        ],
+                        "symbol": {
+                            "png": "conservation_pile.png",
+                            "icon": "custom/octy"
+                        },
+                        "interaction": "interface",
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Incident"
+                            }
+                        ]
+                    },
+                    "natural": {
+                        "geometry_type": "point",
+                        "color": [
+                            0,
+                            200,
+                            55
+                        ],
+                        "add_labels": true,
+                        "symbol": {
+                            "png": "pin.png",
+                            "icon": "custom/octy"
+                        },
+                        "icon-size": 1.0,
+                        "interaction": "interface"
+                    },
+                    "buildings": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "fill_color": [
+                            100,
+                            100,
+                            100
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface"
+                    },
+                    "addresses": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            255,
+                            0,
+                            0
+                        ]
+                    },
+                    "parcels": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            255,
+                            0,
+                            0,
+                            0.3
+                        ],
+                        "fill_color": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "burns": {
+                        "geometry_type": "polygon",
+                        "color": [
+                            155,
+                            5,
+                            5
+                        ],
+                        "fill_color": [
+                            255,
+                            50,
+                            50
+                        ],
+                        "add_labels": true,
+                        "interaction": "interface",
+                        "access": [
+                            "admin"
+                        ],
+                        "paint": {
+                            "fill-opacity": 0.75
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": "Road"
+                            },
+                            {
+                                "name": "readiness",
+                                "type": "radio",
+                                "values": [
+                                    {
+                                        "readiness": "low",
+                                        "fill_color": [
+                                            200,
+                                            100,
+                                            100
+                                        ]
+                                    },
+                                    {
+                                        "readiness": "med",
+                                        "fill_color": [
+                                            100,
+                                            200,
+                                            100
+                                        ]
+                                    },
+                                    {
+                                        "readiness": "high",
+                                        "fill_color": [
+                                            100,
+                                            100,
+                                            200
+                                        ]
+                                    }
+                                ],
+                                "default": {
+                                    "readiness": "med",
+                                    "fill_color": [
+                                        100,
+                                        200,
+                                        100
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+                "assets": {
+                    "console": {
+                        "type": "outlet",
+                        "name": "console",
+                        "config_def": "console"
+                    },
+                    "dem": {
+                        "type": "inlet",
+                        "out_layer": "elevation",
+                        "config_def": "opentopo_dem"
+                    },
+                    "gdal_contours": {
+                        "type": "eddy",
+                        "in_layer": "elevation",
+                        "out_layer": "contours",
+                        "config_def": "gdal_contours"
+                    },
+                    "derived_hillshade": {
+                        "type": "eddy",
+                        "in_layer": "elevation",
+                        "out_layer": "basemap",
+                        "config_def": "derived_hillshade"
+                    },
+                    "spreadsheet_export": {
+                        "type": "outlet",
+                        "name": "spreadsheet_export",
+                        "config_def": "gsheet_export",
+                        "in_layers": [
+                            "burns",
+                            "roads"
+                        ]
+                    },
+                    "spreadsheet_import": {
+                        "type": "outlet",
+                        "name": "spreadsheet_import",
+                        "config_def": "gsheet_import",
+                        "in_layers": [
+                            "ponds",
+                            "poi"
+                        ]
+                    },
+                    "public_buildings": {
+                        "type": "inlet",
+                        "out_layer": "buildings",
+                        "config_def": "overture_buildings"
+                    },
+                    "public_addresses": {
+                        "type": "inlet",
+                        "out_layer": "parcels",
+                        "config_def": "overture_addresses"
+                    },
+                    "oa_parcels": {
+                        "type": "inlet",
+                        "out_layer": "parcels",
+                        "config_def": "local_humboldt_parcels"
+                    },
+                    "public_roads": {
+                        "type": "inlet",
+                        "out_layer": "roads",
+                        "config_def": "overture_roads"
+                    },
+                    "internal_roads": {
+                        "type": "inlet",
+                        "out_layer": "internal_roads",
+                        "config_def": "internal_roads"
+                    },
+                    "public_creeks": {
+                        "type": "inlet",
+                        "out_layer": "creeks",
+                        "config_def": "nhd_creeks"
+                    },
+                    "local_documents": {
+                        "type": "inlet",
+                        "out_layer": "documents",
+                        "config_def": "local_documents"
+                    },
+                    "local_hydrants": {
+                        "type": "inlet",
+                        "out_layer": "hydrants",
+                        "config_def": "local_hydrants"
+                    },
+                    "local_ponds": {
+                        "type": "inlet",
+                        "out_layer": "ponds",
+                        "config_def": "local_ponds"
+                    },
+                    "local_burns": {
+                        "type": "inlet",
+                        "out_layer": "burns",
+                        "config_def": "local_burns"
+                    },
+                    "burns_h3": {
+                        "type": "eddy",
+                        "in_layer": "burns",
+                        "out_layer": "burns_index",
+                        "config_def": "h3_cells"
+                    },
+                    "roads_h3": {
+                        "type": "eddy",
+                        "in_layer": "roads",
+                        "out_layer": "roads_index",
+                        "config_def": "h3_cells"
+                    },
+                    "creeks_h3": {
+                        "type": "eddy",
+                        "in_layer": "creeks",
+                        "out_layer": "creeks_index",
+                        "starting_resolution": 11,
+                        "max_cells": 100,
+                        "config_def": "h3_cells"
+                    },
+                    "local_turnouts": {
+                        "type": "inlet",
+                        "out_layer": "turnouts",
+                        "config_def": "local_turnouts"
+                    },
+                    "webmap": {
+                        "show_user_location": true,
+                        "type": "outlet",
+                        "name": "webmap",
+                        "in_layers": [
+                            "basemap",
+                            "parcels",
+                            "contours",
+                            "roads",
+                            "creeks",
+                            "buildings",
+                            "natural",
+                            "burns",
+                            "burns_index",
+                            "creeks_index",
+                            "roads_index"
+                        ],
+                        "config_def": "webmap",
+                        "access": [
+                            "internal",
+                            "admin"
+                        ]
+                    },
+                    "webedit": {
+                        "type": "outlet",
+                        "name": "webmap",
+                        "in_layers": [
+                            "basemap",
+                            "parcels",
+                            "contours",
+                            "roads",
+                            "creeks",
+                            "buildings",
+                            "natural"
+                        ],
+                        "config_def": "webedit"
+                    },
+                    "internal_webmap": {
+                        "show_user_location": true,
+                        "type": "outlet",
+                        "name": "internal_webmap",
+                        "in_layers": [
+                            "basemap",
+                            "parcels",
+                            "contours",
+                            "roads",
+                            "creeks",
+                            "buildings",
+                            "natural"
+                        ],
+                        "config_def": "webmap",
+                        "access": [
+                            "admin"
+                        ]
+                    },
+                    "runbook": {
+                        "type": "outlet",
+                        "name": "runbook",
+                        "in_layers": [
+                            "basemap",
+                            "parcels",
+                            "contours",
+                            "roads",
+                            "creeks",
+                            "buildings",
+                            "natural"
+                        ],
+                        "access": [
+                            "internal",
+                            "admin"
+                        ],
+                        "config_def": "runbook",
+                        "regions": []
+                    },
+                    "sqldb": {
+                        "type": "outlet",
+                        "config_def": "sqldb",
+                        "layers": [
+                            "roads",
+                            "creeks",
+                            "burns"
+                        ]
+                    },
+                    "sqlquery": {
+                        "type": "outlet",
+                        "name": "sqlquery",
+                        "config_def": "sqlquery",
+                        "access": [
+                            "admin"
+                        ]
+                    },
+                    "gazetteer": {
+                        "type": "outlet",
+                        "name": "gazetteer",
+                        "num_rows": 5,
+                        "num_cols": 6,
+                        "config_def": "gazetteer",
+                        "in_layers": [
+                            "basemap",
+                            "ponds",
+                            "contours",
+                            "roads",
+                            "creeks",
+                            "buildings"
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+}

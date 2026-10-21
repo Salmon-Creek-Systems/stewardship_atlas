@@ -20,9 +20,9 @@ The interactive web map provides a browser-based view of all atlas layers with c
 1. Navigate to the atlas webmap URL (e.g., `https://youratlas.fireatlas.org/webmap/`)
 2. Use the layer toggles to show/hide data layers
 3. Click features to view their properties
-4. Use the location sharing dropdown to copy coordinates or Google Maps links
+4. Use **Share** (or Ctrl/⌘-click for a pin) to copy a map link, Google Maps link or coordinates
 
-See: [Webmap Help](webmap_help.md)
+See: [User Manual → The Web Map](user_manual.md#the-web-map)
 
 ---
 
@@ -81,6 +81,13 @@ The edit map interface allows drawing new features directly in the browser. Edit
 2. Draw features using the drawing tools
 3. Fill in property values in the control panel
 4. Click "Save" to submit to staging
+
+**Reshaping an existing feature** (console: Alter → Reshape, page `webedit/{layer}_reshape.html`):
+1. Click a feature of the layer to load it for editing
+2. Drag vertices to move them, drag a midpoint handle to add a vertex, right-click a vertex to delete it; drag inside the feature (or drag a point) to move it whole
+3. Click "Save Shape" — the feature's geometry is replaced, its properties are untouched
+
+Reshape works on points, lines and polygons (not multi-part features), one feature at a time. It is stored as a `reshape` delta keyed by the feature's `atlas_id`. A layer with a `polygon_shape` (e.g. square regions) re-shapes the result. On an inlet-fed layer, a reshape lasts until the next rebuild from source, like any other hand edit.
 
 See: [Add Private Notes](add_private_note.md), [Editing Layer Data](editing_layer_data.md)
 

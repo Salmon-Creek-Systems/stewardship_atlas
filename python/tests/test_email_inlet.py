@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from email_inlet import parse_subject, extract_gps, build_feature
+from email_inlet import parse_subject, extract_gps, build_feature, exif_timestamp
 
 
 class TestParseSubject(unittest.TestCase):
@@ -189,6 +189,68 @@ class TestBuildFeature(unittest.TestCase):
                                 extra_props={"make": "Apple", "altitude": 142.0})
         self.assertEqual(feature["properties"]["make"], "Apple")
         self.assertEqual(feature["properties"]["altitude"], 142.0)
+
+
+class TestExifTimestamp(unittest.TestCase):
+    """Capture date beats arrival date — see the Hargus batch, uploaded to S3
+    in 2026 from photos taken in March 2025."""
+
+    FALLBACK = "2026-04-08T13:04:57+00:00"
+
+    def test_prefers_exif_datetime(self):
+        ts = exif_timestamp({"datetime": "2025:03:29 17:33:28"}, self.FALLBACK)
+        self.assertEqual(ts, "2025-03-29T17:33:28")
+
+    def test_falls_back_when_absent(self):
+        self.assertEqual(exif_timestamp({"lat": 39.7}, self.FALLBACK), self.FALLBACK)
+
+    def test_falls_back_on_empty_gps(self):
+        self.assertEqual(exif_timestamp({}, self.FALLBACK), self.FALLBACK)
+        self.assertEqual(exif_timestamp(None, self.FALLBACK), self.FALLBACK)
+
+    def test_falls_back_on_unparseable(self):
+        self.assertEqual(exif_timestamp({"datetime": "not a date"}, self.FALLBACK),
+                         self.FALLBACK)
+
+    def test_tolerates_surrounding_whitespace(self):
+        ts = exif_timestamp({"datetime": "  2024:12:08 03:02:51  "}, self.FALLBACK)
+        self.assertEqual(ts, "2024-12-08T03:02:51")
+
+
+
+class TestOutsideBbox(unittest.TestCase):
+    """A fix outside the atlas would import a feature off the edge of its map."""
+
+    BBOX = {'west': -123.726259, 'east': -123.428583,
+            'south': 39.591268, 'north': 39.873943}
+
+    def _outside(self, lat, lon):
+        sys.path.insert(0, os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', 'scripts')))
+        from ingest_s3_photos import outside_bbox
+        return outside_bbox(self.BBOX, lat, lon)
+
+    def test_inside_is_kept(self):
+        # A Hargus 2025 fix.
+        self.assertFalse(self._outside(39.776600, -123.548344))
+
+    def test_west_of_the_atlas_is_dropped(self):
+        # The GoPro shots in Hargus_biochar, ~6km west, inside westport.
+        self.assertTrue(self._outside(39.870032, -123.801585))
+
+    def test_corners_are_inside(self):
+        self.assertFalse(self._outside(39.591268, -123.726259))
+        self.assertFalse(self._outside(39.873943, -123.428583))
+
+    def test_just_past_each_edge_is_outside(self):
+        self.assertTrue(self._outside(39.591267, -123.5))   # south
+        self.assertTrue(self._outside(39.873944, -123.5))   # north
+        self.assertTrue(self._outside(39.7, -123.726260))   # west
+        self.assertTrue(self._outside(39.7, -123.428582))   # east
+
+    def test_null_island_is_dropped(self):
+        # What fhe's photos layer holds for photos whose fix never resolved.
+        self.assertTrue(self._outside(0.0, 0.0))
 
 
 if __name__ == "__main__":

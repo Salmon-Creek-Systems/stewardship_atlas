@@ -21,6 +21,8 @@ import re
 import shutil
 from pathlib import Path
 
+import help_docs
+
 logger = logging.getLogger(__name__)
 
 # The URL prefix nginx serves from /root/data today and the key prefix the
@@ -67,29 +69,6 @@ def render_styled_doc(md_text: str, help_template: str, title: str = None) -> st
         lambda m: f'href="{m.group(1)}.html{m.group(2) or ""}"',
         html_content)
     return help_template.format(title=title, content=html_content)
-
-
-def help_index_content(page_list: list, manual_links: list) -> str:
-    """The body of documents/help/index.html.
-
-    ``page_list`` is (title, filename) for each help page; ``manual_links`` is
-    (title, href) for each manual, which sits one level up.
-    """
-    manuals_section = ""
-    if manual_links:
-        items = "\n".join(f'        <li><a href="{href}">{title}</a></li>'
-                          for title, href in manual_links)
-        manuals_section = f"        <h2>Manuals</h2>\n        <ul>\n{items}\n        </ul>\n"
-
-    page_links = "\n".join(f'        <li><a href="{filename}">{title}</a></li>'
-                           for title, filename in sorted(page_list))
-    return f"""
-{manuals_section}        <h2>Help Topics</h2>
-        <p>Browse the available help documentation:</p>
-        <ul>
-{page_links}
-        </ul>
-        """
 
 
 def plan_site_assets(repo_root) -> list:
@@ -153,8 +132,7 @@ def build_site_assets(repo_root, out_dir) -> list:
 
     help_template = (repo_root / 'templates' / 'help.html').read_text()
 
-    # Titles for the index, collected as the pages are rendered.
-    page_list = []
+    # Manual titles for the index, collected as the manuals are rendered.
     manual_links = []
     index_entry = None
 
@@ -175,14 +153,13 @@ def build_site_assets(repo_root, out_dir) -> list:
         destination.write_text(render_styled_doc(md_text, help_template, title=title),
                                encoding='utf-8')
 
-        filename = Path(entry['path']).name
-        if entry['path'].startswith('documents/help/'):
-            page_list.append((title, filename))
-        elif entry['source'].stem in MANUALS:
-            manual_links.append((title, f'../{filename}'))
+        if entry['source'].stem in MANUALS:
+            manual_links.append((title, f"../{Path(entry['path']).name}"))
 
     if index_entry is not None:
-        content = help_index_content(page_list, manual_links)
+        # Help pages grouped by their audience tag (help_docs), manuals first.
+        pages = help_docs.read_help_pages(repo_root / 'documents' / 'help')
+        content = help_docs.help_index_content(pages, manual_links)
         (out_dir / index_entry['path']).write_text(
             help_template.format(title='Help Index', content=content), encoding='utf-8')
 

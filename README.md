@@ -76,7 +76,7 @@ These integrations exist in the codebase or are planned but are not part of the 
 
 ## Documentation
 
-- [User Guide](documents/user_guide.md)
+- [Developer's Guide](documents/developers_guide.md)
 - [Data Interaction Guide](documents/data_interaction_guide.md)
 - [Technical Architecture](documents/atlas_technical_architecture.md)
 - [Help](documents/help/)

@@ -136,8 +136,16 @@ def tiff2jpg(tiff_path, atlas_config=None, swale_config=None):
 
     return jpg_path
 
-def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
-    """Canonicalize raster to target CRS using versioned paths"""
+def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None,
+                       gdal_config=None):
+    """Canonicalize raster to target CRS using versioned paths
+
+    gdal_config is an optional {name: value} of GDAL config options, passed as
+    --config pairs. A remote source read through /vsicurl/ wants
+    GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR, without which GDAL lists the whole
+    containing prefix before reading a byte. inpath may be any path GDAL
+    accepts, including /vsicurl/ and /vsis3/.
+    """
     
     logger.info(f"Canonicalizing raster: {inpath}")
 
@@ -146,7 +154,10 @@ def canonicalize_raster(inpath, outpath, target_srs, bbox, resample_width=None):
 
     extent = [str(bbox['west']), str(bbox['south']),str(bbox['east']), str(bbox['north'])]
     
-    warp_args = [ 'gdalwarp', '-t_srs', target_srs, '-te'] + extent
+    warp_args = ['gdalwarp']
+    for key, value in (gdal_config or {}).items():
+        warp_args += ['--config', key, str(value)]
+    warp_args += ['-t_srs', target_srs, '-te'] + extent
     if resample_width:
         warp_args += [ '-ts', str(resample_width), '0', '-r', 'bilinear']
     warp_args += [str(inpath), str(outpath)]
@@ -200,16 +211,15 @@ def set_crs_raster(config, inpath):
 
 
 
-def alter_geojson(json_path, alt_conf, sample_names=True):
-    """Alter GeoJSON properties"""
-    logger.info(f"Altering GeoJSON in {json_path} with {alt_conf}.")
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
+def alter_features(features, alt_conf):
+    """Apply an `alterations` block (canonicalize, vector_width, filter) to a
+    list of features in memory. Mutates properties in place and returns the
+    features the filter keeps. File-based inlets go through alter_geojson;
+    inlets that hold features in memory (s3_geojson) call this directly."""
     # Handle feature filtering - collect features to keep
     filtered_features = []
     
-    for feature in data['features']:
+    for feature in features:
         # Handle property canonicalization
         if 'canonicalize' in alt_conf:
             for canon in alt_conf['canonicalize']:
@@ -278,9 +288,15 @@ def alter_geojson(json_path, alt_conf, sample_names=True):
             # No filtering, keep all features
             filtered_features.append(feature)
     
-    # Update features list
-    data['features'] = filtered_features
-    
+    return filtered_features
+
+
+def alter_geojson(json_path, alt_conf, sample_names=True):
+    """Alter GeoJSON properties"""
+    logger.info(f"Altering GeoJSON in {json_path} with {alt_conf}.")
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    data['features'] = alter_features(data['features'], alt_conf)
     with open(json_path, 'w') as f:
         json.dump(data, f)
 
@@ -520,3 +536,164 @@ def build_qgis_color_expression(value_expression, stops):
         f"CASE\n  {body}\n"
         f"  ELSE color_rgb({last_r}, {last_g}, {last_b})\nEND"
     )
+
+def geojson_bbox(coordinates):
+    """(min_x, min_y, max_x, max_y) over any nesting of Polygon/MultiPolygon rings."""
+    xs, ys = [], []
+
+    def walk(item):
+        if (isinstance(item, (list, tuple)) and len(item) >= 2
+                and all(isinstance(v, (int, float)) for v in item[:2])):
+            xs.append(item[0])
+            ys.append(item[1])
+        elif isinstance(item, (list, tuple)):
+            for sub in item:
+                walk(sub)
+
+    walk(coordinates)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def square_from_bbox(bbox):
+    """A closed square ring covering bbox, sized by its longer side, concentric.
+
+    The square is in degrees, which is NOT square on the printed page: the
+    runbook renders in EPSG:3857, where a degree-square is 1/cos(lat) taller
+    than wide (~1.30x at 40N). outlets_qgis_atlas then squares every region in
+    3857 by its longer side, so a degree-square region prints ~1.3x taller than
+    wide and fills only ~77% of the frame's width. Use page_square_from_bbox
+    ('square') for runbook regions.
+
+    Kept because it is how westport's existing regions were made and
+    reproduces them exactly.
+    """
+    min_x, min_y, max_x, max_y = bbox
+    half = max(max_x - min_x, max_y - min_y) / 2
+    cx, cy = (min_x + max_x) / 2, (min_y + max_y) / 2
+    return [[cx - half, cy - half], [cx + half, cy - half], [cx + half, cy + half],
+            [cx - half, cy + half], [cx - half, cy - half]]
+
+
+def page_square_from_bbox(bbox):
+    """A closed ring covering bbox that is square ON THE PRINTED PAGE.
+
+    The runbook renders in EPSG:3857, where a degree of latitude occupies
+    1/cos(lat) times the space of a degree of longitude — so a square on the
+    page is wider in degrees than it is tall: dlat = dlon * cos(lat), about
+    0.77 at 40N.
+
+    THE shape for runbook regions. outlets_qgis_atlas reprojects each region to
+    3857 and replaces it with the 3857 square on its longer side before fitting
+    it to the frame, so a region already square in 3857 is printed exactly as
+    drawn. The frame is close to square by design: every runbook renders Letter
+    landscape (the template's A4/Portrait sits in the asset's nested `config`,
+    which create_atlas_layout never reads), and with the 55 mm side collar that
+    leaves a 220 x 212 mm frame, so the square fills the page.
+
+    Contrast square_from_bbox, which is square in degrees and prints ~1.30x
+    taller than wide.
+    """
+    import math
+
+    min_x, min_y, max_x, max_y = bbox
+    cx, cy = (min_x + max_x) / 2, (min_y + max_y) / 2
+    scale = math.cos(math.radians(cy)) or 1.0      # 1.0 guards the poles
+    # Compare the sides in page units, then grow the smaller one to match.
+    side = max(max_x - min_x, (max_y - min_y) / scale)
+    half_x, half_y = side / 2, side * scale / 2
+    return [[cx - half_x, cy - half_y], [cx + half_x, cy - half_y],
+            [cx + half_x, cy + half_y], [cx - half_x, cy + half_y],
+            [cx - half_x, cy - half_y]]
+
+
+# What a layer's `polygon_shape` can be. 'raw' keeps the drawn geometry;
+# 'bbox' replaces it with its bounding rectangle; 'square' makes a square on
+# paper — the runbook region shape, because outlets_qgis_atlas squares every
+# region in EPSG:3857 before fitting it to the page; 'square_degrees' makes a
+# square in degrees, what the older inlet-level `squarify` did, which prints
+# ~1.3x taller than wide at 40N. (#189's "a degree-square fills the page" was
+# worked out from outlets_qgis.outlet_regions_qgis, which is not a registered
+# materializer; the live renderer is outlets_qgis_atlas.)
+POLYGON_SHAPES = ('raw', 'bbox', 'square', 'square_degrees')
+
+
+def bbox_feature(feature):
+    """Replace a polygon's geometry with its bounding rectangle."""
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+    min_x, min_y, max_x, max_y = bbox
+    ring = [[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y], [min_x, min_y]]
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [ring]}
+    return out
+
+
+def page_squarify_feature(feature):
+    """Replace a polygon's geometry with the square that prints square."""
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [page_square_from_bbox(bbox)]}
+    return out
+
+
+def shape_feature(feature, polygon_shape):
+    """Apply a layer's `polygon_shape` to one incoming feature.
+
+    Called where features land in a layer, so an imported, uploaded and
+    hand-drawn polygon all end up the same shape. Unknown modes and 'raw' pass
+    through untouched.
+    """
+    if polygon_shape == 'bbox':
+        return bbox_feature(feature)
+    if polygon_shape == 'square':
+        return page_squarify_feature(feature)
+    if polygon_shape == 'square_degrees':
+        return squarify_feature(feature)
+    return feature
+
+
+def squarify_feature(feature):
+    """Replace a polygon's geometry with the square that covers it.
+
+    Regions become runbook pages, and a page is a fixed shape — so a region is
+    stored already squared rather than squared at render time, which keeps what
+    is drawn on the webmap identical to what gets printed.
+
+    See square_from_bbox on why "square" here means square in degrees, and why
+    that is not square on the printed page.
+
+    Non-polygons and unreadable geometries pass through untouched.
+    """
+    import copy
+
+    out = copy.deepcopy(feature)
+    geometry = out.get('geometry') or {}
+    if geometry.get('type') not in ('Polygon', 'MultiPolygon'):
+        return out
+
+    bbox = geojson_bbox(geometry.get('coordinates', []))
+    if bbox is None:
+        return out
+
+    min_x, min_y, max_x, max_y = bbox
+    width, height = max_x - min_x, max_y - min_y
+    out['geometry'] = {'type': 'Polygon', 'coordinates': [square_from_bbox(bbox)]}
+    out.setdefault('properties', {}).update({
+        '_squarified': True,
+        '_original_width': width,
+        '_original_height': height,
+        '_square_size': max(width, height),
+    })
+    return out
+

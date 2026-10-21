@@ -1,0 +1,358 @@
+"""Helpers for the MapLibre style layers the webmap outlet emits, and the
+pure parts of the QGIS styling that mirrors them.
+
+Standard library only: `outlets` imports duckdb, geopandas, pandas, nbformat,
+PIL and gspread at module scope (and `outlets_qgis` imports QGIS), so neither
+can be imported on a bare checkout; anything that deserves a test lives here.
+"""
+import base64
+import html
+import json
+import math
+from pathlib import Path
+from urllib.parse import quote
+
+# Every `maxzoom` in every config in this repo is 22, and every one of them
+# means "no upper limit". MapLibre hides a layer at zoom levels *greater than
+# or equal to* its maxzoom, and 22 is also the default ceiling of the map
+# itself — so those layers vanish at exactly the point you finish zooming in.
+# 24 is the style spec's maximum and what the label layer already defaults to,
+# so it is this codebase's spelling of "no limit".
+MAPLIBRE_CEILING_ZOOM = 22
+NO_ZOOM_LIMIT = 24
+
+
+def visibility(vis):
+    """A layer's `vis` block with a maxzoom that means what its author meant.
+
+    Returns a copy — the caller merges it into a style layer, and the config it
+    came from is shared with the label layer and any badge layers.
+    """
+    vis = dict(vis or {})
+    if vis.get('maxzoom') is not None and vis['maxzoom'] >= MAPLIBRE_CEILING_ZOOM:
+        vis['maxzoom'] = NO_ZOOM_LIMIT
+    return vis
+
+
+def merge_vis(style_layer, vis):
+    """Apply a layer's `vis` block to a style layer, in place.
+
+    `vis.layout` is merged into the style layer's own `layout` rather than
+    replacing it. A plain `|=` swapped the whole dict, so a label layer given
+    `vis.layout = {'visibility': ...}` (the console Style form writes one on
+    every save) lost its text-field, font and placement and drew nothing.
+    The merged layout is a fresh dict, so it is never shared between the
+    geometry, label and badge layers built from the same `vis`.
+    """
+    vis = visibility(vis)
+    vis_layout = vis.pop('layout', None)
+    style_layer |= vis
+    if vis_layout is not None or 'layout' in style_layer:
+        style_layer['layout'] = {**style_layer.get('layout', {}), **(vis_layout or {})}
+    return style_layer
+
+
+# ---------------------------------------------------------------------------
+# COG addressing. A raster layer normally reads its COG out of its own atlas,
+# but `cog_url` lets it name one published by another atlas — so a wider atlas
+# can show a neighbour's canopy or fuel rasters without copying gigabytes or
+# re-deriving them. Referencing rather than copying is what `classify_layer`
+# in federation.py already assumes about rasters.
+#
+# A federation inlet is the eventual writer of this field, resolving the href
+# through the source atlas's STAC catalog instead of having it typed in by
+# hand (#159's raster federation). The field is the seam either way.
+# ---------------------------------------------------------------------------
+
+def cog_href(layer, local_href):
+    """Where a COG layer's data lives — its own atlas, or another's."""
+    return layer.get('cog_url') or local_href
+
+
+def is_external_cog(layer):
+    """True when this layer's COG belongs to a different atlas."""
+    return bool(layer.get('cog_url'))
+
+
+def cog_color_wants_stats(cog_color):
+    """Whether a cog_color string defers its range to a stats.json sidecar."""
+    return bool(cog_color) and 'auto' in str(cog_color).split(',')
+
+
+def resolve_cog_color(cog_color, stats):
+    """Substitute 'auto' min/max in a cog_color with values from a stats dict.
+
+    `stats` is the parsed stats.json sidecar, or None when there isn't one, in
+    which case the string comes back untouched for the caller to complain about.
+    Format is "{palette},{min},{max},{mode}".
+    """
+    if not cog_color_wants_stats(cog_color) or not stats:
+        return cog_color
+    parts = str(cog_color).split(',')
+    if len(parts) < 3:
+        return cog_color
+    if parts[1] == 'auto' and stats.get('min') is not None:
+        parts[1] = str(round(stats['min'], 4))
+    if parts[2] == 'auto' and stats.get('max') is not None:
+        parts[2] = str(round(stats['max'], 4))
+    return ','.join(parts)
+
+
+def has_local_basemap(in_layers, layers_dict, layer_name='basemap'):
+    """Whether an outlet should offer the atlas's own raster basemap.
+
+    The dropdown option selects a style layer named `{layer_name}-layer`, which
+    exists only when a raster layer of that exact name is among the outlet's
+    `in_layers`. The test this replaces — "is the first in_layers entry a
+    raster" — held only by the convention of listing the basemap first, and
+    broke the moment some other raster went first: a COG borrowed from another
+    atlas has to be ordered first so its `before_layer_id` resolves to a vector
+    layer and it draws underneath. That offered a basemap the atlas does not
+    have, and selecting it makes MapLibre fire an error and skip the change.
+    """
+    return (layer_name in (in_layers or ())
+            and (layers_dict.get(layer_name) or {}).get('geometry_type') == 'raster')
+
+
+# Named 9-class ColorBrewer ramps, low → high. Named to match cog_color's
+# "Brewer{Name}9" so a raster and a vector coloured with the same palette look
+# the same. The console's Add Layer form draws its palette picker from this
+# table, so this is the one list to extend.
+PALETTES = {
+    'YlGn':     ['#ffffe5', '#f7fcb9', '#d9f0a3', '#addd8e', '#78c679', '#41ab5d', '#238443', '#006837', '#004529'],
+    'YlOrRd':   ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#bd0026', '#800026'],
+    'OrRd':     ['#fff7ec', '#fee8c8', '#fdd49e', '#fdbb84', '#fc8d59', '#ef6548', '#d7301f', '#b30000', '#7f0000'],
+    'BuGn':     ['#f7fcfd', '#e5f5f9', '#ccece6', '#99d8c9', '#66c2a4', '#41ae76', '#238b45', '#006d2c', '#00441b'],
+    'PuBu':     ['#fff7fb', '#ece7f2', '#d0d1e6', '#a6bddb', '#74a9cf', '#3690c0', '#0570b0', '#045a8d', '#023858'],
+    'Purples':  ['#fcfbfd', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d'],
+    'Blues':    ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+    'Greens':   ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c', '#00441b'],
+    'Reds':     ['#fff5f0', '#fee0d2', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#a50f15', '#67000d'],
+    'RdYlGn':   ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850'],
+    'Spectral': ['#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#ffffbf', '#e6f598', '#abdda4', '#66c2a5', '#3288bd'],
+}
+
+
+def palette_stops(palette, lo, hi):
+    """[[value, '#rrggbb'], ...] spreading the palette's colours evenly from lo
+    to hi. The form both colour outputs below are built from."""
+    if palette not in PALETTES:
+        raise ValueError(f"Unknown palette {palette!r}; expected one of {sorted(PALETTES)}")
+    lo, hi = float(lo), float(hi)
+    if not lo < hi:
+        raise ValueError(f"Colour map range needs min < max, got {lo}..{hi}")
+    colors = PALETTES[palette]
+    step = (hi - lo) / (len(colors) - 1)
+    return [[round(lo + i * step, 6), c] for i, c in enumerate(colors)]
+
+
+def palette_paint_expression(prop, palette, lo, hi):
+    """MapLibre colour expression: linear ramp of `prop` over the palette.
+    Features missing the property get the palette's low colour rather than
+    MapLibre's black."""
+    expr = ['interpolate', ['linear'], ['to-number', ['get', prop], lo]]
+    for value, color in palette_stops(palette, lo, hi):
+        expr += [value, color]
+    return expr
+
+
+def palette_qgis_color_stops(prop, palette, lo, hi):
+    """The `qgis_color_stops` block (read by utils.build_qgis_color_expression)
+    that makes PDF output use the same ramp as the webmap."""
+    return {'expression': f'coalesce("{prop}", {lo})',
+            'stops': palette_stops(palette, lo, hi)}
+
+
+# MapLibre rejects a paint property that does not belong to the layer type it
+# lands on ("unknown property circle-color"), and one rejected property makes it
+# refuse the whole style. A layer's `paint` block in config is written for what
+# that layer mainly is, but it gets merged into every style layer generated from
+# it — a point layer with an icon produces both a circle layer and a symbol one —
+# so each merge keeps only the properties its own type accepts.
+_PAINT_PREFIXES = {
+    'circle': ('circle-',),
+    'line': ('line-',),
+    'fill': ('fill-',),
+    'fill-extrusion': ('fill-extrusion-',),
+    'symbol': ('text-', 'icon-'),
+    'raster': ('raster-',),
+}
+
+
+def paint_for(layer_type, paint):
+    """The subset of `paint` that `layer_type` accepts. An unknown type passes
+    through untouched — better to render what the author wrote than to drop it."""
+    prefixes = _PAINT_PREFIXES.get(layer_type)
+    if not prefixes or not paint:
+        return dict(paint or {})
+    return {k: v for k, v in paint.items() if k.startswith(prefixes)}
+
+
+# ---------------------------------------------------------------------------
+# QGIS print widths. On the webmap `vector_width` is a width in screen pixels;
+# QGIS has always read it as ground metres, so a road's printed thickness
+# depended on how much ground its page covered — a 9 m road is 1.5 mm on a
+# 1 km page and a hairline on a 6 km one. `qgis_width_units: "mm"` reads it as
+# paper width instead, the print analogue of the webmap's pixels. Opt-in, so
+# atlases tuned against the metres behaviour keep it.
+# ---------------------------------------------------------------------------
+
+QGIS_MM_PER_WIDTH_UNIT = 0.12
+
+
+def qgis_width_in_mm(layer):
+    """Whether this layer's QGIS line width is paper millimetres."""
+    return layer.get('qgis_width_units') == 'mm'
+
+
+def qgis_mm_width(layer, has_width_field, line_scale=1.0):
+    """(expression, constant) for a paper-width line, in millimetres.
+
+    With a per-feature `vector_width` field the expression reads it, falling
+    back to `constant_width` for a feature that has none; without the field
+    the expression is None and the constant alone applies."""
+    factor = QGIS_MM_PER_WIDTH_UNIT * layer.get('qgis_width_scale', 1.0) * line_scale
+    constant_width = layer.get('constant_width', 2)
+    constant = constant_width * factor
+    if 'vector_width' in layer and has_width_field:
+        return f'coalesce("vector_width", {constant_width}) * {factor:g}', constant
+    return None, constant
+
+
+# ---------------------------------------------------------------------------
+# Where QGIS reads a COG layer from. It renders on the box, which holds the
+# layer's own files, so those come first: a local file is faster than range
+# requests and exists whether or not anything was ever uploaded. Then another
+# atlas's COG by `cog_url`, then this atlas's s3_upload location.
+# ---------------------------------------------------------------------------
+
+def qgis_cog_sources(layer_name, layer, layer_dir, atlas_name):
+    """Ordered sources for QgsRasterLayer — existing local files, then remote."""
+    sources = [str(Path(layer_dir) / f'{layer_name}{suffix}')
+               for suffix in ('.cog.tif', '.tiff')
+               if (Path(layer_dir) / f'{layer_name}{suffix}').exists()]
+    if layer.get('cog_url'):
+        sources.append(f"/vsicurl/{layer['cog_url']}")
+    bucket = layer.get('cog_s3_bucket', 'scs-atlas-data')
+    region = layer.get('cog_s3_region', 'us-east-1')
+    sources.append(f'/vsicurl/https://{bucket}.s3.{region}.amazonaws.com'
+                   f'/{atlas_name}/rasters/{layer_name}/{layer_name}.cog.tif')
+    return sources
+
+
+# ---------------------------------------------------------------------------
+# Webmap view links. A share link is `?s=` + base64(JSON) of the state the
+# webmap's own Share button encodes (webmap.js encodeMapState): a=lat, o=lng,
+# z=zoom, b=basemap, l=visible layer names — anything not in `l` is hidden,
+# p=drop a pin. Building the same blob here lets a layer's features carry a
+# purpose-built view instead of the default centroid-at-zoom-17 link.
+# ---------------------------------------------------------------------------
+
+# What a region link shows: the atlas's context layers, and not `regions`
+# itself — the view is the region, so its outline would only be clutter.
+# Names the atlas lacks are dropped by the caller.
+REGION_VIEW_LAYERS = ('basemap', 'roads', 'roads_primary', 'roads_secondary',
+                      'roads_tertiary', 'creeks', 'buildings')
+
+# The state cannot carry a bbox, so the zoom is fitted to an assumed viewport:
+# narrow enough that a region still fits on a phone, and a laptop just shows
+# a margin around it.
+REGION_VIEW_PX = 700
+MAPLIBRE_TILE_PX = 512
+
+
+def fit_zoom(bbox, view_px=REGION_VIEW_PX):
+    """The zoom at which bbox (w, s, e, n in degrees) fits in view_px square."""
+    west, south, east, north = bbox
+
+    def mercator_y(lat):
+        return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+
+    x_fraction = (east - west) / 360
+    y_fraction = (mercator_y(north) - mercator_y(south)) / (2 * math.pi)
+    fraction = max(x_fraction, y_fraction)
+    if fraction <= 0:
+        return 17
+    zoom = math.log2(view_px / (MAPLIBRE_TILE_PX * fraction))
+    return round(min(max(zoom, 0), 22), 2)
+
+
+def encode_view_state(lat, lng, zoom, layers):
+    """The `s` value webmap.js decodes: base64 of the JSON it would encode."""
+    state = {'a': lat, 'o': lng, 'z': zoom, 'l': list(layers)}
+    return base64.b64encode(json.dumps(state, separators=(',', ':')).encode()).decode()
+
+
+def webmap_view_url(base_url, state):
+    """A staging webmap link for a state. Percent-encoded: base64 can contain
+    '+', which URLSearchParams would otherwise read back as a space."""
+    return f"{base_url}/staging/outlets/webmap/?s={quote(state, safe='')}"
+
+
+def region_view_url(bbox, base_url, atlas_layer_names):
+    """A webmap link framing one region, showing the atlas's context layers."""
+    west, south, east, north = bbox
+    layers = [name for name in REGION_VIEW_LAYERS if name in set(atlas_layer_names)]
+    state = encode_view_state(round((south + north) / 2, 6), round((west + east) / 2, 6),
+                              fit_zoom(bbox), layers)
+    return webmap_view_url(base_url, state)
+
+
+def regions_panel_html(features):
+    """The webmap's Preset Views dropdown (one view per region), or '' when there
+    are no linked regions. No label: the placeholder option names it.
+
+    Each option's value is the region feature's stored `webmap_url`, so an
+    edited link (webmap_url_override) is what the dropdown follows too."""
+    options = []
+    for i, feature in enumerate(features):
+        props = feature.get('properties') or {}
+        url = props.get('webmap_url')
+        if not url:
+            continue
+        name = props.get('name') or props.get('caption') or f"Region {i + 1}"
+        options.append(f'<option value="{html.escape(url, quote=True)}">{html.escape(str(name))}</option>')
+    if not options:
+        return ''
+    return ('<div class="control-panel regions-panel">\n'
+            '                <select id="regions-select" class="input-field" aria-label="Preset Views">\n'
+            '                    <option value="">Preset Views</option>\n'
+            + ''.join(f'                    {o}\n' for o in options) +
+            '                </select>\n'
+            '                <a href="/local/documents/help/preset_views.html" target="_blank"'
+            ' class="help-icon" title="Help: preset views">?</a>\n'
+            '            </div>')
+
+
+# atlas.DEFAULT_CONFIG's description, which every atlas created without one inherits.
+PLACEHOLDER_DESCRIPTION = "Underscripted"
+
+
+def atlas_display_name(config):
+    """The atlas's human-readable name, for page titles and headers.
+
+    /create stores the name the user typed as `description`; atlases without one
+    (or with the DEFAULT_CONFIG placeholder) fall back to the slug, `name`."""
+    description = (config.get('description') or '').strip()
+    if description and description != PLACEHOLDER_DESCRIPTION:
+        return description
+    return config.get('name', '')
+
+
+def edit_page_layers(in_layers, edit_layer):
+    """An edit page's layers: the outlet's, with the layer being edited drawn
+    on top when the outlet leaves it out. Every editable layer gets an edit
+    page, but webedit's in_layers need not list it — and a page that cannot
+    show its own layer invites selecting another layer's look-alike features."""
+    layers = list(in_layers or [])
+    return layers if edit_layer in layers else layers + [edit_layer]
+
+
+def legend_hidden(style_layer):
+    """Whether a style layer asked to stay out of the legend.
+
+    Set on sublayers that belong to another layer's legend entry, like the
+    conversation badges. The legend control shows every id in its targets, so
+    this has to be honoured where the targets are built.
+    """
+    return bool(((style_layer.get('metadata') or {}).get('legend') or {}).get('hidden'))

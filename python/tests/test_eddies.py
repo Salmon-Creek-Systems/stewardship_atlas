@@ -21,7 +21,9 @@ for _mod in ('duckdb', 'geojson', 'osgeo', 'osgeo.gdal', 'osgeo.ogr',
 
 import h3
 from eddies import (contours_gdal, hillshade_gdal, h3_for_point, asset_methods,
-                    _h3_grid_distance_safe, _get_cell_path_distances, _cell_yield)
+                    _h3_grid_distance_safe, _get_cell_path_distances, _cell_yield,
+                    _band_min_max, _count_by_h3, h3_count)
+import eddies
 
 class TestEddies(unittest.TestCase):
     def setUp(self):
@@ -302,6 +304,226 @@ class TestBiocharSimulation(unittest.TestCase):
         result = _cell_yield(burn_props, 'chop_and_leave', treatment_no_biochar, 0.001, 0.01)
         self.assertEqual(result['biochar_extracted'], 0.0)
         self.assertEqual(result['biochar_sale'], 0.0)
+
+
+
+class SequencedReader:
+    """Serves blocks in the order block_windows yields them."""
+
+    def __init__(self, blocks):
+        self.blocks = blocks
+
+    def block_windows(self, bidx=1):
+        for i in range(len(self.blocks)):
+            yield (0, i), i
+
+    def read(self, bidx=1, window=None, masked=False):
+        return self.blocks[window]
+
+
+class TestBandMinMax(unittest.TestCase):
+    """Block-wise min/max replaces a whole-band read that needed ~2.3 GB
+    resident on a gigapixel raster."""
+
+    def _masked(self, values, mask=None):
+        return np.ma.masked_array(np.array(values, dtype=float),
+                                  mask=np.array(mask if mask is not None
+                                                else [False] * len(values)))
+
+    def test_min_max_across_blocks(self):
+        ds = SequencedReader([self._masked([5, 9]), self._masked([2, 7]),
+                              self._masked([6, 8])])
+        self.assertEqual(_band_min_max(ds), (2.0, 9.0))
+
+    def test_fully_masked_blocks_are_skipped(self):
+        ds = SequencedReader([self._masked([1, 2], [True, True]),
+                              self._masked([4, 6])])
+        self.assertEqual(_band_min_max(ds), (4.0, 6.0))
+
+    def test_masked_values_do_not_count(self):
+        # The 0 is nodata; the real minimum is 3.
+        ds = SequencedReader([self._masked([0, 3, 5], [True, False, False])])
+        self.assertEqual(_band_min_max(ds), (3.0, 5.0))
+
+    def test_all_masked_returns_none(self):
+        ds = SequencedReader([self._masked([0, 0], [True, True])])
+        self.assertEqual(_band_min_max(ds), (None, None))
+
+    def test_single_block(self):
+        ds = SequencedReader([self._masked([42])])
+        self.assertEqual(_band_min_max(ds), (42.0, 42.0))
+
+
+class _FakeCentroid:
+    """Stand-in for a shapely geometry: centroid = mean of the outer ring's vertices.
+    shapely is stubbed in this suite, so eddies.shape is patched with this."""
+    def __init__(self, geom):
+        coords = geom['coordinates']
+        if isinstance(coords[0], (int, float)):  # Point
+            coords = [coords]
+        while isinstance(coords[0][0], list):    # Polygon: descend to the outer ring
+            coords = coords[0]
+        self.x = sum(c[0] for c in coords) / len(coords)
+        self.y = sum(c[1] for c in coords) / len(coords)
+
+    @property
+    def centroid(self):
+        return self
+
+
+def _point(lng, lat):
+    return {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+            'properties': {}}
+
+
+def _square(lng, lat, half=0.0001):
+    ring = [[lng - half, lat - half], [lng + half, lat - half], [lng + half, lat + half],
+            [lng - half, lat + half], [lng - half, lat - half]]
+    return {'type': 'Feature', 'geometry': {'type': 'Polygon', 'coordinates': [ring]},
+            'properties': {}}
+
+
+@patch.object(eddies, 'shape', _FakeCentroid)
+class TestCountByH3(unittest.TestCase):
+    """_count_by_h3 puts each feature in exactly one cell: its centroid's."""
+
+    RES = 8
+    LNG, LAT = -123.6, 39.7
+
+    def test_points_in_same_cell_are_summed(self):
+        counts = _count_by_h3([_point(self.LNG, self.LAT)] * 3, self.RES)
+        cell = h3.latlng_to_cell(self.LAT, self.LNG, self.RES)
+        self.assertEqual(counts, {cell: 3})
+
+    def test_small_polygon_counts_once(self):
+        # A building-sized polygon is much smaller than an r8 cell; polyfill would
+        # find no cell for it. The centroid approach must still count it once.
+        counts = _count_by_h3([_square(self.LNG, self.LAT)], self.RES)
+        self.assertEqual(sum(counts.values()), 1)
+        self.assertIn(h3.latlng_to_cell(self.LAT, self.LNG, self.RES), counts)
+
+    def test_features_without_geometry_are_skipped(self):
+        features = [{'type': 'Feature', 'geometry': None, 'properties': {}},
+                    _point(self.LNG, self.LAT)]
+        self.assertEqual(sum(_count_by_h3(features, self.RES).values()), 1)
+
+    def test_distant_points_land_in_different_cells(self):
+        counts = _count_by_h3([_point(self.LNG, self.LAT), _point(self.LNG + 0.1, self.LAT)],
+                              self.RES)
+        self.assertEqual(len(counts), 2)
+
+
+@patch.object(eddies, 'shape', _FakeCentroid)
+class TestH3Count(unittest.TestCase):
+    """h3_count writes the grid with one {source}_count per source, zeros kept."""
+
+    RES = 8
+    LNG, LAT = -123.6, 39.7
+
+    def setUp(self):
+        self.tmp = Path(__file__).parent / '_tmp_h3_count'
+        self.tmp.mkdir(exist_ok=True)
+        center = h3.latlng_to_cell(self.LAT, self.LNG, self.RES)
+        self.center = center
+        self.grid = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'geometry': {'type': 'Polygon', 'coordinates': []},
+             'properties': {'h3_index': c, 'h3_resolution': self.RES}}
+            for c in h3.grid_disk(center, 1)]}
+        self.layers = {
+            'grid': self.grid,
+            # 2 in the center cell, 1 far off-grid
+            'buildings': {'type': 'FeatureCollection', 'features': [
+                _square(self.LNG, self.LAT), _square(self.LNG, self.LAT),
+                _square(self.LNG + 1.0, self.LAT)]},
+            'photos': {'type': 'FeatureCollection', 'features': [_point(self.LNG, self.LAT)]},
+        }
+        self.config = {'assets': {'counts': {'config': {
+            'in_layer': 'grid', 'in_layers': ['buildings', 'photos'], 'out_layer': 'out'}}}}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self):
+        fake_geojson = MagicMock()
+        fake_geojson.FeatureCollection = lambda feats: {'type': 'FeatureCollection',
+                                                        'features': feats}
+        fake_geojson.dump = json.dump
+        with patch.object(eddies.dataswale, 'layer_as_featurecollection',
+                          side_effect=lambda config, name: self.layers[name]), \
+             patch.object(eddies.versioning, 'atlas_path', return_value=self.tmp), \
+             patch.object(eddies, 'geojson', fake_geojson):
+            out_path = h3_count(self.config, 'counts')
+        with open(out_path) as f:
+            return json.load(f)['features']
+
+    def test_every_grid_cell_is_kept_with_counts(self):
+        features = self._run()
+        self.assertEqual(len(features), 7)
+        for f in features:
+            props = f['properties']
+            self.assertIn('buildings_count', props)
+            self.assertIn('photos_count', props)
+            self.assertIn('h3_index', props)
+
+    def test_counts_land_on_the_right_cell(self):
+        by_cell = {f['properties']['h3_index']: f['properties'] for f in self._run()}
+        self.assertEqual(by_cell[self.center]['buildings_count'], 2)
+        self.assertEqual(by_cell[self.center]['photos_count'], 1)
+        others = [p for c, p in by_cell.items() if c != self.center]
+        self.assertTrue(all(p['buildings_count'] == 0 and p['photos_count'] == 0
+                            for p in others))
+
+    def test_grid_without_h3_index_raises(self):
+        self.layers['grid'] = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'geometry': None, 'properties': {}}]}
+        with self.assertRaises(Exception):
+            self._run()
+
+    def test_sparse_mode_writes_only_occupied_cells(self):
+        self.config['assets']['counts']['config'] = {
+            'resolution': self.RES, 'in_layers': ['buildings', 'photos'], 'out_layer': 'out'}
+        by_cell = {f['properties']['h3_index']: f for f in self._run()}
+        far = h3.latlng_to_cell(self.LAT, self.LNG + 1.0, self.RES)
+        # No grid, so the far-off building is not "off grid" — it gets its own cell.
+        self.assertEqual(set(by_cell), {self.center, far})
+        self.assertEqual(by_cell[self.center]['properties']['buildings_count'], 2)
+        self.assertEqual(by_cell[far]['properties']['photos_count'], 0)
+        self.assertEqual(by_cell[far]['properties']['h3_resolution'], self.RES)
+        ring = by_cell[far]['geometry']['coordinates'][0]
+        self.assertEqual(ring[0], ring[-1])
+        # [lng, lat] order, matching the h3_grid inlet
+        self.assertAlmostEqual(ring[0][0], self.LNG + 1.0, delta=0.05)
+
+    def test_neither_grid_nor_resolution_raises(self):
+        self.config['assets']['counts']['config'] = {
+            'in_layers': ['buildings'], 'out_layer': 'out'}
+        with self.assertRaises(Exception):
+            self._run()
+
+
+class TestZonalStats(unittest.TestCase):
+    """_zonal_stats: mean and upper percentile of a cell's valid pixels, plus coverage."""
+
+    def test_values_and_coverage(self):
+        s = eddies._zonal_stats(np.arange(1, 101, dtype=float), n_in_cell=200)
+        self.assertEqual(s['mean'], 50.5)
+        self.assertAlmostEqual(s['p95'], 95.05)
+        self.assertEqual(s['coverage'], 0.5)
+
+    def test_percentile_is_configurable(self):
+        s = eddies._zonal_stats(np.arange(1, 101, dtype=float), n_in_cell=100, percentile=50)
+        self.assertIn('p50', s)
+        self.assertNotIn('p95', s)
+
+    def test_no_valid_pixels_gives_nulls_not_zeros(self):
+        # 0 would read as "bare ground"; an unmeasured cell must be null.
+        s = eddies._zonal_stats(np.array([]), n_in_cell=50)
+        self.assertIsNone(s['mean'])
+        self.assertIsNone(s['p95'])
+        self.assertEqual(s['coverage'], 0.0)
+
+    def test_empty_cell_has_zero_coverage(self):
+        self.assertEqual(eddies._zonal_stats(np.array([]), n_in_cell=0)['coverage'], 0.0)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 import subprocess, math, string, shutil
 import json, csv
+from html import escape as html_escape
 import re
 import sys,os,time
 from io import StringIO
@@ -21,6 +22,8 @@ import gspread
 import dataswale_geojson
 import federation
 import atlas_catalog
+import map_style
+import help_docs
 import utils
 # from outlets_mapnik import build_region_map_mapnik
 
@@ -31,19 +34,45 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-def _resolve_cog_color(config, layer_name, cog_color):
-    """Substitute 'auto' min/max in cog_color with values from stats.json sidecar."""
+def _apply_label_text_minzoom(label_layer, layer):
+    """Fade the text in at a zoom while leaving the icon drawn all the way out.
+
+    The icon and the label share one symbol layer, so `label_minzoom` hides
+    both — at a wide zoom the pins vanish along with their titles. Stepping
+    text-opacity on zoom is the only way to split them without splitting the
+    layer: the symbol still draws, the text is simply transparent until the
+    titles stop being clutter.
+
+    Applied after the symbol branch, which assigns label_layer['paint']
+    wholesale and would otherwise discard it.
+    """
+    if 'label_text_minzoom' not in layer:
+        return
+    label_layer.setdefault('paint', {})['text-opacity'] = [
+        'step', ['zoom'], 0, layer['label_text_minzoom'], 1]
+
+
+def _resolve_cog_color(config, layer_name, cog_color, layer=None):
+    """Substitute 'auto' min/max in cog_color with values from stats.json sidecar.
+
+    An external COG (`cog_url`) has no sidecar in *this* atlas, and emitting
+    the literal string 'auto' into the colour ramp renders nothing at all — so
+    that case raises instead of warning into a log nobody reads. Put explicit
+    min/max in the layer's cog_color; fetching the source atlas's sidecar over
+    HTTP is the nicer answer and is deliberately not done inside materialize.
+    """
     stats_path = versioning.atlas_path(config, 'layers') / layer_name / 'stats.json'
-    if not stats_path.exists():
+    stats = json.loads(stats_path.read_text()) if stats_path.exists() else None
+
+    if stats is None and map_style.cog_color_wants_stats(cog_color):
+        if layer is not None and map_style.is_external_cog(layer):
+            raise ValueError(
+                f"layer '{layer_name}' reads an external COG and its cog_color "
+                f"{cog_color!r} defers its range to a stats.json this atlas does "
+                f"not have — put explicit min/max values in cog_color")
         logger.warning(f"cog_color has 'auto' but no stats.json for '{layer_name}'")
-        return cog_color
-    stats = json.loads(stats_path.read_text())
-    parts = cog_color.split(',')
-    if parts[1] == 'auto':
-        parts[1] = str(round(stats['min'], 4))
-    if parts[2] == 'auto':
-        parts[2] = str(round(stats['max'], 4))
-    return ','.join(parts)
+
+    return map_style.resolve_cog_color(cog_color, stats)
 
 
 # --- Layer data addressing (Phase 3, #159) ---------------------------------
@@ -72,8 +101,11 @@ def _layer_data_url(layer_name: str, filename: str) -> str:
     return atlas_catalog.layer_data_url(layer_name, filename)
 
 
-def webmap_json(config, name, sprite_json=None):
+def webmap_json(config, name, sprite_json=None, edit_layer=None):
     """Generate a JSON object for a web map in MapLibre.
+
+    edit_layer: for a webedit page, the layer being edited — always shown, on
+    top, and never starting hidden, whatever the outlet's in_layers say.
     We will set up sources and layers as static content loaded initially in HTML where possible.
     Layers which invole dynamic content - marker images for example - will be added seperately 
     since the layer must be set up inside the callback for the image load.
@@ -108,6 +140,8 @@ def webmap_json(config, name, sprite_json=None):
 
     # Pre-compute beforeId for each COG layer: first non-COG layer that follows it in in_layers
     in_layers_list = outlet_config['in_layers']
+    if edit_layer:
+        in_layers_list = map_style.edit_page_layers(in_layers_list, edit_layer)
     cog_before_ids = {}
     for i, ln in enumerate(in_layers_list):
         lyr = layers_dict.get(ln, {})
@@ -133,10 +167,11 @@ def webmap_json(config, name, sprite_json=None):
                 # about. Relative here, made absolute in webmap.js — the COG
                 # protocol needs a real URL for its range requests, but which
                 # host that is depends on where the page is served from.
-                cog_url = _layer_data_url(layer_name, f"{layer_name}.cog.tif")
+                cog_url = map_style.cog_href(
+                    layer, _layer_data_url(layer_name, f"{layer_name}.cog.tif"))
                 cog_color = layer.get('cog_color')
-                if cog_color and 'auto' in cog_color:
-                    cog_color = _resolve_cog_color(config, layer_name, cog_color)
+                if map_style.cog_color_wants_stats(cog_color):
+                    cog_color = _resolve_cog_color(config, layer_name, cog_color, layer)
                 cog_source_url = f"cog://{cog_url}" + (f"#color:{cog_color}" if cog_color else "")
                 cog_sources[layer_name] = {
                     'type': 'raster',
@@ -228,13 +263,11 @@ def webmap_json(config, name, sprite_json=None):
 
 
         if vis := layer.get('vis'):
-            map_layer |= vis
-            if 'layout' in map_layer:
-                map_layer['layout'] = dict(map_layer['layout'])  # break shared ref with label_layer
+            map_style.merge_vis(map_layer, vis)
         if paint := layer.get('paint'):
             if not 'paint' in map_layer:
                 map_layer['paint'] = {}
-            map_layer['paint'] |=  paint
+            map_layer['paint'] |= map_style.paint_for(map_layer.get('type'), paint)
 
         if layer.get('conversations_enabled'):
             map_layer.setdefault('metadata', {})['conversations_enabled'] = True
@@ -271,7 +304,7 @@ def webmap_json(config, name, sprite_json=None):
                     'metadata': {'legend': {'hidden': True}, 'conversations_enabled': True}
                 }
                 if vis := layer.get('vis'):
-                    badge_layer |= vis
+                    map_style.merge_vis(badge_layer, vis)
                 map_layers.append(badge_layer)
             else:
                 # Fallback: two circle layers (no sprite available)
@@ -304,7 +337,7 @@ def webmap_json(config, name, sprite_json=None):
                     },
                 ]:
                     if vis := layer.get('vis'):
-                        badge_layer |= vis
+                        map_style.merge_vis(badge_layer, vis)
                     map_layers.append(badge_layer)
 
         # Maybe add label/icon layer:
@@ -319,7 +352,10 @@ def webmap_json(config, name, sprite_json=None):
                     "symbol-placement": map_layer['symbol_placement'],
                     "text-offset": map_layer.get('text_offset', [0,2]),
                     "text-font": ["Open Sans Regular"],
-                    "text-field": ["get", "name"],
+                    # label_field lets a layer label from one of its own
+                    # properties; `name` stays the default, and is what
+                    # hand-drawn features carry.
+                    "text-field": ["get", layer.get('label_field', 'name')],
                     "text-size": 20
                 }
             }
@@ -343,7 +379,7 @@ def webmap_json(config, name, sprite_json=None):
             #label_layer['paint'] |=  layer.get('paint', {})                
             #XSXSXblabel_layer |=  layer.get('vis', {})
             if vis := layer.get('vis'):
-                label_layer |= vis
+                map_style.merge_vis(label_layer, vis)
             if 'label_minzoom' in layer:
                 label_layer['minzoom'] = layer['label_minzoom']
             if 'label_maxzoom' in layer:
@@ -363,6 +399,7 @@ def webmap_json(config, name, sprite_json=None):
                     meta = label_layer.setdefault('metadata', {})
                     meta['show_attributes'] = True
                     meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+                _apply_label_text_minzoom(label_layer, layer)
                 map_layers.append(label_layer)
             else:
                 if 'icon_if' in layer:
@@ -383,7 +420,10 @@ def webmap_json(config, name, sprite_json=None):
                     'icon-halo-blur': 10                    
                 }
 
-                label_layer['paint'] |= layer.get('paint', {})
+                # Symbol layer: text-*/icon-* only. A point layer's circle-*
+                # paint belongs to its circle layer, and MapLibre refuses the
+                # whole style if it arrives here.
+                label_layer['paint'] |= map_style.paint_for('symbol', layer.get('paint', {}))
                 
                 # If we have sprites, add the layer to the initial style so it appears in legend
                 if sprite_json and layer['name'] in sprite_json:
@@ -435,6 +475,7 @@ def webmap_json(config, name, sprite_json=None):
                         meta = label_layer.setdefault('metadata', {})
                         meta['show_attributes'] = True
                         meta['editable_columns'] = [c['name'] for c in layer.get('editable_columns', [])]
+                    _apply_label_text_minzoom(label_layer, layer)
                     map_layers.append(label_layer)
                 else:
                     # Keep as dynamic layer for loadImage approach
@@ -447,7 +488,7 @@ def webmap_json(config, name, sprite_json=None):
                     dynamic_layers.append(label_layer)
     
     # Apply hidden_layers: start with visibility off but remain accessible in legend
-    hidden_layers_set = set(outlet_config.get('hidden_layers', []))
+    hidden_layers_set = set(outlet_config.get('hidden_layers', [])) - {edit_layer}
     if hidden_layers_set:
         for ml in map_layers:
             if ml.get('source') in hidden_layers_set:
@@ -466,7 +507,10 @@ def webmap_json(config, name, sprite_json=None):
         # Skip label layers - they'll be handled as children
         if layer_id.endswith('-label-layer'):
             continue
-            
+        # Sublayers that ride on another layer's entry (conversation badges)
+        if map_style.legend_hidden(layer):
+            continue
+
         # Check if this layer has a label layer
         layer_name = layer_id.replace('-layer', '')
         label_layer_id = f"{layer_name}-label-layer"
@@ -545,19 +589,13 @@ def webmap_json(config, name, sprite_json=None):
     return {"map_config": map_config, "dynamic_layers": dynamic_layers, "legend_targets": legend_targets,
             "cog_sources": cog_sources, "cog_layers": cog_layers}
 
-def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view='', show_user_location=False):
+def generate_map_page(config, title, map_config_data, output_path, sprite_json=None, page_url=None, default_view='', show_user_location=False, regions_panel=''):
     """Generate the complete HTML page for viewing a map"""
     # Read template files
     source_root = versioning.atlas_path(config, version='app') 
     with open(source_root / 'templates' / 'map.html', 'r') as f:
         template = f.read()
     logger.debug(f"About to generate HTML to {output_path}: {template}.")
-    
-    # Read and convert markdown help content
-    import markdown
-    with open(source_root / 'documents' / 'help' / 'webmap_help.md', 'r') as f:
-        help_markdown = f.read()
-    help_html = markdown.markdown(help_markdown)
     
     # Generate JavaScript for dynamic layers
     js_bit = ""
@@ -615,7 +653,7 @@ void await map.loadImage('{im_uri}',
     
     layers_dict = {l['name']: l for l in config['dataswale']['layers']}
     webmap_in_layers = config.get('assets', {}).get('webmap', {}).get('in_layers', [])
-    basemap_is_raster = bool(webmap_in_layers) and layers_dict.get(webmap_in_layers[0], {}).get('geometry_type') == 'raster'
+    basemap_is_raster = map_style.has_local_basemap(webmap_in_layers, layers_dict)
     lidar_basemap_option = '<option value="basemap">LIDAR Hillshade</option>\n                ' if basemap_is_raster else ''
 
     # Generate QR code if a page URL was supplied
@@ -633,7 +671,7 @@ void await map.loadImage('{im_uri}',
             qr_img.save(buf, format='PNG')
             b64 = base64.b64encode(buf.getvalue()).decode()
             qr_code_html = (
-                f'<button class="qr-toggle" id="qr-toggle">(QR)</button>'
+                f'<button class="qr-toggle" id="qr-toggle" title="QR code for this map">QR</button>'
                 f'<div class="qr-popup" id="qr-popup">'
                 f'<img src="data:image/png;base64,{b64}" alt="QR code" title="{page_url}">'
                 f'</div>'
@@ -642,18 +680,18 @@ void await map.loadImage('{im_uri}',
             logger.warning('qrcode package not installed; skipping QR code generation')
 
     processed_template = template.format(
-            title=title,
+            title=html_escape(title),
             map_config=json.dumps(map_config_data['map_config'],  indent=2),
             dynamic_layers=js_bit,
             cog_sources=json.dumps(map_config_data.get('cog_sources', {}), indent=2),
             cog_layers=json.dumps(map_config_data.get('cog_layers', []), indent=2),
             legend_targets=json.dumps(map_config_data.get('legend_targets', {}), indent=2),
-            webmap_help=help_html,
             app_url=app_url,
             swalename=config.get('name', ''),
             lidar_basemap_option=lidar_basemap_option,
             default_view=json.dumps(default_view or ""),
             show_user_location=json.dumps(bool(show_user_location)),
+            regions_panel=regions_panel,
             qr_code=qr_code_html)
 
     with open(output_path, 'w') as f_out:
@@ -861,9 +899,17 @@ def outlet_webmap(config, name):
     # Optional "show my location" control (off by default). When on, webmap.js adds a
     # MapLibre GeolocateControl the user can tap to plot their live position.
     show_user_location = config['assets'][name].get('show_user_location', False)
-    html_path = generate_map_page(config, "Fire Atlas Webmap", map_config, output_path, sprite_json,
+    # Regions dropdown: every atlas with a `regions` layer gets one, following
+    # each region's stored webmap_url (built when the regions layer refreshes).
+    regions_path = versioning.atlas_path(config, "layers") / "regions" / "regions.geojson"
+    regions_features = []
+    if regions_path.exists():
+        with open(regions_path) as f:
+            regions_features = json.load(f).get('features', [])
+    html_path = generate_map_page(config, map_style.atlas_display_name(config), map_config, output_path, sprite_json,
                                   page_url=page_url, default_view=default_view,
-                                  show_user_location=show_user_location)
+                                  show_user_location=show_user_location,
+                                  regions_panel=map_style.regions_panel_html(regions_features))
   
     return output_path
 
@@ -884,8 +930,29 @@ def candidate_move_targets(config: dict, source_layer_name: str) -> list:
     ]
 
 
-def generate_edit_controls_html(editable_attributes, geometry_type='point'):
-    """Generate HTML for edit controls based on attribute configuration"""
+# Reshape pages edit one existing feature's geometry: no attribute form, no
+# selection polygon — click a feature, drag its vertices, save or cancel.
+RESHAPE_CONTROLS_HTML = """
+        <p id="reshape-status" class="selection-hint">Click a feature to reshape it.</p>
+        <p class="selection-hint">Drag vertices to move them, drag a midpoint to add one,
+            right-click a vertex to delete it. Drag inside the feature to move it whole.</p>
+        <div class="button-group">
+            <button id="reshape-cancel-button" class="warning-button" disabled>Cancel</button>
+            <button id="reshape-save-button" class="button" disabled>Save Shape</button>
+        </div>
+    """
+
+
+def generate_edit_controls_html(editable_attributes, geometry_type='point', action='create'):
+    """Generate HTML for edit controls based on attribute configuration.
+
+    On annotate pages the inputs are followed by a hint and an empty
+    #selection-panel, which edit_map.js fills with the properties of the
+    features the drawn polygon selects.
+    """
+    if action == 'reshape':
+        return RESHAPE_CONTROLS_HTML
+
     select_html = ""
     string_html = ""
     
@@ -912,6 +979,19 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
                 # {str_value} {value[ edit_att['name'] ] }
             select_html += "</select></div>"
             
+    selection_html = ''
+    if action == 'annotate':
+        selection_html = """
+                <p class="selection-hint">Blank fields keep existing values.</p>"""
+    selection_panel_html = ''
+    if action == 'annotate':
+        selection_panel_html = """
+        <div id="selection-panel">
+            <div id="selection-header">No features selected. Draw a polygon over features to edit.</div>
+            <div id="selection-tabs"></div>
+            <div id="selection-body"></div>
+        </div>"""
+
     photo_button = '<button id="upload-photo-button" class="button">Upload Photo</button>\n            ' \
         if geometry_type == 'point' else ''
 
@@ -927,22 +1007,23 @@ def generate_edit_controls_html(editable_attributes, geometry_type='point'):
             <button id="delete-button" class="warning-button">Delete Features in Area</button>
         </div>
         <div id="delete-confirm" style="display:none; margin-top: 8px;">
-            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Delete features in selected area?<br>This cannot be undone.</p>
+            <p style="margin: 0 0 8px 0; font-size: 0.9em;"><span id="delete-count-text">Delete features in selected area?</span><br>This cannot be undone.</p>
             <button id="delete-cancel-button" class="button">Cancel</button>
             <button id="delete-confirm-button" class="warning-button">Delete</button>
         </div>
         <div class="button-group" id="move-button-group">
             <button id="move-button" class="button">Move to Layer</button>
+            <a href="/local/documents/help/move_features.html" target="_blank" class="help-icon" title="Help: moving features to another layer">?</a>
         </div>
         <div id="move-confirm" style="display:none; margin-top: 8px;">
-            <p style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
+            <p id="move-count-text" style="margin: 0 0 8px 0; font-size: 0.9em;">Move features in selected area to:</p>
             <select id="move-target-select" class="input-field" style="margin-bottom: 8px;"></select>
             <button id="move-cancel-button" class="button">Cancel</button>
             <button id="move-confirm-button" class="button">Move Features</button>
         </div>
     """
 
-    return select_html + string_html + buttons_html
+    return select_html + string_html + selection_html + selection_panel_html + buttons_html
 
 def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, action: str):
     """Generate the complete HTML page for editing a layer. Params: ea - Editable Asset (config) - Atlas config, name - name of the outlet"""
@@ -952,7 +1033,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         template = f.read()
         
     # Generate controls HTML
-    controls_html = generate_edit_controls_html(ea.get('editable_columns', []), ea.get('geometry_type', 'point'))
+    controls_html = generate_edit_controls_html(ea.get('editable_columns', []), ea.get('geometry_type', 'point'), action)
     
     # Prepare mode string
     mode_string = {
@@ -974,7 +1055,7 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
     
     layers_dict_edit = {l['name']: l for l in config['dataswale']['layers']}
     webedit_in_layers = config.get('assets', {}).get('webedit', {}).get('in_layers', [])
-    basemap_is_raster_edit = bool(webedit_in_layers) and layers_dict_edit.get(webedit_in_layers[0], {}).get('geometry_type') == 'raster'
+    basemap_is_raster_edit = map_style.has_local_basemap(webedit_in_layers, layers_dict_edit, 'hillshade')
     lidar_basemap_option = '<option value="hillshade">Hillshade</option>\n                ' if basemap_is_raster_edit else ''
 
     move_targets = candidate_move_targets(config, ea['name'])
@@ -992,7 +1073,9 @@ def generate_edit_page( config: dict, ea: dict, name: str, map_config: dict, act
         controls_config=json.dumps(controls_config),
         legend_targets=json.dumps(map_config.get('legend_targets', {}), indent=2),
         lidar_basemap_option=lidar_basemap_option,
-        move_targets=json.dumps(move_targets))
+        move_targets=json.dumps(move_targets),
+        help_url=help_docs.help_url(help_docs.EDIT_PAGE_HELP.get(action, 'draw_vector')),
+        edit_script='reshape_map.js' if action == 'reshape' else 'edit_map.js')
 
 def outlet_webmap_edit(config: dict, name: str):
     """Generate an interactive web map edit using MapLibre GL JS - one for each editable asset"""
@@ -1016,11 +1099,17 @@ def outlet_webmap_edit(config: dict, name: str):
     # Copy the JS file
     # subprocess.run(['cp', '../templates/js/edit_map.js', f"{webedit_dir}/js/"])
     
-    # Generate edit pages for each editable asset
+    # Generate edit pages for each editable asset. Each page shows the layer it
+    # edits even when webedit's in_layers leave it out.
+    in_layers = config['assets'][name].get('in_layers', [])
+    hidden_layers = config['assets'][name].get('hidden_layers', [])
     for ea in config['dataswale']['layers']:
         if ea.get('editable_columns'):
-            for action in ['create', 'annotate']:
-                html_content = generate_edit_page(config, ea, name, map_config, action)
+            shown_already = ea['name'] in in_layers and ea['name'] not in hidden_layers
+            page_map_config = (map_config if shown_already
+                               else webmap_json(config, name, sprite_json, edit_layer=ea['name']))
+            for action in ['create', 'annotate', 'reshape']:
+                html_content = generate_edit_page(config, ea, name, page_map_config, action)
                 output_path = webedit_dir /   f"{ea['name']}_{action}.html"
                 logger.debug(f"Generated WEBEDIT for {ea} | {action} into {output_path}")            
                 with open(output_path, 'w') as f:
@@ -1471,6 +1560,7 @@ def regions_from_geojson(path, start_at=2,limit=3, label_property = "Description
                 'index': region['properties'].get(index_property, canonical_name), 
                 'caption': region['properties'].get('Description', default_name),
                 'text': region['properties'].get('text', default_name),
+                'webmap_url': region['properties'].get('webmap_url'),
                 'bbox': bbox,
                 "neighbors": region.get('neighbors'),
                 "vectors": [],
@@ -1768,7 +1858,10 @@ def make_regions_index(config, outlet_name, regions):
         cname  = utils.canonicalize_name(r.get('name', f"region_{i}"))
         iname  = utils.canonicalize_name(str(r.get('index', f"region_{i}")))
         url = f"{base_url}/{iname}.pdf"
-        index_html += f"<li><a href='{url}'>{r['name']}</a></li>\n"
+        # The region's own webmap link, made when the regions layer was refreshed.
+        map_link = (f" &middot; <a href='{html_escape(r['webmap_url'], quote=True)}'>Map</a>"
+                    if r.get('webmap_url') else '')
+        index_html += f"<li><a href='{url}'>{r['name']}</a>{map_link}</li>\n"
     
     index_html += """            </ul>
         </div>
@@ -2210,6 +2303,15 @@ def make_root_html(root_path_str):
         f.write(atlas_html)
     return outpath
 
+def atlas_icons(config):
+    """Icon names available to point layers (templates/icons/*.png)."""
+    icons_dir = versioning.atlas_path(config, version='app') / 'templates' / 'icons'
+    try:
+        return sorted(p.stem for p in icons_dir.glob('*.png'))
+    except OSError:
+        return []
+
+
 def make_console_html(config,
                       displayed_interfaces=[], displayed_downloads=[], displayed_inlets=[], displayed_versions=[], spreadsheets={},
                       admin_controls=[], console_type='ADMINISTRATION', panel_header="", use_cases=[],
@@ -2252,6 +2354,11 @@ def make_console_html(config,
         'spreadsheets': spreadsheets,
         'layers': displayed_inlets,
         'webmapAvailable': webmap_available,
+        # Colour ramps for the Add Layer form's palette picker — the same table
+        # atlas.plan_add_layer builds the layer's paint from.
+        'palettes': map_style.PALETTES,
+        # Icons a point layer can use, for the Add/Edit Layer forms.
+        'icons': atlas_icons(config),
     }
     
     # Insert the data initialization script
@@ -2354,47 +2461,21 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         # and ac.get('interaction') == 'interface'
     ]
     
-    # Define use cases
+    # Help pages: each documents/help/*.md carries an audience tag (help_docs).
     app_docs_path = versioning.atlas_path(config, version='app') / 'documents' / 'help'
-    use_case_paths = list(app_docs_path.glob('*.md'))
-    use_cases = { path.stem: [path.read_text().splitlines()[0].replace('# ', ''), str("/local/documents/help/" + path.name).replace('.md', '.html')] for path in use_case_paths}
-    
+    help_pages = help_docs.read_help_pages(app_docs_path)
+
     # The help pages, manuals and the about/contact pages are site-wide, built
     # from this repo by python/site_assets.py and published once to /local/ by
     # scripts/publish_site_assets.py. They used to be generated here into the
     # shared local/ tree, where the last atlas to materialize decided whose name
     # they carried (#181).
 
-    # use_cases = {"add_road": ["Howto: Add a new road.", "https://internal.fireatlas.org/documentation/"],
-    #              "add_building" :["Howto: Add a new building.", "https://internal.fireatlas.org/documentation/"],
-    #              "download_geojson": ["Howto: Download vector layer as GeoJSON.", "https://internal.fireatlas.org/documentation/"],
-    #              "download_gpkg": ["Howto: Download atlas as GeoPKG", "https://internal.fireatlas.org/documentation/"],
-    #              "download_runbook": ["Howto: download Run Book","https://internal.fireatlas.org/documentation/"],
-    #              "download_runbook": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-    #              "hide_layers": ["Howto: Hide/Show layers in interactive web map.","https://internal.fireatlas.org/documentation/"],
-    #              "upload_geojson": ["Howto: Add a GeoJSON file to an existing vector layer.","https://internal.fireatlas.org/documentation/"],
-    #              "platform_overview": ["Overview of Stewardship Atlas Platform","https://internal.fireatlas.org/documentation/"],
-    #              "python_overview": ["Python Documentation","https://internal.fireatlas.org/documentation/"],
-    #              "schema_overview": ["Schema Documentation","https://internal.fireatlas.org/documentation/"]
-                 
-    #              }
-                                   
-    user_cases_config = [
-        #{"name": "Firefighter", "cases": ["Download Avenza version", "Share a QR Code for Avenza", "Mark an Incident", "Mark a POI"]},
-        #{"name": "GIS Practitioner", "cases": ["Download Layer GeoJSON", "Download GeoPKG", "Add a layer as GeoJSON"]},
-        #{"name": "Administrator", "cases": ["Go to Admin interface", "Switch Version"]},
-        {"name": "VFD Member", "cases": ["download_runbook", "download_gpkg", "hide_layers"]},
-        {"name": "VFD Administrator", "cases": ['add_road', 'add_building', 'download_gpkg']},
-        {"name": "GIS Practitioner", "cases": ["platform_overview",'download_geojson', 'download_gpkg', 'add_road', 'add_building', "upload_geojson", "schema_overview"]},
-        {"name": "Developer", "cases": ["platform_overview", "python_overview", "schema_overview", "download_gpkg"]}
-        ]
-    user_cases = []
-    for u in user_cases_config:
-        uc = [{'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in u['cases'] if label in use_cases]
-        user_cases.append( {'name': u['name'], 'cases': uc} )
-    user_cases.append( {"name": "All Users", "cases": [ {'name': use_cases[label][0], 'uri': use_cases[label][1]} for label in use_cases.keys()]})
-    logger.info(f"Generated User Cases: {user_cases}")
-         
+    # Console help lists, by audience: the internal console shows the
+    # user-facing pages, the admin console the user and admin ones.
+    user_cases = help_docs.use_case_groups(help_pages, ('user',))
+    admin_cases = help_docs.use_case_groups(help_pages, ('user', 'admin'))
+
     # Generate technical view — log panel is populated live via /log endpoint on page load
     technical_html = make_console_html(
         config,
@@ -2428,7 +2509,7 @@ def make_swale_html(config, outlet_config, store_materialized=True, template_nam
         spreadsheets = config['spreadsheets'],
         displayed_versions=[str(v)for v in config.get('dataswale', {}).get('versions', [])],
         admin_controls=[],
-        use_cases=[],
+        use_cases=admin_cases,
         template_name=template_name
     )
     
@@ -2859,6 +2940,10 @@ This is a minimal notebook intended as a starting point for working with a speci
   * web edit
   * html console
   * sql query
+
+The other notebooks in this directory are worked examples of offline analyses whose results feed
+the atlas (e.g. `raster_derivations.ipynb`, `lidar_analyses.ipynb`). They come from
+`templates/notebooks/` in the repo and are refreshed every time this outlet is materialized.
 """))
     
     python_path = str(versioning.atlas_path(config, version='app') / 'python')
@@ -2897,11 +2982,19 @@ atlas.materialize(c, 'webedit')
 
     
 
-    nb_path = versioning.atlas_path(config) / 'outlets' / 'notebook'/ f"{outlet_name}-{config['name']}.ipynb"
+    nb_dir = versioning.atlas_path(config) / 'outlets' / 'notebook'
+    nb_dir.mkdir(parents=True, exist_ok=True)
+    nb_path = nb_dir / f"{outlet_name}-{config['name']}.ipynb"
     with open(nb_path, 'w', encoding='utf-8') as f:
         nbformat.write(notebook, f)
     print(f"Notebook: wrote to {nb_path}...")
-    
+
+    # Worked-example analysis notebooks ship with every atlas. Overwritten on each
+    # materialize: templates/notebooks/ in the repo is their source of truth.
+    for template in sorted((versioning.atlas_path(config, version='app') / 'templates' / 'notebooks').glob('*.ipynb')):
+        shutil.copy(template, nb_dir / template.name)
+        print(f"Notebook: copied {template.name}")
+
 
 def gsheet_export(config: dict, outlet_name: str, layer_name: str) -> str:
     """Create a Google Sheet layer from an atlas layer."""

@@ -302,5 +302,68 @@ class TestOutlets(unittest.TestCase):
         expected_path = Path(self.test_config["data_root"]) / "outlets" / "test_region" / "test_region.geojson"
         self.assertEqual(result, expected_path)
 
+
+class TestLabelTextMinzoom(unittest.TestCase):
+    """The icon and the label share one symbol layer, so hiding the label by
+    zoom must not take the icon with it."""
+
+    def _apply(self, label_layer, layer):
+        from outlets import _apply_label_text_minzoom
+        _apply_label_text_minzoom(label_layer, layer)
+        return label_layer
+
+    def test_absent_key_changes_nothing(self):
+        ll = {'paint': {'icon-color': 'rgb(255,100,0)'}}
+        self._apply(ll, {'name': 'photos'})
+        self.assertEqual(ll['paint'], {'icon-color': 'rgb(255,100,0)'})
+
+    def test_text_is_stepped_on_zoom(self):
+        ll = {'paint': {}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(ll['paint']['text-opacity'], ['step', ['zoom'], 0, 16, 1])
+
+    def test_icon_paint_survives(self):
+        # The symbol branch sets these; losing them would lose the pin.
+        ll = {'paint': {'icon-color': 'rgb(255,100,0)', 'icon-halo-blur': 10}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(ll['paint']['icon-color'], 'rgb(255,100,0)')
+        self.assertEqual(ll['paint']['icon-halo-blur'], 10)
+
+    def test_paint_is_created_when_absent(self):
+        ll = {}
+        self._apply(ll, {'label_text_minzoom': 14})
+        self.assertEqual(ll['paint'], {'text-opacity': ['step', ['zoom'], 0, 14, 1]})
+
+    def test_only_text_opacity_is_added(self):
+        ll = {'paint': {}}
+        self._apply(ll, {'label_text_minzoom': 16})
+        self.assertEqual(set(ll['paint']), {'text-opacity'})
+
+
 if __name__ == '__main__':
     unittest.main() 
+
+
+class TestEditControlsSelectionPanel(unittest.TestCase):
+    """Annotate pages get the blank-fields hint and the #selection-panel that
+    edit_map.js fills; create pages don't."""
+
+    COLS = [{'name': 'status', 'type': 'string'}]
+
+    def test_annotate_has_panel_and_hint(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'annotate')
+        self.assertIn('id="selection-panel"', html)
+        self.assertIn('Blank fields keep existing values', html)
+
+    def test_create_has_neither(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'create')
+        self.assertNotIn('selection-panel', html)
+        self.assertNotIn('Blank fields keep existing values', html)
+
+    def test_delete_and_move_prompts_have_count_targets(self):
+        from outlets import generate_edit_controls_html
+        html = generate_edit_controls_html(self.COLS, 'point', 'create')
+        self.assertIn('id="delete-count-text"', html)
+        self.assertIn('id="move-count-text"', html)

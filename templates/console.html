@@ -283,6 +283,13 @@
                     al.className = 'action-mutate';
                     li.appendChild(al);
 
+                    // Reshape
+                    const ar = document.createElement('a');
+                    ar.href = `../../webedit/${item.name}_reshape.html`;
+                    ar.textContent = ' (reshape) ';
+                    ar.className = 'action-mutate';
+                    li.appendChild(ar);
+
                     // Source
                     const a3 = document.createElement('a');
                     a3.href = `../${item.name}/attribution.html`;

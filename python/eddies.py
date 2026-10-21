@@ -16,6 +16,7 @@ import outlets
 import federation
 import h3
 from datetime import datetime
+from collections import Counter
 
 import requests
 import dataswale_geojson as dataswale
@@ -744,6 +745,26 @@ def _build_road_graph(features, resolution):
     return G, segment_nodes
 
 
+def road_name_matcher(names):
+    """Return a predicate matching a road name against a list of names, by
+    prefix: "Thomas" matches "Thomas Road" and "Thomas Drive" but not
+    "Thomasville Lane". Used both to restrict an LRS zone to its own roads and
+    to filter which roads get distance markers. `names` may be a list or a
+    comma-separated string; empty means match everything."""
+    if isinstance(names, str):
+        names = [n.strip() for n in names.split(',')]
+    names = [n.strip().lower() for n in (names or []) if n and n.strip()]
+    if not names:
+        return lambda _name: True
+
+    def _matches(feature_name):
+        if not feature_name:
+            return False
+        n = feature_name.lower()
+        return any(n == prefix or n.startswith(prefix + ' ') for prefix in names)
+    return _matches
+
+
 def _snap_anchor(G, anchor_lat, anchor_lng, resolution):
     """Return the graph node nearest to the anchor coordinates, searching outward
     in H3 rings if the anchor's own cell isn't a node."""
@@ -754,7 +775,22 @@ def _snap_anchor(G, anchor_lat, anchor_lng, resolution):
         for candidate in h3.grid_disk(anchor_cell, ring):
             if candidate in G:
                 return candidate
-    raise Exception("road_lrs: no graph node found within 30 rings of anchor — check anchor coordinates and road data")
+    # An anchor this far out is usually a point picked off the road (the end of
+    # a hand-drawn line, say), so say how far away the road is rather than
+    # leaving the reader to guess what is wrong.
+    nearest_m = None
+    if G.number_of_nodes():
+        geod = Geod(ellps='WGS84')
+        nearest_m = min(
+            abs(geod.inv(anchor_lng, anchor_lat, lng, lat)[2])
+            for lat, lng in (h3.cell_to_latlng(n) for n in G))
+    raise Exception(
+        f"road_lrs: no road within 30 H3 rings (about "
+        f"{30 * h3.average_hexagon_edge_length(resolution, unit='m'):.0f} m) of anchor "
+        f"({anchor_lat}, {anchor_lng}); nearest road is "
+        f"{nearest_m:.0f} m away. Put the anchor on the road itself."
+        if nearest_m is not None else
+        f"road_lrs: no road segments to anchor to at ({anchor_lat}, {anchor_lng}).")
 
 
 def _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None):
@@ -788,8 +824,11 @@ def _lrs_annotate(features, anchor_lat, anchor_lng, resolution, route_name=None)
 def _load_lrs_zones(config, zones_layer):
     """Load LRS zones from an editable polygon control layer. Each feature needs a
     `name` and an `anchor` property (a JSON string `{"latitude":.., "longitude":..}`
-    as produced by the webmap Share button). Returns a list of
-    {name, anchor_lat, anchor_lng, polygon (shapely geometry)}."""
+    as produced by the webmap Share button), and may carry `roads`: a
+    comma-separated list of road names the zone measures along. Without it the
+    LRS spreads down every connected driveway and side road inside the polygon.
+    Returns a list of {name, anchor_lat, anchor_lng, polygon (shapely geometry),
+    roads (matcher predicate)}."""
     data = dataswale.layer_as_featurecollection(config, zones_layer)
     if not data or 'features' not in data:
         raise Exception(f"road_lrs: could not load zones layer '{zones_layer}'")
@@ -810,28 +849,38 @@ def _load_lrs_zones(config, zones_layer):
         except (ValueError, KeyError, TypeError) as e:
             logger.warning(f"road_lrs: zone '{name}' has unparseable anchor {anchor_raw!r}: {e}")
             continue
+        roads = props.get('roads')
         zones.append({
             'name': name,
             'anchor_lat': anchor_lat,
             'anchor_lng': anchor_lng,
             'polygon': shape(geom),
+            'roads': road_name_matcher(roads),
+            'road_names': roads,
         })
     return zones
 
 
 def _assign_features_to_zones(features, zones):
     """Assign each road segment to the zone whose polygon contains the segment's
-    midpoint. Zones are assumed non-overlapping, so each segment lands in at most
-    one zone (first match wins). Segments in no zone are dropped. Returns a dict
-    keyed by zone name -> list of features."""
+    midpoint and whose `roads` list the segment's name matches. Zones are assumed
+    non-overlapping, so each segment lands in at most one zone (first match
+    wins). Segments in no zone are dropped. Returns a dict keyed by zone name ->
+    list of features.
+
+    The name test is what keeps a route on its own roads: a polygon drawn around
+    a highway also contains every driveway hanging off it, and Dijkstra would
+    otherwise measure down all of them."""
     buckets = {z['name']: [] for z in zones}
     for feature in features:
         geom = feature.get('geometry')
         if not geom or geom.get('type') != 'LineString':
             continue
         midpoint = shape(geom).interpolate(0.5, normalized=True)
+        road_name = (feature.get('properties') or {}).get('name')
         for z in zones:
-            if z['polygon'].contains(midpoint):
+            matches_road = z.get('roads') or (lambda _n: True)
+            if z['polygon'].contains(midpoint) and matches_road(road_name):
                 buckets[z['name']].append(feature)
                 break
     return buckets
@@ -855,16 +904,22 @@ def road_lrs(config, asset_name):
         reachable segments from one anchor.
     """
     asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
-    in_layer = asset_config.get('in_layer', 'roads')
     out_layer = asset_config.get('out_layer', 'road_mileage')
     resolution = asset_config.get('h3_resolution', 12)
     zones_layer = asset_config.get('lrs_zones_layer')
     anchor_coords = asset_config.get('lrs_anchor_coordinates')
 
-    layer_data = dataswale.layer_as_featurecollection(config, in_layer)
-    if not layer_data or 'features' not in layer_data:
-        raise Exception(f"road_lrs: could not load layer '{in_layer}'")
-    features = layer_data['features']
+    # in_layers (plural) for atlases whose roads are split by class: a route that
+    # runs from a highway onto a named side road needs one graph spanning them,
+    # or it stops measuring where the first layer ends.
+    in_layers = asset_config.get('in_layers') or [asset_config.get('in_layer', 'roads')]
+    features = []
+    for layer_name in in_layers:
+        layer_data = dataswale.layer_as_featurecollection(config, layer_name)
+        if not layer_data or 'features' not in layer_data:
+            raise Exception(f"road_lrs: could not load layer '{layer_name}'")
+        features.extend(layer_data['features'])
+    logger.info(f"road_lrs: {len(features)} segments from {in_layers}")
 
     if zones_layer:
         zones = _load_lrs_zones(config, zones_layer)
@@ -875,8 +930,12 @@ def road_lrs(config, asset_name):
         for z in zones:
             zone_features = buckets[z['name']]
             if not zone_features:
-                logger.warning(f"road_lrs: zone '{z['name']}' contains no road segments")
+                logger.warning(
+                    f"road_lrs: zone '{z['name']}' contains no road segments "
+                    f"(roads={z['road_names']!r}) — check the road names against the data")
                 continue
+            logger.info(f"road_lrs: zone '{z['name']}': {len(zone_features)} segments"
+                        + (f" matching {z['road_names']!r}" if z['road_names'] else ""))
             annotated.extend(
                 _lrs_annotate(zone_features, z['anchor_lat'], z['anchor_lng'], resolution, route_name=z['name'])
             )
@@ -931,16 +990,7 @@ def road_lrs_markers(config, asset_name):
 
     features = layer_data['features']
     if road_names:
-        # Prefix match: "Thomas" matches "Thomas Road", "Thomas Drive", etc.
-        road_names_lower = [p.lower() for p in road_names]
-        def _name_matches(feature_name):
-            if not feature_name:
-                return False
-            n = feature_name.lower()
-            for prefix in road_names_lower:
-                if n == prefix or n.startswith(prefix + ' '):
-                    return True
-            return False
+        _name_matches = road_name_matcher(road_names)
         all_names = sorted({f.get('properties', {}).get('name') for f in features if f.get('properties', {}).get('name')})
         features = [f for f in features if _name_matches(f.get('properties', {}).get('name'))]
         if not features:
@@ -1269,6 +1319,27 @@ def terrain_rgb_tiff(config: Dict[str, Any], eddy_name: str) -> Path:
     return out_path
 
 
+def _band_min_max(ds, bidx=1):
+    """Exact min and max of a band, one block at a time.
+
+    The whole-band `read(1, masked=True)` this replaces needed the entire band
+    resident at once — around 2.3 GB on a gigapixel raster, on a box with no
+    swap. Reading block by block gives identical numbers in bounded memory.
+
+    Returns (None, None) when every pixel is masked.
+    """
+    low = high = None
+    for _, window in ds.block_windows(bidx):
+        block = ds.read(bidx, window=window, masked=True)
+        if block.count() == 0:
+            continue
+        block_low = float(block.min())
+        block_high = float(block.max())
+        low = block_low if low is None else min(low, block_low)
+        high = block_high if high is None else max(high, block_high)
+    return low, high
+
+
 def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
     """Convert a GeoTIFF layer to a Cloud-Optimized GeoTIFF (COG).
 
@@ -1281,6 +1352,10 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
         out_layer:     output layer name (defaults to in_layer)
         log_transform: if true, apply log1p to pixel values before COG conversion
                        (stopgap for skewed distributions; see issue #97 for setColorFunction approach)
+        stats:         write the stats.json sidecar (default true). Set false for
+                       a layer whose cog_color names no 'auto' — a hillshade
+                       rendered as RGB needs no range, and computing one costs a
+                       full pass over the raster.
     """
     eddy = config['assets'][eddy_name]
     in_layer = eddy['in_layer']
@@ -1327,14 +1402,26 @@ def tiff_to_cog(config: Dict[str, Any], eddy_name: str) -> Path:
     if result.returncode != 0:
         raise RuntimeError(f"gdalwarp COG failed:\n{result.stderr}")
 
+    if not eddy.get('stats', True):
+        logger.info(f"tiff_to_cog complete: {out_path}, stats skipped")
+        return out_path
+
     with rasterio.open(out_path) as ds:
-        data = ds.read(1, masked=True)
-        stats = {
-            'min': float(data.min()),
-            'max': float(data.max()),
-            'nodata': ds.nodata,
-            'log_transformed': bool(eddy.get('log_transform', False)),
-        }
+        low, high = _band_min_max(ds)
+        nodata = ds.nodata
+
+    if low is None:
+        logger.warning(
+            f"tiff_to_cog: {out_path} has no unmasked pixels, writing no stats.json — "
+            f"a cog_color asking for 'auto' will not resolve")
+        return out_path
+
+    stats = {
+        'min': low,
+        'max': high,
+        'nodata': nodata,
+        'log_transformed': bool(eddy.get('log_transform', False)),
+    }
     (out_dir / 'stats.json').write_text(json.dumps(stats, indent=2))
     logger.info(f"tiff_to_cog complete: {out_path}, stats={stats}")
     return out_path
@@ -1853,6 +1940,229 @@ def merge_h3(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+def _count_by_h3(features, resolution):
+    """
+    Count features per H3 cell. Each feature lands in exactly one cell: the one
+    containing its centroid. Polyfilling instead would drop features smaller
+    than a cell (no cell center inside them) or double-count ones on an edge.
+
+    Returns a Counter of {h3_index: count}; features without geometry are skipped.
+    """
+    counts = Counter()
+    for feature in features:
+        geom = feature.get('geometry')
+        if not geom:
+            continue
+        centroid = shape(geom).centroid
+        counts[h3.latlng_to_cell(centroid.y, centroid.x, resolution)] += 1
+    return counts
+
+
+def _h3_cell_feature(cell, resolution):
+    """A cell as a GeoJSON Feature, in the same shape the h3_grid inlet writes."""
+    coords = [[lng, lat] for lat, lng in h3.cell_to_boundary(cell)]
+    coords.append(coords[0])
+    return {'type': 'Feature',
+            'geometry': {'type': 'Polygon', 'coordinates': [coords]},
+            'properties': {'h3_index': cell, 'h3_resolution': resolution}}
+
+
+def h3_count(config: Dict[str, Any], asset_name: str):
+    """
+    Summarise layers onto an H3 grid: each cell gets a `{layer}_count` property
+    holding how many of that layer's features fall in it (0 if none). Works for
+    any vector layer — points directly, lines and polygons by centroid.
+
+    Writes a new layer rather than enriching the grid in place — the grid is
+    delta-built by the h3_grid inlet, so a refresh of it would wipe in-place counts.
+
+    Sparse mode: give `resolution` and no `in_layer`, and only the cells holding
+    at least one feature are written. For fine resolutions, where a full grid
+    over the atlas would be hundreds of thousands of mostly-empty cells.
+
+    Config:
+      in_layer: H3 grid layer; features must carry h3_index (required unless sparse)
+      resolution: H3 resolution for sparse mode (only used without in_layer)
+      in_layers: list of layer names to count (required). Named in_layers, not
+                 something clearer, so Dagster and rename/copy_layer see them as inputs.
+      out_layer: output layer name (required)
+    """
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config.get('in_layer')
+    count_layers = asset_config['in_layers']
+    out_layer = asset_config['out_layer']
+
+    if in_layer:
+        grid = dataswale.layer_as_featurecollection(config, in_layer)
+        if not grid or not grid.get('features'):
+            raise Exception(f"h3_count: could not load H3 grid layer '{in_layer}'")
+        cells = grid['features']
+        first_idx = (cells[0].get('properties') or {}).get('h3_index')
+        if not first_idx:
+            raise Exception(f"h3_count: grid layer '{in_layer}' has no h3_index property")
+        resolution = h3.get_resolution(first_idx)
+        grid_indices = {(f.get('properties') or {}).get('h3_index') for f in cells}
+    elif 'resolution' in asset_config:
+        resolution = int(asset_config['resolution'])
+        cells = None  # built below from the occupied cells
+    else:
+        raise Exception(f"h3_count: '{asset_name}' needs in_layer (a grid) or resolution (sparse)")
+
+    counts_by_source = {}
+    for source in count_layers:
+        source_data = dataswale.layer_as_featurecollection(config, source)
+        features = (source_data or {}).get('features') or []
+        counts = _count_by_h3(features, resolution)
+        if in_layer:
+            off_grid = sum(n for cell, n in counts.items() if cell not in grid_indices)
+            logger.info(f"h3_count: '{source}': {len(features)} features, "
+                        f"{off_grid} outside grid '{in_layer}' (r{resolution})")
+        else:
+            logger.info(f"h3_count: '{source}': {len(features)} features in "
+                        f"{len(counts)} cells (r{resolution}, sparse)")
+        counts_by_source[source] = counts
+
+    if cells is None:
+        occupied = set().union(*(set(c) for c in counts_by_source.values()))
+        cells = [_h3_cell_feature(cell, resolution) for cell in sorted(occupied)]
+
+    out_features = []
+    for cell in cells:
+        props = dict(cell.get('properties') or {})
+        for source, counts in counts_by_source.items():
+            props[f"{source}_count"] = counts.get(props.get('h3_index'), 0)
+        out_features.append({'type': 'Feature', 'geometry': cell.get('geometry'), 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(geojson.FeatureCollection(out_features), f)
+    logger.info(f"h3_count: wrote {len(out_features)} cells to {out_path}")
+    return str(out_path)
+
+
+def _raster_source(config, layer_name):
+    """Where to read a raster layer from: its external cog_url, else its local COG or tiff."""
+    layer = {l['name']: l for l in config['dataswale']['layers']}.get(layer_name, {})
+    if layer.get('cog_url'):
+        return f"/vsicurl/{layer['cog_url']}"
+    layer_dir = versioning.atlas_path(config, 'layers') / layer_name
+    for suffix in ('.cog.tif', '.tiff'):
+        if (layer_dir / f'{layer_name}{suffix}').exists():
+            return str(layer_dir / f'{layer_name}{suffix}')
+    raise Exception(f"h3_raster_stats: raster layer '{layer_name}' has no cog_url and no local file")
+
+
+def _zonal_stats(values, n_in_cell, percentile=95):
+    """Summarise the valid pixels of one cell.
+
+    values: 1-D array of the valid (non-nodata) pixel values inside the cell.
+    n_in_cell: how many pixels the cell covers in total, valid or not — so a
+               cell half off the raster's edge, or half nodata, has coverage 0.5.
+    """
+    coverage = len(values) / n_in_cell if n_in_cell else 0.0
+    if len(values) == 0:
+        return {'mean': None, f'p{percentile}': None, 'coverage': round(coverage, 3)}
+    return {'mean': round(float(np.mean(values)), 2),
+            f'p{percentile}': round(float(np.percentile(values, percentile)), 2),
+            'coverage': round(coverage, 3)}
+
+
+def h3_raster_stats(config: Dict[str, Any], asset_name: str):
+    """
+    Summarise raster layers onto an H3 grid: each cell gets `{layer}_mean`,
+    `{layer}_p{percentile}` and `{layer}_coverage` for every raster in in_layers.
+
+    Pixels count toward a cell when their centre falls inside it (a rasterize
+    mask per cell, full resolution, read by window) — the raster counterpart of
+    h3_count's one-centroid-one-cell rule. Only cells whose bbox meets the
+    raster are read, so a small raster on a big grid costs its own footprint.
+
+    Cells where no raster reaches min_coverage are left out entirely: an edge
+    cell averaged over a sliver of pixels reads as if it were a real value.
+
+    Config:
+      in_layer: H3 grid layer; features must carry h3_index (required)
+      in_layers: raster layer names (required). A layer with cog_url is read
+                 remotely over /vsicurl/, otherwise its local .cog.tif/.tiff.
+      out_layer: output layer name (required)
+      percentile: which upper percentile to report (default 95)
+      min_coverage: fraction of a cell that must hold valid pixels (default 0.5)
+    """
+    from rasterio import features as rio_features, windows as rio_windows
+    from rasterio.warp import transform_geom
+
+    asset_config = config['assets'][asset_name].get('config', config['assets'][asset_name])
+    in_layer = asset_config['in_layer']
+    raster_layers = asset_config['in_layers']
+    out_layer = asset_config['out_layer']
+    percentile = asset_config.get('percentile', 95)
+    min_coverage = asset_config.get('min_coverage', 0.5)
+
+    grid = dataswale.layer_as_featurecollection(config, in_layer)
+    if not grid or not grid.get('features'):
+        raise Exception(f"h3_raster_stats: could not load H3 grid layer '{in_layer}'")
+    cells = grid['features']
+
+    stats_by_raster = {}  # raster -> {h3_index: stats}
+    for raster in raster_layers:
+        source = _raster_source(config, raster)
+        logger.info(f"h3_raster_stats: '{raster}' from {source}")
+        stats = {}
+        # EMPTY_DIR stops GDAL listing the whole S3 prefix before opening a /vsicurl/ file.
+        with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR'), rasterio.open(source) as ds:
+            left, bottom, right, top = ds.bounds
+            raster_window = rio_windows.Window(0, 0, ds.width, ds.height)
+            for cell in cells:
+                geom = transform_geom('EPSG:4326', ds.crs, cell['geometry'])
+                xs = [x for x, _ in geom['coordinates'][0]]
+                ys = [y for _, y in geom['coordinates'][0]]
+                if max(xs) < left or min(xs) > right or max(ys) < bottom or min(ys) > top:
+                    continue
+                cell_window = rio_windows.from_bounds(min(xs), min(ys), max(xs), max(ys),
+                                                      transform=ds.transform)
+                cell_window = cell_window.round_offsets().round_lengths()
+                # Pixels the whole cell covers, on or off the raster: coverage's denominator.
+                n_in_cell = int(rio_features.geometry_mask(
+                    [geom], out_shape=(cell_window.height, cell_window.width),
+                    transform=ds.window_transform(cell_window), invert=True).sum())
+                try:
+                    window = cell_window.intersection(raster_window)
+                except rio_windows.WindowError:
+                    continue
+                block = ds.read(1, window=window, masked=True)
+                inside = rio_features.geometry_mask(
+                    [geom], out_shape=block.shape,
+                    transform=ds.window_transform(window), invert=True)
+                valid = block[inside].compressed()
+                stats[cell['properties']['h3_index']] = _zonal_stats(valid, n_in_cell, percentile)
+        logger.info(f"h3_raster_stats: '{raster}': {len(stats)} cells meet the raster")
+        stats_by_raster[raster] = stats
+
+    out_features = []
+    for cell in cells:
+        idx = (cell.get('properties') or {}).get('h3_index')
+        per_raster = {r: s.get(idx) for r, s in stats_by_raster.items()}
+        if not any(s and s['coverage'] >= min_coverage for s in per_raster.values()):
+            continue
+        props = dict(cell['properties'])
+        for raster, s in per_raster.items():
+            # A cell kept for one raster may be thin on another: keep its
+            # coverage, blank its values.
+            enough = bool(s) and s['coverage'] >= min_coverage
+            props[f'{raster}_mean'] = s['mean'] if enough else None
+            props[f'{raster}_p{percentile}'] = s[f'p{percentile}'] if enough else None
+            props[f'{raster}_coverage'] = s['coverage'] if s else 0.0
+        out_features.append({'type': 'Feature', 'geometry': cell['geometry'], 'properties': props})
+
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(geojson.FeatureCollection(out_features), f)
+    logger.info(f"h3_raster_stats: wrote {len(out_features)} cells to {out_path}")
+    return str(out_path)
+
+
 def dst_match_point(soil_ph: float, soil_om: float, goal: str, biochar_records: list,
                     target_ph: float = None, top_n: int = 5, soil_sand: float = None) -> list:
     """Simplified Phillips 2020 suitability calculation (point mode).
@@ -2069,5 +2379,7 @@ asset_methods = {
     "road_lrs_markers": road_lrs_markers,
     "ssurgo_enrich": ssurgo_enrich,
     "merge_h3": merge_h3,
+    "h3_count": h3_count,
+    "h3_raster_stats": h3_raster_stats,
     "dst_match_simplified": dst_match_simplified,
 }

@@ -43,13 +43,7 @@
                 "logo_url": "https://cdn.prod.website-files.com/648ea312c78f6d7a5ca19989/64c2933be813b5edc51b9063_WFDlogo_DS.png",
                 "versioned_outlets": [],
                 "cloud": {
-                    "outlets": [
-                        "webmap",
-                        "console",
-                        "html",
-                        "3dview",
-                        "runbook"
-                    ]
+                    "outlets": ["webmap", "console", "3dview", "runbook"]
                 },
                 "layers": {
                     "regions": {
@@ -541,6 +535,7 @@
                         "config_def": "local_turnouts"
                     },
                     "webmap": {
+                        "show_user_location": true,
                         "in_layers": [
                             "basemap",
                             "lidar_basemap",
@@ -574,6 +569,7 @@
                         ]
                     },
                     "private_webmap": {
+                        "show_user_location": true,
                         "in_layers": [
                             "basemap",
                             "lidar_basemap",
@@ -672,9 +668,6 @@
                             "admin",
                             "technical"
                         ]
-                    },
-                    "html": {
-                        "config_def": "static_html"
                     },
                     "console": {
                         "config_def": "console"

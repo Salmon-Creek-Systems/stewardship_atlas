@@ -10,7 +10,7 @@ import geojson
 # Add the python directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from vector_inlets import overture_duckdb, local_ogr, gazetteer_grid
+from vector_inlets import overture_duckdb, local_ogr, gazetteer_grid, s3_geojson
 
 class TestVectorInlets(unittest.TestCase):
     def setUp(self):
@@ -199,6 +199,34 @@ class TestVectorInlets(unittest.TestCase):
         self.assertIn('-spat', args)
         self.assertIn('-spat_srs', args)
         self.assertEqual(args[args.index('-spat_srs') + 1], self.test_config['dataswale']['crs'])
+
+class TestS3GeojsonAlterations(unittest.TestCase):
+    """s3_geojson applies an `alterations` block, after its own name defaulting,
+    so the Add Layer label property ends up in `name`."""
+
+    def _run(self, inlet_config):
+        fc = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [-73.2, 41.2]},
+             'properties': {'street': 'Miller Rd'}}]}
+        config = {'dataswale': {'bbox': {'west': -73.5, 'south': 41.0, 'east': -73.0, 'north': 41.5}},
+                  'assets': {'roads_import': {'config': {'s3_bucket': 'b', 's3_key': 'k', **inlet_config}}}}
+        fake_s3 = MagicMock()
+        fake_s3.download_file.side_effect = lambda bucket, key, path: Path(path).write_text(json.dumps(fc))
+        fake_boto3 = MagicMock()
+        fake_boto3.client.return_value = fake_s3
+        queue = MagicMock()
+        with patch.dict(sys.modules, {'boto3': fake_boto3}):
+            s3_geojson(config, 'roads_import', delta_queue=queue)
+        return queue.add_deltas_from_features.call_args[0][2]['features']
+
+    def test_label_property_canonicalized_to_name(self):
+        features = self._run({'alterations': {'canonicalize': [{'to': 'name', 'from': ['street']}]}})
+        self.assertEqual(features[0]['properties']['name'], 'Miller Rd')
+
+    def test_no_alterations_leaves_default_name(self):
+        features = self._run({})
+        self.assertEqual(features[0]['properties']['name'], '')
+
 
 class TestGazetteerGrid(unittest.TestCase):
     """Tests for gazetteer_grid() — projected-space grid generation."""

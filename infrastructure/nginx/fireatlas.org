@@ -23,13 +23,22 @@
 # To add a new atlas: no nginx changes needed — just add data under SWALES_ROOT/{atlas}/
 
 
+# ── Usage log (scripts/usage_report.py) ─────────────────────────────────────
+# http-level, so every server block on the box writes it alongside the stock
+# access.log: combined format plus the vhost and the owner cookie that
+# /identify_as_scs sets. The report reads only this file.
+log_format usage '$remote_addr - $remote_user [$time_local] "$request" '
+                 '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                 '$host "$cookie_fa_owner"';
+access_log /var/log/nginx/usage.log usage;
+
 # ── Static file server — fireatlas.org ──────────────────────────────────────
 
 server {
     server_name fireatlas.org;
 
     # Static files root — serves all atlas data.
-    # fireatlas.org/{atlas}/staging/outlets/html/public → /root/swales_dev/{atlas}/staging/...
+    # fireatlas.org/{atlas}/staging/outlets/console/public → /root/swales_dev/{atlas}/staging/...
     root /root/swales_dev;
 
     # Security: never serve dotfiles/dirs (.git, .env, .ht*). 404 hides existence.
@@ -57,13 +66,32 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
     # ABI demo shortcut
+    # Marks this browser as SCS's own so the usage report leaves it out.
+    # Domain covers every *.fireatlas.org site; ten-year lifetime.
+    location = /identify_as_scs {
+        add_header Set-Cookie "fa_owner=1; Domain=.fireatlas.org; Path=/; Max-Age=315360000; Secure; SameSite=Lax";
+        default_type text/html;
+        return 200 '<!doctype html><meta name="viewport" content="width=device-width"><p style="font:16px sans-serif;margin:2em">This browser is now marked as SCS and left out of the <a href="/usage/">usage report</a>.</p>';
+    }
+
+    # Usage report, regenerated hourly by scripts/usage_report.py (cron).
+    # ^~ so the atlas-root redirect regex below doesn't catch /usage/.
+    location = /usage {
+        return 301 /usage/;
+    }
+    location ^~ /usage/ {
+        alias /var/www/usage/;
+        auth_basic "Fire Atlas usage";
+        auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
+    }
+
     location = /biochar_atlas_poc {
       return 302 https://fireatlas.org/abi_demo/staging/outlets/biochar_webedit/;
     }
 
-    # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/html/public
+    # Atlas root redirect: fireatlas.org/{atlas} → fireatlas.org/{atlas}/staging/outlets/console/public
     location ~ ^/([a-zA-Z0-9_-]+)/?$ {
-        return 302 https://fireatlas.org/$1/staging/outlets/html/public;
+        return 302 https://fireatlas.org/$1/staging/outlets/console/public/;
     }
 
     # Shared local data (CSS, JS, images) — mirrors the per-atlas local/ symlink
@@ -79,32 +107,35 @@ server {
         add_header 'Access-Control-Allow-Origin' '*';
     }
 
-    # Per-atlas auth — admin and internal paths.
+    # The old `html` console is retired: send its URLs (bookmarks, QR codes,
+    # printed runbooks) to the same role and page of the `console` outlet,
+    # in staging or any published version. Its directories stay on disk until
+    # the cloud cutover but are no longer served. Regex locations match in
+    # order, so these sit above everything else that could match /html/.
+    location ~ ^/(.+)/outlets/html/?$ {
+        return 301 /$1/outlets/console/public/;
+    }
+    location ~ ^/(.+)/outlets/html/(.*)$ {
+        return 301 /$1/outlets/console/$2$is_args$args;
+    }
+
+    # Per-atlas auth — admin and internal paths of the console.
     # Add a block per atlas. No changes needed for new atlases if they
     # follow the same htpasswd path convention.
 
-location ~ ^/samuelsloop/staging/outlets/html/admin/ {
-    auth_basic "Atlas Admin";
-    auth_basic_user_file /root/swales_dev/roles/samuelsloop/admin.htpasswd;
-}
-location ~ ^/samuelsloop/staging/outlets/html/internal/ {
-    auth_basic "Atlas Internal";
-    auth_basic_user_file /root/swales_dev/roles/samuelsloop/internal.htpasswd;
-}
-
-    location ~ ^/scvfd/staging/outlets/html/admin/ {
+    location ~ ^/scvfd/staging/outlets/console/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/scvfd/admin.htpasswd;
     }
-    location ~ ^/scvfd/staging/outlets/html/internal/ {
+    location ~ ^/scvfd/staging/outlets/console/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/scvfd/internal.htpasswd;
     }
-    location ~ ^/kennedy/staging/outlets/html/admin/ {
+    location ~ ^/kennedy/staging/outlets/console/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/kennedy/admin.htpasswd;
     }
-    location ~ ^/kennedy/staging/outlets/html/internal/ {
+    location ~ ^/kennedy/staging/outlets/console/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/kennedy/internal.htpasswd;
     }
@@ -116,11 +147,11 @@ location ~ ^/samuelsloop/staging/outlets/html/internal/ {
     # shared.htpasswd contains default admin:admin and internal:internal credentials.
     # Create it on the server: htpasswd -bc /root/swales_dev/roles/shared.htpasswd admin admin
     #                          htpasswd -b  /root/swales_dev/roles/shared.htpasswd internal internal
-    location ~ /outlets/html/admin/ {
+    location ~ /outlets/console/admin/ {
         auth_basic "Atlas Admin";
         auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
     }
-    location ~ /outlets/html/internal/ {
+    location ~ /outlets/console/internal/ {
         auth_basic "Atlas Internal";
         auth_basic_user_file /root/swales_dev/roles/shared.htpasswd;
     }

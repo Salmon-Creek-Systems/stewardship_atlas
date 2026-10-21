@@ -4,17 +4,24 @@
 Uses MapLibre GL JS to create 3D terrain visualization from existing elevation data.
 """
 
+import html
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 import versioning
 import utils
+import map_style
 
 
 _VECTOR_INCLUDE_TYPES = {'linestring', 'point', 'polygon'}
 _INDEX_SUFFIXES = ('_index',)
 _GLYPHS_URL = 'https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf'
 _AWS_TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+
+# Camera route animation defaults: height above the aimed-at ground point (m),
+# camera angle (MapLibre pitch: 0 = straight down, 85 = MapLibre 4's max), and
+# total duration (s) to traverse every line in the layer.
+_ROUTE_DEFAULTS = {'height': 300, 'angle': 45, 'secs': 240}
 
 # Layer names containing any of these substrings start visible; all others start hidden.
 _DEFAULT_VISIBLE_PATTERNS = ('road', 'creek', 'stream', 'photo')
@@ -129,37 +136,357 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
             'ids': toggle_ids,
             'label': name.replace('_', ' ').title(),
             'visible': visible,
+            'geometry_type': geom_type,
         })
 
     return sources, polygon_layers + line_layers + point_layers, toggle_list
 
 
-def _build_toggle_panel_html(toggle_list: list) -> str:
-    # The panel always renders so the Share view button is available, even for
-    # atlases with no overlay layers. The Layers header/list only appears when
-    # there are toggleable layers.
+_COLLAPSE_BTN = '<button class="panel-collapse-btn" title="Collapse panel">&#x25be;</button>'
+
+
+def _build_view_panel_html(toggle_list: list) -> str:
+    """Bottom-left View panel: Share view, the layer toggles, then the terrain sliders.
+
+    Always renders, so Share view and the sliders are there even for atlases
+    with no overlay layers; the Layers list only appears when there are some.
+    """
     lines = [
-        '<div class="layer-panel">',
-        '    <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
+        '<div class="panel view-panel">',
+        '    <div class="panel-head">',
+        f'        {_COLLAPSE_BTN}',
+        '        <button id="share-view-btn" class="share-view-btn">&#x1f517; Share view</button>',
+        '        <a href="/local/documents/help/3d_terrain_view.html" target="_blank" class="help-icon" title="Help: 3D view">?</a>',
+        '    </div>',
+        '    <div class="panel-body">',
     ]
     if toggle_list:
         lines += [
-            '    <div class="layer-panel-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">',
-            '        Layers <span class="layer-panel-arrow">&#x25be;</span>',
-            '    </div>',
-            '    <div class="layer-panel-list">',
+            '        <div class="panel-heading">Layers</div>',
+            '        <div class="layer-panel-list">',
         ]
         for t in toggle_list:
             ids_attr = ','.join(t['ids'])
             checked = ' checked' if t['visible'] else ''
             lines.append(
-                f'        <label>'
+                f'            <label>'
                 f'<input type="checkbox" data-layers="{ids_attr}" data-name="{t["name"]}"{checked}> '
                 f'{t["label"]}</label>'
             )
-        lines += ['    </div>']
-    lines += ['</div>']
+        lines += ['        </div>']
+    lines += [
+        '        <div class="terrain-controls">',
+        '            <label>Exaggeration',
+        '                <input type="range" id="exaggeration" min="0.1" max="3" step="0.1" value="1.5">',
+        '                <span id="exaggeration-value">1.5x</span></label>',
+        '            <label>Pitch',
+        '                <input type="range" id="pitch" min="0" max="85" step="5" value="60">',
+        '                <span id="pitch-value">60&deg;</span></label>',
+        '        </div>',
+        '    </div>',
+        '</div>',
+    ]
     return '\n'.join(lines)
+
+
+def _build_route_panel_html(route_layers: list) -> str:
+    """'Animate Camera' controls; empty when the 3D view has no line layers.
+
+    One line (label, layer dropdown, help) until a layer is chosen; the camera
+    settings and buttons then appear beneath it.
+    """
+    if not route_layers:
+        return ''
+    options = '\n'.join(
+        f'                    <option value="{t["name"]}">{t["label"]}</option>'
+        for t in route_layers
+    )
+    return f'''
+            <div class="route-controls">
+                <div class="route-row">
+                    <span class="route-title">Animate Camera</span>
+                    <select id="route-layer">
+                    <option value="">Choose a layer&hellip;</option>
+{options}
+                    </select>
+                    <a href="/local/documents/help/3d_terrain_view.html#animating-a-camera-route" target="_blank" class="help-icon" title="Help: animate camera">?</a>
+                </div>
+                <div id="route-details" hidden>
+                    <label>Height above ground (m): <input type="number" id="route-height" min="1" step="50" value="{_ROUTE_DEFAULTS['height']}"></label>
+                    <label>Camera angle (&deg;): <input type="number" id="route-angle" min="0" max="85" step="5" value="{_ROUTE_DEFAULTS['angle']}"></label>
+                    <label>Duration (s): <input type="number" id="route-secs" min="1" step="10" value="{_ROUTE_DEFAULTS['secs']}"></label>
+                    <div class="route-buttons">
+                        <button id="route-play" disabled>&#x25b6; Play</button>
+                        <button id="route-stop" disabled>&#x25a0; Stop</button>
+                    </div>
+                </div>
+                <div id="route-status" class="route-status"></div>
+            </div>'''
+
+
+# Camera route playback. The camera aims at a point moving along the line at a
+# constant pace; MapLibre puts that point on the terrain, so the camera follows
+# the ground. Height above ground becomes a zoom via the camera-to-center
+# distance. Bearing points ROUTE_LOOKAHEAD_M further along the line, so turns
+# swing gradually instead of snapping at every vertex. Every line in the layer
+# is played in file order; the camera jumps between disconnected lines.
+# Plain ?route=&height=&angle=&secs= params are accepted alongside the ?s= state.
+_ROUTE_JS = """
+        const ROUTE_URLS = __ROUTE_URLS__;
+        const ROUTE_LOOKAHEAD_M = 150;
+        const ROUTE_MAX_ZOOM = 22;
+        const BASE_MAX_ZOOM = map.getMaxZoom();
+        const route = {layer: '', legs: [], total: 0, playing: false, progress: 0,
+                       startedAt: 0, secs: 60, raf: null, bearing: null};
+        const routeEls = {
+            layer: document.getElementById('route-layer'),
+            details: document.getElementById('route-details'),
+            height: document.getElementById('route-height'),
+            angle: document.getElementById('route-angle'),
+            secs: document.getElementById('route-secs'),
+            play: document.getElementById('route-play'),
+            stop: document.getElementById('route-stop'),
+            status: document.getElementById('route-status'),
+        };
+
+        function haversineM(a, b) {
+            const R = 6371008.8, rad = Math.PI / 180;
+            const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+            const h = Math.sin(dLat / 2) ** 2 +
+                Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+        }
+
+        function bearingDeg(a, b) {
+            const rad = Math.PI / 180;
+            const y = Math.sin((b[0] - a[0]) * rad) * Math.cos(b[1] * rad);
+            const x = Math.cos(a[1] * rad) * Math.sin(b[1] * rad) -
+                Math.sin(a[1] * rad) * Math.cos(b[1] * rad) * Math.cos((b[0] - a[0]) * rad);
+            return Math.atan2(y, x) / rad;
+        }
+
+        // One leg per LineString (or MultiLineString part), with cumulative metres per vertex.
+        function buildRouteLegs(fc) {
+            const parts = [];
+            ((fc && fc.features) || []).forEach(f => {
+                const g = f && f.geometry;
+                if (!g) return;
+                if (g.type === 'LineString') parts.push(g.coordinates);
+                else if (g.type === 'MultiLineString') g.coordinates.forEach(c => parts.push(c));
+            });
+            const legs = [];
+            parts.forEach(coords => {
+                const pts = (coords || []).filter(c => Array.isArray(c) && c.length >= 2)
+                    .map(c => [c[0], c[1]]);
+                if (pts.length < 2) return;
+                const cum = [0];
+                for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversineM(pts[i - 1], pts[i]));
+                const len = cum[cum.length - 1];
+                if (len > 0) legs.push({pts, cum, len});
+            });
+            return legs;
+        }
+
+        function pointAlong(leg, d) {
+            d = Math.max(0, Math.min(leg.len, d));
+            let lo = 1, hi = leg.cum.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (leg.cum[mid] < d) lo = mid + 1; else hi = mid;
+            }
+            const seg = leg.cum[lo] - leg.cum[lo - 1];
+            const t = seg > 0 ? (d - leg.cum[lo - 1]) / seg : 0;
+            const a = leg.pts[lo - 1], b = leg.pts[lo];
+            return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        }
+
+        function legAt(dist) {
+            for (let k = 0; k < route.legs.length; k++) {
+                const leg = route.legs[k];
+                if (dist <= leg.len || k === route.legs.length - 1) return {leg, d: Math.min(dist, leg.len)};
+                dist -= leg.len;
+            }
+        }
+
+        function routeNumber(el, def, lo, hi) {
+            const v = parseFloat(el.value);
+            return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def;
+        }
+
+        function routeParams() {
+            return {
+                h: routeNumber(routeEls.height, __DEF_HEIGHT__, 1, 100000),
+                c: routeNumber(routeEls.angle, __DEF_ANGLE__, 0, 85),
+                d: routeNumber(routeEls.secs, __DEF_SECS__, 1, 86400),
+            };
+        }
+
+        // Zoom that puts the camera h metres above the aimed-at ground point at this pitch.
+        function zoomForHeight(h, pitchDeg, lat) {
+            const tr = map.transform;
+            const camPx = (tr && tr.cameraToCenterDistance) || 1.5 * map.getCanvas().clientHeight;
+            const camM = h / Math.max(Math.cos(pitchDeg * Math.PI / 180), 0.05);
+            const metresPerPx = camM / camPx;
+            const z = Math.log2(40075016.686 * Math.cos(lat * Math.PI / 180) / (512 * metresPerPx));
+            return Math.max(0, Math.min(ROUTE_MAX_ZOOM, z));
+        }
+
+        function setRouteStatus(msg) { routeEls.status.textContent = msg; }
+
+        function setRouteButtons() {
+            const ready = route.legs.length > 0;
+            routeEls.play.disabled = !ready;
+            routeEls.stop.disabled = !ready || (!route.playing && route.progress === 0);
+            routeEls.play.innerHTML = route.playing ? '&#x275a;&#x275a; Pause' : '&#x25b6; Play';
+        }
+
+        function routeFrame(now) {
+            if (!route.playing) return;
+            const p = routeParams();  // height and angle can be changed mid-flight
+            const frac = Math.min(1, route.progress + (now - route.startedAt) / (route.secs * 1000));
+            const {leg, d} = legAt(frac * route.total);
+            const center = pointAlong(leg, d);
+            const ahead = pointAlong(leg, d + ROUTE_LOOKAHEAD_M);
+            if (haversineM(center, ahead) > 1) route.bearing = bearingDeg(center, ahead);
+            // MapLibre refreshes the target's ground elevation only when it renders,
+            // so it still holds the previous frame's ground. queryTerrainElevation
+            // gives (new ground - that), which we add so the camera height is right
+            // even on slow devices where frames are far apart.
+            const lag = map.queryTerrainElevation(center) || 0;
+            map.jumpTo({
+                center,
+                zoom: zoomForHeight(Math.max(1, p.h + lag), p.c, center[1]),
+                pitch: p.c,
+                bearing: route.bearing === null ? map.getBearing() : route.bearing,
+            });
+            if (frac >= 1) {
+                routeStop(true);
+                setRouteStatus('Finished. Press Play to run it again.');
+                return;
+            }
+            route.raf = requestAnimationFrame(routeFrame);
+        }
+
+        function routePlay() {
+            if (!route.legs.length || route.playing) return;
+            // MapLibre 4.7.1 leaves _elevationFreeze stuck true after any animated
+            // (non-gesture) camera move on terrain -- fitBounds, the zoom/compass
+            // buttons -- until the next drag. While stuck, the ground elevation under
+            // the camera's target is never refreshed, so the camera stays at the old
+            // height, sinks into rising terrain, and MapLibre flattens the pitch.
+            map.stop();
+            if (map._elevationFreeze) map._elevationFreeze = false;
+            route.secs = routeParams().d;
+            route.playing = true;
+            route.startedAt = performance.now();
+            map.setMaxZoom(ROUTE_MAX_ZOOM);
+            setRouteButtons();
+            route.raf = requestAnimationFrame(routeFrame);
+        }
+
+        function routePause() {
+            if (!route.playing) return;
+            route.progress = Math.min(1, route.progress + (performance.now() - route.startedAt) / (route.secs * 1000));
+            route.playing = false;
+            cancelAnimationFrame(route.raf);
+            setRouteButtons();
+        }
+
+        // keepView: leave the camera where the flight ended (restoring the normal
+        // max zoom would pull a low camera back up).
+        function routeStop(keepView) {
+            route.playing = false;
+            route.progress = 0;
+            route.bearing = null;
+            cancelAnimationFrame(route.raf);
+            if (!keepView) map.setMaxZoom(BASE_MAX_ZOOM);
+            setRouteButtons();
+        }
+
+        async function loadRoute(name, opts) {
+            routeStop();
+            route.layer = name;
+            route.legs = [];
+            route.total = 0;
+            setRouteButtons();
+            routeEls.details.hidden = !name;
+            if (!name) { setRouteStatus(''); return false; }
+            setRouteStatus('Loading route...');
+            let fc;
+            try {
+                const resp = await fetch(ROUTE_URLS[name]);
+                fc = await resp.json();
+            } catch (e) {
+                setRouteStatus('Could not load this layer.');
+                return false;
+            }
+            if (route.layer !== name) return false;  // selection changed while loading
+            route.legs = buildRouteLegs(fc);
+            route.total = route.legs.reduce((s, l) => s + l.len, 0);
+            setRouteButtons();
+            if (!route.legs.length) {
+                setRouteStatus('No lines to follow in this layer.');
+                return false;
+            }
+            const km = (route.total / 1000).toFixed(1);
+            setRouteStatus(route.legs.length > 1
+                ? `${km} km in ${route.legs.length} separate lines; the camera jumps between them.`
+                : `${km} km route.`);
+            if (opts.show) {
+                const cb = document.querySelector(`.layer-panel-list input[data-name="${name}"]`);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    cb.dataset.layers.split(',').forEach(id => {
+                        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+                    });
+                }
+            }
+            if (opts.fit) {
+                // Frame the whole route so its terrain tiles load before playback.
+                // jumpTo, not fitBounds: see the elevation note in routePlay.
+                const b = new maplibregl.LngLatBounds();
+                route.legs.forEach(l => l.pts.forEach(pt => b.extend(pt)));
+                const cam = map.cameraForBounds(b, {padding: 60});
+                if (cam) map.jumpTo(cam);
+            }
+            return true;
+        }
+
+        routeEls.layer.addEventListener('change', e => loadRoute(e.target.value, {fit: true, show: true}));
+        routeEls.play.addEventListener('click', () => route.playing ? routePause() : routePlay());
+        routeEls.stop.addEventListener('click', () => { routeStop(); setRouteStatus(''); });
+
+        function routeShareState() {
+            if (!route.layer) return {};
+            const p = routeParams();
+            return {p: route.layer, h: p.h, c: p.c, d: p.d};
+        }
+
+        // A shared link naming a route loads it and starts playing once the map settles.
+        function initRouteFromUrl(st) {
+            const q = new URLSearchParams(window.location.search);
+            const s = st || {};
+            const name = q.get('route') || s.p;
+            if (!name) return;
+            if (!(name in ROUTE_URLS)) {
+                setRouteStatus(`No line layer named "${name}" in this 3D view.`);
+                return;
+            }
+            const pick = (key, short) => q.get(key) !== null ? q.get(key) : s[short];
+            [['height', 'h', routeEls.height], ['angle', 'c', routeEls.angle], ['secs', 'd', routeEls.secs]]
+                .forEach(([key, short, el]) => {
+                    const v = pick(key, short);
+                    if (v !== undefined && v !== null && v !== '') el.value = v;
+                });
+            routeEls.layer.value = name;
+            loadRoute(name, {fit: false, show: false}).then(ok => {
+                if (!ok) return;
+                let started = false;
+                const go = () => { if (!started) { started = true; routePlay(); } };
+                map.once('idle', go);
+                setTimeout(go, 4000);
+            });
+        }"""
 
 
 def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
@@ -167,6 +494,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     Generate a 3D terrain HTML page using MapLibre GL JS with AWS Open Data terrain.
     """
     atlas_name = config['name']
+    display_name = map_style.atlas_display_name(config)
 
     bbox = config['dataswale']['bbox']
     center_lng = (bbox['west'] + bbox['east']) / 2
@@ -174,7 +502,18 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
 
     in_layers = config.get('assets', {}).get('3dview', {}).get('in_layers')
     vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers)
-    toggle_panel_html = _build_toggle_panel_html(toggle_list)
+    view_panel_html = _build_view_panel_html(toggle_list)
+
+    route_layers = [t for t in toggle_list if t['geometry_type'] == 'linestring']
+    route_panel_html = _build_route_panel_html(route_layers)
+    route_js = ""
+    if route_layers:
+        route_urls = {t['name']: vector_sources[t['name']]['data'] for t in route_layers}
+        route_js = (_ROUTE_JS
+                    .replace('__ROUTE_URLS__', json.dumps(route_urls))
+                    .replace('__DEF_HEIGHT__', str(_ROUTE_DEFAULTS['height']))
+                    .replace('__DEF_ANGLE__', str(_ROUTE_DEFAULTS['angle']))
+                    .replace('__DEF_SECS__', str(_ROUTE_DEFAULTS['secs'])))
 
     style = {
         "version": 8,
@@ -224,7 +563,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     # Share state is a base64-encoded JSON blob in the ?s= param. This codec is
     # intentionally independent of the webmap's share state (different camera
     # fields), so the two are not coupled.
-    # Keys: a=lat, o=lng, z=zoom, t=pitch, r=bearing, e=exaggeration, l=visible layer names.
+    # Keys: a=lat, o=lng, z=zoom, t=pitch, r=bearing, e=exaggeration, l=visible layer names;
+    # with a camera route chosen, also p=route layer, h=height (m), c=camera angle, d=duration (s).
     interaction_js = """
         function encode3DState(s) { return btoa(JSON.stringify(s)); }
         function decode3DState(s) { try { return JSON.parse(atob(s)); } catch (e) { return null; } }
@@ -253,6 +593,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                 e: exEl ? parseFloat(exEl.value) : 1.5,
                 l: layers,
             };
+            if (typeof routeShareState === 'function') Object.assign(state, routeShareState());
             return `https://${window.location.hostname}${window.location.pathname}?s=${encode3DState(state)}`;
         }
 
@@ -274,6 +615,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             CHECKBOX_LISTENERS
 
             const st = decode3DState(new URLSearchParams(window.location.search).get('s'));
+            if (typeof initRouteFromUrl === 'function') initRouteFromUrl(st);
             if (!st) return;
             if (typeof st.a === 'number' && typeof st.o === 'number') map.setCenter([st.o, st.a]);
             if (typeof st.z === 'number') map.setZoom(st.z);
@@ -302,7 +644,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>3D Terrain - {atlas_name.title()}</title>
+    <title>{html.escape(display_name)} 3D View</title>
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' />
@@ -324,68 +666,117 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             width: 100%;
             height: 100%;
         }}
-        .info-panel {{
+        /* Panels mirror the web map's: 80%-opaque white, a ▾/▸ collapse toggle top-left. */
+        .panel {{
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 10px;
+            border-radius: 6px;
             z-index: 1000;
-            max-width: 300px;
-        }}
-        .info-panel h3 {{
-            margin: 0 0 10px 0;
-            color: #333;
-        }}
-        .info-panel p {{
-            margin: 5px 0;
             font-size: 14px;
         }}
-        .terrain-controls {{
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
+        .panel-head {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }}
-        .terrain-controls label {{
-            display: block;
-            margin: 5px 0;
-            font-size: 14px;
-        }}
-        .terrain-controls input {{
-            width: 100px;
-            margin-left: 10px;
-        }}
-        .layer-panel {{
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
-            max-width: 200px;
-        }}
-        .layer-panel-header {{
+        .panel-collapse-btn {{
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            padding: 0 2px;
             cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            margin-bottom: 6px;
-            user-select: none;
+            font-size: 16px;
+            color: #666;
+            line-height: 1;
         }}
-        .layer-panel-arrow {{
-            display: inline-block;
-            transition: transform 0.15s;
+        .panel-collapse-btn:hover {{
+            color: #000;
         }}
-        .layer-panel.collapsed .layer-panel-list {{
+        .panel.collapsed .panel-body {{
             display: none;
         }}
-        .layer-panel.collapsed .layer-panel-arrow {{
-            transform: rotate(-90deg);
+        .title-panel {{
+            top: 10px;
+            right: 54px;  /* clear of MapLibre's zoom/compass/terrain buttons */
+            max-width: 300px;
+        }}
+        .title-panel h3 {{
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }}
+        .title-panel p {{
+            margin: 6px 0 0 0;
+            font-size: 13px;
+        }}
+        .view-panel {{
+            bottom: 10px;
+            left: 10px;
+            max-width: 240px;
+        }}
+        .panel-heading {{
+            font-weight: bold;
+            margin: 8px 0 4px 0;
+        }}
+        .terrain-controls {{
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid #ccc;
+        }}
+        .terrain-controls label {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 4px 0;
+            font-size: 13px;
+        }}
+        .terrain-controls input {{
+            flex: 1;
+            min-width: 0;
+        }}
+        .route-controls {{
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #ccc;
+            font-size: 14px;
+        }}
+        .route-row {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .route-title {{
+            font-weight: bold;
+            white-space: nowrap;
+        }}
+        .route-row select {{
+            flex: 1;
+            min-width: 0;
+        }}
+        .route-controls label {{
+            display: flex;
+            margin: 5px 0;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .route-controls input[type=number] {{
+            width: 70px;
+        }}
+        .route-buttons {{
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }}
+        .route-buttons button {{
+            flex: 1;
+            padding: 4px 8px;
+            cursor: pointer;
+        }}
+        .route-status {{
+            margin-top: 4px;
+            font-size: 12px;
+            color: #555;
         }}
         .layer-panel-list {{
             max-height: 300px;
@@ -402,10 +793,8 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             cursor: pointer;
         }}
         .share-view-btn {{
-            display: block;
-            width: 100%;
-            margin-bottom: 8px;
-            padding: 6px 10px;
+            flex: 1;
+            padding: 5px 10px;
             background: #f0f0f0;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -416,6 +805,21 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         }}
         .share-view-btn:hover {{
             background: #e0e0e0;
+        }}
+        .help-icon {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            border: 1px solid #9ab;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            color: #007bff;
+            background: #fff;
+            text-decoration: none;
         }}
         .success-notification {{
             position: fixed;
@@ -433,7 +837,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             position: absolute;
             bottom: 10px;
             right: 10px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.8);
             padding: 8px 15px;
             border-radius: 5px;
             z-index: 1000;
@@ -450,26 +854,17 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     <div class="map-container">
         <div id="map"></div>
 
-        <div class="info-panel">
-            <h3>3D Terrain View</h3>
-            <p><strong>Atlas:</strong> {atlas_name.title()}</p>
-            <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>
+        <div class="panel title-panel">
+            <div class="panel-head">
+                {_COLLAPSE_BTN}
+                <h3>{html.escape(display_name)} 3D View</h3>
+            </div>
+            <div class="panel-body">
+                <p><em>Drag to pan &middot; Scroll to zoom &middot; Right-click drag to rotate</em></p>{route_panel_html}
+            </div>
         </div>
 
-        <div class="terrain-controls">
-            <label>
-                Terrain Exaggeration:
-                <input type="range" id="exaggeration" min="0.1" max="3" step="0.1" value="1.5">
-                <span id="exaggeration-value">1.5x</span>
-            </label>
-            <label>
-                Pitch:
-                <input type="range" id="pitch" min="0" max="85" step="5" value="60">
-                <span id="pitch-value">60&deg;</span>
-            </label>
-        </div>
-
-        {toggle_panel_html}
+        {view_panel_html}
 
         <a href="#" onclick="history.back(); return false;" class="back-link">&larr; Back</a>
     </div>
@@ -501,6 +896,15 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             exaggeration: 1.5
         }}));
 
+        // Panel collapse toggles, as on the web map: ▾ open, ▸ collapsed.
+        document.querySelectorAll('.panel-collapse-btn').forEach(btn => {{
+            btn.addEventListener('click', () => {{
+                const collapsed = btn.closest('.panel').classList.toggle('collapsed');
+                btn.textContent = collapsed ? '\u25b8' : '\u25be';
+                btn.title = collapsed ? 'Expand panel' : 'Collapse panel';
+            }});
+        }});
+
         const exaggerationSlider = document.getElementById('exaggeration');
         const exaggerationValue = document.getElementById('exaggeration-value');
         exaggerationSlider.addEventListener('input', (e) => {{
@@ -522,6 +926,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             pitchSlider.value = pitch;
             pitchValue.textContent = Math.round(pitch) + '°';
         }});
+        {route_js}
         {interaction_js}
         map.on('load', () => {{
             console.log('3D Terrain map loaded — atlas: {atlas_name}');

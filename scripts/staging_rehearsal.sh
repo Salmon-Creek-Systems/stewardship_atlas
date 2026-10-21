@@ -99,11 +99,11 @@ import atlas, atlas_session
 
 name = sys.argv[1]
 # One session for both: a cascade is one hydrate and one write-back, never one
-# session per asset. webmap before html — the console checks for
+# session per asset. webmap before console — the console checks for
 # outlets/webmap/index.html at generation time, so the reverse order silently
 # produces a console with no map link.
 with atlas_session.open_session(name, purpose='rehearsal materialize') as session:
-    for asset in ('webmap', 'html'):
+    for asset in ('webmap', 'console'):
         if asset in session.config.get('assets', {}):
             print(f"  materializing {asset}")
             atlas.materialize(session.config, asset)

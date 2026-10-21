@@ -1,4 +1,5 @@
 # Add Private Notes
+<!-- audience: admin -->
 
 Private notes allow administrators to add location-specific comments, reminders, or annotations that are only visible to admin users. These are useful for:
 
@@ -11,12 +12,13 @@ Private notes allow administrators to add location-specific comments, reminders,
 
 ### From the Edit Map Interface
 
-1. Go to the **Edit Map** (Admin access required)
-2. In the layer selector, choose **"private_notes"**
-3. Click the **Draw Point** tool
-4. Click on the map where you want to place the note
-5. In the popup form, enter your note text in the **"name"** field
-6. Click **Save**
+1. In the Admin Console, find the **private_notes** layer
+2. Open **Alter → Draw**
+3. Click on the map where you want to place the note
+4. Enter your note text in the **name** field
+5. Click **Save**
+
+See [Draw New Features](draw_vector.md) for more on drawing.
 
 ### Note Properties
 
@@ -46,7 +48,9 @@ See [Editing Layer Data](editing_layer_data.md) for instructions on modifying or
 
 ## Access Control
 
-The `private_notes` layer is configured with `"access": ["admin"]`, meaning:
-- Only admin users can view these notes
-- They do not appear on public or internal maps
-- They are excluded from public exports
+The `private_notes` layer is configured with `"access": ["admin"]`, so it is
+left off public and internal maps and out of public exports.
+
+⚠️ That keeps notes out of sight, but it is not yet a hard security boundary:
+someone who knows the exact address of the layer's data file can still open it.
+Don't put anything in a private note that would be harmful if it got out.

@@ -96,6 +96,36 @@ def test_graph_shape():
     assert AssetKey(['testatlas', 'layer_elevation']) not in by_key
 
 
+def test_h3_count_depends_on_grid_and_counted_layers():
+    """h3_count reads the grid from in_layer and the layers to count from
+    in_layers — both must be upstream, or refreshing a counted layer with
+    cascade=true would never re-run the count."""
+    config = {
+        'name': 'testatlas',
+        'dataswale': {'layers': [
+            {'name': 'h3_grid_r9', 'geometry_type': 'polygon'},
+            {'name': 'buildings', 'geometry_type': 'polygon'},
+            {'name': 'buildings_count_h3_r9', 'geometry_type': 'polygon'},
+        ]},
+        'assets': {
+            'grid': {'type': 'inlet',
+                     'config': {'fetch_type': 'h3_grid', 'out_layer': 'h3_grid_r9'}},
+            'public_buildings': {'type': 'inlet',
+                                 'config': {'fetch_type': 'overture_duckdb',
+                                            'out_layer': 'buildings'}},
+            'counts': {'type': 'eddy',
+                       'config': {'fetch_type': 'h3_count', 'in_layer': 'h3_grid_r9',
+                                  'in_layers': ['buildings'],
+                                  'out_layer': 'buildings_count_h3_r9'}},
+        },
+    }
+    by_key = assets_by_key(atlas_dagster.build_atlas_assets(config))
+    counts = AssetKey(['testatlas', 'counts'])
+    assert by_key[counts].asset_deps[counts] == {
+        AssetKey(['testatlas', 'layer_h3_grid_r9']),
+        AssetKey(['testatlas', 'layer_buildings']),
+    }
+
 def test_midgraph_asset_materializes_in_isolation(monkeypatch):
     """An eddy/outlet must run alone on a fresh instance — no upstream
     Dagster materializations, no IO-manager input loading."""

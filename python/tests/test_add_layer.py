@@ -115,6 +115,257 @@ class TestPlanAddLayer(unittest.TestCase):
         self.assertEqual([k for k, _ in plan['consumer_edits']], ['webmap'])
 
 
+class TestPlanAddLayerOptions(unittest.TestCase):
+    """The console Add Layer form's options: name validation, empty source,
+    label property, width, colour map."""
+
+    def test_unsafe_names_rejected(self):
+        for bad in ('../etc', 'Trailheads', 'trail heads', '1roads', '', 'a/b', 'x' * 50):
+            with self.assertRaises(ValueError, msg=bad):
+                atlas.plan_add_layer(RESOLVED_ASSETS, bad)
+
+    def test_good_name_accepted(self):
+        atlas.plan_add_layer(RESOLVED_ASSETS, 'road_2026_v2')
+
+    def test_unknown_geometry_and_source_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', geometry_type='raster')
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', source='ftp')
+
+    def test_empty_source_has_no_inlet_and_a_name_column(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'culverts', source='empty')
+        self.assertIsNone(plan['inlet_key'])
+        self.assertIsNone(plan['inlet_asset'])
+        self.assertEqual(plan['layer_def']['editable_columns'][0]['name'], 'name')
+        # Still wired into consumers so it can be drawn in webedit and seen.
+        self.assertIn('webedit', [k for k, _ in plan['consumer_edits']])
+
+    def test_label_property_canonicalizes_to_name(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2', label_property='street')
+        self.assertTrue(plan['layer_def']['add_labels'])
+        self.assertEqual(plan['inlet_asset']['alterations'],
+                         {'canonicalize': [{'to': 'name', 'from': ['street']}]})
+
+    def test_label_property_name_needs_no_alteration(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2', label_property='name')
+        self.assertTrue(plan['layer_def']['add_labels'])
+        self.assertNotIn('alterations', plan['inlet_asset'])
+
+    def test_no_label_property_turns_labels_off(self):
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'roads2')
+        self.assertFalse(plan['layer_def']['add_labels'])
+        self.assertNotIn('alterations', plan['inlet_asset'])
+
+    def test_width_maps_per_geometry(self):
+        line = atlas.plan_add_layer(RESOLVED_ASSETS, 'a', geometry_type='linestring', width=7)
+        point = atlas.plan_add_layer(RESOLVED_ASSETS, 'b', geometry_type='point', width=5)
+        poly = atlas.plan_add_layer(RESOLVED_ASSETS, 'c', geometry_type='polygon', width=5)
+        self.assertEqual(line['layer_def']['paint']['line-width'], 7)
+        self.assertEqual(point['layer_def']['paint']['circle-radius'], 5)
+        self.assertNotIn('line-width', poly['layer_def']['paint'])
+        self.assertNotIn('circle-radius', poly['layer_def']['paint'])
+
+    def test_colormap_builds_ramp_and_pdf_stops(self):
+        cm = {'palette': 'YlGn', 'property': 'depth', 'min': 0, 'max': 8}
+        plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'wells', geometry_type='point', colormap=cm)
+        ld = plan['layer_def']
+        expr = ld['paint']['circle-color']
+        self.assertEqual(expr[0], 'interpolate')
+        self.assertEqual(expr[2], ['to-number', ['get', 'depth'], 0])
+        self.assertEqual(len(expr), 3 + 2 * 9)                 # 9 stops, value+colour each
+        self.assertEqual(expr[3:5], [0.0, '#ffffe5'])
+        self.assertEqual(expr[-2:], [8.0, '#004529'])
+        self.assertEqual(len(ld['qgis_color_stops']['stops']), 9)
+        # The coloured property is readable in a popup.
+        self.assertTrue(ld['show_attributes'])
+        self.assertIn({'name': 'depth', 'type': 'number'}, ld['editable_columns'])
+
+    def test_colormap_paint_key_per_geometry(self):
+        cm = {'palette': 'Reds', 'property': 'v', 'min': 0, 'max': 1}
+        for geom, key in (('linestring', 'line-color'), ('polygon', 'fill-color')):
+            plan = atlas.plan_add_layer(RESOLVED_ASSETS, 'x', geometry_type=geom, colormap=cm)
+            self.assertEqual(plan['layer_def']['paint'][key][0], 'interpolate')
+
+    def test_colormap_bad_palette_or_range_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', colormap={
+                'palette': 'Nope', 'property': 'v', 'min': 0, 'max': 1})
+        with self.assertRaises(ValueError):
+            atlas.plan_add_layer(RESOLVED_ASSETS, 'x', colormap={
+                'palette': 'Reds', 'property': 'v', 'min': 5, 'max': 5})
+
+
+class TestValidateLayerUpload(unittest.TestCase):
+
+    def _fc(self, *types):
+        return {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'properties': {},
+             'geometry': None if t is None else {'type': t, 'coordinates': []}}
+            for t in types]}
+
+    def test_matching_geometries_accepted(self):
+        self.assertEqual(atlas.validate_layer_upload(self._fc('Point', 'MultiPoint', None), 'point'), 3)
+
+    def test_mismatched_geometry_named_in_error(self):
+        with self.assertRaisesRegex(ValueError, 'LineString'):
+            atlas.validate_layer_upload(self._fc('Point', 'LineString'), 'point')
+
+    def test_not_a_feature_collection_rejected(self):
+        for bad in ({'type': 'Feature'}, [], {'type': 'FeatureCollection'}, self._fc()):
+            with self.assertRaises(ValueError):
+                atlas.validate_layer_upload(bad, 'point')
+
+
+class TestPlanEditLayer(unittest.TestCase):
+    """The console's Edit Layer form: restyle an existing layer in place."""
+
+    POINT = {'name': 'hydrants', 'geometry_type': 'point', 'color': [12, 94, 46],
+             'paint': {'circle-radius': 9, 'circle-color': '#0c5e2e',
+                       'circle-stroke-width': 1.5, 'circle-stroke-color': '#063c1c'}}
+    LINE = {'name': 'trails', 'geometry_type': 'linestring', 'color': [12, 94, 46],
+            'paint': {'line-color': '#0c5e2e', 'line-width': 4}}
+    POLY = {'name': 'parcels', 'geometry_type': 'polygon', 'color': [12, 94, 46],
+            'fill_color': [12, 94, 46], 'paint': {'fill-color': '#0c5e2e', 'fill-opacity': 0.5}}
+    ICONS = ('camera', 'culvert', 'flower')
+
+    def test_absent_keys_are_left_alone(self):
+        out = atlas.plan_edit_layer(self.POINT, {'width': 12}, icons=self.ICONS)
+        self.assertEqual(out['paint']['circle-radius'], 12)
+        self.assertEqual(out['paint']['circle-color'], '#0c5e2e')       # untouched
+        self.assertEqual(out['paint']['circle-stroke-width'], 1.5)      # untouched
+        self.assertEqual(out['color'], [12, 94, 46])
+
+    def test_renaming_is_refused(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.POINT, {'name': 'other'}, icons=self.ICONS)
+
+    def test_width_means_radius_width_and_nothing_for_polygons(self):
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'width': 5})['paint']['circle-radius'], 5)
+        self.assertEqual(atlas.plan_edit_layer(self.LINE, {'width': 5})['paint']['line-width'], 5)
+        poly = atlas.plan_edit_layer(self.POLY, {'width': 5})
+        self.assertNotIn('line-width', poly['paint'])
+        self.assertNotIn('circle-radius', poly['paint'])
+
+    def test_colour_updates_both_color_and_paint(self):
+        out = atlas.plan_edit_layer(self.LINE, {'color': '#FFAA33'})
+        self.assertEqual(out['color'], [255, 170, 51])
+        self.assertEqual(out['paint']['line-color'], '#ffaa33')
+
+    def test_polygon_colour_is_the_outline_fill_color_the_interior(self):
+        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33', 'fill_color': '#0000FF'})
+        self.assertEqual(out['color'], [255, 170, 51])
+        self.assertEqual(out['paint']['fill-outline-color'], '#ffaa33')
+        self.assertEqual(out['fill_color'], [0, 0, 255])        # QGIS reads this one
+        self.assertEqual(out['paint']['fill-color'], '#0000ff')
+
+    def test_polygon_outline_alone_leaves_the_fill(self):
+        out = atlas.plan_edit_layer(self.POLY, {'color': '#FFAA33'})
+        self.assertEqual(out['paint']['fill-color'], '#0c5e2e')  # untouched
+        self.assertEqual(out['paint']['fill-outline-color'], '#ffaa33')
+
+    def test_fill_color_only_for_polygons(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.LINE, {'fill_color': '#0000FF'})
+
+    def test_visible_toggles_the_webmap_visibility(self):
+        off = atlas.plan_edit_layer(self.POINT, {'visible': False})
+        self.assertEqual(off['vis']['layout']['visibility'], 'none')
+        on = atlas.plan_edit_layer(off, {'visible': True})
+        self.assertEqual(on['vis']['layout']['visibility'], 'visible')
+
+    def test_visible_keeps_other_vis_settings(self):
+        zoomed = dict(self.POINT, vis={'minzoom': 13, 'layout': {'visibility': 'visible'}})
+        out = atlas.plan_edit_layer(zoomed, {'visible': False})
+        self.assertEqual(out['vis']['minzoom'], 13)
+        self.assertEqual(out['vis']['layout']['visibility'], 'none')
+
+    def test_opacity_per_geometry(self):
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'opacity': 0.5})['paint']['circle-opacity'], 0.5)
+        self.assertEqual(atlas.plan_edit_layer(self.LINE, {'opacity': 0.5})['paint']['line-opacity'], 0.5)
+        poly = atlas.plan_edit_layer(self.POLY, {'opacity': 0.25})
+        self.assertEqual(poly['paint']['fill-opacity'], 0.25)
+        self.assertEqual(poly['fill_opacity'], 0.25)        # QGIS reads this one
+
+    def test_opacity_out_of_range_rejected(self):
+        for bad in (-0.1, 1.5):
+            with self.assertRaises(ValueError):
+                atlas.plan_edit_layer(self.POINT, {'opacity': bad})
+
+    def test_icon_sets_symbol_and_forces_labels(self):
+        out = atlas.plan_edit_layer(self.POINT, {'icon': 'camera'}, icons=self.ICONS)
+        self.assertEqual(out['symbol'], {'png': 'camera.png', 'icon': 'camera'})
+        # The icon rides on the label layer, so labels have to be on.
+        self.assertTrue(out['add_labels'])
+
+    def test_icon_size_follows_width_and_the_dot_goes_away(self):
+        out = atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 18}, icons=self.ICONS)
+        self.assertEqual(out['icon-size'], 2.0)             # 9 (the default dot) -> 1.0
+        # Otherwise a coloured dot sits behind the icon.
+        self.assertEqual(out['paint']['circle-radius'], 0)
+        self.assertEqual(atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 9},
+                                               icons=self.ICONS)['icon-size'], 1.0)
+
+    def test_clearing_icon_goes_back_to_a_dot(self):
+        withicon = atlas.plan_edit_layer(self.POINT, {'icon': 'camera', 'width': 18}, icons=self.ICONS)
+        out = atlas.plan_edit_layer(withicon, {'icon': ''}, icons=self.ICONS)
+        self.assertNotIn('symbol', out)
+        self.assertNotIn('icon-size', out)
+
+    def test_unknown_icon_and_icon_on_a_line_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.POINT, {'icon': 'rocket'}, icons=self.ICONS)
+        with self.assertRaises(ValueError):
+            atlas.plan_edit_layer(self.LINE, {'icon': 'camera'}, icons=self.ICONS)
+
+    def test_label_field_is_made_editable(self):
+        out = atlas.plan_edit_layer(self.POINT, {'label_field': 'street'})
+        self.assertEqual(out['label_field'], 'street')
+        # Otherwise a hand-drawn feature could never be given a label.
+        self.assertIn({'name': 'street', 'type': 'string', 'default': ''}, out['editable_columns'])
+
+    def test_label_field_name_is_the_default_and_stored_as_absent(self):
+        out = atlas.plan_edit_layer(dict(self.POINT, label_field='street'), {'label_field': 'name'})
+        self.assertNotIn('label_field', out)
+
+    def test_colormap_and_back_to_flat(self):
+        cm = {'palette': 'Greens', 'property': 'depth', 'min': 0, 'max': 10}
+        ramped = atlas.plan_edit_layer(self.POINT, {'colormap': cm})
+        self.assertEqual(ramped['paint']['circle-color'][0], 'interpolate')
+        self.assertEqual(len(ramped['qgis_color_stops']['stops']), 9)
+
+        flat = atlas.plan_edit_layer(ramped, {'colormap': None, 'color': '#FFAA33'})
+        self.assertEqual(flat['paint']['circle-color'], '#ffaa33')
+        self.assertNotIn('qgis_color_stops', flat)
+
+    def test_colour_does_not_clobber_an_existing_ramp(self):
+        cm = {'palette': 'Greens', 'property': 'depth', 'min': 0, 'max': 10}
+        ramped = atlas.plan_edit_layer(self.POINT, {'colormap': cm})
+        still = atlas.plan_edit_layer(ramped, {'color': '#FFAA33'})
+        self.assertEqual(still['paint']['circle-color'][0], 'interpolate')
+        self.assertEqual(still['color'], [255, 170, 51])     # legend/QGIS colour still updates
+
+
+class TestStylingOutlets(unittest.TestCase):
+    """Which outlets a restyle re-materializes: webmaps, not the slow ones."""
+
+    CONFIG = {'assets': {
+        'webmap':     {'type': 'outlet', 'config': {'fetch_type': 'webmap', 'in_layers': ['roads', 'hydrants']}},
+        'experimental_webmap': {'type': 'outlet', 'config': {'fetch_type': 'webmap', 'in_layers': ['hydrants']}},
+        'webedit':    {'type': 'outlet', 'config': {'fetch_type': 'webedit', 'in_layers': ['hydrants']}},
+        'runbook':    {'type': 'outlet', 'config': {'fetch_type': 'qgis_atlas', 'in_layers': ['hydrants']}},
+        'html':       {'type': 'outlet', 'config': {'fetch_type': 'html'}},
+    }}
+
+    def test_every_webmap_showing_the_layer(self):
+        self.assertEqual(sorted(atlas.styling_outlets(self.CONFIG, 'hydrants')),
+                         ['experimental_webmap', 'webedit', 'webmap'])
+
+    def test_skips_maps_without_the_layer_and_slow_outlets(self):
+        self.assertEqual(atlas.styling_outlets(self.CONFIG, 'roads'), ['webmap'])
+        self.assertNotIn('runbook', atlas.styling_outlets(self.CONFIG, 'hydrants'))
+
+
 class TestAddLayerExecutor(unittest.TestCase):
 
     def setUp(self):
@@ -216,6 +467,118 @@ class TestAddLayerExecutor(unittest.TestCase):
         self.assertEqual(fixed['s3_bucket'], 'scs-internal')      # bucket repaired
         self.assertEqual(fixed['out_layer'], 'derelicts')         # out_layer added
         self.assertEqual(self.materialized[0], 'derelicts')       # (re)materialized
+
+
+    def test_empty_layer_initialised_not_imported(self):
+        import dataswale_geojson
+        orig_clear = dataswale_geojson.clear_vector_layer
+        dataswale_geojson.clear_vector_layer = MagicMock()
+        self.addCleanup(setattr, dataswale_geojson, 'clear_vector_layer', orig_clear)
+
+        atlas.add_layer(self.config, 'culverts', geometry_type='point', source='empty')
+
+        props = json.load(open(self.seed))['features'][0]['properties']
+        self.assertIn('culverts', props['layers'])
+        self.assertNotIn('culverts', props['assets'])              # no inlet
+        self.assertIn('culverts', props['assets']['webmap']['in_layers'])
+        dataswale_geojson.clear_vector_layer.assert_called_once()  # file exists, so no 404
+        self._refresh_mock.assert_not_called()
+        self.assertNotIn('culverts', self.materialized)            # nothing to materialize
+
+    def test_empty_layer_refuses_existing_name(self):
+        with self.assertRaises(ValueError):
+            atlas.add_layer(self.config, 'roads', source='empty')
+
+class TestEditLayerExecutor(unittest.TestCase):
+    """edit_layer against a temp seed geojson, including the layer_def case that
+    broke on regions: geometry_type lives in the shared template, not the seed."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.name = 'testatlas'
+        app_cfg = root / self.name / 'app' / 'configuration'
+        app_cfg.mkdir(parents=True)
+        (root / self.name / 'staging').mkdir(parents=True)
+        self.seed = app_cfg / f'{self.name}.geojson'
+        self.seed.write_text(json.dumps({
+            "type": "FeatureCollection",
+            "features": [{"type": "Feature", "geometry": None, "properties": {
+                "layers": {
+                    # A layer_def layer: everything but the overrides comes from
+                    # shared_layers_config at build time.
+                    "regions": {"layer_def": "regions", "access": ["admin"]},
+                    "hydrants": {"name": "hydrants", "geometry_type": "point",
+                                 "color": [12, 94, 46]},
+                },
+                "assets": {"webmap": {"type": "outlet", "in_layers": ["regions", "hydrants"]}},
+            }}],
+        }, indent=2))
+
+        # The resolved config the running system uses: template values merged in.
+        self.config = {
+            'name': self.name,
+            'data_root': str(root),
+            'dataswale': {'layers': [
+                {'name': 'regions', 'geometry_type': 'polygon', 'color': [255, 140, 0],
+                 'fill_color': [255, 140, 0], 'access': ['admin'],
+                 'paint': {'fill-color': '#ff8c00', 'fill-opacity': 0.15,
+                           'fill-outline-color': '#ff8c00'}},
+                {'name': 'hydrants', 'geometry_type': 'point', 'color': [12, 94, 46]},
+            ]},
+            'assets': {'webmap': {'type': 'outlet',
+                                  'config': {'fetch_type': 'webmap',
+                                             'in_layers': ['regions', 'hydrants']}}},
+        }
+
+        self.materialized = []
+        self._orig_build = atlas.build_atlas_from_geojson
+        self._orig_materialize = atlas.materialize
+        atlas.build_atlas_from_geojson = MagicMock(side_effect=self._fake_build)
+        atlas.materialize = MagicMock(side_effect=lambda cfg, a, *x, **k: self.materialized.append(a))
+
+        def _restore():
+            atlas.build_atlas_from_geojson = self._orig_build
+            atlas.materialize = self._orig_materialize
+        self.addCleanup(_restore)
+
+    def _fake_build(self, geojson_path, config_only=False):
+        (Path(self.config['data_root']) / self.name / 'staging' / 'atlas_config.json').write_text(
+            json.dumps(self.config))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _layer(self, name):
+        return json.loads(self.seed.read_text())['features'][0]['properties']['layers'][name]
+
+    def test_layer_def_layer_is_styled_as_its_resolved_geometry(self):
+        # The bug: a polygon written as {"layer_def": ...} read as a point, so
+        # "Only polygon layers have a separate fill colour."
+        atlas.edit_layer(self.config, 'regions',
+                         {'fill_color': '#00FF00', 'color': '#000000', 'opacity': 0.4})
+        regions = self._layer('regions')
+        self.assertEqual(regions['fill_color'], [0, 255, 0])
+        self.assertEqual(regions['paint']['fill-color'], '#00ff00')
+        self.assertEqual(regions['paint']['fill-outline-color'], '#000000')
+        self.assertEqual(regions['paint']['fill-opacity'], 0.4)
+
+    def test_layer_def_is_kept_and_template_values_preserved(self):
+        atlas.edit_layer(self.config, 'regions', {'opacity': 0.4})
+        regions = self._layer('regions')
+        self.assertEqual(regions['layer_def'], 'regions')      # still template-backed
+        self.assertEqual(regions['access'], ['admin'])         # override kept
+        # Writing one paint property must not drop the rest of the block.
+        self.assertEqual(regions['paint']['fill-color'], '#ff8c00')
+        self.assertEqual(regions['geometry_type'], 'polygon')
+
+    def test_only_the_webmaps_are_rematerialized(self):
+        atlas.edit_layer(self.config, 'hydrants', {'color': '#FFAA33'})
+        self.assertEqual(self.materialized, ['webmap'])
+
+    def test_unknown_layer_rejected(self):
+        with self.assertRaises(ValueError):
+            atlas.edit_layer(self.config, 'nosuchlayer', {'color': '#FFAA33'})
 
 
 if __name__ == '__main__':

@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, logger
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, logger
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,7 +8,7 @@ import json
 from datetime import datetime
 import os
 import shutil
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 import logging
 import traceback
@@ -39,6 +40,7 @@ import dataswale_geojson
 import outlets
 import versioning
 import deltas_geojson
+import geojson_import
 import utils
 import vector_inlets
 import email_inlet
@@ -147,13 +149,24 @@ class BBox(BaseModel):
 class CreateAtlasRequest(BaseModel):
     name: str   # display name (e.g. "Salmon Creek VFD")
     slug: str   # atlas ID / directory name (e.g. "scvfd")
-    bbox: BBox
+    bbox: Optional[BBox] = None          # drawn rectangle, or derived from boundary
+    boundary: Optional[Dict[str, Any]] = None   # uploaded GeoJSON (see geojson_import)
     starter: str = "simple"   # starter bundle key (configuration/{starter}_starter.json)
+
+
+class BoundaryPreviewRequest(BaseModel):
+    """What /create-preview needs to say what a create would do."""
+    boundary: Dict[str, Any]
+    starter: str = "simple"
 
 class MovePayload(BaseModel):
     source_layer: str
     target_layer: str
     selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of selection polygon(s)
+
+class SelectPayload(BaseModel):
+    layer: str
+    selection: Dict[str, Any]  # GeoJSON Feature or FeatureCollection of drawn shape(s)
 
 class CommentPayload(BaseModel):
     text: str
@@ -422,6 +435,162 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Uploads are parsed in the browser (the form reads them anyway, to offer the
+# file's properties as label/colour choices) and sent as JSON, so no multipart
+# dependency. 50 MB is well above any hand-collected layer we have.
+ADD_LAYER_MAX_BYTES = 50 * 1024 * 1024
+# The private data bucket, not scs-internal: scs-internal is public-read, and an
+# upload may well be admin-only data. The box's role already reads and writes
+# here (the publish path uses it), so no IAM change was needed. Same override
+# as atlas_store, so the staging substrate uses its own bucket.
+ADD_LAYER_UPLOAD_BUCKET = os.environ.get('ATLAS_PRIVATE_BUCKET', 'scs-atlas-private-prod')
+
+
+@app.post("/add_layer/{swalename}/{layer_name}")
+async def add_layer_post(swalename: str, layer_name: str, request: Request):
+    """Add a layer from the console's Add Layer form.
+
+    JSON body: geometry ('point'|'linestring'|'polygon'), source ('upload'|
+    'empty'), and optional color ('#rrggbb'), opacity (0-1), width (px), icon,
+    label_field, colormap ({palette, property, min, max}), and data (the
+    GeoJSON FeatureCollection, required for source='upload').
+
+    An upload is validated, written to s3://{ADD_LAYER_UPLOAD_BUCKET}/{atlas}/
+    imports/{layer}.geojson, and imported through the same s3_geojson inlet as
+    the GET endpoint. Synchronous (#154), but run off the event loop.
+    """
+    size = int(request.headers.get('content-length') or 0)
+    if size > ADD_LAYER_MAX_BYTES:
+        raise HTTPException(status_code=413, detail=(
+            f"Upload is {size // (1024 * 1024)} MB; the limit is "
+            f"{ADD_LAYER_MAX_BYTES // (1024 * 1024)} MB."))
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+        geometry = body.get('geometry', 'point')
+        source = body.get('source', 'upload')
+        if source not in ('upload', 'empty'):
+            raise ValueError(f"Unknown source {source!r}; expected 'upload' or 'empty'.")
+
+        s3_key = None
+        if source == 'upload':
+            data = body.get('data')
+            n = atlas.validate_layer_upload(data, geometry)
+            s3_key = f"{swalename}/imports/{layer_name}.geojson"
+            boto3.client('s3').put_object(
+                Bucket=ADD_LAYER_UPLOAD_BUCKET, Key=s3_key,
+                Body=json.dumps(data).encode('utf-8'),
+                ContentType='application/geo+json')
+            logging.info(f"add_layer: uploaded {n} features to "
+                         f"s3://{ADD_LAYER_UPLOAD_BUCKET}/{s3_key}")
+
+        def run():
+            with write_session(swalename, f"add_layer {layer_name}") as session:
+                atlas.add_layer(
+                    session.config, layer_name,
+                    s3_key=s3_key, s3_bucket=ADD_LAYER_UPLOAD_BUCKET,
+                    geometry_type=geometry,
+                    source='s3' if source == 'upload' else 'empty',
+                    color=body.get('color'), width=body.get('width'),
+                    label_property=body.get('label_property') or None,
+                    label_field=body.get('label_field') or None,
+                    icon=body.get('icon') or None,
+                    opacity=body.get('opacity'),
+                    polygon_shape=body.get('polygon_shape') or None,
+                    colormap=body.get('colormap') or None)
+
+        await run_in_threadpool(run)
+        return {"status": "success",
+                "message": f"Layer '{layer_name}' added and materialized.",
+                "layer": layer_name}
+    except SESSION_ERRORS:
+        raise
+    except (ValueError, FileExistsError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"add_layer (POST) failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/edit_layer/{swalename}/{layer_name}")
+async def edit_layer_post(swalename: str, layer_name: str, request: Request):
+    """Restyle an existing layer from the console's Edit Layer form.
+
+    JSON body carries any of: color ('#rrggbb'), opacity (0-1), width (px),
+    icon (a name from templates/icons, point layers only), add_labels (bool),
+    label_field (property to label from), colormap ({palette, property, min,
+    max}) or colormap: null to go back to a flat colour. Absent keys are left
+    alone. Cannot rename a layer — that is rename_layer's job.
+
+    Rebuilds the config and re-materializes the webmaps showing the layer; the
+    PDF outlets honour the same styling but are slow, so they are not rebuilt.
+    """
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+
+        def run():
+            with write_session(swalename, f"edit_layer {layer_name}") as session:
+                return atlas.edit_layer(session.config, layer_name, body)
+
+        _, materialized = await run_in_threadpool(run)
+        return {
+            "status": "success",
+            "message": f"Layer '{layer_name}' restyled.",
+            "layer": layer_name,
+            "materialized": materialized,
+            "note": "PDF and other slow outlets keep their old styling until rebuilt.",
+        }
+    except SESSION_ERRORS:
+        raise
+    except (ValueError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"edit_layer failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/delete_layer/{swalename}/{layer_name}")
+async def delete_layer_post(swalename: str, layer_name: str, request: Request):
+    """Delete a layer and every reference to it, from the console.
+
+    JSON body: {"dry_run": true} returns the plan (assets removed, lists edited,
+    blockers) and changes nothing. A real delete needs {"confirm": layer_name} —
+    the name typed back — and is refused (400) while the plan has blockers.
+    Data is archived under {atlas}/deleted_layers/, not removed.
+    """
+    try:
+        body = await request.json()
+        atlas.validate_layer_name(layer_name)
+        if body.get('dry_run'):
+            with read_session(swalename, f"delete_layer {layer_name} (dry run)") as session:
+                plan = atlas.delete_layer(session.config, layer_name, dry_run=True)
+            return {"status": "success", "dry_run": True, "plan": plan}
+        if body.get('confirm') != layer_name:
+            raise ValueError(f"Type the layer name ('{layer_name}') to confirm.")
+
+        def run():
+            with write_session(swalename, f"delete_layer {layer_name}") as session:
+                return atlas.delete_layer(session.config, layer_name)
+
+        plan = await run_in_threadpool(run)
+        return {
+            "status": "success",
+            "message": f"Layer '{layer_name}' deleted.",
+            "plan": plan,
+        }
+    except SESSION_ERRORS:
+        raise
+    except (ValueError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"delete_layer failed for {swalename}/{layer_name}: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/delta_upload/{swalename}")
 async def json_upload(payload: JSONPayload, swalename: str):
     """Store a delta, and apply it when the atlas is free.
@@ -484,6 +653,45 @@ async def json_upload(payload: JSONPayload, swalename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _selection_to_fc(sel: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalise a drawn selection (Feature or FeatureCollection) to a FeatureCollection."""
+    if sel.get("type") == "Feature":
+        return {"type": "FeatureCollection", "features": [sel]}
+    if sel.get("type") == "FeatureCollection":
+        return sel
+    raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+
+
+@app.post("/select_features/{swalename}")
+async def select_features(payload: SelectPayload, swalename: str):
+    """Preview which features of a layer a drawn selection hits.
+
+    Read-only. Uses the same predicate (extract_intersecting_features,
+    ST_Intersects against any drawn shape) as annotate, delete and move, so
+    the webedit highlight shows exactly what those actions would touch.
+    """
+    try:
+        sel_fc = _selection_to_fc(payload.selection)
+        with read_session(swalename, "select_features") as session:
+            ac = session.config
+            layer_path = versioning.atlas_path(ac, "layers") / payload.layer / f"{payload.layer}.geojson"
+            if not layer_path.exists():
+                raise HTTPException(status_code=404, detail=f"layer not found: {payload.layer}")
+            if not sel_fc.get("features"):
+                return {"type": "FeatureCollection", "features": []}
+
+            selected = deltas_geojson.extract_intersecting_features(layer_path, sel_fc)
+            return json.loads(json.dumps(
+                {"type": "FeatureCollection", "features": [dict(f) for f in selected]},
+                default=utils.json_serial))
+    except (HTTPException, *SESSION_ERRORS):
+        raise
+    except Exception as e:
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        print(f"ERROR in select_features: {e}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/move_features/{swalename}")
 async def move_features(payload: MovePayload, swalename: str):
     try:
@@ -493,13 +701,7 @@ async def move_features(payload: MovePayload, swalename: str):
 
             source_path = versioning.atlas_path(ac, "layers") / payload.source_layer / f"{payload.source_layer}.geojson"
 
-            sel = payload.selection
-            if sel.get("type") == "Feature":
-                sel_fc = {"type": "FeatureCollection", "features": [sel]}
-            elif sel.get("type") == "FeatureCollection":
-                sel_fc = sel
-            else:
-                raise HTTPException(status_code=400, detail="selection must be a GeoJSON Feature or FeatureCollection")
+            sel_fc = _selection_to_fc(payload.selection)
 
             moved = deltas_geojson.extract_intersecting_features(source_path, sel_fc)
             if not moved:
@@ -943,6 +1145,26 @@ def _load_starter(key: str) -> dict:
         return json.load(f)
 
 
+@app.post("/create-preview")
+async def preview_boundary(payload: BoundaryPreviewRequest):
+    """What a create would do with an uploaded GeoJSON, without creating anything.
+
+    Lets the create page show the extent and the per-layer feature counts before
+    you commit — a mismatch found here costs nothing, where the same mismatch
+    found after a create leaves a half-built atlas behind.
+
+    Under the /create prefix for the same nginx reason as /create-starters.
+    """
+    try:
+        starter = _load_starter(payload.starter)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=400, detail=f"starter '{payload.starter}': {e}")
+    try:
+        return geojson_import.summarize(payload.boundary, starter.get('layers', {}).keys())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"boundary geojson: {e}")
+
+
 @app.get("/create-starters")
 async def list_starters():
     """List available starter bundles for the /create dropdown.
@@ -984,6 +1206,11 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                                  atlas_store.cloud_settings({})['private_bucket'],
                                  slug):
         raise HTTPException(status_code=409, detail=f"Atlas '{slug}' already exists")
+    # A retired atlas can be gone from S3 while its configuration/{slug}.geojson
+    # is still in git. The new atlas's staging/atlas.geojson would shadow it
+    # (atlas.source_geojson_path), so refuse rather than leave two sources.
+    if (atlas.shared_config_directory() / f"{slug}.geojson").exists():
+        raise HTTPException(status_code=409, detail=f"A config for '{slug}' already exists in configuration/")
 
     starter = _load_starter(payload.starter)
     starter_props = starter.get("properties", {})
@@ -999,8 +1226,19 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
         "log": [["Starting atlas creation", datetime.now().isoformat()]]
     }
 
-    bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
-            "north": payload.bbox.north, "south": payload.bbox.south}
+    if payload.bbox is not None:
+        bbox = {"west": payload.bbox.west, "east": payload.bbox.east,
+                "north": payload.bbox.north, "south": payload.bbox.south}
+    elif payload.boundary is not None:
+        # Every feature contributes to the extent, so an upload that is only a
+        # boundary and one that also carries regions both land here.
+        try:
+            bbox = geojson_import.boundary_bbox(payload.boundary)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"boundary geojson: {e}")
+    else:
+        raise HTTPException(status_code=400,
+                            detail="a bbox or a boundary geojson is required")
 
     # Compute H3 resolution that gives ~10 cells across the short axis of the bbox.
     # H3 approximate average edge lengths (km) by resolution.
@@ -1034,7 +1272,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 "name": slug,
                 "description": payload.name,
                 "app_url": "https://fireatlas.org:9000",
-                "versioned_outlets": ["html", "webmap"],
+                "versioned_outlets": [],  # empty = snapshot every outlet (#131 C9)
                 "default_h3_resolution": _default_h3_resolution,
                 **starter_props,
             }
@@ -1123,6 +1361,24 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                         logging.warning(f"Inlet {inlet_name} failed for {slug}: {inlet_err}")
                         create_statuses[slug]["log"].append([f"Warning: {inlet_name} failed ({inlet_err}) — skipped", datetime.now().isoformat()])
 
+                # Features from the uploaded boundary are seeded exactly the way an
+                # inlet seeds one — as a delta, applied by the refresh below. One
+                # path into a layer rather than two.
+                if payload.boundary is not None:
+                    known = [l['name'] for l in ac['dataswale']['layers']]
+                    split = geojson_import.split_features_by_layer(payload.boundary, known)
+                    for layer_name, features in sorted(split['routed'].items()):
+                        fc = {"type": "FeatureCollection", "features": features}
+                        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name)
+                        create_statuses[slug]["log"].append(
+                            [f"Imported {len(features)} feature(s) into {layer_name}",
+                             datetime.now().isoformat()])
+                    for unknown_name, count in sorted(split['unknown'].items()):
+                        create_statuses[slug]["log"].append(
+                            [f"Warning: {count} feature(s) name layer '{unknown_name}', "
+                             f"which this starter does not have — not imported",
+                             datetime.now().isoformat()])
+
                 # Inlets only wrote deltas; apply them so the layers actually hold
                 # data, and give inlet-less layers an empty FeatureCollection so the
                 # webmap doesn't 404 on a missing file. Must precede the outlets,
@@ -1134,13 +1390,25 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                     else:
                         create_statuses[slug]["log"].append([f"Layer {layer_name} {action}", datetime.now().isoformat()])
 
-                # Outlets: webmap must precede html (console HTML checks for the
-                # webmap output); notebook first, html last.
-                _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "html": 9}
+                # Outlets: webmap must precede the console (it checks for the
+                # webmap output); notebook first, console last.
+                _outlet_order = {"notebook": 0, "webmap": 1, "webedit": 2, "3dview": 3, "console": 9}
+                # QGIS PDF outlets are deferred for the same reason eddies are: a
+                # runbook render is slow and memory-hungry, and at create time it
+                # would run over regions that were only just imported. Materialize
+                # them once the atlas has been looked at.
+                deferred = [n for n, a in assets.items()
+                            if a.get('type') == 'outlet'
+                            and a.get('config', {}).get('data_type') == 'geopdf']
                 outlet_names = sorted(
-                    (n for n, a in assets.items() if a.get('type') == 'outlet'),
+                    (n for n, a in assets.items()
+                     if a.get('type') == 'outlet' and n not in deferred),
                     key=lambda n: _outlet_order.get(n, 5)
                 )
+                for deferred_name in deferred:
+                    create_statuses[slug]["log"].append(
+                        [f"Deferred {deferred_name} (PDF outlets are materialized on request)",
+                         datetime.now().isoformat()])
                 for outlet_name in outlet_names:
                     create_statuses[slug]["log"].append([f"Materializing {outlet_name}", datetime.now().isoformat()])
                     try:

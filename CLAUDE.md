@@ -17,6 +17,15 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Cloud-Native Plan**: `documents/cloud_native_plan.md` - Phased migration to S3/CloudFront + Lambda; Phase 1 done
 - **CDK Runbook**: `infrastructure/cdk/README.md` - Stacks, toolchain, first-deploy steps
 
+## Decisions & Constraints (2026-10)
+
+- **The old `html` console is retired.** Every atlas builds `console`; starters, `/create`, full builds and `atlas_full_refresh.sh` materialize it instead. nginx 301-redirects `…/outlets/html/…` → `…/outlets/console/…` (old bookmarks, QR codes, printed runbooks) and gates `console/(admin|internal)` with the same htpasswd files the html console used. The stale `html/` dirs stay on disk until the cloud cutover — don't delete them, don't link to them. Home links go to `../console/public/` (incl. webedit, for now).
+- **`versioned_outlets` must stay `[]`** on every atlas. It is a publish *copy filter* (#131 C9); the old `["html", "webmap"]` would drop the console from every version and the S3 push. `tests/test_json_configs.py::test_active_atlas_configs_are_current` enforces it.
+- **Active atlases** (kept current; listed in that test): scvfd, kennedy, westport, fhe, gilhamhike, king_range, napachar, south_fork_eel, abi_demo, mineralkinsey, isf_920, nfsc_refugia, mather, angelo, sherwood_ranch, laytonville, cahto_creek_ranch. **Abandoned — don't update:** samuelsloop, layt1, king_range_hike, wildwood, ft*, south_fork_eel_2026_10_02, and the box's backup/test dirs. All active atlases are single-file `configuration/{atlas}.geojson`, have `show_user_location` on every webmap, and a `cloud.outlets` allowlist.
+- **`/create` writes `configuration/{slug}.geojson`** in the shared checkout (not `staging/atlas.geojson`), because every console layer action and `atlas_full_refresh.sh` read the source from there. Still uncommitted on the box like other console edits (#195). On older `/create` atlases, `staging/atlas.geojson` is a stale birth copy — the repo file is the source.
+- **Help pages:** every `documents/help/*.md` starts `# Title` then `<!-- audience: user|admin|developer -->` (`python/help_docs.py`). The manuals (`user_manual.md`, `admin_manual.md`) are short narrative that links to help pages instead of repeating them; `user_guide.md` is now `developers_guide.md`. In-app `?` links open the most specific page in a new tab (`/local/documents/help/{page}.html` or a manual `#section`). `tests/test_help_docs.py` fails on a missing tag, an unlinked page, or any `?` whose target or anchor doesn't exist — add the page and a manual link together.
+- **Customer-facing copy uses US spelling.**
+
 ## Core Architecture Concepts
 
 The system uses a water/flow metaphor:
@@ -49,11 +58,24 @@ DEFAULT_MATERIALIZERS = (
 
 ### Deltas
 
-Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Two actions:
+Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Actions:
 - `"create"` — append new features
-- `"annotate"` — update properties on existing features
+- `"annotate"` — update properties on existing features (spatial: features the drawn polygon intersects)
+- `"match"` — update properties by `atlas_id`
+- `"reshape"` — replace geometry by `atlas_id`, properties untouched (webedit Reshape page; `python/reshape.py`)
+- `"delete"` — remove features the drawn polygon intersects
+
+`atlas_id` is stable: it lives in the layer file, an update applies deltas on top of it, and a rebuild re-runs inlets without replaying archived `work/` deltas.
 
 Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
+
+### Feature webmap links
+
+Every vector refresh (`refresh_vector_layer`) rewrites `webmap_url` on every feature. `dataswale_geojson.FEATURE_URL_BUILDERS` picks the builder by layer name; the default is the centroid at zoom 17 with a pin. `regions` gets a share-view `?s=` link (the same state the Share button encodes) fitted to the region, with `l` listing only context layers so the regions outline is hidden. **Edit a link via `webmap_url_override`, not `webmap_url`** — the latter is overwritten on the next refresh. The runbook index and the webmap's Regions dropdown both read the stored `webmap_url`.
+
+A layer's `polygon_shape` is applied to *every* polygon on each refresh (not only incoming deltas), so setting it and refreshing squares an existing hand-drawn layer. `raw` (the default) leaves polygons alone.
+
+**Runbook regions want `square` (square on paper), NOT `square_degrees`.** `outlets_qgis_atlas` squares every region in EPSG:3857 before fitting it to the frame, so a paper square prints exactly as drawn; a degree-square prints ~1.3× taller than wide. The opposite claim ("a degree-square fills the page") came from #189's analysis of `outlets_qgis.outlet_regions_qgis`, which is not a registered materializer — verify against `outlets_qgis_atlas.py`, never `outlets_qgis.py`, when reasoning about runbook layout. Every runbook renders **Letter landscape** (220 × 212 mm frame beside the 55 mm side collar): the template's `page_size: A4`/`Portrait` is nested in the asset's `config` and ignored (#194).
 
 ### Versioning
 
@@ -141,7 +163,14 @@ uvicorn --port 9000 --host 0.0.0.0 webapp:app --reload \
   --ssl-keyfile /etc/letsencrypt/live/fireatlas.org-0001/privkey.pem
 ```
 
-**`--reload` has a race condition.** If the service was mid-flight during a `git pull`, `--reload` may not pick up the new code. Hard restart (kill screen session + relaunch) is required to guarantee new code is running.
+**`--reload` has a race condition.** If the service was mid-flight during a `git pull`, `--reload` may not pick up the new code. Hard restart (kill screen session + relaunch) is required to guarantee new code is running (#214 drops `--reload`). Deploy loop: pull → hard restart → materialize. Restart from the laptop:
+
+```bash
+ssh -i ~/.ssh/SCSProd.pem ubuntu@54.241.152.98 'sudo pkill -f "[u]vicorn.*webapp:app"; sudo screen -S app -X quit'
+ssh -i ~/.ssh/SCSProd.pem ubuntu@54.241.152.98 'cd /root/swales_dev/app/python && sudo screen -S app -d -m bash ../scripts/start_app.sh'
+```
+
+The `[u]` bracket matters: a bare `pkill -f "uvicorn.*webapp:app"` inside `ssh … bash -c "…"` matches and kills its own shell, leaving the API down. Always confirm `curl https://fireatlas.org:9000/publish-status?swale=kennedy` returns 200 afterwards.
 
 **Ghostty + screen**: The server doesn't have Ghostty's terminfo. Run `TERM=xterm-256color screen` or add `export TERM=xterm-256color` to `~/.bashrc` on the server.
 
@@ -172,6 +201,7 @@ On the deployed server:
 | `GET /publish?swale={name}` | Async publish — materializes versioned outlets, creates snapshot, updates `CURRENT` |
 | `GET /publish-status?swale={name}` | Poll publish job progress |
 | `POST /save_config/{swalename}` | Persist config changes |
+| `POST /delete_layer/{swalename}/{layer}` | Delete a layer + every reference (`layer_plans`). `{"dry_run": true}` returns the plan; a real delete needs `{"confirm": layer}` and refuses while anything depends on it. Data archived to `{atlas}/deleted_layers/`. Not committed (#195) |
 | `POST /import_sheet`, `GET /export_gsheet` | Google Sheets import/export |
 | `POST /sql_query` | DuckDB query across layers |
 
@@ -190,20 +220,13 @@ Keep commits focused — the deployed server may have uncommitted local changes.
 
 Pipeline: `scvfd@fireatlas.org` → SES → S3 `atlas-ingress/incoming/` → Lambda `atlas-email-photo-handler` → POST `/ingest/email_photo` on webapp → delta written → layer refreshed
 
-### Subject Line Format
+### Subject and Body Format
 
-`<layer>: <title>` — e.g. `hydrants: New hydrant on Miller Rd`
-
-If no colon present, the whole subject is used as the title and the layer defaults to `processing_sites`. Override the default per-atlas with `email_photo_default_layer` in the atlas GeoJSON.
+The whole subject is the feature title (`email_inlet.parse_subject`). The layer comes from the **body**: a `layer: <name>` (or `layer=<name>`) line, or a first line that is just a layer name; other `field: value` lines set editable columns (`email_inlet.parse_body`). No layer, or an unknown one, falls back to `email_photo_default_layer` in the atlas GeoJSON (default `processing_sites`).
 
 ### Authorized Senders
 
-`admin_emails` in atlas config controls who can submit:
-- **Non-empty list** → only those addresses accepted (403 otherwise, no bounce)
-- **Empty list `[]`** → open ingest mode (all senders accepted)
-- **Missing entirely** → treated as non-empty (safe default, allowlist behavior)
-
-Add new senders to `{atlas}.geojson`, commit, pull on server, rebuild config.
+**Anyone can submit** — `/ingest/email_photo` has no sender check (since 8f303be). `admin_emails` no longer gates email ingest; it still controls spreadsheet sharing. Per-purpose sender auth is #61 (and the field split #98).
 
 ### GPS Requirement
 
@@ -232,6 +255,16 @@ Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces
 ### Technical Console Log
 
 `/log/{swalename}` endpoint queries CloudWatch for recent Lambda invocations. Technical console fetches this live on page load. Implemented in `python/atlas_logs.py`.
+
+## Usage Report (fireatlas.org/usage/)
+
+Hourly GoAccess report of real visitors, deployed 2026-10-16. `scripts/usage_report.py` (cron `infrastructure/cron/fireatlas-usage`, installed as a copy in `/etc/cron.d/`) reads `/var/log/nginx/usage.log*`, drops SCS traffic and scanners, and writes `/var/www/usage/{index,report}.html`, served at `/usage/` behind the **scvfd admin** htpasswd.
+
+- **`usage.log` is a second, http-level log** defined in `infrastructure/nginx/fireatlas.org`: combined format + `$host` + the `fa_owner` cookie. The stock `access.log` is untouched and has neither, so the report ignores it.
+- **SCS exclusion:** visit `https://fireatlas.org/identify_as_scs` once per browser/phone (sets `fa_owner=1` on `.fireatlas.org` for 10 years). Fixed addresses go in `/etc/fireatlas/usage_exclude_ips` on the box — **not** in the repo, which is public.
+- **Scanners:** any address that requests an exploit-probe path (`PROBE_RE`) is dropped entirely — that is ~80% of raw traffic.
+- **QR codes:** print URLs with `?src=<tag>`; `index.html` tallies them. QR scans carry no referrer, so untagged codes are indistinguishable from typed URLs.
+- Logrotate keeps **400** days (`/etc/logrotate.d/nginx` on the box, edited by hand; backup at `/root/logrotate.nginx.bak-20261016`). Logs are ~60 KB/day gzipped.
 
 ## AWS Infrastructure
 
@@ -316,7 +349,7 @@ Stacks (all **us-east-1**, since CloudFront requires its ACM cert there):
   "enabled": true,
   "outlets_bucket": "scs-atlas-outlets-prod",
   "distribution_id": "E1A5S5MB0K3FZG",
-  "outlets": ["webmap", "console", "html", "3dview", "runbook"]
+  "outlets": ["webmap", "console", "3dview", "runbook"]
 }
 ```
 
@@ -346,9 +379,9 @@ Until Phase 6 retires the box, its EBS volume `vol-09ea03f2f799ff5c6` is the **o
 
 **Phase 2a–2c complete (2026-08-21).** All eight atlases publish their public outlets to `scs-atlas-outlets-prod`, served by CloudFront at `next.fireatlas.org`. **No traffic goes there yet** — the box still serves everything.
 
-Use `scripts/atlas_full_refresh.sh <atlas>` for the per-atlas sequence (config rebuild → webmap → staging check → html → publish → verify). It encodes the ordering and runs a role-variant leak check on every publish. `-y` skips the staging prompt.
+Use `scripts/atlas_full_refresh.sh <atlas>` for the per-atlas sequence (config rebuild → webmap → staging check → console → publish → verify). It encodes the ordering and runs a role-variant leak check on every publish. `-y` skips the staging prompt.
 
-**`html` and `console` have no root `index.html`** — all four role variants are subdirectories, so the public entry point is `html/public/`. Checking `html/` always 403s.
+**`console` has no root `index.html`** — all four role variants are subdirectories, so the public entry point is `console/public/`. Checking `console/` always 403s.
 
 **2d moved to Phase 4** (#160). Its stated deliverable, "box goes private", is unreachable while protected outlets and the `:9000` API still live on the box. Next up is **Phase 3** (#159) — the S3 data-layer refactor; that issue's comment carries the full starting context.
 
@@ -489,6 +522,12 @@ All options live in the per-atlas `{atlas}_layers.json` and are read by `apply_b
 | `label_expression` | string | **Most powerful.** Raw QGIS expression; NULL return suppresses label. Use this first for non-trivial filtering. |
 | `label_color` | [r, g, b] | Overrides default label color |
 | `qgis_width_scale` | float | Multiplies line width (roads, creeks) |
+| `qgis_width_units` | `"mm"` | Read `vector_width` as paper width (0.12 mm/unit × `qgis_width_scale`), like the webmap's pixels. Default is ground **metres**, so thickness varies with page scale — a 9 m road is a hairline on a 6 km page |
+| `label_buffer` | bool or mm | White halo around label text; `true` = 0.6 mm |
+
+Line labels with no `label_color` default to **white with no buffer** — invisible on white paper. Any linestring layer with `add_labels` needs a `label_color` in PDF output.
+
+`cog: true` raster layers load from the box's local `{layer}.cog.tif`/`.tiff` first, then `cog_url`, then the `s3_upload` location (`map_style.qgis_cog_sources`). `blend_percent` is a dead key in the QGIS path; the halftone basemap is `qgis_opacity` on the raster layer.
 
 `label_deduplicate` uses PAL expression: `if($id = minimum($id, group_by:="<field>"), "<field>", NULL)` — aggregate runs across the whole layer. Works well for buildings/addresses; less predictable for per-cell gazetteer context.
 
@@ -615,7 +654,7 @@ atlas.materialize(config, "webmap")    # outlet
 
 | Key | What it generates |
 |-----|-------------------|
-| `html` | All console HTML variants (technical, admin, internal, public) — all four generated together. **Do not use `technical_console`, `admin_console`, etc. — they don't exist.** |
+| `console` | All console variants (technical, admin, internal, public) — all four generated together. Also renders the shared help pages and manuals into `/local/documents/`. **Do not use `technical_console`, `admin_console`, etc. — they don't exist.** The old `html` outlet is retired (see Decisions). |
 | `webmap` | MapLibre webmap |
 | `webmap_private` | Private variant of webmap |
 | `webedit` | Web editing interface |
@@ -624,14 +663,21 @@ atlas.materialize(config, "webmap")    # outlet
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
+| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (main-road edge crossings; re-run skips existing points) |
 
-**Outlet build order**: `webmap` must come before `html` — the console HTML checks if `outlets/webmap/index.html` exists at generation time.
+**Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
 ### Notable fetch_types
 
 **`h3_grid`** (`vector_inlets.py`) — generates a hexagonal H3 grid covering the atlas bbox at a fixed resolution. No input layer required. Config: `resolution` (int, required), optional `out_layer` (defaults to `h3_grid_r{resolution}`). Each hex feature carries `h3_index` and `h3_resolution` properties — the join key for downstream aggregation.
 
 **`ssurgo_enrich`** (`eddies.py`) — enriches a layer with NRCS soil properties via the SDA REST API. Writes `ssurgo_mukey`, `ssurgo_compname`, `ssurgo_drainagecl`, `ssurgo_ph`, `ssurgo_om`, `ssurgo_sand/silt/clay` onto each feature. Works on Point layers (direct lookup) and Polygon/MultiPolygon layers (centroid used for lookup). Config: `in_layer` (required), `out_layer` (defaults to `in_layer`, i.e. enriches in place).
+
+**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: its deltas are `assetless__…` and a re-run appends a duplicate grid.
+
+**`h3_count` sparse mode** — give `resolution` and no `in_layer` and only occupied cells are written. Use it for fine resolutions: a full r11 grid over SFE would be ~370k cells / ~190 MB, while sparse `buildings_count_h3_r11` is 3,142 cells.
+
+**`h3_raster_stats`** (`eddies.py`) — raster counterpart of `h3_count`. `in_layer` is a grid, `in_layers` lists raster layers; each cell gets `{layer}_mean`, `{layer}_p{percentile}` (default 95) and `{layer}_coverage`. Pixels are assigned by centre-in-cell mask at full resolution, read per cell by window, and only cells whose bbox meets the raster are read. Cells below `min_coverage` (default 0.5) are dropped. A layer with `cog_url` is read remotely over `/vsicurl/`. Reference: SFE `canopy_height_lidar_h3_r9` (coloured by p95 — mean mixes canopy gaps with height).
 
 **`h3_cells`** (`eddies.py`) — indexes an existing vector layer by H3 cells. Takes `in_layer`, produces a new polygon layer of hex geometries, one per H3 cell, with all original feature properties copied. Use `h3_grid` instead if you just want a blank coverage grid.
 

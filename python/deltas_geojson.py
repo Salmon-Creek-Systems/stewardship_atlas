@@ -27,7 +27,9 @@ from geojson import Feature, FeatureCollection
 import duckdb
 
 import versioning
+import utils
 import eddies
+import reshape
 import utils
 
 # Configure logging
@@ -229,6 +231,19 @@ def _apply_delete_delta(layer_filepath: Path, delta_filepath: Path) -> None:
     logger.info(f"Moving consumed delete delta: {delta_filepath} -> {moved_path}")
 
 
+def layer_polygon_shape(config: Dict[str, Any], layer_name: str) -> str:
+    """The layer's `polygon_shape` setting, or 'raw'.
+
+    Read where create deltas are applied, so an imported, uploaded and
+    hand-drawn polygon all get the same treatment — regions, in particular,
+    have to be page-shaped however they arrived.
+    """
+    for layer in config.get('dataswale', {}).get('layers', []):
+        if layer.get('name') == layer_name:
+            return layer.get('polygon_shape', 'raw')
+    return 'raw'
+
+
 def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = False) -> FeatureCollection:
     """
    Apply all delta file sin order.
@@ -266,8 +281,13 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
                 # for now, apply transforms to delta here, as static file...
                 delta = geojson.load(infile)
                 logger.info(f"Apply Delta loaded {len(delta['features'])} DELTA features from {filepath}...")
+            new_features = delta['features']
+            polygon_shape = layer_polygon_shape(config, layer_name)
+            if polygon_shape != 'raw':
+                new_features = [utils.shape_feature(f, polygon_shape) for f in new_features]
+                logger.info(f"Applied polygon_shape='{polygon_shape}' to {len(new_features)} features")
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
-                geojson.dump(FeatureCollection(features=layer['features'] + delta['features']), outfile)
+                geojson.dump(FeatureCollection(features=layer['features'] + new_features), outfile)
 
                 moved_path = filepath.parent / 'work' / filepath.name
             logger.info(f"moving consumed delta: {filepath} -> {moved_path}")
@@ -300,6 +320,21 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
                     for k, v in delta_by_id[fid]['properties'].items():
                         if k != 'atlas_id' and v is not None:
                             feature.setdefault('properties', {})[k] = v
+            with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
+                geojson.dump(FeatureCollection(features=layer['features']), outfile)
+            filepath.rename(filepath.parent / 'work' / filepath.name)
+
+        # ID-based geometry replacement (webedit Reshape) — properties untouched
+        elif action == "reshape":
+            with open(layer_filepath, mode="rt") as infile:
+                layer = geojson.load(infile)
+            with open(filepath, mode="rt") as infile:
+                delta = geojson.load(infile)
+            polygon_shape = layer_polygon_shape(config, layer_name)
+            shape_fn = ((lambda f: utils.shape_feature(f, polygon_shape))
+                        if polygon_shape != 'raw' else None)
+            reshaped, skipped = reshape.apply_reshape(layer['features'], delta['features'], shape_fn)
+            logger.info(f"Reshape delta {filepath}: {len(reshaped)} reshaped, {len(skipped)} skipped")
             with versioning.atlas_file(layer_filepath, mode="wt") as outfile:
                 geojson.dump(FeatureCollection(features=layer['features']), outfile)
             filepath.rename(filepath.parent / 'work' / filepath.name)

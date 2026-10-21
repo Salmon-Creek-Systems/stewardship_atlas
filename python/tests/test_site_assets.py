@@ -97,18 +97,34 @@ class TestMissingSources(SiteAssetsTestCase):
             site_assets.build_site_assets(self.repo, self.tmp / 'out')
 
 
-class TestHelpIndex(unittest.TestCase):
-    def test_pages_are_listed_alphabetically(self):
-        content = site_assets.help_index_content([('Zebra', 'z.html'), ('Alpha', 'a.html')], [])
-        self.assertLess(content.index('a.html'), content.index('z.html'))
+class TestHelpIndex(SiteAssetsTestCase):
+    """The index is help_docs' audience-grouped one, manuals first."""
+
+    def build_index(self):
+        try:
+            import markdown  # noqa: F401
+        except ImportError:
+            self.skipTest('markdown is not installed')
+        site_assets.build_site_assets(self.repo, self.tmp / 'out')
+        return (self.tmp / 'out' / 'documents' / 'help' / 'index.html').read_text()
+
+    def test_pages_grouped_by_audience(self):
+        (self.repo / 'documents' / 'help' / 'publish.md').write_text(
+            '# Publish\n<!-- audience: admin -->\n\ntext')
+        content = self.build_index()
+        self.assertIn('Using the Atlas', content)            # untagged page counts as user
+        self.assertIn('Maintaining the Atlas', content)
+        self.assertLess(content.index('draw_vector.html'), content.index('publish.html'))
 
     def test_manuals_section_links_one_level_up(self):
-        content = site_assets.help_index_content([], [('User Manual', '../user_manual.html')])
+        content = self.build_index()
         self.assertIn('<h2>Manuals</h2>', content)
         self.assertIn('href="../user_manual.html"', content)
 
     def test_no_manuals_section_without_manuals(self):
-        self.assertNotIn('Manuals', site_assets.help_index_content([('A', 'a.html')], []))
+        shutil.rmtree(self.repo)
+        fixture_repo(self.repo, manuals=())
+        self.assertNotIn('Manuals', self.build_index())
 
 
 class TestTheRealTemplate(unittest.TestCase):

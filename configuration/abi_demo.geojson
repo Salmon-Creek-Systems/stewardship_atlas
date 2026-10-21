@@ -55,6 +55,7 @@
                     }
                 },
                 "assets": {
+                    "console": {"type": "outlet", "name": "console", "config_def": "console"},
                     "seed_ssurgo": {
                         "out_layer": "ssurgo_polk_or",
                         "config_def": "s3_geojson_inlet",
