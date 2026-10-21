@@ -54,6 +54,11 @@ class TestLayout(unittest.TestCase):
         self.assertFalse(ws.is_archive_path('layers/roads/work/roads.geojson'))
         self.assertFalse(ws.is_archive_path('outlets/runbook/work/page.pdf'))
 
+    def test_deleted_layers_are_archive(self):
+        self.assertTrue(ws.is_archive_path(
+            'deleted_layers/hargus__20260925_101500/layers/hargus.geojson'))
+        self.assertFalse(ws.is_archive_path('layers/deleted_layers/deleted_layers.geojson'))
+
 
 class TestManifestIO(unittest.TestCase):
     def setUp(self):

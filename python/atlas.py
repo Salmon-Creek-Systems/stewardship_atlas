@@ -1290,8 +1290,10 @@ def delete_layer(config, layer_name, dry_run=False, run_materialize=True):
     another layer, a runbook using it as regions_layer, the email default layer.
 
     The data is archived, not deleted: staging/layers/{name} and
-    staging/deltas/{name} move to {atlas}/deleted_layers/{name}__{timestamp}/,
-    outside staging so publish never copies it and nginx never serves it.
+    staging/deltas/{name} move to staging/deleted_layers/{name}__{timestamp}/.
+    It has to be inside staging, since a session writes back only staging. It
+    is archive (atlas_workspace.is_archive_path), so later sessions never
+    download it, and publish copies only the layers the config names.
 
     Like the other console edits this writes the box's working-tree
     {atlas}.geojson and does not commit it (#195).
@@ -1329,7 +1331,7 @@ def delete_layer(config, layer_name, dry_run=False, run_materialize=True):
     print(f"Deleted '{layer_name}' from {geojson_path.name}: assets {plan['remove_assets']}, "
           f"lists {plan['list_edits']}")
 
-    archive = (Path(data_root) / name / 'deleted_layers'
+    archive = (staging_path / 'deleted_layers'
                / f"{layer_name}__{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     for kind in ('layers', 'deltas'):
         src = staging_path / kind / layer_name

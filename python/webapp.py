@@ -559,7 +559,7 @@ async def delete_layer_post(swalename: str, layer_name: str, request: Request):
     JSON body: {"dry_run": true} returns the plan (assets removed, lists edited,
     blockers) and changes nothing. A real delete needs {"confirm": layer_name} —
     the name typed back — and is refused (400) while the plan has blockers.
-    Data is archived under {atlas}/deleted_layers/, not removed.
+    Data is archived under staging/deleted_layers/, not removed.
     """
     try:
         body = await request.json()
