@@ -1,12 +1,17 @@
 """game_roads.py: the DuckDB road filter and edge exits. Needs duckdb + spatial (runs on the box)."""
 import os
 import sys
+import types
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     import duckdb
+    # Other suites leave a MagicMock in sys.modules['duckdb'] (#153), which
+    # would pass the connect below; only a real module counts.
+    if not isinstance(duckdb, types.ModuleType):
+        raise ImportError("duckdb is a test stub")
     duckdb.connect().execute("INSTALL spatial; LOAD spatial;")
     import game_roads as gr
     HAVE_DUCKDB = True
