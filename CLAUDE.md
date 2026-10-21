@@ -256,6 +256,16 @@ Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces
 
 `/log/{swalename}` endpoint queries CloudWatch for recent Lambda invocations. Technical console fetches this live on page load. Implemented in `python/atlas_logs.py`.
 
+## Usage Report (fireatlas.org/usage/)
+
+Hourly GoAccess report of real visitors, deployed 2026-10-16. `scripts/usage_report.py` (cron `infrastructure/cron/fireatlas-usage`, installed as a copy in `/etc/cron.d/`) reads `/var/log/nginx/usage.log*`, drops SCS traffic and scanners, and writes `/var/www/usage/{index,report}.html`, served at `/usage/` behind the **scvfd admin** htpasswd.
+
+- **`usage.log` is a second, http-level log** defined in `infrastructure/nginx/fireatlas.org`: combined format + `$host` + the `fa_owner` cookie. The stock `access.log` is untouched and has neither, so the report ignores it.
+- **SCS exclusion:** visit `https://fireatlas.org/identify_as_scs` once per browser/phone (sets `fa_owner=1` on `.fireatlas.org` for 10 years). Fixed addresses go in `/etc/fireatlas/usage_exclude_ips` on the box — **not** in the repo, which is public.
+- **Scanners:** any address that requests an exploit-probe path (`PROBE_RE`) is dropped entirely — that is ~80% of raw traffic.
+- **QR codes:** print URLs with `?src=<tag>`; `index.html` tallies them. QR scans carry no referrer, so untagged codes are indistinguishable from typed URLs.
+- Logrotate keeps **400** days (`/etc/logrotate.d/nginx` on the box, edited by hand; backup at `/root/logrotate.nginx.bak-20261016`). Logs are ~60 KB/day gzipped.
+
 ## AWS Infrastructure
 
 ### Accounts and Profiles
