@@ -28,6 +28,7 @@ import map_style
 import layer_plans
 import outlets
 import outlets_qgis_atlas
+import outlets_game_kit
 import vector_inlets
 import raster_inlets
 import eddies
@@ -60,7 +61,7 @@ DEFAULT_CONFIG = {
     }
 }
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
-DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods 
+DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods | outlets_game_kit.asset_methods
 
 
 def discover_versions(swale_path: Path) -> List[str]:

@@ -210,6 +210,19 @@
             "citation": "https://www.scvfd.fireatlas.org"
         }
     },
+    "game_kit": {
+        "name": "game_kit",
+        "asset_type": "outlet",
+        "fetch_type": "outlet_game_kit",
+        "interaction": "interface",
+        "board_size_in": [36, 24],
+        "attribution": {
+            "url": "https://prototypingresilience.com/diy-game-kit",
+            "description": "Local board and chance cards for the Wildfire Resilience board game (game design: Tom Maiorana, UC Davis).",
+            "license": "https://prototypingresilience.com/diy-game-kit",
+            "citation": "https://prototypingresilience.com/diy-game-kit"
+        }
+    },
     "biochar_webedit": {
         "asset_type": "outlet",
         "fetch_type": "biochar_webedit",
