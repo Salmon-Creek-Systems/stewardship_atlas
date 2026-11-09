@@ -22,7 +22,7 @@ def atlas_path(config=None, local_path='', version='staging'):
     always come from the live codebase regardless of per-atlas app/ checkouts.
     """
     if version == 'app':
-        return Path(__file__).parent.parent / local_path
+        return Path(__file__).resolve().parent.parent / local_path
     atlas_name = config['name']
     data_root = config['data_root']
     atlas_path = Path(data_root) / atlas_name / version / local_path

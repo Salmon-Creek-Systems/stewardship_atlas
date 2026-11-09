@@ -29,9 +29,7 @@ import duckdb
 import versioning
 import delta_provenance
 import utils
-import eddies
 import reshape
-import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -360,6 +358,10 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
         # This is a Delta of anotation features which update properties for existing features
         elif action == "annotate":
             # delta_annotate_spatial_duckdb(config:Dict[str, Any], layer_name:str, delta_name:str, anno_type: str = "deltas", updated_properties: List[str] = [])
+            # Imported here, not at module top: eddies → outlets →
+            # dataswale_geojson → deltas_geojson is a cycle, and
+            # dataswale_geojson reads deltas.apply_deltas at import time.
+            import eddies
             output = eddies.delta_annotate_spatial_duckdb(
                 config=config,
                 layer_name = layer_name,
