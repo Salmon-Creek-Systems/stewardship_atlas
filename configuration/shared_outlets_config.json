@@ -118,6 +118,28 @@
         "fetch_type": "console",
         "interaction": "backend"
     },
+    "overlook": {
+        "asset_type": "outlet",
+        "fetch_type": "overlook",
+        "interaction": "interface",
+        "access": ["public"],
+        "bulk_threshold": 500,
+        "max_change_features": 5000,
+        "photo_strip_count": 12,
+        "headlines": [
+            {"label": "Hydrants mapped", "layer": "hydrants", "measure": "count"},
+            {"label": "Water tanks", "layer": "watertanks", "measure": "count"},
+            {"label": "Culverts", "layer": "culverts", "measure": "count"},
+            {"label": "Landmarks", "layer": "landmarks", "measure": "count"},
+            {"label": "Buildings", "layer": "buildings", "measure": "count"},
+            {"label": "Processing sites", "layer": "processing_sites", "measure": "count"},
+            {"label": "Wildlife observations", "layer": "inaturalist", "measure": "count"},
+            {"label": "Miles of road", "layer": "roads", "measure": "length_mi"},
+            {"label": "Miles of trail", "layer": "trails", "measure": "length_mi"},
+            {"label": "Miles of creek", "layer": "creeks", "measure": "length_mi"},
+            {"label": "Burn acres", "layer": "burn_areas", "measure": "area_acres"}
+        ]
+    },
     "runbook": {
         "asset_type": "outlet",
         "layers": [

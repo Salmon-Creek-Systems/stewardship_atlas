@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{title} — Overlook</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/overlook.css">
+</head>
+<body>
+    <div id="preview-banner" class="preview-banner" hidden>
+        Preview — this is the working copy, not yet published.
+    </div>
+
+    <header class="masthead">
+        <img id="logo" class="logo" alt="" hidden>
+        <div>
+            <h1 id="title"></h1>
+            <p id="tagline" class="tagline" hidden></p>
+            <p id="asof" class="asof"></p>
+        </div>
+        <nav class="masthead-links">
+            <a href="../webmap/">Open the map</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="about-section" class="card" hidden>
+            <p id="about"></p>
+        </section>
+
+        <section id="headlines" class="tiles" aria-label="Headline numbers"></section>
+
+        <div class="columns">
+            <section class="card" id="changes-section">
+                <h2>What changed this release</h2>
+                <p id="changes-since" class="muted"></p>
+                <ul id="changes" class="changes"></ul>
+                <div id="change-map" class="minimap" role="region" aria-label="Map of changes"></div>
+                <ul id="change-legend" class="legend"></ul>
+                <p id="change-truncated" class="muted" hidden>The map shows a subset of this release's changes.</p>
+            </section>
+
+            <section class="card" id="photos-section">
+                <h2>Field photos</h2>
+                <p id="photos-count" class="muted"></p>
+                <div id="photo-map" class="minimap" role="region" aria-label="Map of field photos"></div>
+                <div id="photo-strip" class="photo-strip"></div>
+            </section>
+        </div>
+
+        <section class="card" id="products-section">
+            <h2>Products</h2>
+            <div class="table-wrap">
+                <table class="products">
+                    <thead><tr><th>Product</th><th>Who can see it</th><th>Built</th><th>Status</th></tr></thead>
+                    <tbody id="products"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card" id="involved-section">
+            <h2>Get involved</h2>
+            <ul class="involved">
+                <li id="photo-help">
+                    <strong>Send a photo.</strong> Email a geotagged photo to
+                    <a id="photo-email" href="#"></a>. Put the subject as the photo's title.
+                    To check a photo has a location: in iOS Photos, swipe up — if a map appears, it does.
+                </li>
+                <li><strong>Comment on a feature.</strong> Open the <a href="../webmap/">map</a>,
+                    tap a feature and add a note.</li>
+                <li id="contact-help" hidden><strong>Get in touch:</strong> <a id="contact-email" href="#"></a></li>
+            </ul>
+        </section>
+    </main>
+
+    <footer class="footer muted">
+        Built <span id="built-at"></span> · Stewardship Atlas
+    </footer>
+
+    <dialog id="photo-dialog" class="photo-dialog">
+        <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+        <img id="photo-dialog-img" alt="">
+        <p id="photo-dialog-caption"></p>
+        <a id="photo-dialog-link" href="#">View on the map</a>
+    </dialog>
+
+    <script src="js/overlook.js"></script>
+    <script>initializeOverlook({summary_json});</script>
+</body>
+</html>

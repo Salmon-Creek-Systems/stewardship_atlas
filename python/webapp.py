@@ -36,6 +36,7 @@ import dataswale_geojson
 import outlets
 import versioning
 import deltas_geojson
+import delta_provenance
 import geojson_import
 import utils
 import vector_inlets
@@ -237,9 +238,8 @@ async def import_gsheet(swalename: str, layer_name: str):
 
 
         # store the geojson
-        outpath = deltas_geojson.delta_path_from_layer(ac, layer_name, "create")
-        with open(outpath, "w") as f:
-            json.dump(layer_fc, f)
+        outpath = str(deltas_geojson.write_delta(ac, layer_name, layer_fc, "create",
+                                                  source="gsheet_import"))
 
         res = dataswale_geojson.refresh_vector_layer(ac, layer_name)
         return {
@@ -527,13 +527,20 @@ async def json_upload(payload: JSONPayload, swalename: str):
         # sources default to immediate apply; bulk sources send apply=False
         # to accumulate. Transport flag only — not persisted in the delta.
         apply_now = bool(delta_package.pop('apply', True))
+        # Provenance (#G3): the client names itself — webedit, reshape,
+        # console_upload, ... A client that doesn't is recorded as 'api', never
+        # as an anonymous delta. Like `apply`, a transport field; it is stored
+        # in the delta's provenance member, not on the features.
+        source = delta_package.pop('source', None) or 'api'
+        try:
+            delta_provenance.validate_source(source)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         print(f"delta_upoad.=: {action} for {layer}: delta_package (apply={apply_now})")
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer, action)
-        with open(delta_path, "w") as f:
-            json.dump(fc, f)
+        delta_path = str(deltas_geojson.write_delta(ac, layer, fc, action, source=source))
 
         if apply_now:
             # Cheap update-refresh of the target layer only, no cascade.
@@ -550,6 +557,8 @@ async def json_upload(payload: JSONPayload, swalename: str):
             "applied": apply_now,
             "filename": os.path.basename(delta_path),
             "path": delta_path}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"ERROR in json_upload. {e}")
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -617,18 +626,18 @@ async def move_features(payload: MovePayload, swalename: str):
         delta_files_written = []
         try:
             create_fc = {"type": "FeatureCollection", "layer": payload.target_layer, "action": "create", "features": [dict(f) for f in moved]}
-            target_delta = deltas_geojson.delta_path_from_layer(ac, payload.target_layer, "create")
-            with open(target_delta, "w") as f:
-                json.dump(create_fc, f, default=utils.json_serial)
+            target_delta = deltas_geojson.write_delta(
+                ac, payload.target_layer, create_fc, "create", source="move",
+                detail={"from_layer": payload.source_layer})
             delta_files_written.append(Path(target_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.target_layer)
 
             delete_fc = dict(sel_fc)
             delete_fc["layer"] = payload.source_layer
             delete_fc["action"] = "delete"
-            source_delta = deltas_geojson.delta_path_from_layer(ac, payload.source_layer, "delete")
-            with open(source_delta, "w") as f:
-                json.dump(delete_fc, f, default=utils.json_serial)
+            source_delta = deltas_geojson.write_delta(
+                ac, payload.source_layer, delete_fc, "delete", source="move",
+                detail={"to_layer": payload.target_layer})
             delta_files_written.append(Path(source_delta))
             dataswale_geojson.refresh_vector_layer(ac, payload.source_layer)
 
@@ -685,9 +694,7 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
                 }
             }]
         }
-        delta_path = deltas_geojson.delta_path_from_layer(ac, layer_name, "match")
-        with open(delta_path, "w") as f:
-            json.dump(delta_fc, f)
+        deltas_geojson.write_delta(ac, layer_name, delta_fc, "match", source="comment")
 
         dataswale_geojson.refresh_vector_layer(ac, layer_name)
 
@@ -718,7 +725,7 @@ async def store_json(swalename: str, payload: JSONPayload):
         config_path = Path(SWALES_ROOT) / swalename / "staging" / "atlas_config.json"
         print(f"loading config from {config_path}")
         ac = json.load(open(config_path))
-        outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create")
+        outpath = deltas_geojson.delta_path_from_layer(ac, layer, "create", source="api_store")
         print(f"writing delta to  {outpath}")
         
         #outpath = versioning.atlas_path(swalename, "deltas") / layer / f"data_{version}.json"
@@ -727,8 +734,12 @@ async def store_json(swalename: str, payload: JSONPayload):
         #logger.logger.debug(f"Created directory: {os.path.dirname(outpath)}")
         
         # Store the JSON data
+        stored = dict(payload.data)
+        stored['provenance'] = delta_provenance.record(
+            ac, source="api_store", action="create", layer=layer,
+            feature_count=len(stored.get('features') or []))
         with open(outpath, 'w') as f:
-            json.dump(payload.data, f, indent=2)
+            json.dump(stored, f, indent=2)
         logger.logger.info(f"Successfully stored JSON data at: {outpath}")
         print(f"Successfully stored JSON data at: {outpath}")
         
@@ -1255,8 +1266,8 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
                 split = geojson_import.split_features_by_layer(payload.boundary, known)
                 for layer_name, features in sorted(split['routed'].items()):
                     fc = {"type": "FeatureCollection", "features": features}
-                    await asyncio.to_thread(deltas_geojson.add_deltas_from_features,
-                                            ac, None, fc, "create", layer_name)
+                    await asyncio.to_thread(deltas_geojson.write_delta,
+                                            ac, layer_name, fc, "create", "create")
                     create_statuses[slug]["log"].append(
                         [f"Imported {len(features)} feature(s) into {layer_name}",
                          datetime.now().isoformat()])
@@ -1692,7 +1703,7 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=layer_name)
+        deltas_geojson.write_delta(ac, layer_name, fc, "create", source="email_photo")
 
         # Refresh layer
         dataswale_geojson.refresh_vector_layer(ac, layer_name)
@@ -1766,7 +1777,7 @@ async def ingest_web_photo(payload: WebPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        deltas_geojson.add_deltas_from_features(ac, None, fc, "create", layer_name=payload.layer_name)
+        deltas_geojson.write_delta(ac, payload.layer_name, fc, "create", source="web_photo")
         dataswale_geojson.refresh_vector_layer(ac, payload.layer_name)
 
         return {

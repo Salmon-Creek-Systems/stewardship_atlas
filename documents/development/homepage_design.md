@@ -1,7 +1,66 @@
-# Gauge — the Atlas Progress Report
+# Overlook — the Atlas Progress Report
 
-**Status:** Design, v1 scope agreed in discussion (2026-11-08). Not started.
-**Outlet key:** `gauge` · **Visitor-facing title:** "Progress Report" (see Open Questions)
+**Status:** Spike MVP on branch `claude/tender-heisenberg-j42g6i` (2026-11-09), wired
+into kennedy only. See §0 for what the spike decided and built.
+**Outlet key:** `overlook` (was `gauge` in the first draft; "gauge" below means
+the same thing) · **Code:** `python/overlook.py`, `templates/overlook.html`,
+`templates/css/overlook.css`, `templates/js/overlook.js`
+
+## 0. Spike decisions (2026-11-09)
+
+**Name.** The outlet is `overlook`. Visitor-facing title is the atlas title;
+the page calls itself Overlook only in the browser tab.
+
+**Delta provenance is fixed at the source, not worked around (was G3).**
+Deltas exist so that every change to a layer is recorded and can be used
+exactly, so every write path now names itself. The heuristics in §3.3 apply
+only to legacy files.
+
+- Filenames are `{source}__{YYYYmmdd_HHMMSS}__{action}.geojson`. The source is
+  the inlet asset name, or an interactive source from
+  `delta_provenance.SOURCES`: `webedit`, `webedit_upload`, `reshape`,
+  `console_upload`, `sheet_import`, `gsheet_import`, `email_photo`,
+  `web_photo`, `s3_photo_import`, `comment`, `move`, `create`, `api_store`, and
+  `api` for an untagged `/delta_upload` client. `assetless` is refused for new
+  deltas; old files read as source `unrecorded`.
+- Every delta also carries a `provenance` foreign member: `source`, `asset`,
+  `action`, `layer`, `feature_count`, `written_at` (UTC) and **`base_version`**,
+  the newest published version when the delta was written. That answers
+  "what's been added since the last publish" directly: a delta with
+  `base_version == V` belongs to the release after V. It is written into the
+  data rather than inferred from file times, and published versions keep it
+  because they keep the delta tree.
+- One entry point, `deltas_geojson.write_delta(config, layer, fc, action, source)`.
+  `delta_path_from_layer` now requires `source`. Files written by external tools
+  (ogr2ogr, Overpass) get the member added with `stamp_provenance`.
+- `/delta_upload` takes a transport field `source` (like `apply`); the web
+  editor, reshape page and console upload send theirs.
+- Same-second filenames get a `_cNNN` suffix (#180). `apply_deltas` now orders by
+  the timestamp field (`delta_sort_key`). With varied sources, a whole-name sort
+  would apply them alphabetically by source.
+- **Still not recorded as deltas:** `/clear_layer` (wipes the file directly);
+  the overwrite in `/import_sheet` (`apply_deltas_overwrite` — the import
+  itself *is* a `sheet_import` delta, but the wipe before it isn't); eddy and
+  raster outputs, which are regenerated rather than edited. These need a
+  `clear`/`replace` action in the delta model (#223), not more naming. The
+  overlook shows layers rewritten without deltas as "regenerated".
+- Not recorded: *who* made a web edit. The API doesn't see the htpasswd user
+  today. `provenance.actor` is the place for it once auth moves into the API
+  (Cognito, Phase 4).
+
+**Open photo ingest on a public page (G7): accepted for now.** Anyone can email
+a photo and it appears on the overlook. Before the photo address is promoted
+widely, go back to the sender allowlist (#61) or add admin approval: a
+`reviewed` property set from the console, and `overlook.is_photo` filters on
+it. That function is the single place photos are selected, which is the room
+left to improve. `sender` is never written to the outlet either way.
+
+**Spike scope vs the plan below:** slices 1–3 are in (masthead, headlines,
+change list and map, photos, products), plus tests (`tests/test_overlook.py`,
+`tests/test_delta_provenance.py`). Not done: G2 metadata on real atlases (the
+page falls back to `name`/`description`), G4–G6, G8 (refresh script + leak
+check), roll-out beyond kennedy, and the help page. Pipeline outlets
+(`s3_upload`) are left out of the products table (open question 4).
 
 A public, static page per atlas that shows what the atlas holds, what changed in
 the latest release, where field photos are coming in from, and the state of every

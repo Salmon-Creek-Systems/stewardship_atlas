@@ -72,7 +72,8 @@ def fetch_osm(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
     # Write response
     with open(outpath, 'w') as f:
         geojson.dump(response, f)
-    
+    delta_queue.stamp_provenance(config, outpath, source=name, asset=name)
+
     return outpath
 
 
@@ -103,6 +104,7 @@ def local_ogr(config, name, delta_queue=DELTA_QUEUE):
 
     if 'alterations' in inlet_config:
         utils.alter_geojson(outpath, inlet_config['alterations'])
+    delta_queue.stamp_provenance(config, outpath, source=name, asset=name)
     return outpath
 
 
@@ -122,7 +124,8 @@ def import_sheet(config, layer_name, delta_queue=DELTA_QUEUE):
     
     # Add deltas and return paths
     delta_paths = delta_queue.add_deltas_from_features(
-        config, None, feature_collection, 'create', layer_name=layer_name)
+        config, None, feature_collection, 'create', layer_name=layer_name,
+        source='sheet_import')
     return delta_paths
     
 
@@ -193,7 +196,7 @@ def gazetteer_grid(config=None, name=None, delta_queue=DELTA_QUEUE):
 
     layer_name = config['assets'][name]['out_layer']
     fc = geojson.FeatureCollection(features)
-    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=layer_name)
+    delta_queue.add_deltas_from_features(config, name, fc, 'create', layer_name=layer_name)
     logger.info(f"Generated {len(features)} gazetteer grid cells ({num_cols}x{num_rows})")
 
 
@@ -234,6 +237,7 @@ def s3_gpkg(config=None, name=None, delta_queue=DELTA_QUEUE):
         subprocess.check_output(args, stderr=subprocess.STDOUT)
         if 'alterations' in inlet_config:
             utils.alter_geojson(outpath, inlet_config['alterations'])
+        delta_queue.stamp_provenance(config, outpath, source=name, asset=name)
     finally:
         import os
         os.unlink(tmp_path)
@@ -348,7 +352,7 @@ def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
 
     out_layer = inlet_config.get('out_layer', f'h3_grid_r{resolution}')
     fc = geojson.FeatureCollection(features)
-    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+    delta_queue.add_deltas_from_features(config, name, fc, 'create', layer_name=out_layer)
     logger.info(f"h3_grid_inlet: generated {len(features)} cells at resolution {resolution}")
 
 
@@ -502,7 +506,7 @@ def inaturalist_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
             time.sleep(0.5)  # iNat rate limit: 100 req/min
 
     fc = geojson.FeatureCollection(features)
-    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+    delta_queue.add_deltas_from_features(config, name, fc, 'create', layer_name=out_layer)
     logger.info(f"inaturalist_inlet: {len(features)} observations across {len(regions)} region(s)")
     # TODO: delta refresh — pass updated_since=<last_run> to the API to skip unchanged observations
 
@@ -560,7 +564,7 @@ def federation_inlet(config=None, name=None, delta_queue=DELTA_QUEUE, quick=Fals
         fc = federation.filter_features_to_bbox(fc, filter_bbox)
 
     fc = geojson.FeatureCollection(fc.get('features', []))
-    delta_queue.add_deltas_from_features(config, None, fc, 'create', layer_name=out_layer)
+    delta_queue.add_deltas_from_features(config, name, fc, 'create', layer_name=out_layer)
 
     # Provenance → folded into attribution by generate_attributions.py
     provenance = federation.build_provenance(

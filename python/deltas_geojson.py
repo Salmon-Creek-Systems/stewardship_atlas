@@ -27,6 +27,7 @@ from geojson import Feature, FeatureCollection
 import duckdb
 
 import versioning
+import delta_provenance
 import utils
 import eddies
 import reshape
@@ -93,57 +94,132 @@ def transform(feature: Feature, config: Dict[str, Any]) -> Feature:
     
     return feature
 
+def _unique_delta_path(directory: Path, source: str, action: str, ext: str) -> Path:
+    """``{source}__{ts}__{action}.{ext}``, with a ``_cNNN`` suffix on the timestamp
+    if a delta from the same second already exists (#180). Apply order comes
+    from ``delta_sort_key``, which orders the suffix after the bare timestamp."""
+    timestamp = datetime.now().strftime(delta_provenance.TIMESTAMP_FORMAT)
+
+    def taken(ts):
+        # Any source counts: two sources in the same second must still order.
+        return any(directory.glob(f"*__{ts}__*")) or any((directory / 'work').glob(f"*__{ts}__*"))
+
+    ts, n = timestamp, 1
+    while taken(ts):
+        ts = f"{timestamp}_c{n:03d}"
+        n += 1
+    return directory / f"{source}__{ts}__{action}.{ext}"
+
+
+def delta_sort_key(path: Path):
+    """Apply order: by the filename's timestamp field, not the whole name.
+
+    The first field is the source, so a plain sort would apply every
+    ``email_photo`` delta before every ``webedit`` one regardless of time.
+    """
+    parts = Path(path).stem.split("__")
+    ts = parts[1] if len(parts) == 3 else ''
+    return (ts, Path(path).name)
+
+
 def delta_path(config: Dict[str, Any], asset_name: str, delta_action: str) -> str:
     """
     Return the path to the delta file for a given asset and delta action.
+    The asset name is the delta's source token.
     """
+    delta_provenance.validate_source(asset_name)
     delta_type = config['assets'][asset_name]['config']['data_type']
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     layer_name = config['assets'][asset_name]['out_layer']
-    p =  versioning.atlas_path(config,"deltas") / layer_name / f"{asset_name}__{timestamp}__{delta_action}.{delta_type}"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    (p.parent / 'work').mkdir(exist_ok=True)
-    return p
+    d = versioning.atlas_path(config, "deltas") / layer_name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / 'work').mkdir(exist_ok=True)
+    return _unique_delta_path(d, asset_name, delta_action, delta_type)
 
-def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action: str) -> str:
+
+def delta_path_from_layer(config: Dict[str, Any], layer_name: str, delta_action: str,
+                          source: str) -> str:
     """
-    Return the path to the delta file for a given layer and delta action.
+    Return the path to a new delta file for a layer, named for its source.
+
+    ``source`` is required: an inlet asset name or one of
+    ``delta_provenance.SOURCES`` (``webedit``, ``email_photo``, ...). Prefer
+    ``write_delta``, which also embeds the provenance record.
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    p =  versioning.atlas_path(config,"deltas") / layer_name / f"assetless__{timestamp}__{delta_action}.geojson"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    (p.parent / 'work').mkdir(exist_ok=True)
-    return p
+    delta_provenance.validate_source(source)
+    d = versioning.atlas_path(config, "deltas") / layer_name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / 'work').mkdir(exist_ok=True)
+    return _unique_delta_path(d, source, delta_action, 'geojson')
+
+
+def write_delta(config: Dict[str, Any], layer_name: str, feature_collection: Dict[str, Any],
+                delta_action: str, source: str, asset: str = None,
+                detail: Dict[str, Any] = None) -> Path:
+    """Write a delta for ``layer_name`` with its provenance recorded.
+
+    The single entry point for every non-inlet write (web edits, uploads,
+    sheet imports, photos, comments, moves, /create). Returns the path.
+    """
+    outpath = Path(delta_path_from_layer(config, layer_name, delta_action, source))
+    fc = dict(feature_collection)
+    fc['provenance'] = delta_provenance.record(
+        config, source=source, action=delta_action, layer=layer_name,
+        feature_count=len(fc.get('features') or []), asset=asset, detail=detail)
+    with versioning.atlas_file(outpath, mode="wt") as outfile:
+        json.dump(fc, outfile, default=utils.json_serial)
+    logger.info(f"Wrote delta {outpath} ({fc['provenance']['feature_count']} features, source={source})")
+    return outpath
+
+
+def stamp_provenance(config: Dict[str, Any], path: Path, source: str, asset: str = None,
+                     detail: Dict[str, Any] = None) -> None:
+    """Add the provenance member to a GeoJSON delta written by another tool
+    (ogr2ogr, an Overpass dump). No-op for non-GeoJSON deltas (rasters)."""
+    path = Path(path)
+    if path.suffix not in ('.geojson', '.json') or not path.exists():
+        return
+    try:
+        with open(path) as f:
+            fc = json.load(f)
+    except ValueError:
+        logger.warning(f"Could not stamp provenance on {path}: not JSON")
+        return
+    parts = delta_provenance.parse_filename(path)
+    layer_name = path.parent.name
+    fc['provenance'] = delta_provenance.record(
+        config, source=source, action=parts['action'] or 'create', layer=layer_name,
+        feature_count=len(fc.get('features') or []), asset=asset, detail=detail)
+    with open(path, 'w') as f:
+        json.dump(fc, f, default=utils.json_serial)
+
 
 def add_deltas_from_features(
         config: Dict[str, Any],
         asset_name: str,
         feature_collection: FeatureCollection,
         delta_action: str,
-        layer_name: str = None) -> Tuple[int, str]:
+        layer_name: str = None,
+        source: str = None) -> List[str]:
     """
     Add a new delta file to the layer's deltas directory.
-    
+
     Args:
-        feature_collection: GeoJSON FeatureCollection to store
         config: Configuration dictionary
-        asset_name: the asset generating the delta
+        asset_name: the asset generating the delta (its name is the source
+            token unless ``source`` is given)
+        feature_collection: GeoJSON FeatureCollection to store
+        delta_action: create / annotate / match / reshape / delete
+        layer_name: target layer; defaults to the asset's ``out_layer``
+        source: explicit source token (e.g. ``s3_photo_import``)
     Returns:
-        Tuple of (number of features written, path to written file)
-    
-    Raises:
-        InvalidDelta: If the feature collection is invalid
-    """    
-    if layer_name:
-        outpath = delta_path_from_layer(config, layer_name, delta_action)
-    else:
-        outpath = delta_path(config, asset_name, delta_action)
-    with versioning.atlas_file(outpath, mode="wt") as outfile:
-        json.dump(feature_collection, outfile)
-    
-    
-    logger.info(f"Wrote {len(feature_collection['features'])} features to {outpath}")
-    return [ str(outpath) ]
+        [path to written file]
+    """
+    source = source or asset_name
+    if not layer_name:
+        layer_name = config['assets'][asset_name]['out_layer']
+    outpath = write_delta(config, layer_name, feature_collection, delta_action,
+                          source=source, asset=asset_name)
+    return [str(outpath)]
 
 
 def extract_intersecting_features(layer_path: Path, polygon_fc: dict) -> List[Feature]:
@@ -245,7 +321,7 @@ def apply_deltas(config: Dict[str, Any], layer_name: str, overwrite: bool = Fals
     work_dir.mkdir(parents=True, exist_ok=True)
 
     # Get all .geojson files in the deltas directory, sorted by filename (timestamp order)
-    delta_files = sorted(deltas_dir.glob("*.geojson"))
+    delta_files = sorted(deltas_dir.glob("*.geojson"), key=delta_sort_key)
 
     
     # start an empypty layer file

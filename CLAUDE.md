@@ -61,7 +61,7 @@ DEFAULT_MATERIALIZERS = (
 
 ### Deltas
 
-Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Actions:
+Delta files are stored at `deltas/{layer_name}/{source}__{timestamp}__{action}.geojson`. `source` is the inlet asset name or an interactive source (`webedit`, `email_photo`, `sheet_import`, … — `delta_provenance.SOURCES`). **Every delta names its source; `assetless` is refused for new writes** (legacy files read as `unrecorded`). Each delta also carries a `provenance` member with `base_version` (the newest published version when it was written), which is how "changed since the last publish" is answered. Write through `deltas_geojson.write_delta(config, layer, fc, action, source)`; `/delta_upload` clients send `source` alongside `apply`. Apply order is by the timestamp field (`delta_sort_key`), not the whole filename. Actions:
 - `"create"` — append new features
 - `"annotate"` — update properties on existing features (spatial: features the drawn polygon intersects)
 - `"match"` — update properties by `atlas_id`
@@ -666,6 +666,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
+| `overlook` | Public progress page (`overlook.py`): headline numbers, changes since the last release (from delta provenance), field photos, products table. Materialize last, after the outlets it reports on. Only public layers; derived GeoJSON is property-allowlisted. Spike, kennedy only — `documents/development/homepage_design.md` |
 | `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (main-road edge crossings; re-run skips existing points) |
 
 **Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
@@ -676,7 +677,7 @@ atlas.materialize(config, "webmap")    # outlet
 
 **`ssurgo_enrich`** (`eddies.py`) — enriches a layer with NRCS soil properties via the SDA REST API. Writes `ssurgo_mukey`, `ssurgo_compname`, `ssurgo_drainagecl`, `ssurgo_ph`, `ssurgo_om`, `ssurgo_sand/silt/clay` onto each feature. Works on Point layers (direct lookup) and Polygon/MultiPolygon layers (centroid used for lookup). Config: `in_layer` (required), `out_layer` (defaults to `in_layer`, i.e. enriches in place).
 
-**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: its deltas are `assetless__…` and a re-run appends a duplicate grid.
+**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: a re-run appends a duplicate grid (its old deltas are `assetless__…`; new ones carry the asset name).
 
 **`h3_count` sparse mode** — give `resolution` and no `in_layer` and only occupied cells are written. Use it for fine resolutions: a full r11 grid over SFE would be ~370k cells / ~190 MB, while sparse `buildings_count_h3_r11` is 3,142 cells.
 

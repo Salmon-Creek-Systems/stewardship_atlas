@@ -264,7 +264,7 @@ def main():
 
     # Write single delta for the whole batch
     fc = {"type": "FeatureCollection", "features": features}
-    deltas_geojson.add_deltas_from_features(config, "s3_import", fc, "create", layer_name=layer_name)
+    deltas_geojson.write_delta(config, layer_name, fc, "create", source="s3_photo_import")
 
     # Refresh layer
     dataswale_geojson.refresh_vector_layer(config, layer_name)

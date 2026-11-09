@@ -23,6 +23,7 @@ import federation
 import atlas_catalog
 import map_style
 import help_docs
+import overlook
 import utils
 # from outlets_mapnik import build_region_map_mapnik
 
@@ -3410,4 +3411,5 @@ asset_methods = {
     's3_upload': s3_upload,
     'stac_catalog': outlet_stac_catalog,
     'biochar_webedit': outlet_biochar_webedit,
+    'overlook': overlook.outlet_overlook,
 }

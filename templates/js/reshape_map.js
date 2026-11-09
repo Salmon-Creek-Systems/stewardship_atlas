@@ -153,6 +153,7 @@ saveBtn.addEventListener('click', async () => {
         type: 'FeatureCollection',
         layer: LAYER,
         action: 'reshape',
+        source: 'reshape',
         features: [{type: 'Feature', geometry: edited.geometry,
                     properties: {atlas_id: loaded.atlasId}}],
     };
