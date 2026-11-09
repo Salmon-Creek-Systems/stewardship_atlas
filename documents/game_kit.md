@@ -88,7 +88,7 @@ So the loop runs **atlas → readiness check → community fixes → game → ne
 
 - The `game_kit` outlet covers the board PDF, the local cards and the readiness page (`python/game_kit.py`, `python/outlets_game_kit.py`).
 - **Any atlas:** an atlas needs only a `game_kit` asset. `roles` maps layers to game roles, and any role left out is found by conventional layer name. `name_field` and `road_filter.field` say which road properties hold the name and class. Unset, the name comes from the layer's webmap label field, and the class field is detected from `FUNCTIONAL`, `class` or `highway`, with only foot-only classes dropped. An atlas with no roads fails the readiness check and still builds what it can.
-- SCVFD is the first atlas wired up, admin-only because it prints names from admin layers.
+- SCVFD is the first atlas wired up. Its kit is declared admin because it prints names from restricted layers, but that isn't enforced yet, so it loads without a login (#228).
 - **Safe locations** are a point layer, `safe_locations`. A piece that reaches one is saved and leaves the game.
 - **Roads are filtered** in DuckDB by category. SCVFD keeps every class except unclassed roads, so private roads count the same as public ones for now (#226). A road outside the kept categories stays if it serves a safe location, helispot, landmark, or at least 3 buildings. Short dead ends that serve nothing are pruned.
 - **Spaces** sit at every junction and evenly along the roads between, sized so that the longest trip across the board is about 32 spaces.

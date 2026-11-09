@@ -27,6 +27,9 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Help pages:** every `documents/help/*.md` starts `# Title` then `<!-- audience: user|admin|developer -->` (`python/help_docs.py`). The manuals (`user_manual.md`, `admin_manual.md`) are short narrative that links to help pages instead of repeating them; `user_guide.md` is now `developers_guide.md`. In-app `?` links open the most specific page in a new tab (`/local/documents/help/{page}.html` or a manual `#section`). `tests/test_help_docs.py` fails on a missing tag, an unlinked page, or any `?` whose target or anchor doesn't exist — add the page and a manual link together.
 - **Customer-facing copy uses US spelling.**
 - **Federation v2 is design only and post-cloud (#224).** No branch or code until Scot says to start, and don't design for the box. Federated features are read-only to the consumer and consumer-side changes are out of v2, because a real answer needs the delta rethink (#223). Don't add anything just to prohibit chains; they're expected eventually. All share changes wait for the source's next publish, which keeps the data flow simple. `documents/federation-overview.md` still describes v1.
+- **Evacuation Game (`game_kit`) runs on any atlas, using only what the atlas has.** The atlas bbox is the game world: don't add data, connect roads across the crop, or add a connector step. A road reaching the edge is an exit there, and each clipped piece is judged on its own network. One main-network exit is a real finding the readiness page calls out, not a bug; admins edit `safe_locations` if they disagree.
+- **An outlet's access is the most restrictive of its own and its inputs' (#228).** Scot's rule; not implemented yet. Today only `console/(admin|internal)` is gated, so a `game_kit` declared admin still loads without a login.
+- **Don't roll the `overture_roads` touch-the-atlas query (`ab53843`) out to atlases with hand-edited roads** (scvfd, kennedy, gilhamhike) until rebuild replays deltas (#200, #223). The rollout path is `config_only` + rebuild, and a rebuild drops those edits.
 - **Atlas tours don't live in this repo.** A tour (an overview walkthrough of one atlas, with preset map-view links) is a markdown file in `Salmon-Creek-Systems.github.io/_tours/`, auto-listed at salmoncreeksystems.com/tours/. Chosen over a fireatlas.org render step because it reuses Jekyll and existing styling and doesn't add to the box being retired. Tour links point at `staging/` deliberately; CURRENT may be stale, so revisit them during the cloud migration. Don't put tours in `documents/release_notes/`.
 
 ## Core Architecture Concepts
@@ -57,7 +60,7 @@ DEFAULT_MATERIALIZERS = (
 )
 ```
 
-**Config resolution**: Each asset in `{atlas}_assets.json` has a `config_def` field that references a template in `shared_*.json`. The shared template is loaded first, then per-asset overrides are applied. The merged result lives in `config['assets'][name]` at runtime. Use `atlas.create_config()` to inspect the merged result.
+**Config resolution**: Each asset in `{atlas}_assets.json` has a `config_def` field that references a template in `shared_*.json`. The shared template is loaded first, then per-asset overrides are applied. Overrides must be **top-level keys on the asset**: a `config` block in the atlas source is discarded (`atlas.py:237`, #53 item 7), so read the built config to see what an atlas really runs. The merged result lives in `config['assets'][name]` at runtime. Use `atlas.create_config()` to inspect the merged result.
 
 ### Deltas
 
@@ -68,7 +71,7 @@ Delta files are stored at `deltas/{layer_name}/{source}__{timestamp}__{action}.g
 - `"reshape"` — replace geometry by `atlas_id`, properties untouched (webedit Reshape page; `python/reshape.py`)
 - `"delete"` — remove features the drawn polygon intersects
 
-`atlas_id` is stable: it lives in the layer file, an update applies deltas on top of it, and a rebuild re-runs inlets without replaying archived `work/` deltas.
+`atlas_id` is stable across updates, because it lives in the layer file and deltas apply on top of it. It is **not** stable across a rebuild: the fresh inlet base gets new UUIDs. A rebuild re-runs inlets without replaying archived `work/` deltas, so hand edits drop out of the layer, though the files survive (#200).
 
 Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
 
@@ -667,7 +670,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `config_editor` | Config editor UI |
 | `3dview` | 3D terrain view |
 | `overlook` | Public progress page (`overlook.py`): headline numbers, changes since the last release (from delta provenance), field photos, products table. Materialize last, after the outlets it reports on. Only public layers; derived GeoJSON is property-allowlisted. Spike, kennedy only — `documents/development/homepage_design.md` |
-| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (main-road edge crossings; re-run skips existing points) |
+| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Any role left out is found by conventional layer name. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (edge crossings per road network; re-run skips existing points); with no such layer, exits are generated in memory at build. Roads with no route to safety are drawn in red (see `documents/game_kit.md`) |
 
 **Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
