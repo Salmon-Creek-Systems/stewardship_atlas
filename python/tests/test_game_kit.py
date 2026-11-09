@@ -60,6 +60,59 @@ class TestBoard(unittest.TestCase):
         self.assertEqual([(p["number"], p["name"]) for p in places], [(1, "School"), (2, "Store")])
 
 
+def classed(field, value, **extra):
+    return {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
+            "properties": {field: value, **extra}}
+
+
+class TestRoadConfig(unittest.TestCase):
+
+    def test_road_passes(self):
+        self.assertTrue(gk.road_passes("x", None))
+        self.assertTrue(gk.road_passes("a", {"field": "f", "keep": ["a"]}))
+        self.assertFalse(gk.road_passes("b", {"field": "f", "keep": ["a"]}))
+        self.assertFalse(gk.road_passes(None, {"field": "f", "keep": ["a"]}))
+        self.assertFalse(gk.road_passes("path", {"field": "f", "drop": ["path"]}))
+        self.assertTrue(gk.road_passes(None, {"field": "f", "drop": ["path"]}))
+
+    def test_class_field_is_detected_for_each_source(self):
+        for field, value, main in (("FUNCTIONAL", "Private", "Principal Arterials"),
+                                   ("class", "service", "tertiary"),
+                                   ("highway", "track", "primary")):
+            opts = gk.road_options([classed(field, None), classed(field, value)], {})
+            self.assertEqual(opts["road_filter"]["field"], field)
+            self.assertIn("footway", opts["road_filter"]["drop"])
+            self.assertIn(main, opts["main_roads"])
+
+    def test_unknown_fields_keep_every_road(self):
+        opts = gk.road_options([classed("kind", "x")], {})
+        self.assertIsNone(opts["road_filter"])
+        self.assertEqual(opts["main_roads"], [])
+
+    def test_configured_values_win(self):
+        configured = {"field": "tier", "keep": ["1"]}
+        opts = gk.road_options([classed("class", "service")],
+                               {"road_filter": configured, "main_roads": ["1"], "name_field": "NM"})
+        self.assertEqual(opts, {"name_field": "NM", "road_filter": configured, "main_roads": ["1"]})
+
+    def test_name_field_comes_from_the_webmap_label(self):
+        self.assertEqual(gk.road_options([], {}, {"label_field": "FULLNAME"})["name_field"], "FULLNAME")
+        self.assertEqual(gk.road_options([], {}, {})["name_field"], "name")
+
+    def test_apply_name_field(self):
+        roads = [classed("FULLNAME", "Thomas Rd")]
+        gk.apply_name_field(roads, "FULLNAME")
+        self.assertEqual(gk.feature_name(roads[0]), "Thomas Rd")
+
+    def test_roles_fill_in_around_configured_ones(self):
+        roles = gk.resolve_roles({"landmarks": ["my_places"]}, {"roads", "buildings", "poi", "my_places"})
+        self.assertEqual(roles, {"landmarks": ["my_places"], "roads": ["roads"], "residences": ["buildings"]})
+
+    def test_base_layers_use_one_basemap(self):
+        self.assertEqual(gk.default_base_layers({"basemap", "lidar_basemap", "creeks"}), ["lidar_basemap", "creeks"])
+        self.assertEqual(gk.default_base_layers({"roads"}), [])
+
+
 def safe(lon, lat, name, source="drawn"):
     return {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
             "properties": {"name": name, "source": source}}
@@ -109,6 +162,42 @@ class TestKit(unittest.TestCase):
         kit = self.kit(roads=(HIGHWAY, SPUR, BACK, island), safe_locations={"safe_locations": EDGE_SAFE})
         self.assertEqual(self.status(kit)["way_out"], "warn")
         self.assertEqual(kit["stranded_spaces"], 5)
+
+    def test_stranded_roads_are_split_out_for_red(self):
+        island = road([[-123.99, 40.17], [-123.966, 40.17]], "Island Rd")
+        kit = self.kit(roads=(HIGHWAY, island), safe_locations={"safe_locations": EDGE_SAFE})
+        layers = gk.overlay_layers(kit)
+        self.assertEqual([f["properties"]["name"] for f in layers["game_roads_stranded"]["features"]], ["Island Rd"])
+        self.assertEqual(len(layers["game_spaces_stranded"]["features"]), kit["stranded_spaces"])
+        self.assertNotIn("Island Rd", [f["properties"]["name"] for f in layers["game_roads"]["features"]])
+        self.assertIn("Island Rd", next(c for c in kit["readiness"] if c["key"] == "way_out")["detail"])
+
+    def test_no_roads_is_reported_and_still_builds(self):
+        kit = self.kit(roads=())
+        self.assertEqual(self.status(kit)["roads"], "missing")
+        self.assertFalse(gk.ready(kit))
+        self.assertTrue(gk.index_html(kit, board_ok=False))
+
+    def test_main_network_with_one_way_out_is_called_out(self):
+        kit = self.kit(safe_locations={"safe_locations": EDGE_SAFE[:1]})
+        check = next(c for c in kit["readiness"] if c["key"] == "main_exits")
+        self.assertEqual(check["status"], "warn")
+        self.assertIn("only one way out: US Hwy 101 (west edge)", check["detail"])
+
+    def test_main_network_with_two_ways_out_is_fine(self):
+        self.assertEqual(self.status(self.kit(safe_locations={"safe_locations": EDGE_SAFE}))["main_exits"], "ok")
+
+    def test_chokepoints_named_and_on_the_page(self):
+        role_layers = {"roads": {"roads": [HIGHWAY, SPUR]}, "residences": {"buildings": [point(-123.95, 40.228, "h")]},
+                       "safe_locations": {"safe_locations": EDGE_SAFE}}
+        parts = [{"rid": i, "coords": f["geometry"]["coordinates"], "by_class": True, "serves": {"residences"}}
+                 for i, f in enumerate([HIGHWAY, SPUR])]
+        board = gb.build_board(parts, BBOX, gk.safe_points(EDGE_SAFE), step_m=500,
+                               residence_points=[[-123.95, 40.228]])
+        kit = gk.build_kit("test", BBOX, role_layers, board, {})
+        self.assertEqual(kit["chokepoints"][0]["name"], "Spur Rd")
+        self.assertEqual(self.status(kit)["chokepoints"], "warn")
+        self.assertIn("Single points of failure", gk.index_html(kit, board_ok=True))
 
     def test_cards_use_local_names_and_skip_empty_layers(self):
         kit = self.kit(hazards={"hazards": [point(-123.95, 40.21, "One-lane bridge")]},

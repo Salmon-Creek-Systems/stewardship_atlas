@@ -1436,11 +1436,7 @@
                         "name": "safe_exits",
                         "config_def": "game_safe_exits",
                         "in_layer": "roads",
-                        "out_layer": "safe_locations",
-                        "road_filter": {
-                            "field": "FUNCTIONAL",
-                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors"]
-                        }
+                        "out_layer": "safe_locations"
                     },
                     "game_kit": {
                         "type": "outlet",
@@ -1451,7 +1447,7 @@
                         "in_layers": ["lidar_basemap", "creeks", "buildings"],
                         "road_filter": {
                             "field": "FUNCTIONAL",
-                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads"]
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads", "Unclassified", "Private"]
                         },
                         "residence_min": 3,
                         "roles": {

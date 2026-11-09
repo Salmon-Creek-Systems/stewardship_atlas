@@ -357,14 +357,17 @@ def h3_grid_inlet(config=None, name=None, delta_queue=DELTA_QUEUE):
 
 
 def game_safe_exits(config=None, name=None, delta_queue=DELTA_QUEUE):
-    """Seed the safe_locations layer: a point where each main road leaves the atlas.
+    """Seed the safe_locations layer: points where the board's roads leave the atlas.
 
-    Only roads whose `road_filter.field` is in `road_filter.keep` (arterials and
-    collectors, not every back road that happens to touch the rectangle). A
-    crossing that already has a point within the merge distance is skipped, so
-    re-running after the layer is refreshed adds only new ones. Points carry
-    source "edge"; edit or delete them in webedit like any point layer.
+    One per main road, side and connected network, and at least one for every
+    network that reaches the edge (game_board.seed_exits). road_filter and
+    main_roads come from this asset, else the atlas's game_kit outlet, else are
+    guessed from the road data. A crossing that already has a point within the
+    merge distance is skipped, so re-running after the layer is refreshed adds
+    only new ones. Points carry source "edge"; edit or delete them in webedit
+    like any point layer.
     """
+    import game_kit
     import game_roads
 
     asset = config['assets'][name]
@@ -376,8 +379,13 @@ def game_safe_exits(config=None, name=None, delta_queue=DELTA_QUEUE):
         path = versioning.atlas_path(config, 'layers') / layer / f'{layer}.geojson'
         return geojson.load(open(path))['features'] if path.exists() else []
 
-    points = game_roads.edge_exits(features(in_layer), config['dataswale']['bbox'],
-                                   inlet_config['road_filter'], existing=features(out_layer))
+    roads = features(in_layer)
+    kit_asset = next((a for a in config['assets'].values() if a.get('config_def') == 'game_kit'), {})
+    road_layer = next((l for l in config['dataswale']['layers'] if l.get('name') == in_layer), None)
+    options = game_kit.road_options(roads, {**kit_asset, **inlet_config}, road_layer)
+    game_kit.apply_name_field(roads, options['name_field'])
+    points = game_roads.edge_exits(roads, config['dataswale']['bbox'], options['road_filter'],
+                                   main_roads=options['main_roads'], existing=features(out_layer))
     if points:
         delta_queue.add_deltas_from_features(config, name, geojson.FeatureCollection(points), 'create',
                                              layer_name=out_layer)
