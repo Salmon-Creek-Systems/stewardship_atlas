@@ -44,6 +44,26 @@ EXIT_MERGE_M = 300                   # crossings closer than this are one exit
 MIN_SAFE = 2                         # safe locations a playable board needs
 MAX_EXITS = 8                        # (board_exits, uncalled) exits on the board, longest roads first
 MIN_PLACES = 6                       # enough numbered places for the "go to ⑰" cards
+MIN_MAIN_EXITS = 2                   # ways out the biggest road network should have
+
+_OVERTURE_MAIN = ("motorway", "trunk", "primary", "secondary", "tertiary")
+# Road class fields by source, each with the classes that count as main roads.
+ROAD_CLASS_FIELDS = {
+    "FUNCTIONAL": ("Principal Arterials", "Minor Arterials", "Major Collectors", "Minor Collectors"),
+    "class": _OVERTURE_MAIN,
+    "highway": _OVERTURE_MAIN,
+}
+FOOT_ONLY_CLASSES = ("footway", "path", "steps", "cycleway", "pedestrian", "bridleway", "sidewalk", "crosswalk")
+DEFAULT_ROLE_LAYERS = {
+    "roads": ("roads",),
+    "safe_locations": ("safe_locations",),
+    "helispots": ("helispots",),
+    "landmarks": ("landmarks", "poi"),
+    "residences": ("buildings",),
+    "hazards": ("hazards",),
+    "water": ("watertanks",),
+}
+BASEMAP_LAYERS = ("lidar_basemap", "hillshade", "basemap")
 
 # Road "names" that aren't: a bare street type or a number.
 _STREET_TYPES = {"DR", "RD", "LN", "ST", "WAY", "CT", "AVE", "PL", "TRL", "HWY", "CIR", "BLVD", "LOOP"}
@@ -169,6 +189,60 @@ def feature_name(feature, keys=("name", "title", "label")):
         if n:
             return n
     return None
+
+
+# ── road and layer configuration ────────────────────────────────────────────
+
+def road_passes(cls, road_filter):
+    """Whether a road of class `cls` is on the board under road_filter."""
+    if not road_filter:
+        return True
+    if road_filter.get("keep") is not None:
+        return cls in road_filter["keep"]
+    return cls not in (road_filter.get("drop") or ())
+
+
+def road_options(road_features, options, road_layer=None):
+    """{'name_field', 'road_filter', 'main_roads'} from outlet config, guessing what's unset.
+
+    name_field defaults to the road layer's webmap label_field. The class
+    field is the first of the known ones the data fills in, and the default
+    filter only drops foot-only classes. An atlas whose roads have none of
+    those fields gets every road on the board and no main roads.
+    """
+    road_filter = options.get("road_filter")
+    if not road_filter:
+        field = next((f for f in ROAD_CLASS_FIELDS
+                      if any((r.get("properties") or {}).get(f) not in (None, "") for r in road_features)), None)
+        road_filter = {"field": field, "drop": list(FOOT_ONLY_CLASSES)} if field else None
+    field = (road_filter or {}).get("field")
+    return {"name_field": options.get("name_field") or (road_layer or {}).get("label_field") or "name",
+            "road_filter": road_filter,
+            "main_roads": options.get("main_roads") or list(ROAD_CLASS_FIELDS.get(field, ()))}
+
+
+def apply_name_field(road_features, field):
+    """Copy each road's name_field into 'name', which the kit reads. In memory only."""
+    if field != "name":
+        for f in road_features:
+            f.setdefault("properties", {})["name"] = (f.get("properties") or {}).get(field)
+
+
+def resolve_roles(configured, layer_names):
+    """The outlet's roles: as configured, then any others found by conventional layer name."""
+    roles = dict(configured or {})
+    for role, names in DEFAULT_ROLE_LAYERS.items():
+        if role not in roles:
+            found = [n for n in names if n in layer_names]
+            if found:
+                roles[role] = found[:1]
+    return roles
+
+
+def default_base_layers(layer_names):
+    """Layers under the board when in_layers isn't set: one basemap, then creeks and buildings."""
+    basemap = next((n for n in BASEMAP_LAYERS if n in layer_names), None)
+    return ([basemap] if basemap else []) + [n for n in ("creeks", "buildings") if n in layer_names]
 
 
 # ── board overlays ──────────────────────────────────────────────────────────
@@ -353,11 +427,14 @@ def build_kit(atlas_name, bbox, role_layers, board, options=None):
     roads = feats.get("roads", [])
 
     board_roads = [{"type": "Feature", "geometry": {"type": "LineString", "coordinates": r["coords"]},
-                    "properties": {"name": feature_name(roads[r["rid"]]) if r["rid"] < len(roads) else None}}
+                    "properties": {"name": feature_name(roads[r["rid"]]) if r["rid"] < len(roads) else None,
+                                   "stranded": r["stranded"]}}
                    for r in board["roads"]]
     named, _ = named_road_lengths(board_roads, bbox)
     all_named, unnamed_m = named_road_lengths(roads, bbox)
     reachable = [d for d in board["to_safety"] if d is not None]
+    safe_names = {s["space"]: s["name"] for s in board["safe"]}
+    main = board["networks"][0] if board["networks"] else None
 
     kit = {
         "atlas": atlas_name,
@@ -371,6 +448,13 @@ def build_kit(atlas_name, bbox, role_layers, board, options=None):
         "unplaced_safe": board["unplaced_safe"],
         "longest_to_safety": max(reachable) if reachable else None,
         "stranded_spaces": len(board["to_safety"]) - len(reachable),
+        "stranded_space_points": [p for p, d in zip(board["spaces"], board["to_safety"]) if d is None],
+        "stranded_road_names": sorted({r["properties"]["name"] for r in board_roads
+                                       if r["properties"]["stranded"] and r["properties"]["name"]}),
+        "main_network": main and {"spaces": main["spaces"], "exits": [safe_names[s] for s in main["safe"]]},
+        "chokepoints": [dict(c, name=(feature_name(roads[c["rid"]]) if c["rid"] < len(roads) else None) or "Unnamed road",
+                             cell=grid_cell_of(board["spaces"][c["space"]], bbox))
+                        for c in board["chokepoints"]],
         "places": numbered_places(feats.get("landmarks", []), bbox),
         "helispots": [{"name": feature_name(f) or "Helispot", "lonlat": _point(f)}
                       for f in feats.get("helispots", []) if _point(f)],
@@ -405,8 +489,10 @@ def overlay_layers(kit):
         "game_grid": g,
         "game_grid_labels": _fc([_pt([c["properties"]["label_x"], c["properties"]["label_y"]],
                                      label=str(c["properties"]["cell"])) for c in g["features"]]),
-        "game_roads": _fc(kit["roads"]),
-        "game_spaces": _fc([_pt(p) for p in kit["spaces"]]),
+        "game_roads": _fc([r for r in kit["roads"] if not r["properties"]["stranded"]]),
+        "game_roads_stranded": _fc([r for r in kit["roads"] if r["properties"]["stranded"]]),
+        "game_spaces": _fc([_pt(p) for p in kit["spaces"] if p not in kit["stranded_space_points"]]),
+        "game_spaces_stranded": _fc([_pt(p) for p in kit["stranded_space_points"]]),
         "game_safe": _fc([_pt(s["lonlat"], label="SAFE", name=s["name"]) for s in kit["safe"]]),
         "game_places": _fc([_pt(p["lonlat"], label=str(p["number"]), name=p["name"])
                             for p in kit["places"]]),
@@ -436,7 +522,13 @@ def readiness(kit, role_layers, options):
         return ", ".join(f"{name} ({len(fs)})" for name, fs in layers.items()) or "no layers"
 
     safe, drawn = kit["safe"], _drawn(kit["safe"])
-    detail = (f"{len(safe)} on the board ({len(safe) - len(drawn)} where a main road leaves the "
+    checks.append(_check(
+        "roads", "Roads", any(role_layers.get("roads", {}).values()),
+        f"roads: {layer_note('roads')}",
+        "The board is built from the road network, and this atlas has no road features. Assign "
+        "a line layer to the roads role on the game_kit outlet, or add a layer named roads.",
+    ))
+    detail = (f"{len(safe)} on the board ({len(safe) - len(drawn)} where a road leaves the "
               f"atlas, {len(drawn)} drawn by hand): {layer_note('safe_locations')}")
     if kit["unplaced_safe"]:
         detail += f". {len(kit['unplaced_safe'])} too far from any board road to place"
@@ -447,9 +539,11 @@ def readiness(kit, role_layers, options):
         "safe_locations layer.",
     ))
     total_spaces = len(kit["spaces"])
+    stranded_names = ", ".join(kit["stranded_road_names"][:6])
     checks.append(_check(
         "way_out", "A way out from everywhere", total_spaces > 0 and kit["stranded_spaces"] == 0,
         (f"{kit['stranded_spaces']} of {total_spaces} board spaces have no road to a safe location"
+         f"{' (' + stranded_names + ')' if stranded_names else ''}; they are red on the board"
          if kit["stranded_spaces"] else
          f"every space reaches safety; the longest trip is {kit['longest_to_safety']} moves")
         if total_spaces else "no roads on the board",
@@ -457,6 +551,30 @@ def readiness(kit, role_layers, options):
         "from the data, or those households really have no way out; both are worth knowing.",
         warn_only=bool(kit["safe"]),
     ))
+    main = kit["main_network"]
+    if main:
+        n_exits = len(main["exits"])
+        checks.append(_check(
+            "main_exits", "Two ways out of the main road network", n_exits >= MIN_MAIN_EXITS,
+            f"the main road network ({main['spaces']} of {total_spaces} spaces) has "
+            + (f"only one way out: {main['exits'][0]}" if n_exits == 1 else
+               "no way out" if n_exits == 0 else f"{n_exits} ways out: {', '.join(main['exits'])}"),
+            "Everyone on the main network depends on too few ways out. If there are other real "
+            "exits, an admin can add them to the safe_locations layer. If there aren't, that is "
+            "what the game is here to show.",
+            warn_only=True,
+        ))
+    if any(role_layers.get("residences", {}).values()):
+        worst = kit["chokepoints"][0] if kit["chokepoints"] else None
+        checks.append(_check(
+            "chokepoints", "No single road or junction cuts people off", worst is None,
+            (f"{len(kit['chokepoints'])} listed below; the worst is {_choke_label(worst)}, "
+             f"with {worst['households']} buildings behind it" if worst else
+             "every building with a route to safety has at least two independent ways to get there"),
+            "Each of these is one road or junction that, if blocked, leaves buildings with no "
+            "way to any safe location.",
+            warn_only=True,
+        ))
     checks.append(_check(
         "helispots", "Helicopter landing spots", bool(kit["helispots"]),
         f"{len(kit['helispots'])} helispot(s): {layer_note('helispots')}",
@@ -497,6 +615,11 @@ def readiness(kit, role_layers, options):
 
 def ready(kit):
     return all(c["status"] != "missing" for c in kit["readiness"])
+
+
+def _choke_label(choke):
+    kind = "the road" if choke["kind"] == "road" else "a junction on"
+    return f"{kind} {choke['name']} (cell {choke['cell']})"
 
 
 # ── cards and evacuation order ──────────────────────────────────────────────
@@ -587,6 +710,12 @@ def index_html(kit, board_ok):
     files = "".join(f"<li><a href='{e(u)}'>{e(n)}</a></li>" for n, u in KIT_FILES)
     places = "".join(f"<li>({p['number']}) {e(p['name'])}</li>" for p in kit["places"]) or "<li><em>none</em></li>"
     safe = "".join(f"<li>{e(x['name'])}</li>" for x in kit["safe"]) or "<li><em>none</em></li>"
+    chokes = "".join(f"<tr><td>{e(_choke_label(c))}</td><td>{c['households']}</td><td>{c['spaces_cut']}</td></tr>"
+                     for c in kit["chokepoints"])
+    choke_section = (f"<h2>Single points of failure</h2><p>If one of these is blocked, the buildings behind "
+                     f"it have no way to any safe location. Buildings are counted at their nearest "
+                     f"board space and include outbuildings.</p><table><tr><th>Where</th><th>Buildings "
+                     f"behind it</th><th>Board spaces cut off</th></tr>{chokes}</table>") if chokes else ""
     verdict = ("This atlas has what the game needs." if ready(kit)
                else "This atlas is missing something the game needs — see below. "
                     "The board still prints, with the gaps showing.")
@@ -612,7 +741,7 @@ board game</a> (game design: Tom Maiorana, UC Davis), built from this atlas.</p>
 
 <h2>Can this atlas be played?</h2>
 <table><tr><th>Ingredient</th><th>Status</th><th>Detail</th></tr>{rows}</table>
-
+{choke_section}
 <h2>Sample evacuation order (for the Fire)</h2>
 <blockquote>{e(kit['evacuation_order'])}</blockquote>
 

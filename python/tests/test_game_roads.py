@@ -20,6 +20,7 @@ except Exception:                       # not installed locally, or no spatial e
 
 BBOX = {"west": -124.0, "east": -123.9, "south": 40.15, "north": 40.25}
 FILTER = {"field": "FUNCTIONAL", "keep": ["Principal Arterials"]}
+MAIN = ["Principal Arterials"]
 
 
 def road(coords, name, cls):
@@ -54,6 +55,10 @@ class TestRoadParts(unittest.TestCase):
         self.assertAlmostEqual(max(xs), -123.9, places=6)
         self.assertAlmostEqual(min(c[1] for c in by_rid[2]["coords"]), 40.15, places=6)
 
+    def test_drop_filter_keeps_unclassed_roads(self):
+        parts = gr.road_parts([HWY, LANE], BBOX, {"field": "FUNCTIONAL", "drop": ["Private"]})
+        self.assertEqual({p["rid"]: p["by_class"] for p in parts}, {0: True, 1: False})
+
     def test_no_filter_keeps_everything(self):
         self.assertTrue(all(p["by_class"] for p in gr.road_parts([HWY, LANE], BBOX)))
 
@@ -75,20 +80,24 @@ class TestRoadParts(unittest.TestCase):
 class TestEdgeExits(unittest.TestCase):
 
     def test_only_kept_roads_one_per_side(self):
-        pts = gr.edge_exits([HWY, BACK], BBOX, FILTER)
+        pts = gr.edge_exits([HWY, BACK], BBOX, FILTER, main_roads=MAIN)
         names = sorted(p["properties"]["name"] for p in pts)
         self.assertEqual(names, ["US Hwy 101 (east edge)", "US Hwy 101 (west edge)"])
         self.assertTrue(all(p["properties"]["source"] == "edge" for p in pts))
 
-    def test_wiggle_on_one_side_is_one_exit(self):
+    def test_road_leaving_and_returning_gets_an_exit_per_piece(self):
         wiggle = road([[-123.95, 40.2], [-124.01, 40.2], [-123.99, 40.18], [-124.01, 40.17]],
                       "Wiggle Rd", "Principal Arterials")
-        self.assertEqual(len(gr.edge_exits([wiggle], BBOX, FILTER)), 1)
+        self.assertEqual(len(gr.edge_exits([wiggle], BBOX, FILTER, main_roads=MAIN)), 2)
+
+    def test_road_clipped_exactly_at_the_edge_counts(self):
+        clipped = road([[-124.0, 40.2], [-123.95, 40.2]], "Clipped Rd", "Principal Arterials")
+        self.assertEqual(len(gr.edge_exits([clipped], BBOX, FILTER, main_roads=MAIN)), 1)
 
     def test_rerun_skips_existing_points(self):
-        first = gr.edge_exits([HWY], BBOX, FILTER)
-        self.assertEqual(gr.edge_exits([HWY], BBOX, FILTER, existing=first), [])
-        self.assertEqual(len(gr.edge_exits([HWY], BBOX, FILTER, existing=first[:1])), 1)
+        first = gr.edge_exits([HWY], BBOX, FILTER, main_roads=MAIN)
+        self.assertEqual(gr.edge_exits([HWY], BBOX, FILTER, main_roads=MAIN, existing=first), [])
+        self.assertEqual(len(gr.edge_exits([HWY], BBOX, FILTER, main_roads=MAIN, existing=first[:1])), 1)
 
 
 if __name__ == '__main__':
