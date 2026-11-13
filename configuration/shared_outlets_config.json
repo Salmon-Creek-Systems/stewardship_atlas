@@ -245,6 +245,21 @@
             "citation": "https://prototypingresilience.com/diy-game-kit"
         }
     },
+    "slides": {
+        "name": "slides",
+        "asset_type": "outlet",
+        "fetch_type": "outlet_slides",
+        "interaction": "interface",
+        "access": ["public"],
+        "size": [1600, 900],
+        "scale": 2,
+        "attribution": {
+            "url": "https://fireatlas.org",
+            "description": "PNG snapshots of preset web map and 3D views, for slides.",
+            "license": "https://fireatlas.org",
+            "citation": "https://fireatlas.org"
+        }
+    },
     "biochar_webedit": {
         "asset_type": "outlet",
         "fetch_type": "biochar_webedit",

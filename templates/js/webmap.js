@@ -1,6 +1,18 @@
 // Initialize the map
 const map = new maplibregl.Map(MAP_CONFIG);
 
+// Snapshot mode (?chrome=0), used by the slides outlet (outlets_slides.py): hide every
+// panel and control except the scale bar and attribution, so a headless render
+// captures just the map. The renderer waits for window.atlasMapReady, set below
+// on the first idle after the load handler has finished.
+if (new URLSearchParams(window.location.search).get('chrome') === '0') {
+    const bareStyle = document.createElement('style');
+    bareStyle.textContent =
+        '#controls, #basemap-control, .maplibregl-ctrl-group, #zoom-indicator, ' +
+        '.maplibregl-popup, .success-notification { display: none !important; }';
+    document.head.appendChild(bareStyle);
+}
+
 // Add scale control
 map.addControl(new maplibregl.ScaleControl({
     maxWidth: 80,
@@ -786,4 +798,10 @@ map.on('load', async () => {
             collapseBtn.title = collapsed ? 'Expand panel' : 'Collapse panel';
         });
     }
+
+    // Everything above has run: the next idle means every layer the view shows has drawn.
+    // A throw anywhere earlier skips this, so the slides renderer times out instead of
+    // capturing a half-built map.
+    map.once('idle', () => { window.atlasMapReady = true; });
+    map.triggerRepaint(); // guarantees an idle follows even if nothing else changes
 });

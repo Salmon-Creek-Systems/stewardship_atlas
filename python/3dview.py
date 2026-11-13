@@ -566,6 +566,16 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     # Keys: a=lat, o=lng, z=zoom, t=pitch, r=bearing, e=exaggeration, l=visible layer names;
     # with a camera route chosen, also p=route layer, h=height (m), c=camera angle, d=duration (s).
     interaction_js = """
+        // Snapshot mode (?chrome=0), used by the slides outlet (outlets_slides.py):
+        // hide the panels and controls, don't play a camera route, and set
+        // window.atlasMapReady on the first idle once the view state is applied.
+        const BARE_MODE = new URLSearchParams(window.location.search).get('chrome') === '0';
+        if (BARE_MODE) {
+            const bareStyle = document.createElement('style');
+            bareStyle.textContent = '.panel, .maplibregl-ctrl-group, .success-notification { display: none !important; }';
+            document.head.appendChild(bareStyle);
+        }
+
         function encode3DState(s) { return btoa(JSON.stringify(s)); }
         function decode3DState(s) { try { return JSON.parse(atob(s)); } catch (e) { return null; } }
 
@@ -615,7 +625,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             CHECKBOX_LISTENERS
 
             const st = decode3DState(new URLSearchParams(window.location.search).get('s'));
-            if (typeof initRouteFromUrl === 'function') initRouteFromUrl(st);
+            if (typeof initRouteFromUrl === 'function' && !BARE_MODE) initRouteFromUrl(st);
             if (!st) return;
             if (typeof st.a === 'number' && typeof st.o === 'number') map.setCenter([st.o, st.a]);
             if (typeof st.z === 'number') map.setZoom(st.z);
@@ -639,6 +649,13 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                     });
                 });
             }
+        });
+
+        // Registered after the state handler, so this idle comes after the camera,
+        // terrain and layer visibility from ?s= are applied.
+        map.on('load', () => {
+            map.once('idle', () => { window.atlasMapReady = true; });
+            map.triggerRepaint();
         });""".replace('CHECKBOX_LISTENERS', checkbox_listener_js)
 
     html_content = f"""<!DOCTYPE html>
