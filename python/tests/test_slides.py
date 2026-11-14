@@ -143,3 +143,41 @@ def test_tour_views_feed_plan_slides():
     plan = slides.plan_slides(slides.tour_views(TOUR), BASE)
     assert [p['kind'] for p in plan] == ['3dview', 'webmap', 'webmap']
     assert plan[1]['file'] == '02_water_sources.png'
+
+
+# --- tour_meta and the deck ----------------------------------------------------
+
+def test_tour_meta_reads_front_matter():
+    meta = slides.tour_meta(TOUR)
+    assert meta['title'] == 'Test Tour'
+    assert meta['description'].startswith('has a [link]')
+    assert slides.tour_meta("no front matter\n") == {}
+
+
+ENTRIES = [
+    {'title': 'Overview', 'file': '01_overview.png', 'url': URL_3D, 'notes': 'Look\naround.'},
+    {'title': 'Water', 'file': '02_water.png', 'url': WEBMAP_URL, 'notes': ''},
+]
+
+
+def test_deck_markdown_title_slide_then_one_per_view():
+    md = slides.deck_markdown({'title': 'Tour', 'description': 'About it'}, ENTRIES)
+    parts = md.split('\n---\n')
+    assert len(parts) == 3
+    assert '# Tour' in parts[0] and 'About it' in parts[0]
+    assert 'background-image: url(01_overview.png)' in parts[0]
+    assert '## Overview' in parts[1] and '](01_overview.png)' in parts[1]
+    assert 'Look around.' in parts[1]                     # notes kept on one line
+    assert f'[Open the live view →]({URL_3D})' in parts[1]
+
+
+def test_deck_markdown_notes_cannot_start_a_new_slide():
+    md = slides.deck_markdown({'title': 'T'}, [{**ENTRIES[0], 'notes': '--- not a break'}])
+    assert len(md.split('\n---\n')) == 2
+
+
+def test_deck_html_escapes_into_the_textarea():
+    page = slides.deck_html({'title': 'A & B <x>'}, ENTRIES)
+    assert '<title>A &amp; B &lt;x&gt;</title>' in page
+    assert '# A &amp; B &lt;x&gt;' in page
+    assert slides.REMARK_JS in page and '__' not in page.replace('__TITLE__', '')

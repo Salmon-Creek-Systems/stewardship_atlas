@@ -15,6 +15,7 @@ added). An older page never signals ready and its slide fails with a timeout.
 """
 import json
 import logging
+from datetime import date
 
 import slides
 import versioning
@@ -36,8 +37,9 @@ def outlet_slides(config, outlet_name):
     # Shared-def keys sit under 'config' in the merged asset; per-atlas keys at the top.
     outlet_config = {**asset.get('config', {}), **asset}
     views = outlet_config.get('views')
+    meta = {'title': outlet_config.get('title') or config.get('name', '')}
     if outlet_config.get('tour'):
-        views = _fetch_tour_views(outlet_config['tour'])
+        meta, views = _fetch_tour(outlet_config['tour'])
     plan = slides.plan_slides(views, config.get('base_url', ''))
     opts = slides.render_options(outlet_config)
 
@@ -58,9 +60,14 @@ def outlet_slides(config, outlet_name):
         finally:
             browser.close()
 
-    manifest = {'size': [opts['width'], opts['height']], 'scale': opts['scale'], 'slides': results}
+    manifest = {'size': [opts['width'], opts['height']], 'scale': opts['scale'],
+                'meta': meta, 'slides': results}
     with open(out_dir / 'slides.json', 'w') as f:
         json.dump(manifest, f, indent=2)
+    # The deck shows whatever rendered; a failed view is reported below, not shown.
+    deck_meta = {**meta, 'byline': f"{config.get('name', '')} · {date.today().isoformat()}".strip(' ·')}
+    with open(out_dir / 'index.html', 'w') as f:
+        f.write(slides.deck_html(deck_meta, [r for r in results if r['status'] == 'ok']))
 
     failed = [r for r in results if r['status'] != 'ok']
     logger.info(f"slides: {len(results) - len(failed)}/{len(results)} rendered to {out_dir}")
@@ -70,7 +77,8 @@ def outlet_slides(config, outlet_name):
     return out_dir
 
 
-def _fetch_tour_views(name):
+def _fetch_tour(name):
+    """(front-matter meta, views) from the named tour."""
     import requests
     url = slides.TOUR_RAW_URL.format(name=name)
     resp = requests.get(url, timeout=30)
@@ -78,7 +86,7 @@ def _fetch_tour_views(name):
         raise ValueError(f"slides: tour {name!r} not found at {url} (HTTP {resp.status_code})")
     views = slides.tour_views(resp.text)
     logger.info(f"slides: {len(views)} views from tour {url}")
-    return views
+    return slides.tour_meta(resp.text), views
 
 
 def _render_one(context, slide, out_dir):

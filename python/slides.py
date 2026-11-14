@@ -14,6 +14,7 @@ Asset config:
 or, instead of `views`, `"tour": "scvfd"` to take the views from that atlas tour
 (Salmon-Creek-Systems.github.io `_tours/scvfd.md`; see tour_views).
 """
+import html
 import re
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
@@ -69,6 +70,18 @@ def _strip_front_matter(text):
     return text
 
 
+def tour_meta(markdown):
+    """`title` and `description` (any `key: value` lines) from a tour's front matter."""
+    meta = {}
+    if markdown.startswith('---'):
+        end = markdown.find('\n---', 3)
+        for line in markdown[3:end if end != -1 else 0].splitlines():
+            key, sep, value = line.partition(':')
+            if sep and key.strip():
+                meta[key.strip()] = value.strip().strip('"\'')
+    return meta
+
+
 def tour_views(markdown):
     """Views from a tour: one per markdown link to an atlas outlet page.
 
@@ -121,3 +134,115 @@ def render_options(outlet_config):
     w, h = outlet_config.get('size') or DEFAULT_SIZE
     scale = outlet_config.get('scale') or DEFAULT_SCALE
     return {'width': int(w), 'height': int(h), 'scale': float(scale)}
+
+
+# --- the deck ------------------------------------------------------------------
+# A remark.js deck (index.html beside the PNGs): a title slide, then one slide per
+# rendered view with its title, the image and the notes as a caption. Styling
+# follows the console's tokens (IBM Plex, white, blue links); the title slide
+# borrows fireatlas.org's dark panel over a photo, using the first map image.
+
+REMARK_JS = "https://remarkjs.com/downloads/remark-0.15.0.min.js"
+
+
+def _one_line(text):
+    """Text safe to sit on one line of remark markdown: no slide or notes separators."""
+    text = ' '.join((text or '').split())
+    return re.sub(r'^(-{2,}|\?{3})', r'\\\1', text)
+
+
+def deck_markdown(meta, entries):
+    """remark source for the deck: title slide, then one slide per rendered view."""
+    title = _one_line(meta.get('title')) or 'Atlas views'
+    first = entries[0]['file'] if entries else None
+    parts = [
+        "class: title-slide" + (f"\nbackground-image: url({first})" if first else ""),
+        ".hero[\n# " + title
+        + (f"\n\n{_one_line(meta['description'])}" if meta.get('description') else "")
+        + (f"\n\n.meta[{_one_line(meta['byline'])}]" if meta.get('byline') else "")
+        + "\n]",
+    ]
+    slides_md = ["\n".join(parts)]
+    for e in entries:
+        lines = ["class: map-slide", f"## {_one_line(e['title'])}", f".shot[![{_one_line(e['title'])}]({e['file']})]"]
+        caption = _one_line(e.get('notes'))
+        link = f"[Open the live view →]({e['url']})" if e.get('url') else ""
+        if caption or link:
+            lines.append(".caption[" + " ".join(x for x in (caption, link) if x) + "]")
+        slides_md.append("\n".join(lines))
+    return "\n---\n".join(slides_md)
+
+
+def deck_html(meta, entries):
+    """The deck page. Markdown goes in a <textarea>, so it is HTML-escaped there."""
+    page_title = html.escape(meta.get('title') or 'Atlas views')
+    source = html.escape(deck_markdown(meta, entries), quote=False)
+    return DECK_TEMPLATE.replace('__TITLE__', page_title) \
+                        .replace('__REMARK__', REMARK_JS) \
+                        .replace('__SOURCE__', source)
+
+
+DECK_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font: 'IBM Plex Sans', Arial, sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --bg: #ffffff;
+    --surface: #f7f7f7;
+    --border: #d8d8d8;
+    --text: #111111;
+    --text-muted: #555555;
+    --blue: #1d4ed8;
+    --hero-bg: rgba(10, 20, 10, 0.82);
+    --hero-text: #e8e8e0;
+    --hero-title: #d4e8c2;
+    --hero-meta: #8aaa70;
+  }
+  body { font-family: var(--font); background: #222; }
+  .remark-slide-content {
+    font-family: var(--font); color: var(--text); background: var(--bg);
+    padding: 18px 28px 14px; font-size: 15px; line-height: 1.45;
+  }
+  .remark-slide-content h2 {
+    font-size: 22px; font-weight: 600; margin: 0 0 10px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .remark-slide-content a { color: var(--blue); text-decoration: none; white-space: nowrap; }
+  .remark-slide-content a:hover { text-decoration: underline; }
+  .shot { text-align: center; }
+  .shot img {
+    max-width: 100%; max-height: 360px; border: 1px solid var(--border);
+    border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.11);
+  }
+  .caption { margin-top: 10px; color: var(--text-muted); font-size: 14px; }
+  .remark-slide-number { font-family: var(--mono); font-size: 11px; color: #999; }
+  .title-slide { background-size: cover; background-position: center; padding: 0; }
+  .title-slide .remark-slide-number { color: var(--hero-meta); }
+  .hero {
+    position: absolute; left: 48px; right: 48px; bottom: 56px;
+    background: var(--hero-bg); color: var(--hero-text);
+    border-radius: 6px; padding: 22px 28px;
+  }
+  .hero h1 { font-size: 32px; font-weight: 600; color: var(--hero-title); margin: 0 0 8px; }
+  .hero p { margin: 0 0 6px; font-size: 16px; }
+  .hero .meta { font-family: var(--mono); font-size: 12px; color: var(--hero-meta); margin-top: 10px; }
+</style>
+</head>
+<body>
+<textarea id="source">
+__SOURCE__
+</textarea>
+<script src="__REMARK__"></script>
+<script>
+  remark.create({ ratio: '16:9', navigation: { scroll: false } });
+</script>
+</body>
+</html>
+"""

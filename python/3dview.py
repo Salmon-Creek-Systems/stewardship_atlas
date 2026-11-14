@@ -683,6 +683,11 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             height: 100%;
             width: 100%;
         }}
+        /* Sky: MapLibre 4 draws nothing above the horizon, so the canvas is
+           transparent there and this shows through (5.x adds style `sky`). */
+        #map {{
+            background: linear-gradient(to bottom, #4a7fc1 0%, #8fb8e3 45%, #d6e6f3 75%, #eef4f8 100%);
+        }}
         .map-container {{
             position: relative;
             width: 100%;
