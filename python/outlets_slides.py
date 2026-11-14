@@ -23,6 +23,8 @@ import versioning
 logger = logging.getLogger(__name__)
 
 READY_TIMEOUT_MS = 90_000
+# Software WebGL: a wide, steep 3D view can take over two minutes to settle.
+READY_TIMEOUT_3D_MS = 240_000
 # Raster tiles fade in over ~300 ms after idle; give them time to finish.
 SETTLE_MS = 800
 SCREENSHOT_TIMEOUT_MS = 180_000
@@ -107,7 +109,8 @@ def _render_one(context, slide, out_dir):
     page.on('pageerror', lambda e: errors.append(str(e)))
     try:
         page.goto(slide['render_url'], wait_until='load', timeout=READY_TIMEOUT_MS)
-        page.wait_for_function('window.atlasMapReady === true', timeout=READY_TIMEOUT_MS)
+        ready_ms = READY_TIMEOUT_3D_MS if slide['kind'] == '3dview' else READY_TIMEOUT_MS
+        page.wait_for_function('window.atlasMapReady === true', timeout=ready_ms)
         page.wait_for_timeout(SETTLE_MS)
         # Software WebGL makes a 3D screenshot itself take a minute or more.
         page.screenshot(path=str(out_dir / slide['file']), timeout=SCREENSHOT_TIMEOUT_MS)
