@@ -1056,6 +1056,26 @@
                             }
                         ]
                     },
+                    "federated": {
+                        "name": "federated",
+                        "geometry_type": "polygon",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            0,
+                            150,
+                            160
+                        ],
+                        "fill_color": [
+                            0,
+                            150,
+                            160
+                        ],
+                        "fill_opacity": 0.5,
+                        "add_labels": true,
+                        "interaction": "interface"
+                    },
                     "thp_boundaries": {
                         "name": "thp_boundaries",
                         "geometry_type": "polygon",
@@ -1218,6 +1238,13 @@
                         "out_layer": "turnouts",
                         "config_def": "local_turnouts"
                     },
+                    "federated_boundaries": {
+                        "type": "inlet",
+                        "out_layer": "federated",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/federated.geojson"
+                    },
                     "thp_from_map": {
                         "type": "inlet",
                         "out_layer": "thp_boundaries",
@@ -1245,6 +1272,7 @@
                             "basemap",
                             "ponds",
                             "contours",
+                            "federated",
                             "thp_boundaries",
                             "roads",
                             "mileage_markers",
