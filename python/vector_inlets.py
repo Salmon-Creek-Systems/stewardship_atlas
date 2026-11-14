@@ -607,7 +607,7 @@ def s3_map_polygons(config=None, name=None, delta_queue=DELTA_QUEUE):
       close_px            gap-bridging radius in pixels (default 2)
       dpi                 render resolution for a PDF (default 150)
       min_area_m2         smaller enclosed areas are dropped (default 1000)
-      simplify_m          vertex simplification (default 1.0)
+      simplify_m          vertex simplification (default 2.5)
       width_m             drawn line width; measured per outline if omitted
       names               names for the polygons, largest first; else "Polygon N"
       properties          extra properties set on every feature

@@ -20,7 +20,7 @@ import numpy as np
 DEFAULT_TOLERANCE = 60
 DEFAULT_CLOSE_PX = 2
 DEFAULT_MIN_AREA_M2 = 1000
-DEFAULT_SIMPLIFY_M = 1.0
+DEFAULT_SIMPLIFY_M = 2.5
 
 
 def color_mask(rgb, color, tolerance=DEFAULT_TOLERANCE):

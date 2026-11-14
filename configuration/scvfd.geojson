@@ -1055,6 +1055,26 @@
                                 "default": ""
                             }
                         ]
+                    },
+                    "thp_boundaries": {
+                        "name": "thp_boundaries",
+                        "geometry_type": "polygon",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "fill_color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "fill_opacity": 0.3,
+                        "add_labels": true,
+                        "interaction": "interface"
                     }
                 },
                 "assets": {
@@ -1156,6 +1176,25 @@
                         "out_layer": "turnouts",
                         "config_def": "local_turnouts"
                     },
+                    "thp_from_map": {
+                        "type": "inlet",
+                        "out_layer": "thp_boundaries",
+                        "config_def": "s3_map_polygons",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/crk_thp_slope_dr2.pdf",
+                        "color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "names": [
+                            "clear cut",
+                            "selective"
+                        ],
+                        "properties": {
+                            "note": "Approximate; traced from the THP slope map (Noel Soucy, 2026)"
+                        }
+                    },
                     "webmap": {
                         "show_user_location": true,
                         "type": "outlet",
@@ -1164,6 +1203,7 @@
                             "basemap",
                             "ponds",
                             "contours",
+                            "thp_boundaries",
                             "roads",
                             "mileage_markers",
                             "creeks",
