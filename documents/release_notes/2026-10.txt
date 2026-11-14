@@ -6,6 +6,10 @@ It's been a busy few months. A lot of the work has been under the hood,
 making the atlas faster, sturdier and ready to grow, which you won't see
 directly. Meanwhile, here's what's new that you can see!
 
+As always, besides your own Atlas(es), you can visit https://fireatlas.org to learn
+more about the platform - and now you can see example "tours" of existing Atlases at:
+https://salmoncreeksystems.com/tours/
+
 
 A SIMPLER, ROOMIER WEB MAP
 
@@ -78,5 +82,13 @@ pages have been rewritten to match, with a short page for each task and two
 guides tying them together: one for using an atlas, one for looking after
 it.
 
+
+ATLAS TOURS
+
+You can see some of these features in action together in the new "Tours" we're
+making as a way to explore an Atlas, getting a feel for the data and interface. 
+These are just shared views placed in a little text for context, and you 
+can see a few of them here:
+https://salmoncreeksystems.com/tours/
 
 As always, reply to this email with any questions, or if anything looks off.

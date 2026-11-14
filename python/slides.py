@@ -164,11 +164,13 @@ def deck_markdown(meta, entries):
     ]
     slides_md = ["\n".join(parts)]
     for e in entries:
-        lines = ["class: map-slide", f"## {_one_line(e['title'])}", f".shot[![{_one_line(e['title'])}]({e['file']})]"]
+        # Multi-line .class[ … ] makes a <div>; the one-line form is an inline <span>.
+        lines = ["class: map-slide", f"## {_one_line(e['title'])}", "",
+                 f".shot[\n![{_one_line(e['title'])}]({e['file']})\n]"]
         caption = _one_line(e.get('notes'))
         link = f"[Open the live view →]({e['url']})" if e.get('url') else ""
         if caption or link:
-            lines.append(".caption[" + " ".join(x for x in (caption, link) if x) + "]")
+            lines += ["", ".caption[\n" + " ".join(x for x in (caption, link) if x) + "\n]"]
         slides_md.append("\n".join(lines))
     return "\n---\n".join(slides_md)
 
@@ -218,10 +220,10 @@ DECK_TEMPLATE = """<!DOCTYPE html>
   .remark-slide-content a:hover { text-decoration: underline; }
   .shot { text-align: center; }
   .shot img {
-    max-width: 100%; max-height: 360px; border: 1px solid var(--border);
+    max-width: 100%; max-height: 372px; display: block; margin: 0 auto; border: 1px solid var(--border);
     border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.11);
   }
-  .caption { margin-top: 10px; color: var(--text-muted); font-size: 14px; }
+  .caption { margin-top: 12px; text-align: left; color: var(--text-muted); font-size: 14px; }
   .remark-slide-number { font-family: var(--mono); font-size: 11px; color: #999; }
   .title-slide { background-size: cover; background-position: center; padding: 0; }
   .title-slide .remark-slide-number { color: var(--hero-meta); }
