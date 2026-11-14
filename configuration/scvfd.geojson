@@ -1075,6 +1075,32 @@
                         "fill_opacity": 0.3,
                         "add_labels": true,
                         "interaction": "interface"
+                    },
+                    "miranda_to_kennedy": {
+                        "name": "miranda_to_kennedy",
+                        "geometry_type": "linestring",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            255,
+                            0,
+                            255
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff00ff",
+                            "line-width": 9,
+                            "line-opacity": 1.0
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
                     }
                 },
                 "assets": {
@@ -1118,7 +1144,8 @@
                             "buildings",
                             "hydrants",
                             "watertanks",
-                            "hazards"
+                            "hazards",
+                            "miranda_to_kennedy"
                         ],
                         "visible_layers": [
                             "thp_boundaries",
@@ -1226,7 +1253,8 @@
                             "hydrants",
                             "watertanks",
                             "hazards",
-                            "circuit"
+                            "circuit",
+                            "miranda_to_kennedy"
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
@@ -1333,7 +1361,8 @@
                             "mileage_zones_oneloop",
                             "mileage_markers_oneloop",
                             "circuit",
-                            "safe_locations"
+                            "safe_locations",
+                            "miranda_to_kennedy"
                         ],
                         "config_def": "webedit"
                     },
@@ -1399,7 +1428,8 @@
                             "roads",
                             "creeks",
                             "culverts",
-                            "circuit"
+                            "circuit",
+                            "miranda_to_kennedy"
                         ]
                     },
                     "sqlquery": {
