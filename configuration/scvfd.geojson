@@ -1110,6 +1110,21 @@
                         "type": "outlet",
                         "name": "3dview",
                         "config_def": "3dview",
+                        "in_layers": [
+                            "thp_boundaries",
+                            "roads",
+                            "creeks",
+                            "ponds",
+                            "buildings",
+                            "hydrants",
+                            "watertanks",
+                            "hazards"
+                        ],
+                        "visible_layers": [
+                            "thp_boundaries",
+                            "roads",
+                            "creeks"
+                        ],
                         "access": [
                             "public",
                             "internal",

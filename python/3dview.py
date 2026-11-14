@@ -32,13 +32,16 @@ def _is_default_visible(name: str) -> bool:
     return any(p in name_lower for p in _DEFAULT_VISIBLE_PATTERNS)
 
 
-def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -> Tuple[dict, list, list]:
+def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None,
+                          visible_layers: List[str] = None) -> Tuple[dict, list, list]:
     """
     Build MapLibre sources, layers, and toggle info for non-index vector layers.
     Returns (sources_dict, layers_list, toggle_list).
     Layer order: polygons first, then lines, then points.
     Each toggle_list item: {ids, label, visible} where ids covers geometry + label layers.
     If in_layers is provided, only those layers are included (order preserved from config).
+    If visible_layers is provided, exactly those start visible; otherwise the name
+    patterns in _DEFAULT_VISIBLE_PATTERNS decide.
     """
     sources = {}
     polygon_layers: List[dict] = []
@@ -56,7 +59,7 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
         if in_layers is not None and name not in in_layers:
             continue
 
-        visible = _is_default_visible(name)
+        visible = (name in visible_layers) if visible_layers is not None else _is_default_visible(name)
         visibility = 'visible' if visible else 'none'
 
         sources[name] = {'type': 'geojson', 'data': f'../../layers/{name}/{name}.geojson'}
@@ -500,8 +503,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     center_lng = (bbox['west'] + bbox['east']) / 2
     center_lat = (bbox['south'] + bbox['north']) / 2
 
-    in_layers = config.get('assets', {}).get('3dview', {}).get('in_layers')
-    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers)
+    view_asset = config.get('assets', {}).get('3dview', {})
+    in_layers = view_asset.get('in_layers')
+    visible_layers = view_asset.get('visible_layers')
+    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers, visible_layers)
     view_panel_html = _build_view_panel_html(toggle_list)
 
     route_layers = [t for t in toggle_list if t['geometry_type'] == 'linestring']
