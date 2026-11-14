@@ -738,6 +738,12 @@
         "interaction": "import",
         "data_type": "geojson"
     },
+    "s3_map_polygons": {
+        "asset_type": "inlet",
+        "fetch_type": "s3_map_polygons",
+        "interaction": "import",
+        "data_type": "geojson"
+    },
     "s3_gpkg": {
         "asset_type": "inlet",
         "fetch_type": "s3_gpkg",

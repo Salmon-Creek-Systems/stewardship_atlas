@@ -590,6 +590,105 @@ def federation_inlet(config=None, name=None, delta_queue=DELTA_QUEUE, quick=Fals
                 f"'{collection_id}' from {source_catalog} into '{out_layer}'")
 
 
+def s3_map_polygons(config=None, name=None, delta_queue=DELTA_QUEUE):
+    """Polygons drawn as colored outlines on a georeferenced map (GeoPDF or GeoTIFF) in S3.
+
+    For maps that arrive flattened — no vector layers to read — such as a THP map
+    with its unit boundaries in red. The file is rendered with the system GDAL
+    (rasterio's bundled GDAL has no PDF driver), pixels near `color` are traced
+    into polygons along the middle of the drawn line (map_trace.py), and those
+    are written as a `create` delta in EPSG:4326.
+
+    Config (top-level keys on the asset):
+      s3_bucket, s3_key   the map file
+      out_layer           target polygon layer
+      color               [r, g, b] of the outline, e.g. [230, 0, 0]
+      tolerance           color distance accepted (default 60)
+      close_px            gap-bridging radius in pixels (default 2)
+      dpi                 render resolution for a PDF (default 150)
+      min_area_m2         smaller enclosed areas are dropped (default 1000)
+      simplify_m          vertex simplification (default 1.0)
+      width_m             drawn line width; measured per outline if omitted
+      names               names for the polygons, largest first; else "Polygon N"
+      properties          extra properties set on every feature
+
+    Re-running appends another copy of every polygon (inlets write `create`
+    deltas); clear the layer or delete the old delta first.
+    """
+    import boto3, tempfile
+    from pathlib import PurePosixPath
+    from affine import Affine
+    from osgeo import gdal, osr
+    from shapely.geometry import mapping
+    from shapely.ops import transform as shapely_transform
+    import map_trace
+
+    inlet_config = config['assets'][name]['config']
+    bucket, key = inlet_config['s3_bucket'], inlet_config['s3_key']
+    color = inlet_config['color']
+    bbox = config['dataswale']['bbox']
+    suffix = PurePosixPath(key).suffix or '.pdf'
+
+    with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
+        logger.info(f"s3_map_polygons: fetching s3://{bucket}/{key}")
+        boto3.client('s3').download_file(bucket, key, tmp.name)
+        open_options = [f"DPI={inlet_config.get('dpi', 150)}"] if suffix.lower() == '.pdf' else []
+        ds = gdal.OpenEx(tmp.name, gdal.OF_RASTER, open_options=open_options)
+        if ds is None or ds.RasterCount < 3:
+            raise ValueError(f"s3_map_polygons: {key} did not open as an RGB raster")
+        if not ds.GetProjection():
+            raise ValueError(f"s3_map_polygons: {key} has no georeferencing")
+        rgb = ds.ReadAsArray(band_list=[1, 2, 3])
+        transform = Affine.from_gdal(*ds.GetGeoTransform())
+        src_srs = osr.SpatialReference(wkt=ds.GetProjection())
+        ds = None
+
+    mask = map_trace.color_mask(rgb, color, inlet_config.get('tolerance', map_trace.DEFAULT_TOLERANCE))
+    mask = map_trace.close_mask(mask, inlet_config.get('close_px', map_trace.DEFAULT_CLOSE_PX))
+    logger.info(f"s3_map_polygons: {int(mask.sum())} pixels match {color}")
+    polygons, skipped = map_trace.trace_polygons(
+        mask, transform,
+        min_area_m2=inlet_config.get('min_area_m2', map_trace.DEFAULT_MIN_AREA_M2),
+        simplify_m=inlet_config.get('simplify_m', map_trace.DEFAULT_SIMPLIFY_M),
+        width_m=inlet_config.get('width_m'))
+    for reason in skipped:
+        logger.warning(f"s3_map_polygons: skipped {reason}")
+
+    wgs84 = osr.SpatialReference()
+    wgs84.ImportFromEPSG(4326)
+    for srs in (src_srs, wgs84):
+        srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)  # x=lon, y=lat
+    to_wgs84 = osr.CoordinateTransformation(src_srs, wgs84)
+
+    def reproject(x, y, z=None):
+        pts = to_wgs84.TransformPoints(list(zip(x, y)))
+        return [p[0] for p in pts], [p[1] for p in pts]
+
+    names = inlet_config.get('names') or []
+    extra = inlet_config.get('properties') or {}
+    features = []
+    for i, poly in enumerate(polygons):
+        geom = shapely_transform(reproject, poly['geometry'])
+        c = geom.centroid
+        if not (bbox['west'] <= c.x <= bbox['east'] and bbox['south'] <= c.y <= bbox['north']):
+            logger.warning(f"s3_map_polygons: polygon {i + 1} lies outside the atlas bbox; dropped")
+            continue
+        props = {
+            'name': names[i] if i < len(names) else f"Polygon {i + 1}",
+            'area_acres': map_trace.acres(poly['geometry']),
+            'line_width_m': poly['width_m'],
+            'source_file': f"s3://{bucket}/{key}",
+            **extra,
+        }
+        features.append(geojson.Feature(geometry=mapping(geom), properties=props))
+
+    logger.info(f"s3_map_polygons: {len(features)} polygon(s) from {key}: " +
+                ", ".join(f"{f['properties']['name']} {f['properties']['area_acres']} ac" for f in features))
+    if not features:
+        raise ValueError(f"s3_map_polygons: no polygons found in {key} for color {color}")
+    delta_queue.add_deltas_from_features(config, name, geojson.FeatureCollection(features), 'create')
+
+
 asset_methods = {
     "overture_duckdb": overture_duckdb,
     "local_ogr": local_ogr,
@@ -601,4 +700,5 @@ asset_methods = {
     "h3_grid": h3_grid_inlet,
     "inaturalist": inaturalist_inlet,
     "game_safe_exits": game_safe_exits,
+    "s3_map_polygons": s3_map_polygons,
     }
