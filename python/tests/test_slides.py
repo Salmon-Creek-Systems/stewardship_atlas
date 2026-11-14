@@ -91,3 +91,55 @@ def test_render_options_defaults_and_overrides():
     assert slides.render_options({}) == {'width': 1600, 'height': 900, 'scale': 2.0}
     assert slides.render_options({'size': [1280, 720], 'scale': 1}) == \
         {'width': 1280, 'height': 720, 'scale': 1.0}
+
+
+# --- tour_views --------------------------------------------------------------
+
+TOUR = """---
+title: Test Tour
+description: has a [link](https://fireatlas.org/x/outlets/webmap/?s=front) in front matter
+---
+
+Intro paragraph with an [outside link](https://example.com/page).
+
+First we look around.
+It continues here:
+
+[3D View](https://fireatlas.org/scvfd/staging/outlets/3dview/?s=AAA=)
+
+Water is important.
+[Water Sources](https://fireatlas.org/scvfd/staging/outlets/webmap/?s=BBB)
+
+[No Text Above](https://fireatlas.org/scvfd/staging/outlets/webmap/?s=CCC)
+"""
+
+
+def test_tour_views_titles_urls_in_order():
+    views = slides.tour_views(TOUR)
+    assert [v['title'] for v in views] == ['3D View', 'Water Sources', 'No Text Above']
+    assert views[0]['url'].endswith('/3dview/?s=AAA=')
+
+
+def test_tour_views_notes_from_previous_paragraph():
+    views = slides.tour_views(TOUR)
+    assert views[0]['notes'] == 'First we look around. It continues here:'
+
+
+def test_tour_views_notes_from_same_paragraph():
+    assert slides.tour_views(TOUR)[1]['notes'] == 'Water is important.'
+
+
+def test_tour_views_link_alone_takes_previous_paragraph_prose():
+    # The paragraph above also holds a link; only its prose becomes the notes.
+    assert slides.tour_views(TOUR)[2]['notes'] == 'Water is important.'
+
+
+def test_tour_views_skips_front_matter_and_non_outlet_links():
+    urls = [v['url'] for v in slides.tour_views(TOUR)]
+    assert not any('front' in u or 'example.com' in u for u in urls)
+
+
+def test_tour_views_feed_plan_slides():
+    plan = slides.plan_slides(slides.tour_views(TOUR), BASE)
+    assert [p['kind'] for p in plan] == ['3dview', 'webmap', 'webmap']
+    assert plan[1]['file'] == '02_water_sources.png'

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 READY_TIMEOUT_MS = 90_000
 # Raster tiles fade in over ~300 ms after idle; give them time to finish.
 SETTLE_MS = 800
+SCREENSHOT_TIMEOUT_MS = 180_000
 # WebGL in headless Chromium on a GPU-less box: software rendering.
 CHROMIUM_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
 
@@ -34,7 +35,10 @@ def outlet_slides(config, outlet_name):
     asset = config['assets'][outlet_name]
     # Shared-def keys sit under 'config' in the merged asset; per-atlas keys at the top.
     outlet_config = {**asset.get('config', {}), **asset}
-    plan = slides.plan_slides(outlet_config.get('views'), config.get('base_url', ''))
+    views = outlet_config.get('views')
+    if outlet_config.get('tour'):
+        views = _fetch_tour_views(outlet_config['tour'])
+    plan = slides.plan_slides(views, config.get('base_url', ''))
     opts = slides.render_options(outlet_config)
 
     out_dir = versioning.atlas_path(config, "outlets") / outlet_name
@@ -66,6 +70,17 @@ def outlet_slides(config, outlet_name):
     return out_dir
 
 
+def _fetch_tour_views(name):
+    import requests
+    url = slides.TOUR_RAW_URL.format(name=name)
+    resp = requests.get(url, timeout=30)
+    if resp.status_code != 200:
+        raise ValueError(f"slides: tour {name!r} not found at {url} (HTTP {resp.status_code})")
+    views = slides.tour_views(resp.text)
+    logger.info(f"slides: {len(views)} views from tour {url}")
+    return views
+
+
 def _render_one(context, slide, out_dir):
     entry = {k: slide[k] for k in ('title', 'file', 'url', 'kind', 'notes')}
     page = context.new_page()
@@ -75,7 +90,8 @@ def _render_one(context, slide, out_dir):
         page.goto(slide['render_url'], wait_until='load', timeout=READY_TIMEOUT_MS)
         page.wait_for_function('window.atlasMapReady === true', timeout=READY_TIMEOUT_MS)
         page.wait_for_timeout(SETTLE_MS)
-        page.screenshot(path=str(out_dir / slide['file']))
+        # Software WebGL makes a 3D screenshot itself take a minute or more.
+        page.screenshot(path=str(out_dir / slide['file']), timeout=SCREENSHOT_TIMEOUT_MS)
         entry['status'] = 'ok'
     except Exception as e:
         entry['status'] = 'error'

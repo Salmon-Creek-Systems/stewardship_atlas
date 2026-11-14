@@ -10,6 +10,9 @@ Asset config:
                "size": [1600, 900], "scale": 2,
                "views": [{"title": "Hargus Road", "url": "https://…/webmap/?s=…"},
                          {"title": "Overview", "s": "eyJh…", "view": "3dview"}]}
+
+or, instead of `views`, `"tour": "scvfd"` to take the views from that atlas tour
+(Salmon-Creek-Systems.github.io `_tours/scvfd.md`; see tour_views).
 """
 import re
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -51,6 +54,43 @@ def slug(text, max_len=40):
     """A filename-safe lower-case slug; 'view' if nothing usable is left."""
     s = re.sub(r'[^a-z0-9]+', '_', (text or '').lower()).strip('_')
     return s[:max_len].rstrip('_') or 'view'
+
+
+TOUR_RAW_URL = ("https://raw.githubusercontent.com/Salmon-Creek-Systems/"
+                "Salmon-Creek-Systems.github.io/main/_tours/{name}.md")
+_LINK = re.compile(r'\[([^\]]+)\]\((https?://[^)\s]+)\)')
+
+
+def _strip_front_matter(text):
+    if text.startswith('---'):
+        end = text.find('\n---', 3)
+        if end != -1:
+            return text[end + 4:]
+    return text
+
+
+def tour_views(markdown):
+    """Views from a tour: one per markdown link to an atlas outlet page.
+
+    The link text is the title. The notes are the paragraph the link sits in
+    (the lines above it, up to a blank line); if the link starts its own
+    paragraph, the previous paragraph. Links that aren't to an outlet page
+    (no `/outlets/` in the path) are ignored.
+    """
+    blocks = [b.splitlines() for b in re.split(r'\n\s*\n', _strip_front_matter(markdown))]
+    views, prev_text = [], ''
+    for lines in blocks:
+        text_above = []
+        for line in lines:
+            links = [m for m in _LINK.finditer(line) if '/outlets/' in urlsplit(m.group(2)).path]
+            if not links:
+                text_above.append(line.strip())
+                continue
+            notes = ' '.join(t for t in text_above if t) or prev_text
+            for m in links:
+                views.append({'title': m.group(1).strip(), 'url': m.group(2), 'notes': notes})
+        prev_text = ' '.join(l.strip() for l in lines if l.strip() and not _LINK.search(l))
+    return views
 
 
 def plan_slides(views, base_url):

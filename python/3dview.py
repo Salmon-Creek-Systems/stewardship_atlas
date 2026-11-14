@@ -577,7 +577,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         const BARE_MODE = new URLSearchParams(window.location.search).get('chrome') === '0';
         if (BARE_MODE) {
             const bareStyle = document.createElement('style');
-            bareStyle.textContent = '.panel, .maplibregl-ctrl-group, .success-notification { display: none !important; }';
+            bareStyle.textContent = '.panel, .maplibregl-ctrl-group, .success-notification, .back-link { display: none !important; }';
             document.head.appendChild(bareStyle);
         }
 
