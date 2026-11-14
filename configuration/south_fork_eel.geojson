@@ -1751,6 +1751,23 @@
                         "type": "outlet",
                         "name": "3dview",
                         "config_def": "3dview",
+                        "in_layers": [
+                            "roads_primary",
+                            "roads_secondary",
+                            "roads_tertiary",
+                            "creeks",
+                            "photos",
+                            "landmarks",
+                            "camera_tour",
+                            "driving_route"
+                        ],
+                        "visible_layers": [
+                            "roads_primary",
+                            "roads_secondary",
+                            "roads_tertiary",
+                            "creeks",
+                            "photos"
+                        ],
                         "access": [
                             "public",
                             "internal",
