@@ -69,6 +69,17 @@ def outlet_slides(config, outlet_name):
     with open(out_dir / 'index.html', 'w') as f:
         f.write(slides.deck_html(deck_meta, [r for r in results if r['status'] == 'ok']))
 
+    ok = [r for r in results if r['status'] == 'ok']
+    if outlet_config.get('gslides') and ok:
+        import gslides
+        # Slides fetches the PNGs over HTTP, from this (staging) copy of the outlet.
+        image_base = f"{config['base_url'].rstrip('/')}/staging/outlets/{outlet_name}"
+        manifest['gslides_url'] = gslides.sync_deck(
+            out_dir, deck_meta, ok, image_base, (opts['width'], opts['height']),
+            writers=config.get('admin_emails', []))
+        with open(out_dir / 'slides.json', 'w') as f:
+            json.dump(manifest, f, indent=2)
+
     failed = [r for r in results if r['status'] != 'ok']
     logger.info(f"slides: {len(results) - len(failed)}/{len(results)} rendered to {out_dir}")
     if failed:
