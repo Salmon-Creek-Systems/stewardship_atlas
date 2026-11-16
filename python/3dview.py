@@ -848,6 +848,11 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         .back-link:hover {{
             background: rgba(255, 255, 255, 1);
         }}
+        /* Embed mode (?embed=1): only the map and its navigation buttons stay. */
+        html.embed .panel,
+        html.embed .back-link {{
+            display: none !important;
+        }}
     </style>
 </head>
 <body>
@@ -874,8 +879,15 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         maplibregl.addProtocol('pmtiles', protocol.tile);
         maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
 
+        // Embed mode (?embed=1): shown in a small frame inside another page (a tour).
+        // Panels are hidden by the html.embed CSS rule; cooperative gestures keep the
+        // map from capturing the scroll of the page around it.
+        const EMBED = new URLSearchParams(window.location.search).get('embed') === '1';
+        if (EMBED) document.documentElement.classList.add('embed');
+
         const map = new maplibregl.Map({{
             container: 'map',
+            cooperativeGestures: EMBED,
             zoom: 14,
             center: [{center_lng}, {center_lat}],
             pitch: 60,
