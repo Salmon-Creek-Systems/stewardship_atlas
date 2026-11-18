@@ -214,19 +214,23 @@ def ensure(config: dict, rel: str, client=None, bucket: str = None) -> Path:
     for suffix in SIDECAR_SUFFIXES.get(Path(rel).suffix.lower(), ()):
         wanted.append(str(Path(rel).with_suffix(suffix)))
 
-    outstanding = [r for r in wanted if (bucket, r) not in _verified]
+    # Keyed by cache dir too: a process can serve more than one workspace
+    # (a warm Lambda whose /tmp was cleared, the declared-inputs check), and a
+    # file verified in one cache says nothing about another.
+    root = cache_dir(config['data_root'])
+    memo = str(root.resolve())
+    outstanding = [r for r in wanted if (memo, bucket, r) not in _verified]
     if not outstanding:
         return path
 
     client = client or atlas_store._s3()
-    root = cache_dir(config['data_root'])
     manifest_file = root / CACHE_MANIFEST
     manifest = ws.load_manifest(manifest_file)
     fetched_any = False
     for r in outstanding:
         before = (manifest.get('files') or {}).get(r)
         _fetch(client, bucket, r, root / r, manifest, root / '.partial')
-        _verified.add((bucket, r))
+        _verified.add((memo, bucket, r))
         fetched_any = fetched_any or (manifest.get('files') or {}).get(r) != before
     if fetched_any:
         ws.save_manifest(manifest_file, manifest)

@@ -181,3 +181,19 @@ class TestNeverWritesOutsideTheWorkspace(SharedTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestTwoWorkspacesOneProcess(SharedTestCase):
+    """A file verified in one workspace's cache says nothing about another's.
+
+    Found by check_declared_inputs: the second workspace in a process got no
+    icons, so its webmap silently lost every sprite."""
+
+    def test_second_workspace_is_fetched_too(self):
+        self.put('icons/hydrant.png', b'png')
+        first = self.config()
+        atlas_shared.local_path(first, 'icons/hydrant.png', client=self.s3, bucket=BUCKET)
+        self.root = Path(self.tmp.name) / 'second'
+        second = self.config()
+        path = atlas_shared.local_path(second, 'icons/hydrant.png', client=self.s3, bucket=BUCKET)
+        self.assertEqual(path.read_bytes(), b'png')
