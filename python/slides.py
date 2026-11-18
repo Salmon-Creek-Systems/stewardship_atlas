@@ -37,17 +37,39 @@ def bare_url(url):
     return urlunsplit((scheme, netloc, path, urlencode(params), fragment))
 
 
-def view_url(view, base_url):
-    """The page a view renders from: its `url`, or the staging outlet for a bare `s`."""
+def published_url(url, public_base):
+    """The published copy of an outlet page: ``{public_base}/{atlas}/current/outlets/…``.
+
+    Slides render the last official version, not work in progress, so a link
+    to ``…/{atlas}/staging/outlets/…`` (as tours write them), the box's old
+    ``CURRENT`` or a dated version all map to the atlas's ``current/`` mirror
+    on CloudFront. The query (the view state) is kept.
+    """
+    scheme, netloc, path, query, fragment = urlsplit(url)
+    parts = [p for p in path.split('/') if p]
+    if 'outlets' not in parts or parts.index('outlets') < 2:
+        raise ValueError(f"not an atlas outlet URL: {url}")
+    i = parts.index('outlets')
+    atlas = parts[i - 2]
+    rest = '/'.join(parts[i:]) + ('/' if path.endswith('/') else '')
+    base = urlsplit(public_base.rstrip('/'))
+    return urlunsplit((base.scheme, base.netloc,
+                       f"{base.path}/{atlas}/current/{rest}", query, fragment))
+
+
+def view_url(view, public_base, atlas_name=''):
+    """The published page a view renders from: its `url` mapped to `current/`,
+    or the published outlet for a bare `s`."""
     if view.get('url'):
-        return view['url']
+        return published_url(view['url'], public_base)
     if view.get('s'):
         kind = view.get('view', 'webmap')
         if kind not in VIEW_KINDS:
             raise ValueError(f"view must be one of {VIEW_KINDS}, not {kind!r}")
-        if not base_url:
-            raise ValueError("a view given as a bare `s` needs base_url in the atlas config")
-        return f"{base_url}/staging/outlets/{kind}/?{urlencode({'s': view['s']})}"
+        if not (public_base and atlas_name):
+            raise ValueError("a view given as a bare `s` needs the public base URL and atlas name")
+        return (f"{public_base.rstrip('/')}/{atlas_name}/current/outlets/{kind}/"
+                f"?{urlencode({'s': view['s']})}")
     raise ValueError("each view needs a `url` or an `s`")
 
 
@@ -106,7 +128,7 @@ def tour_views(markdown):
     return views
 
 
-def plan_slides(views, base_url):
+def plan_slides(views, public_base, atlas_name=''):
     """One entry per view, in order: title, file name, the page to render and its kind.
 
     Files are numbered so they sort in deck order: 01_hargus_road.png, …
@@ -116,7 +138,7 @@ def plan_slides(views, base_url):
     width = len(str(len(views))) if len(views) >= 100 else 2
     plan = []
     for i, view in enumerate(views, start=1):
-        url = view_url(view, base_url)
+        url = view_url(view, public_base, atlas_name)
         title = view.get('title') or f"View {i}"
         plan.append({
             'title': title,

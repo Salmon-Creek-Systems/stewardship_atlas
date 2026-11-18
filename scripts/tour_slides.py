@@ -2,13 +2,16 @@
 """Render an atlas tour as slides on the box, without a slides asset in the config.
 
     python3 scripts/tour_slides.py scvfd scvfd --gslides
-    python3 scripts/tour_slides.py south_fork_eel south-fork-eel --gslides --materialize 3dview
+    python3 scripts/tour_slides.py south_fork_eel south-fork-eel --gslides
     python3 scripts/tour_slides.py scvfd scvfd --deck-only     # rebuild decks from existing PNGs
 
 Writes {atlas}/staging/outlets/slides/: NN_slug.png, slides.json, index.html (remark
 deck) and, with --gslides, rebuilds the atlas's Google Slides deck (id in gslides.json).
 A full render takes ~8-10 min (3D slides 1-3 min each). Stopgap until #231 adds
 slides assets and a /refresh path.
+
+Slides render the atlas's *published* pages ({public base}/{atlas}/current/),
+not staging: publish first if a tour should show recent edits.
 
 Runs in a session (#159): the atlas is locked and hydrated from S3, the slides
 outlet is written into the workspace and written back on success. The Google
@@ -22,7 +25,6 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
-import atlas  # noqa: E402
 import atlas_session  # noqa: E402
 import gslides  # noqa: E402
 import outlets_slides  # noqa: E402
@@ -36,8 +38,6 @@ def main():
     ap.add_argument("--gslides", action="store_true", help="also rebuild the Google Slides deck")
     ap.add_argument("--deck-only", action="store_true",
                     help="skip rendering; rebuild index.html (and the Google deck) from slides.json")
-    ap.add_argument("--materialize", nargs="*", default=[], metavar="ASSET",
-                    help="assets to re-materialize first, e.g. 3dview webmap")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO)
 
@@ -47,8 +47,6 @@ def main():
 
 
 def render(config, staging_dir, args):
-    for asset in args.materialize:
-        atlas.materialize(config, asset)
     if not args.deck_only:
         config["assets"]["slides"] = {"type": "outlet", "config": {"fetch_type": "outlet_slides"},
                                       "tour": args.tour, "gslides": args.gslides}

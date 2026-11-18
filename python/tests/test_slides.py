@@ -12,6 +12,8 @@ BASE = "https://fireatlas.org/scvfd"
 S = "eyJhIjozOS44LCJvIjotMTIzLjYsInoiOjE1LCJsIjpbImNyZWVrcyJdfQ=="  # contains '='
 WEBMAP_URL = f"{BASE}/staging/outlets/webmap/?s=eyJh%2BIjo%3D"
 URL_3D = "https://fireatlas.org/sfe/staging/outlets/3dview/?s=abc"
+PUBLIC = "https://next.fireatlas.org"
+URL_3D_PUBLISHED = f"{PUBLIC}/sfe/current/outlets/3dview/?s=abc"
 
 
 def test_view_kind_from_path():
@@ -33,25 +35,48 @@ def test_bare_url_replaces_existing_chrome():
     assert q['chrome'] == ['0']
 
 
-def test_view_url_prefers_url():
-    assert slides.view_url({'url': URL_3D, 's': S}, BASE) == URL_3D
+def test_view_url_prefers_url_and_maps_it_to_current():
+    assert slides.view_url({'url': URL_3D, 's': S}, PUBLIC, 'scvfd') == URL_3D_PUBLISHED
 
 
 def test_view_url_from_bare_state():
-    url = slides.view_url({'s': S}, BASE)
-    assert url.startswith(f"{BASE}/staging/outlets/webmap/?s=")
+    url = slides.view_url({'s': S}, PUBLIC, 'scvfd')
+    assert url.startswith(f"{PUBLIC}/scvfd/current/outlets/webmap/?s=")
     assert parse_qs(urlsplit(url).query)['s'] == [S]
-    assert '/outlets/3dview/' in slides.view_url({'s': S, 'view': '3dview'}, BASE)
+    assert '/outlets/3dview/' in slides.view_url({'s': S, 'view': '3dview'}, PUBLIC, 'scvfd')
 
 
-@pytest.mark.parametrize('view, base, msg', [
-    ({}, BASE, 'url'),
-    ({'s': S, 'view': 'runbook'}, BASE, 'view must be'),
-    ({'s': S}, '', 'base_url'),
+@pytest.mark.parametrize('url', [
+    "https://fireatlas.org/scvfd/staging/outlets/webmap/?s=x",
+    "https://fireatlas.org/scvfd/CURRENT/outlets/webmap/?s=x",
+    "https://fireatlas.org/scvfd/2026-10-01_12-00-00/outlets/webmap/?s=x",
+    "https://next.fireatlas.org/scvfd/current/outlets/webmap/?s=x",
 ])
-def test_view_url_errors(view, base, msg):
+def test_published_url_maps_every_version_shape_to_current(url):
+    """Slides render the last official version, never work in progress."""
+    assert slides.published_url(url, PUBLIC) == f"{PUBLIC}/scvfd/current/outlets/webmap/?s=x"
+
+
+def test_published_url_keeps_a_path_prefix_on_the_public_base():
+    out = slides.published_url("https://fireatlas.org/scvfd/staging/outlets/3dview/index.html?s=y",
+                               "https://d1.cloudfront.net/prefix/")
+    assert out == "https://d1.cloudfront.net/prefix/scvfd/current/outlets/3dview/index.html?s=y"
+
+
+def test_published_url_rejects_non_outlet_links():
+    with pytest.raises(ValueError, match='outlet'):
+        slides.published_url("https://fireatlas.org/about/", PUBLIC)
+
+
+@pytest.mark.parametrize('view, base, atlas, msg', [
+    ({}, PUBLIC, 'scvfd', 'url'),
+    ({'s': S, 'view': 'runbook'}, PUBLIC, 'scvfd', 'view must be'),
+    ({'s': S}, '', 'scvfd', 'public base'),
+    ({'s': S}, PUBLIC, '', 'public base'),
+])
+def test_view_url_errors(view, base, atlas, msg):
     with pytest.raises(ValueError, match=msg):
-        slides.view_url(view, base)
+        slides.view_url(view, base, atlas)
 
 
 def test_slug():
@@ -65,26 +90,26 @@ def test_plan_slides_orders_and_names():
     plan = slides.plan_slides([
         {'title': 'Overview', 'url': URL_3D, 'notes': 'start here'},
         {'s': S},
-    ], BASE)
+    ], PUBLIC, 'scvfd')
     assert [p['file'] for p in plan] == ['01_overview.png', '02_view_2.png']
     assert plan[0]['kind'] == '3dview' and plan[1]['kind'] == 'webmap'
     assert plan[0]['notes'] == 'start here'
     assert plan[1]['title'] == 'View 2'
     assert all('chrome=0' in p['render_url'] for p in plan)
-    assert plan[0]['url'] == URL_3D  # the shareable link, without chrome=0
+    assert plan[0]['url'] == URL_3D_PUBLISHED  # the shareable link, without chrome=0
 
 
 def test_plan_slides_pads_for_large_decks():
-    plan = slides.plan_slides([{'url': URL_3D}] * 120, BASE)
+    plan = slides.plan_slides([{'url': URL_3D}] * 120, PUBLIC)
     assert plan[0]['file'] == '001_view_1.png'
     assert plan[-1]['file'] == '120_view_120.png'
 
 
 def test_plan_slides_requires_views():
     with pytest.raises(ValueError, match='views'):
-        slides.plan_slides([], BASE)
+        slides.plan_slides([], PUBLIC)
     with pytest.raises(ValueError, match='views'):
-        slides.plan_slides(None, BASE)
+        slides.plan_slides(None, PUBLIC)
 
 
 def test_render_options_defaults_and_overrides():
@@ -140,7 +165,7 @@ def test_tour_views_skips_front_matter_and_non_outlet_links():
 
 
 def test_tour_views_feed_plan_slides():
-    plan = slides.plan_slides(slides.tour_views(TOUR), BASE)
+    plan = slides.plan_slides(slides.tour_views(TOUR), PUBLIC)
     assert [p['kind'] for p in plan] == ['3dview', 'webmap', 'webmap']
     assert plan[1]['file'] == '02_water_sources.png'
 

@@ -42,7 +42,10 @@ def outlet_slides(config, outlet_name):
     meta = {'title': outlet_config.get('title') or config.get('name', '')}
     if outlet_config.get('tour'):
         meta, views = _fetch_tour(outlet_config['tour'])
-    plan = slides.plan_slides(views, config.get('base_url', ''))
+    # Render the published version (#159): {public_base}/{atlas}/current/.
+    import atlas_store
+    public_base = atlas_store.cloud_settings(config)['public_base_url']
+    plan = slides.plan_slides(views, public_base, config.get('name', ''))
     opts = slides.render_options(outlet_config)
 
     out_dir = versioning.atlas_path(config, "outlets") / outlet_name
