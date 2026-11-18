@@ -497,10 +497,9 @@ class TestEditLayerExecutor(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.name = 'testatlas'
-        app_cfg = root / self.name / 'app' / 'configuration'
-        app_cfg.mkdir(parents=True)
+        # The source lives in staging on this branch (#159), not in an app/ checkout.
         (root / self.name / 'staging').mkdir(parents=True)
-        self.seed = app_cfg / f'{self.name}.geojson'
+        self.seed = root / self.name / 'staging' / 'atlas.geojson'
         self.seed.write_text(json.dumps({
             "type": "FeatureCollection",
             "features": [{"type": "Feature", "geometry": None, "properties": {

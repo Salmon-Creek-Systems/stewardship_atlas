@@ -1463,6 +1463,9 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
     # Only add the layer def if missing, so re-runs don't clobber styling
     # customizations. Always (re)write an inlet so a repair fixes bucket/key.
     layers.setdefault(layer_name, plan['layer_def'])
+    # A repaired partial import keeps its old def, which may predate declared
+    # access (#175); give it the requested tier rather than refuse the repair.
+    layers[layer_name].setdefault('access', list(access))
     print(f"  layers:  {layer_name}")
     if inlet_key:
         assets[inlet_key] = plan['inlet_asset']
