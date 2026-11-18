@@ -787,8 +787,7 @@ def copy_layer(config, old_name, new_name, rebuild=True):
             in_layers.append(new_name)
             print(f"  asset '{key}': appended '{new_name}' to in_layers")
 
-    with open(geojson_path, 'w') as f:
-        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+    write_source_geojson(geojson_path, gj)
 
     if rebuild:
         print("\nRebuilding config (config_only):")
@@ -902,8 +901,12 @@ def validate_layer_upload(fc, geometry_type):
 def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
                    s3_bucket='scs-internal', s3_key=None, consumers=None,
                    source='s3', label_property=None, width=None, colormap=None,
-                   icon=None, opacity=None, label_field=None, polygon_shape=None, icons=()):
+                   icon=None, opacity=None, label_field=None, polygon_shape=None, icons=(),
+                   access=('public',)):
     """Decide the config additions for a new vector layer. Pure.
+
+    access:         the layer's access tiers, always written explicitly (#175).
+                    Public by default, which is what the box serves today.
 
     source:         's3'    — an s3_geojson inlet imports s3://{s3_bucket}/{s3_key}
                     'empty' — no inlet; the layer is filled by hand (webedit,
@@ -949,7 +952,7 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
     color_rgb, extra = _default_layer_style(geometry_type, color, width)
     layer_def = {"name": layer_name, "geometry_type": geometry_type,
                  "color": color_rgb, "interaction": "interface",
-                 "add_labels": bool(label_property)}
+                 "add_labels": bool(label_property), "access": list(access)}
     layer_def.update(extra)
 
     if colormap:
@@ -1001,6 +1004,40 @@ def plan_add_layer(assets, layer_name, geometry_type='point', color=None,
     return {"layer_name": layer_name, "layer_def": layer_def,
             "inlet_key": inlet_key, "inlet_asset": inlet_asset,
             "consumer_edits": consumer_edits}
+
+
+def write_source_geojson(geojson_path, gj):
+    """Write an atlas's source GeoJSON, refusing a change that breaks it.
+
+    Every console layer action (add, edit, copy, delete) writes through here,
+    and runs the same checks as `scripts/atlas_config.py push`
+    (`config_checks`). Only problems the change *introduces* are refused, so an
+    atlas with an older, unrelated problem can still be edited. Raises
+    ValueError without writing.
+    """
+    import config_checks
+
+    geojson_path = Path(geojson_path)
+    shared = config_checks.load_shared(shared_config_directory())
+
+    def problems(doc):
+        try:
+            return config_checks.atlas_config_problems(doc['features'][0]['properties'], shared)
+        except (KeyError, IndexError, TypeError):
+            return ["not a single-feature atlas GeoJSON"]
+
+    before = []
+    if geojson_path.exists():
+        try:
+            before = problems(json.load(open(geojson_path)))
+        except ValueError:
+            before = []
+    introduced = [p for p in problems(gj) if p not in before]
+    if introduced:
+        raise ValueError("config change refused: " + "; ".join(introduced))
+    indent = utils._detect_indent(geojson_path) if geojson_path.exists() else 4
+    with open(geojson_path, 'w') as f:
+        json.dump(gj, f, indent=indent)
 
 
 def source_geojson_path(config):
@@ -1255,8 +1292,7 @@ def edit_layer(config, layer_name, changes, rebuild=True, run_materialize=True):
     layers[layer_name] = new_def
     print(f"Styling '{layer_name}': {sorted(changes)}")
 
-    with open(geojson_path, 'w') as f:
-        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+    write_source_geojson(geojson_path, gj)
 
     materialized = []
     if rebuild:
@@ -1327,8 +1363,7 @@ def delete_layer(config, layer_name, dry_run=False, run_materialize=True):
     # Config first: if writing it fails, no data has moved. Data left behind
     # after a config change is harmless; config pointing at archived data is not.
     layer_plans.apply_layer_delete(props, config['assets'], plan)
-    with open(geojson_path, 'w') as f:
-        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+    write_source_geojson(geojson_path, gj)
     print(f"Deleted '{layer_name}' from {geojson_path.name}: assets {plan['remove_assets']}, "
           f"lists {plan['list_edits']}")
 
@@ -1360,7 +1395,8 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
               geometry_type='point', color=None, consumers=None,
               rebuild=True, run_materialize=True,
               source='s3', label_property=None, width=None, colormap=None,
-              icon=None, opacity=None, label_field=None, polygon_shape=None):
+              icon=None, opacity=None, label_field=None, polygon_shape=None,
+              access=('public',)):
     """Add a new vector layer to an existing atlas.
 
     source='s3' (default): assumes the GeoJSON file is ALREADY in S3 at
@@ -1395,7 +1431,7 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
                           label_property=label_property, width=width,
                           colormap=colormap, icon=icon, opacity=opacity,
                           label_field=label_field, polygon_shape=polygon_shape,
-                          icons=available_icons(config))
+                          icons=available_icons(config), access=access)
     inlet_key = plan['inlet_key']
 
     gj = json.load(open(geojson_path))
@@ -1448,8 +1484,7 @@ def add_layer(config, layer_name, s3_key=None, s3_bucket='scs-internal',
             src[field] = current
             print(f"  asset '{key}': appended '{layer_name}' to {field}")
 
-    with open(geojson_path, 'w') as f:
-        json.dump(gj, f, indent=utils._detect_indent(geojson_path))
+    write_source_geojson(geojson_path, gj)
 
     if rebuild:
         print("Rebuilding config (config_only)...")
