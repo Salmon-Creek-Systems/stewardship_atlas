@@ -34,6 +34,7 @@ import sys, os, subprocess, time, json, string, random, math
 import atlas
 import atlas_lock
 import asset_inputs
+import atlas_jobs
 import atlas_session
 import atlas_store
 import atlas_workspace
@@ -873,11 +874,68 @@ async def list_files():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Jobs (Phase 4, task 4) ------------------------------------------------------
+#
+# On Lambda a FastAPI background task never runs: the container freezes once the
+# response is sent. So everything that answers "started" and is polled afterwards
+# is a job (atlas_jobs): a status object in S3, a message on the light-jobs queue
+# (consumed by the jobs Lambda) or the render queue (the box worker), and one
+# /job-status endpoint the console polls.
+
+JOBS_QUEUE_ENV = {'lambda': 'ATLAS_JOBS_QUEUE_URL', 'box': 'ATLAS_RENDER_QUEUE_URL'}
+
+
+def _job_clients():
+    import boto3
+    queue_urls = {target: os.environ.get(env) for target, env in JOBS_QUEUE_ENV.items()}
+    missing = [JOBS_QUEUE_ENV[t] for t, url in queue_urls.items() if not url]
+    if missing:
+        raise HTTPException(status_code=503, detail=f"job queues not configured: {missing}")
+    sqs = boto3.client('sqs', region_name=os.environ.get('ATLAS_JOBS_REGION', 'us-east-1'))
+    return atlas_store._s3(), sqs, atlas_store.cloud_settings({})['private_bucket'], queue_urls
+
+
+def _config_session(swale: str, purpose: str):
+    """A read session over just the config: enough to validate and route a job."""
+    return read_session(swale, purpose, wanted=asset_inputs.wanted(asset_inputs.ALWAYS))
+
+
+def submit_job(config: dict, kind: str, **params) -> dict:
+    job = atlas_jobs.new_job(config['name'], kind, **params)
+    target = atlas_jobs.route(config, job, layer_inlets=asset_inputs.layer_inlets)
+    s3, sqs, bucket, queue_urls = _job_clients()
+    job = atlas_jobs.submit(s3, sqs, bucket, queue_urls, job, target)
+    logging.info(f"job {job['atlas']}/{job['id']} {kind} {params} -> {target}")
+    return job
+
+
+def _started(job: dict, **extra) -> dict:
+    return {"status": "started", "job_id": job["id"], "target": job["target"],
+            "swale": job["atlas"], "submitted_at": job["submitted_at"], **extra}
+
+
+@app.get("/job-status")
+async def job_status(swale: str, id: str):
+    """A job's status: state queued|running|succeeded|failed, result, error."""
+    s3, _sqs, bucket, _urls = _job_clients()
+    job = atlas_jobs.read_status(s3, bucket, swale, id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"no job {id} for atlas {swale}")
+    return job
+
+
 @app.get("/refresh")
 async def refresh(swale: str, asset: str):
+    """Re-materialize one asset. Light assets run here and answer when done; an
+    asset that runs on the box (runs_on: box) is queued and answers with a job."""
     try:
-        # Synchronous, and a QGIS outlet can take minutes — the lease heartbeat
-        # keeps it held for as long as the materialize actually runs.
+        with _config_session(swale, f"validate refresh {asset}") as session:
+            config = session.config
+        if asset not in config.get('assets', {}):
+            raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
+        if atlas_jobs.asset_runs_on(config, asset) == 'box':
+            return _started(submit_job(config, 'materialize', asset=asset), asset=asset,
+                            message=f"Queued {asset} on the render worker")
         with write_session(swale, f"refresh {asset}",
                            inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
             res = atlas.materialize(session.config, asset)
@@ -897,280 +955,52 @@ async def refresh(swale: str, asset: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Global variable to track layer refresh status.
-# Single-flight: one running refresh per webapp process.
-refresh_layer_status = {
-    "running": False,
-    "swale": None,
-    "layer": None,
-    "mode": None,
-    "cascade": None,
-    "started_at": None,
-    "finished_at": None,
-    "success": None,
-    "error": None,
-}
-
-
-def _refresh_layer_inputs(config, layer, mode, cascade):
-    """What a /refresh_layer job reads. A cascade re-derives everything
-    downstream, so it hydrates everything (the union over the Dagster
-    selection is a later refinement)."""
-    if cascade:
-        return None
-    if mode == "rebuild":
-        return asset_inputs.layer_rebuild_inputs(config, layer)
-    return asset_inputs.layer_refresh_inputs(layer)
-
-
 @app.get("/refresh_layer")
-async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: BackgroundTasks,
-                                 mode: str = "update", cascade: bool = True):
-    """Refresh one layer through the Dagster asset graph (issue #131, T5).
+async def refresh_layer_endpoint(swale: str, layer: str, mode: str = "update",
+                                 cascade: bool = True):
+    """Refresh one layer through the Dagster asset graph (issue #131, T5), as a job.
 
     mode=update|rebuild, cascade=true|false — see atlas_dagster.refresh_layer.
-    Runs in the background; poll /refresh-layer-status for completion.
+    Poll /job-status?swale=&id= with the returned job_id.
     """
     if mode not in ("update", "rebuild"):
         raise HTTPException(status_code=400, detail=f"Unknown refresh mode: {mode!r}")
-    if refresh_layer_status["running"]:
-        return {
-            "status": "already_running",
-            "swale": refresh_layer_status["swale"],
-            "layer": refresh_layer_status["layer"],
-            "mode": refresh_layer_status["mode"],
-            "started_at": refresh_layer_status["started_at"],
-        }
-
-    # Validate against the real config before promising to run. A read session
-    # takes no lease, and it warms the workspace the background job is about to
-    # use anyway.
-    with read_session(swale, f"validate refresh_layer {layer}") as session:
-        layer_names = [l.get('name') for l in session.config.get('dataswale', {}).get('layers', [])]
+    with _config_session(swale, f"validate refresh_layer {layer}") as session:
+        config = session.config
+    layer_names = [l.get('name') for l in config.get('dataswale', {}).get('layers', [])]
     if layer not in layer_names:
         raise HTTPException(status_code=400, detail=f"No layer '{layer}' in atlas '{swale}'")
-
-    refresh_layer_status.update(
-        running=True, swale=swale, layer=layer, mode=mode, cascade=cascade,
-        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
-
-    def run_refresh():
-        # Lazy import: keeps webapp importable where dagster isn't installed.
-        import atlas_dagster
-        try:
-            # The whole cascade is one session: hydrate once, write back once.
-            # The response has already gone out, so a busy atlas is recorded in
-            # the status rather than raised.
-            with write_session(swale, f"refresh_layer {layer} ({mode})",
-                               inputs=lambda c: _refresh_layer_inputs(c, layer, mode, cascade)) as session:
-                result = atlas_dagster.refresh_layer(session.config, layer,
-                                                     mode=mode, cascade=cascade)
-                refresh_layer_status["success"] = bool(result.success)
-        except atlas_lock.AtlasLocked as e:
-            logging.info(f"refresh_layer for {swale}/{layer} skipped: {e}")
-            refresh_layer_status["success"] = False
-            refresh_layer_status["error"] = f"atlas busy: {e}"
-        except Exception as e:
-            logging.error(f"refresh_layer failed for {swale}/{layer}: {e}")
-            logging.error(traceback.format_exc())
-            refresh_layer_status["success"] = False
-            refresh_layer_status["error"] = str(e)
-        finally:
-            refresh_layer_status["finished_at"] = datetime.now().isoformat()
-            refresh_layer_status["running"] = False
-
-    # Plain def: FastAPI runs sync background tasks in the threadpool, so
-    # the blocking dagster.materialize doesn't stall the event loop.
-    background_tasks.add_task(run_refresh)
-    return {
-        "status": "started",
-        "swale": swale,
-        "layer": layer,
-        "mode": mode,
-        "cascade": cascade,
-        "started_at": refresh_layer_status["started_at"],
-    }
-
-
-@app.get("/refresh-layer-status")
-async def get_refresh_layer_status():
-    return refresh_layer_status
-
-
-# Global variable to track single-asset materialize status.
-# Single-flight: one running build per webapp process.
-materialize_status = {
-    "running": False,
-    "swale": None,
-    "asset": None,
-    "started_at": None,
-    "finished_at": None,
-    "success": None,
-    "error": None,
-}
+    job = submit_job(config, 'refresh_layer', layer=layer, mode=mode, cascade=cascade)
+    return _started(job, layer=layer, mode=mode, cascade=cascade)
 
 
 @app.get("/materialize_asset")
-async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: BackgroundTasks):
+async def materialize_asset_endpoint(swale: str, asset: str):
     """Build one asset (typically an outlet, e.g. runbook) through the
-    Dagster graph (issue #131, T6). No cascade — exactly this asset.
-    Runs in the background; poll /materialize-asset-status for completion.
+    Dagster graph (issue #131, T6), as a job. No cascade — exactly this asset.
+    Poll /job-status?swale=&id= with the returned job_id.
     """
-    if materialize_status["running"]:
-        return {
-            "status": "already_running",
-            "swale": materialize_status["swale"],
-            "asset": materialize_status["asset"],
-            "started_at": materialize_status["started_at"],
-        }
-
-    # Validate against the real config before promising to build; a read
-    # session takes no lease and warms the workspace the job will use.
-    with read_session(swale, f"validate materialize {asset}") as session:
-        known_assets = session.config.get('assets', {})
-    if asset not in known_assets:
+    with _config_session(swale, f"validate materialize {asset}") as session:
+        config = session.config
+    if asset not in config.get('assets', {}):
         raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
-
-    materialize_status.update(
-        running=True, swale=swale, asset=asset,
-        started_at=datetime.now().isoformat(), finished_at=None, success=None, error=None)
-
-    def run_materialize():
-        # Lazy import: keeps webapp importable where dagster isn't installed.
-        import atlas_dagster
-        try:
-            # The response has already gone out, so a busy atlas is recorded in
-            # the status rather than raised.
-            with write_session(swale, f"materialize {asset}",
-                               inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
-                result = atlas_dagster.materialize_asset(session.config, asset)
-                materialize_status["success"] = bool(result.success)
-        except atlas_lock.AtlasLocked as e:
-            logging.info(f"materialize_asset for {swale}/{asset} skipped: {e}")
-            materialize_status["success"] = False
-            materialize_status["error"] = f"atlas busy: {e}"
-        except Exception as e:
-            logging.error(f"materialize_asset failed for {swale}/{asset}: {e}")
-            logging.error(traceback.format_exc())
-            materialize_status["success"] = False
-            materialize_status["error"] = str(e)
-        finally:
-            materialize_status["finished_at"] = datetime.now().isoformat()
-            materialize_status["running"] = False
-
-    background_tasks.add_task(run_materialize)
-    return {
-        "status": "started",
-        "swale": swale,
-        "asset": asset,
-        "started_at": materialize_status["started_at"],
-    }
-
-
-@app.get("/materialize-asset-status")
-async def get_materialize_asset_status():
-    return materialize_status
+    return _started(submit_job(config, 'materialize', asset=asset), asset=asset)
 
 
 # Global dict to track atlas creation status, keyed by slug
 create_statuses: Dict[str, Any] = {}
 
-# Global variable to track publish status
-publish_status = {
-    "publishing": False,
-    "started_at": None,
-    "finished_at": None,
-    "log": [ ('start', datetime.now().isoformat()) ]
-}
 
 @app.get("/publish")
-async def publish(swale: str, background_tasks: BackgroundTasks):
-    logging.info("Starting publish...")
-    try:
-        # Check if already publishing
-        if publish_status["publishing"]:
-            return {
-                "status": "error",
-                "message": "Publishing already in progress",
-                "publishing": True,
-                "started_at": publish_status["started_at"]
-            }
-
-        # Fail fast on an unknown atlas: a read session takes no lease and
-        # raises AtlasNotSeeded (404) when S3 holds no staging config for it.
-        # The publish itself runs under a write session in the task below.
-        with read_session(swale, "validate publish") as session:
-            logging.info(f"publish requested for {session.config['name']}")
-
-        # Start new publishing task
-        publish_status["publishing"] = True
-        publish_status["started_at"] = datetime.now().isoformat()
-        publish_status["finished_at"] = None
-        
-        # Send immediate response
-        response = {
-            "status": "success",
-            "publishing": True,
-            "started_at": publish_status["started_at"]
-        }
-        
-        # Add the delayed task to background
-
-            
-        def finish_publishing():
-            # Publish is a pure snapshot (issue #131, C8): no inlet, eddy, or
-            # outlet materialization here. Outlets are kept current by refresh
-            # cascades before publish. Plain def so the work runs in the
-            # threadpool and /publish-status stays responsive.
-            try:
-                publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
-
-                # Under the lease, so nothing edits the atlas mid-publish. It
-                # promotes the staging catalog from S3 and copies objects
-                # server-side, so only the config is hydrated.
-                with write_session(swale, "publish",
-                                   wanted=asset_inputs.wanted(asset_inputs.publish_inputs())) as session:
-                    res = versioning.publish_new_version(session.config)
-                publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
-                publish_status["finished_at"] = datetime.now().isoformat()
-                publish_status["publishing"] = False
-                return str(res)
-            except Exception as e:
-                error_msg = f"Error in publish background task: {e}"
-                logging.error(error_msg)
-                logging.error(traceback.format_exc())
-                publish_status["log"].append([(f'ERROR: {e}', datetime.now().isoformat())])
-                publish_status["publishing"] = False
-                publish_status["finished_at"] = datetime.now().isoformat()
-                # Don't raise HTTPException in background task - response already sent
-
-
-
-        background_tasks.add_task(finish_publishing)
-        
-        return response
-    except (HTTPException, *SESSION_ERRORS):
-        publish_status["publishing"] = False
-        publish_status["finished_at"] = datetime.now().isoformat()
-        raise
-    except Exception as e:
-        # Reset status on error
-        publish_status["publishing"] = False
-        publish_status["finished_at"] = datetime.now().isoformat()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/publish-status")
-async def publish_status_check(swale: str):
-    try:
-        return {
-            "status": "success",
-            "publishing": publish_status["publishing"],
-            "started_at": publish_status["started_at"],
-            "finished_at": publish_status["finished_at"],
-            "log": publish_status["log"]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def publish(swale: str):
+    """Publish a new version, as a job: it promotes the staging catalog in S3
+    (server-side copies), so it runs on the jobs Lambda. Poll /job-status."""
+    # Publish is a pure snapshot (issue #131, C8): no inlet, eddy, or outlet
+    # materialization. Outlets are kept current by refresh cascades before publish.
+    # An unknown atlas fails fast here: AtlasNotSeeded (404).
+    with _config_session(swale, "validate publish") as session:
+        config = session.config
+    return _started(submit_job(config, 'publish'), publishing=True)
 
 @app.get("/create")
 async def create_page():

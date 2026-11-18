@@ -1,0 +1,24 @@
+# The box worker for the render queue (Phase 4, task 4).
+# Install: copy to /etc/systemd/system/, put the environment in
+# /etc/atlas-worker.env (ATLAS_RENDER_QUEUE_URL, ATLAS_PRIVATE_BUCKET,
+# ATLAS_OUTLETS_BUCKET, ATLAS_PUBLIC_BASE_URL, ATLAS_DISTRIBUTION_ID,
+# ATLAS_WORKSPACE_ROOT, ATLAS_SHARED_DIR, SWALES_ROOT, DAGSTER_HOME,
+# QT_QPA_PLATFORM=offscreen), then
+#   systemctl daemon-reload && systemctl enable --now atlas-worker
+[Unit]
+Description=Stewardship Atlas render-queue worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/atlas-worker.env
+WorkingDirectory=/root/swales_dev/app
+ExecStart=/usr/bin/python3 scripts/atlas_worker.py
+Restart=always
+RestartSec=10
+# A QGIS render or a slide deck can take many minutes; let the job in hand finish.
+TimeoutStopSec=1800
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

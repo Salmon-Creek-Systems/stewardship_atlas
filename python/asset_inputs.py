@@ -139,6 +139,17 @@ def layer_rebuild_inputs(config: dict, layer_name: str):
     return sorted(prefixes)
 
 
+def refresh_layer_job_inputs(config: dict, layer_name: str, mode: str, cascade: bool):
+    """What a /refresh_layer job reads. A cascade re-derives everything
+    downstream, so it hydrates everything (the union over the Dagster
+    selection is a later refinement)."""
+    if cascade:
+        return None
+    if mode == 'rebuild':
+        return layer_rebuild_inputs(config, layer_name)
+    return layer_refresh_inputs(layer_name)
+
+
 # The consumers atlas.add_layer appends a new layer to (plan_add_layer's
 # default) and re-materializes, then the console.
 ADD_LAYER_OUTLETS = ('webmap', 'webedit', 'sqldb', 'html', 'console')

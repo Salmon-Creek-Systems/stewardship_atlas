@@ -142,6 +142,7 @@
         ]
     },
     "runbook": {
+        "runs_on": "box",
         "asset_type": "outlet",
         "layers": [
             "hillshade",
@@ -165,6 +166,7 @@
         }
     },
     "gazetteer": {
+        "runs_on": "box",
         "name": "gazetteer",
         "asset_type": "outlet",
         "access": ["admin"],
@@ -200,6 +202,7 @@
         }
     },
     "qgis_runbook": {
+        "runs_on": "box",
         "name": "qgis_runbook",
         "asset_type": "outlet",
         "fetch_type": "outlet_runbook_qgis_atlas",
@@ -217,6 +220,7 @@
         }
     },
     "qgis_gazetteer": {
+        "runs_on": "box",
         "name": "qgis_gazetteer",
         "asset_type": "outlet",
         "fetch_type": "qgis_gazetteer",
@@ -234,6 +238,7 @@
         }
     },
     "game_kit": {
+        "runs_on": "box",
         "name": "game_kit",
         "asset_type": "outlet",
         "fetch_type": "outlet_game_kit",
@@ -247,6 +252,7 @@
         }
     },
     "slides": {
+        "runs_on": "box",
         "name": "slides",
         "asset_type": "outlet",
         "fetch_type": "outlet_slides",

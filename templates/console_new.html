@@ -392,9 +392,12 @@ function startPublish() {
     fetch(apiurl + '/publish?swale=' + swalename)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.publishing) {
-                setPublishStatus('In progress…');
-                pollPublishStatus();
+            if (d.job_id) {
+                setPublishStatus('Queued…');
+                pollPublishStatus(d.job_id);
+            } else {
+                setPublishStatus('Error: ' + (d.detail || d.message || 'not started'));
+                setPublishUI(false, 'Publish');
             }
         })
         .catch(function(err) {
@@ -404,18 +407,21 @@ function startPublish() {
         });
 }
 
-function pollPublishStatus() {
-    fetch(apiurl + '/publish-status?swale=' + swalename)
+function pollPublishStatus(jobId) {
+    fetch(jobStatusUrl(jobId))
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.publishing) {
-                const lines = (d.log || []).map(function(l) { return Array.isArray(l) ? l[0] : l; });
-                setPublishStatus(lines.slice(-4).join('<br>'));
-                setTimeout(pollPublishStatus, 5000);
-            } else {
+            if (d.state === 'queued' || d.state === 'running') {
+                setPublishStatus(d.state === 'queued' ? 'Queued…' : 'Publishing…');
+                setTimeout(function() { pollPublishStatus(jobId); }, 5000);
+            } else if (d.state === 'succeeded') {
                 setPublishStatus('Complete');
                 setPublishUI(false, 'Publish');
                 showToast('Published successfully');
+            } else {
+                setPublishStatus('Failed: ' + firstLine(d.error || d.detail));
+                setPublishUI(false, 'Publish');
+                showToast('Publish failed', true);
             }
         })
         .catch(function(err) {
@@ -612,17 +618,28 @@ function clearLayer(layerName) {
 }
 
 // ── Asset builds / layer refresh (issue #131 T6) ─────────
-function pollJobStatus(statusPath, btn, idleLabel, doneMsg) {
-    fetch(apiurl + statusPath)
+// Jobs (publish, layer refresh, builds) report through /job-status, which
+// reads the job's status object in S3: queued → running → succeeded|failed.
+function jobStatusUrl(jobId) {
+    return apiurl + '/job-status?swale=' + swalename + '&id=' + encodeURIComponent(jobId);
+}
+
+function firstLine(text) {
+    return String(text || 'unknown error').split('\n')[0];
+}
+
+function pollJobStatus(jobId, btn, idleLabel, doneMsg) {
+    fetch(jobStatusUrl(jobId))
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.running) {
-                setTimeout(function() { pollJobStatus(statusPath, btn, idleLabel, doneMsg); }, 3000);
+            if (d.state === 'queued' || d.state === 'running') {
+                if (d.state === 'running') btn.textContent = 'Running…';
+                setTimeout(function() { pollJobStatus(jobId, btn, idleLabel, doneMsg); }, 3000);
             } else {
                 btn.disabled = false;
                 btn.textContent = idleLabel;
-                if (d.success) showToast(doneMsg);
-                else showToast('Failed: ' + (d.error || 'unknown error'), true);
+                if (d.state === 'succeeded') showToast(doneMsg);
+                else showToast('Failed: ' + firstLine(d.error || d.detail), true);
             }
         })
         .catch(function(err) {
@@ -639,13 +656,14 @@ function buildAsset(assetName, btn) {
     fetch(apiurl + '/materialize_asset?swale=' + swalename + '&asset=' + encodeURIComponent(assetName))
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.status === 'already_running') {
+            if (!d.job_id) {
                 btn.disabled = false;
                 btn.textContent = idleLabel;
-                showToast('A build is already running: ' + d.asset, true);
+                showToast('Build not started: ' + (d.detail || d.message || 'unknown error'), true);
                 return;
             }
-            pollJobStatus('/materialize-asset-status', btn, idleLabel, 'Built ' + assetName);
+            btn.textContent = 'Queued…';
+            pollJobStatus(d.job_id, btn, idleLabel, 'Built ' + assetName);
         })
         .catch(function(err) {
             btn.disabled = false;
@@ -665,13 +683,14 @@ function refreshLayer(layerName, mode, btn) {
     fetch(apiurl + '/refresh_layer?swale=' + swalename + '&layer=' + encodeURIComponent(layerName) + '&mode=' + mode)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.status === 'already_running') {
+            if (!d.job_id) {
                 btn.disabled = false;
                 btn.textContent = idleLabel;
-                showToast('A refresh is already running: ' + d.layer, true);
+                showToast('Refresh not started: ' + (d.detail || d.message || 'unknown error'), true);
                 return;
             }
-            pollJobStatus('/refresh-layer-status', btn, idleLabel,
+            btn.textContent = 'Queued…';
+            pollJobStatus(d.job_id, btn, idleLabel,
                           (mode === 'rebuild' ? 'Rebuilt ' : 'Updated ') + layerName);
         })
         .catch(function(err) {

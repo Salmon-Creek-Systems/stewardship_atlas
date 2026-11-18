@@ -73,13 +73,6 @@ else
   echo "publishes   : NOTHING — no cloud.outlets allowlist in $ATLAS.geojson"
 fi
 
-# The webapp's publish status is a single module-level global, not per-atlas,
-# so two overlapping publishes would report each other's progress.
-if curl -sS --max-time 15 "$API_URL/publish-status?swale=$ATLAS" \
-     | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["publishing"] else 1)' 2>/dev/null; then
-  die "a publish is already running (status is process-wide, not per-atlas) — wait for it"
-fi
-
 step "1/5  rebuilding config from $ATLAS.geojson"
 python3 "$REPO/scripts/build_atlas.py" config_only "$CONFIG"
 
@@ -119,26 +112,30 @@ step "4/5  materializing console"
 refresh console
 
 step "5/5  publishing"
-curl -sS --max-time 60 "$API_URL/publish?swale=$ATLAS" >/dev/null || die "publish request failed"
+JOB_ID=$(curl -sS --max-time 60 "$API_URL/publish?swale=$ATLAS" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["job_id"])') \
+  || die "publish request failed"
+echo "   job $JOB_ID"
 
+# Publish is a job: poll its status object until it finishes.
+job_state() {
+  curl -sS --max-time 15 "$API_URL/job-status?swale=$ATLAS&id=$JOB_ID" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state", "unknown"))' 2>/dev/null
+}
 printf '   waiting'
 for _ in $(seq 1 240); do          # 240 * 5s = 20 min
   sleep 5
   printf '.'
-  if ! curl -sS --max-time 15 "$API_URL/publish-status?swale=$ATLAS" \
-       | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["publishing"] else 1)' 2>/dev/null; then
-    break
-  fi
+  case "$(job_state)" in queued|running) ;; *) break ;; esac
 done
 echo
 
-curl -sS --max-time 15 "$API_URL/publish-status?swale=$ATLAS" | python3 -c "
+curl -sS --max-time 15 "$API_URL/job-status?swale=$ATLAS&id=$JOB_ID" | python3 -c "
 import json,sys
 r=json.load(sys.stdin)
-if r.get('publishing'): print('   still publishing after 20min — check the server'); sys.exit(1)
-print(f\"   finished at {r.get('finished_at')}\")
-for entry in (r.get('log') or [])[-6:]:
-    print('   ' + str(entry)[:220])
+if r.get('state') in ('queued', 'running'): print('   still publishing after 20min — check the jobs'); sys.exit(1)
+if r.get('state') != 'succeeded': print('   publish failed: ' + str(r.get('error'))[:600]); sys.exit(1)
+print(f\"   finished at {r.get('finished_at')}: {str(r.get('result'))[:200]}\")
 " || die "publish did not finish"
 
 if [ -n "$CDN_URL" ] && [ -n "$CLOUD_OUTLETS" ]; then

@@ -7,6 +7,7 @@
         "bbox": null
     },
     "overture_addresses": {
+        "runs_on": "box",
         "name": "addresses",
         "asset_type": "inlet",
         "fetch_type": "overture_duckdb",
@@ -32,6 +33,7 @@
 	}
     },
     "overture_buildings": {
+        "runs_on": "box",
         "name": "raw_buildings",
 	"asset_type": "inlet",
         "fetch_type": "overture_duckdb",
@@ -495,6 +497,7 @@
           }
     },
     "terrain_dem": {
+        "runs_on": "box",
         "asset_type": "inlet",
         "fetch_type": "terrain_dem",
         "interaction": "import",
@@ -506,6 +509,7 @@
         }
     },
     "opentopo_dem":  {
+	"runs_on": "box",
 	"asset_type": "inlet",
 	"fetch_type": "fetch_url",
 	"interaction": "import",
@@ -520,6 +524,7 @@
 	}
     },
     "dem": {
+	"runs_on": "box",
 	"name": "dem",
 	"asset_type": "inlet",
 	"fetch_type": "fetch_url",
@@ -535,6 +540,7 @@
 	}
     },
     "overture_roads":  {
+	"runs_on": "box",
 	"asset_type": "inlet",
 	"fetch_type": "overture_duckdb",
 	"interaction": "import",
@@ -573,6 +579,7 @@
 	}
     },			
     "roads_overture": {
+        "runs_on": "box",
         "asset_type": "inlet",
         "fetch_type": "overture_duckdb",
         "interaction": "import",
@@ -607,6 +614,7 @@
         }
     },
     "trails_overture": {
+        "runs_on": "box",
         "asset_type": "inlet",
         "fetch_type": "overture_duckdb",
         "interaction": "import",
@@ -632,6 +640,7 @@
         }
     },
     "local_hillshade":  {
+	"runs_on": "box",
 	"asset_type": "inlet",
 	"fetch_type": "local_raster",
 	"interaction": "import",
@@ -695,6 +704,7 @@
         "num_cols": 6
     },
     "landfire_evc": {
+        "runs_on": "box",
         "name": "landfire_evc",
         "asset_type": "inlet",
         "fetch_type": "fetch_url",
@@ -708,6 +718,7 @@
         }
     },
     "landfire_evt": {
+        "runs_on": "box",
         "name": "landfire_evt",
         "asset_type": "inlet",
         "fetch_type": "fetch_url",
@@ -721,6 +732,7 @@
         }
     },
     "s3_geotiff": {
+        "runs_on": "box",
         "asset_type": "inlet",
         "fetch_type": "s3_raster",
         "interaction": "import",
@@ -739,6 +751,7 @@
         "data_type": "geojson"
     },
     "s3_map_polygons": {
+        "runs_on": "box",
         "asset_type": "inlet",
         "fetch_type": "s3_map_polygons",
         "interaction": "import",

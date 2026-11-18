@@ -7,6 +7,7 @@
         "data_type": "geojson"
     },
     "derived_hillshade": {
+        "runs_on": "box",
         "name": "hillshade",
         "asset_type": "eddy",
         "fetch_type": "derived_hillshade",
@@ -23,6 +24,7 @@
         }
     },
     "gdal_contours": {
+        "runs_on": "box",
         "name": "gdal_contours",
         "color": [
             2,
@@ -57,16 +59,19 @@
         }
     },
     "tiff_to_cog": {
+        "runs_on": "box",
         "asset_type": "eddy",
         "fetch_type": "tiff_to_cog",
         "data_type": "tiff"
     },
     "terrain_rgb_tiff": {
+        "runs_on": "box",
         "asset_type": "eddy",
         "fetch_type": "terrain_rgb_tiff",
         "data_type": "tiff"
     },
     "hillshade_tiles": {
+        "runs_on": "box",
         "asset_type": "eddy",
         "fetch_type": "hillshade_tiles",
         "data_type": "pmtiles",
@@ -77,6 +82,7 @@
         }
     },
     "terrain_rgb_tiles": {
+        "runs_on": "box",
         "asset_type": "eddy",
         "fetch_type": "terrain_rgb_tiles",
         "data_type": "pmtiles",
@@ -119,6 +125,7 @@
         }
     },
     "fuel_mass_landfire": {
+        "runs_on": "box",
         "type": "eddy",
         "fetch_type": "fuel_mass_landfire",
         "in_layer": "burns_index",
@@ -159,6 +166,7 @@
         }
     },
     "ssurgo_enrich": {
+        "runs_on": "box",
         "type": "eddy",
         "fetch_type": "ssurgo_enrich",
         "interaction": "backend",
@@ -186,6 +194,7 @@
         }
     },
     "h3_raster_stats": {
+        "runs_on": "box",
         "type": "eddy",
         "fetch_type": "h3_raster_stats",
         "interaction": "backend",
@@ -197,6 +206,7 @@
         }
     },
     "biochar_simulation": {
+        "runs_on": "box",
         "type": "eddy",
         "fetch_type": "biochar_simulation",
         "in_layers": [
