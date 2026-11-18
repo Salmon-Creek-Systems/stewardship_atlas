@@ -80,8 +80,26 @@ class MissingOpens:
                 self.missing.add(os.path.relpath(path, self.root))
 
 
+class SeededUuids:
+    """uuid4 from a fixed seed while active, so both runs mint the same ids.
+
+    A refresh gives every feature without an ``atlas_id`` a fresh uuid4, which
+    would make every such layer differ between the full and declared runs.
+    """
+
+    def __enter__(self):
+        import random
+        import uuid
+        rng = random.Random(0)
+        self._uuid, self._orig = uuid, uuid.uuid4
+        uuid.uuid4 = lambda: uuid.UUID(int=rng.getrandbits(128), version=4)
+        return self
+
+    def __exit__(self, *exc):
+        self._uuid.uuid4 = self._orig
+
+
 def run(atlas_name: str, asset: str, workspace: Path, wanted, hook: MissingOpens):
-    import atlas
     import atlas_session
     with atlas_session.open_session(atlas_name, purpose=f"check_declared_inputs {asset}",
                                     workspace_root=workspace, wanted=wanted,
@@ -91,16 +109,22 @@ def run(atlas_name: str, asset: str, workspace: Path, wanted, hook: MissingOpens
         hook.missing = set()
         error = None
         try:
-            if asset.startswith('layer:'):
-                import dataswale_geojson
-                dataswale_geojson.refresh_vector_layer(session.config, asset[len('layer:'):])
-            else:
-                atlas.materialize(session.config, asset)
+            with SeededUuids():
+                _build(session.config, asset)
         except Exception:
             error = traceback.format_exc(limit=3)
         finally:
             hook.root = None
         return written(session.staging_dir, before), error, sorted(hook.missing)
+
+
+def _build(config, asset):
+    if asset.startswith('layer:'):
+        import dataswale_geojson
+        dataswale_geojson.refresh_vector_layer(config, asset[len('layer:'):])
+    else:
+        import atlas
+        atlas.materialize(config, asset)
 
 
 def default_assets(config: dict) -> list:
