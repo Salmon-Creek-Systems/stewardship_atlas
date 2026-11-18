@@ -44,6 +44,7 @@ import atlas_session
 import atlas_store
 import atlas_workspace as ws
 import versioning
+import staging_catalog
 
 CONFIG_REL = 'atlas_config.json'
 LAYER_REL = 'layers/roads/roads.geojson'
@@ -128,6 +129,9 @@ class Rehearsal:
             self.client.put_object(Bucket=self.bucket, Key=self.key(rel),
                                    Body=body.encode('utf-8'),
                                    ContentType=atlas_store.content_type_for(rel))
+        # Written straight to S3, as the seed does, so build the staging
+        # catalog the way the seed does too.
+        staging_catalog.rebuild(self.client, self.outlets_bucket, self.bucket, self.atlas)
 
     def teardown(self):
         removed = 0
@@ -346,6 +350,10 @@ class Rehearsal:
         """The whole task-6 path against the real object store: catalog,
         immutable layer keys, the private outlet archive, documents, and the
         pointer."""
+        # The wipe checks above restored objects from S3 versioning — an
+        # out-of-band change the staging catalog cannot see. Rebuilding it is
+        # the last step of any such recovery (cutover runbook), so do it here.
+        staging_catalog.rebuild(self.client, self.outlets_bucket, self.bucket, self.atlas)
         with self.session('publish', heartbeat_interval=0) as s:
             result = versioning.publish_new_version(s.config, version='r1',
                                                     client=self.client)
