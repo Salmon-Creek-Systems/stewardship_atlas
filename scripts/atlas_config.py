@@ -97,9 +97,9 @@ def push(atlas: str, path: Path, message: str, rebuild: bool, yes: bool) -> int:
         with open(session.staging_dir / LOG_REL, 'a') as f:
             f.write(log_line(atlas, message, old, new))
         if rebuild:
-            import atlas
-            atlas.build_atlas_from_geojson(src, config_only=True,
-                                           data_root=session.workspace_root)
+            import atlas as atlas_module  # `atlas` is the atlas name here
+            atlas_module.build_atlas_from_geojson(src, config_only=True,
+                                                  data_root=session.workspace_root)
     print(f"{atlas}: pushed{' and rebuilt atlas_config.json' if rebuild else ''}; "
           f"written back {session.written}")
     return 0
