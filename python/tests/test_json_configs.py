@@ -128,13 +128,7 @@ class TestJsonConfigs(unittest.TestCase):
         self.assertIn('_default', data)
 
 
-# Atlases kept current (the rest — samuelsloop, layt1, king_range_hike,
-# wildwood, the ft* field-trip tests — are abandoned).
-ACTIVE_ATLASES = [
-    'scvfd', 'kennedy', 'westport', 'fhe', 'gilhamhike', 'king_range', 'napachar',
-    'south_fork_eel', 'abi_demo', 'mineralkinsey', 'isf_920', 'nfsc_refugia',
-    'mather', 'angelo', 'sherwood_ranch', 'laytonville', 'cahto_creek_ranch',
-]
+ACTIVE_ATLASES = config_checks.ACTIVE_ATLASES
 
 CORE_OUTLETS = {'console', 'webmap', 'webedit', 'notebook', '3dview'}
 

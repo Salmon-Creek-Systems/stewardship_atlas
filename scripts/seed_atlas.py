@@ -106,6 +106,13 @@ def seed_one(client, bucket, atlas_name, args) -> dict:
         client, bucket, shared_plan, atlas_shared.shared_key,
         dry_run=args.dry_run)
 
+    if not args.dry_run:
+        # Publish promotes the staging catalog, so a seeded atlas needs one.
+        import staging_catalog
+        outlets_bucket = atlas_store.cloud_settings({})['outlets_bucket']
+        result['staging_catalog'] = staging_catalog.rebuild(
+            client, outlets_bucket, bucket, atlas_name)
+
     result['uploaded'] = moved['uploaded']
     result['skipped'] = moved['skipped'] + shared_moved['skipped']
     if not args.dry_run:

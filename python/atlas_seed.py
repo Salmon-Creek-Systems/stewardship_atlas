@@ -23,34 +23,18 @@ import fnmatch
 import logging
 
 import atlas_shared
+import config_checks
 import atlas_store
 import atlas_workspace as ws
 
 logger = logging.getLogger(__name__)
 
 
-# The atlases to migrate, chosen 2026-09-11. Deliberately a list rather than a
-# directory scan: /root/swales_dev holds 37 directories, most of them backups,
-# test atlases and superseded duplicates (westportdev, king_range_hike, ft1-4,
-# *_backup*). Seeding what happens to be on disk would carry all of that into
-# the thing that replaces it.
-MIGRATE = [
-    'abi_demo',
-    'angelo',
-    'fhe',
-    'ft5',
-    'gilhamhike',
-    'kennedy',
-    'king_range',
-    'layt1',
-    'mineralkinsey',
-    'napachar',
-    'nfsc_refugia',
-    'scvfd',
-    'sherwood_ranch',
-    'south_fork_eel_2026_10_02',
-    'westport',
-]
+# The atlases to migrate: the active list, which the config tests also check.
+# Deliberately a list rather than a directory scan: /root/swales_dev holds 37
+# directories, most of them backups, test atlases and superseded duplicates.
+# Abandoned atlases are not seeded (decided 2026-11-17).
+MIGRATE = list(config_checks.ACTIVE_ATLASES)
 
 
 # Paths under staging/ that are never seeded.
