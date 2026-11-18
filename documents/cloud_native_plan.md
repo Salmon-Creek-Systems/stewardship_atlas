@@ -248,9 +248,17 @@ A full staging copy is fine on the box, where the workspace cache persists and o
 
 - Most of it already exists: `in_layer`, `in_layers`, and an outlet's `in_layers`.
 - Undeclared reads found so far: the console checks the webmap exists; `sqldb` reads every layer; inlets read `local/`; delta apply reads the layer's own `deltas/`.
-- **Verified, not trusted:** during the staging rehearsal each job logs the files it actually opens, and the rehearsal fails if a job opened something outside its declared set.
-- The planner's `wanted` argument (`atlas_workspace.plan_hydrate`) is where this plugs in; it has been there since Phase 3 for this purpose.
-- Write-back needs one change. Deletes are already safe: only files in the manifest can be deleted, and an unhydrated file is never in it, so a partial hydrate cannot read as a wipe. Overwrites are not: a job that rewrites an output it did not hydrate (any outlet rebuild) uploads with no `If-Match`, and the create-only PUT refuses it because the object exists. The fix is to record the listing's ETags for every file in the manifest without downloading the unwanted ones.
+- **Verified, not trusted** — built 2026-11-18 as `python/asset_inputs.py` plus `scripts/check_declared_inputs.py`, a *differential* check: each asset is materialized in a full and in a declared-only workspace (read-only sessions) and every file written must match. That catches reads by GDAL/QGIS, which a Python audit hook cannot see; the hook only names missing files Python opened. Green for webmap/webedit/3dview/console on kennedy, scvfd, westport, fhe. It found the console's undeclared `layers/attributions/` read and a real `atlas_shared` bug (the shared-file memo was per process, not per cache, so a second or recreated workspace lost every sprite — a warm Lambda with a cleared `/tmp` would have hit it).
+- Write-back (done, `75f2bf6`): a partial hydrate records every object it did not download as `{etag, hydrated: false}`. A write over one is an `If-Match` overwrite; its absence is never a delete, so a partial hydrate cannot read as a wipe.
+
+#### 4c′. Publish promotes a staging STAC catalog (built 2026-11-18)
+
+Publish used to walk a hydrated staging directory and hash every file, because staging had no index. Now it has one, in the same format and place as the version catalogs: `{atlas}/catalog/staging/` in the outlets bucket, one Item per layer and per outlet directory, one asset per file with `file:checksum`, size and S3 ETag; hrefs are the private staging objects. It is not a child of the root catalog (whose children are versions) and is written `no-cache`.
+
+- **Written by** session write-back only (under the lock). The files about to change are recorded in the write-back marker first, so a resumed write-back still catalogues uploads that landed before the crash.
+- **Built by** the seed (`staging_catalog.rebuild`, from the listing and each object's `sha256` metadata). **Any out-of-band change to staging in S3 — a versioning restore, direct puts — must end with a rebuild.**
+- **Publish** reads it (`staging_tree.CatalogTree`), reuses by checksum, and server-side copies changed objects to the version archive and the public mirror. It hydrates only the config, so it runs on Lambda. It refuses an empty staging catalog when the config declares layers, which would otherwise publish an empty version and prune the public site.
+- Rehearsed green on four atlases; `session_race.py` 13/13 against real S3.
 
 Direct S3 reads (#174) stay a later optimization, worth it only for large inputs (COGs via `/vsis3/`, Overture via DuckDB httpfs).
 
@@ -259,7 +267,7 @@ Direct S3 reads (#174) stay a later optimization, worth it only for large inputs
 Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded from `configuration/` and versioned by the private bucket. The repo copies of the active atlases are deleted at cutover so there is one copy. `shared_*.json` and starters stay in git — they are code and ship in the image.
 
 - `scripts/atlas_config.py pull <atlas>` copies it out through a read-only session; `push <atlas>` takes the lock, prints a diff against S3, validates, writes it back, appends a line to a change log in the atlas's staging, and optionally runs a `config_only` rebuild.
-- The checks in `tests/test_json_configs.py` (`versioned_outlets` empty, `cloud.outlets` present, …) move into a function that both `push` and the console's config writes call.
+- Built: `python/config_checks.py` holds the rules; `tests/test_json_configs.py`, `atlas_config.py push` and every console layer action (`atlas.write_source_geojson`) call it, and a console edit that would *introduce* a problem is refused.
 - This closes #195 (console edits never committed).
 
 #### 4e. Traffic flip (inherited from 2d)
@@ -274,7 +282,7 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
 #### Cutover sequence (outline)
 
 1. Re-rehearse every active atlas on the staging substrate, Lambda path included.
-2. Freeze edits; final seed of every active atlas (abandoned ones are not seeded — the EBS snapshot keeps them).
+2. Freeze edits; final seed of every active atlas (`config_checks.ACTIVE_ATLASES`; abandoned ones are not seeded — the EBS snapshot keeps them). The seed builds each staging catalog. **Then** push each repo config: `atlas_config.py push <atlas> configuration/<atlas>.geojson` — after the seed, which would otherwise copy the box's stale `staging/atlas.geojson` back (the stale copies were moved to `/root/stale_atlas_geojson_20261117/` on 2026-11-17).
 3. Publish each atlas; publish site assets.
 4. Deploy the API image and worker; flip DNS; verify every atlas through `verify_published.py`.
 5. Close the box to the public.
@@ -282,7 +290,7 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
 #### Known gaps at cutover
 
 - **Jupyter** reads the box's staging directly, so it stops seeing current data. Deferred since Phase 3; rethink after cutover.
-- Delta `base_version` and overlook's "since the last release" read `config['dataswale']['versions']`, which Phase 3 stopped updating on publish. Must read the catalog before cutover.
+- ~~Delta `base_version` and overlook's "since the last release" read stale config versions~~ — fixed `9126576`: they read the S3 catalog.
 
 ### Phase 5 — QGIS as an async SQS worker · *M*
 - **5a.** Lambda enqueues render jobs `{atlas, asset, version}` to SQS; a worker on the box consumes them, **opens a session** like any other compute (not `/vsis3/` — see Phase 3), writes PDFs to S3, updates a status object the client polls (matches submit→spinner→poll).
