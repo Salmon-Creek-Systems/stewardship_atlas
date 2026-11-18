@@ -249,6 +249,13 @@ A full staging copy is fine on the box, where the workspace cache persists and o
 - Most of it already exists: `in_layer`, `in_layers`, and an outlet's `in_layers`.
 - Undeclared reads found so far: the console checks the webmap exists; `sqldb` reads every layer; inlets read `local/`; delta apply reads the layer's own `deltas/`.
 - **Verified, not trusted** — built 2026-11-18 as `python/asset_inputs.py` plus `scripts/check_declared_inputs.py`, a *differential* check: each asset is materialized in a full and in a declared-only workspace (read-only sessions) and every file written must match. That catches reads by GDAL/QGIS, which a Python audit hook cannot see; the hook only names missing files Python opened. Green for webmap/webedit/3dview/console on kennedy, scvfd, westport, fhe. It found the console's undeclared `layers/attributions/` read and a real `atlas_shared` bug (the shared-file memo was per process, not per cache, so a second or recreated workspace lost every sprite — a warm Lambda with a cleared `/tmp` would have hit it).
+- **Wired (2026-11-18):** `open_session(inputs=config -> prefixes | None)` hydrates the config, works out the prefixes from it, then hydrates those, all under the lease and against one listing, so the job runs on the config its inputs were planned from. The following use it:
+  - delta apply, photo ingest, comment/store, gsheet import/export, clear/copy layer: the layer and its deltas;
+  - `/refresh` and `/materialize_asset`: `asset_inputs`;
+  - `/refresh_layer` without cascade: in rebuild mode, also its inlets' inputs;
+  - add/edit layer: the layer plus the outlets they re-materialize. `add_layer` touches `sqldb`, so in practice it gets a full hydrate.
+
+  A cascade, `delete_layer`, `save_config` and read sessions hydrate everything. Narrowing a cascade to its Dagster selection is left for later; Scot will write it. The differential check also takes `layer:<name>` for a delta apply; it seeds `uuid4` so that features minted without an `atlas_id` match across the two runs. Green for `roads` and `regions` on the four rehearsal atlases.
 - Write-back (done, `75f2bf6`): a partial hydrate records every object it did not download as `{etag, hydrated: false}`. A write over one is an `If-Match` overwrite; its absence is never a delete, so a partial hydrate cannot read as a wipe.
 
 #### 4c′. Publish promotes a staging STAC catalog (built 2026-11-18)
