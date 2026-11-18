@@ -121,9 +121,7 @@
                             0
                         ],
                         "interaction": "interface",
-                        "access": [
-                            "admin"
-                        ],
+                        "access": ["public"],
                         "name": "regions",
                         "editable_columns": [
                             {
@@ -1044,6 +1042,7 @@
                         ]
                     },
                     "mtbs_sample": {
+                        "access": ["public"],
                         "name": "mtbs_sample",
                         "geometry_type": "point",
                         "color": [
@@ -1120,6 +1119,7 @@
                         "show_attributes": true
                     },
                     "camera_tour": {
+                        "access": ["public"],
                         "name": "camera_tour",
                         "geometry_type": "linestring",
                         "color": [

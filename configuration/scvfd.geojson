@@ -1034,6 +1034,7 @@
                         "qgis_label_scale": 2.0
                     },
                     "circuit": {
+                        "access": ["public"],
                         "name": "circuit",
                         "geometry_type": "linestring",
                         "color": [

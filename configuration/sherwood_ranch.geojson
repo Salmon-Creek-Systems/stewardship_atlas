@@ -53,9 +53,7 @@
                         ],
                         "fill_opacity": 0.3,
                         "interaction": "interface",
-                        "access": [
-                            "admin"
-                        ],
+                        "access": ["public"],
                         "editable_columns": [
                             {
                                 "name": "name",
@@ -65,6 +63,7 @@
                         ]
                     },
                     "roads": {
+                        "access": ["public"],
                         "geometry_type": "linestring",
                         "color": [
                             20,
@@ -111,6 +110,7 @@
                         ]
                     },
                     "creeks": {
+                        "access": ["public"],
                         "geometry_type": "linestring",
                         "add_labels": true,
                         "color": [
@@ -129,6 +129,7 @@
                         ]
                     },
                     "landmarks": {
+                        "access": ["public"],
                         "geometry_type": "point",
                         "color": [
                             20,
@@ -146,6 +147,7 @@
                         ]
                     },
                     "landfire_evc": {
+                        "access": ["public"],
                         "geometry_type": "raster",
                         "vis": {
                             "layout": {
@@ -157,6 +159,7 @@
                         }
                     },
                     "landfire_evt": {
+                        "access": ["public"],
                         "geometry_type": "raster",
                         "vis": {
                             "layout": {
@@ -168,6 +171,7 @@
                         }
                     },
                     "roads_index": {
+                        "access": ["public"],
                         "geometry_type": "polygon",
                         "color": [
                             100,
@@ -187,6 +191,7 @@
                         }
                     },
                     "creeks_index": {
+                        "access": ["public"],
                         "geometry_type": "polygon",
                         "color": [
                             50,
@@ -206,6 +211,7 @@
                         }
                     },
                     "burns_index": {
+                        "access": ["admin"],
                         "geometry_type": "polygon",
                         "color": [
                             200,
@@ -225,6 +231,7 @@
                         }
                     },
                     "processing_sites_index": {
+                        "access": ["admin"],
                         "geometry_type": "polygon",
                         "color": [
                             128,
@@ -404,11 +411,7 @@
                             "landfire_evc",
                             "landfire_evt",
                             "roads_index",
-                            "creeks_index",
-                            "burns_index",
-                            "processing_sites_index",
-                            "burns",
-                            "processing_sites"
+                            "creeks_index"
                         ],
                         "config_def": "webmap",
                         "access": [

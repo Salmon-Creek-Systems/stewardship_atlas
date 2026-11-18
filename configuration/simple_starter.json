@@ -2,10 +2,10 @@
   "label": "Simple",
   "description": "A minimal atlas: roads, creeks, and landmarks over terrain. A clean starting point for any region.",
   "layers": {
-    "regions": { "layer_def": "regions" },
-    "roads": { "layer_def": "roads" },
-    "creeks": { "layer_def": "creeks" },
-    "landmarks": { "layer_def": "poi" }
+    "regions": { "access": ["public"], "layer_def": "regions" },
+    "roads": { "access": ["public"], "layer_def": "roads" },
+    "creeks": { "access": ["public"], "layer_def": "creeks" },
+    "landmarks": { "access": ["public"], "layer_def": "poi" }
   },
   "assets": {
     "public_roads": { "type": "inlet", "out_layer": "roads", "config_def": "overture_roads" },

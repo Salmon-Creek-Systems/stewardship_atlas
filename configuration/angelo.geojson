@@ -46,18 +46,23 @@
         "cloud": {"outlets": ["webmap", "console", "3dview"]},
         "layers": {
           "regions": {
+            "access": ["public"],
             "layer_def": "regions"
           },
           "roads": {
+            "access": ["public"],
             "layer_def": "roads"
           },
           "creeks": {
+            "access": ["public"],
             "layer_def": "creeks"
           },
           "landmarks": {
+            "access": ["public"],
             "layer_def": "poi"
           },
           "photos": {
+            "access": ["public"],
             "geometry_type": "point",
             "conversations_enabled": true,
             "color": [
@@ -87,6 +92,7 @@
             ]
           },
           "inaturalist": {
+            "access": ["public"],
             "geometry_type": "point",
             "color": [
               60,

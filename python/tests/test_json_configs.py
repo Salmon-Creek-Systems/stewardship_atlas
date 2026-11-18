@@ -155,6 +155,68 @@ ACTIVE_ATLASES = [
 
 CORE_OUTLETS = {'console', 'webmap', 'webedit', 'notebook', '3dview'}
 
+# Outlets whose page fetches its layers in the browser, so every layer they list
+# must be in the public mirror (atlas_store.CLIENT_FETCHED_OUTLETS).
+PUBLIC_MAP_OUTLETS = ('webmap', '3dview')
+
+
+def unpublishable_map_layers(props, shared_layers):
+    """`outlet:layer=access` for every layer a public map loads that is not
+    explicitly declared public.
+
+    A missing `access` reads as public in atlas.py but as internal in the
+    publish guardrail (#175), so the map 403s on S3 while working on the box.
+    Declaring it is the only state both agree on.
+    """
+    layers = props.get('layers') or {}
+    allow = (props.get('cloud') or {}).get('outlets')
+    found = []
+    for outlet in PUBLIC_MAP_OUTLETS:
+        if allow is not None and outlet not in allow:
+            continue
+        asset = (props.get('assets') or {}).get(outlet) or {}
+        if 'public' not in (asset.get('access') or ['public']):
+            continue
+        for name in asset.get('in_layers') or []:
+            layer = layers.get(name)
+            if layer is None:
+                continue
+            access = layer.get('access')
+            if access is None and layer.get('layer_def'):
+                access = (shared_layers.get(layer['layer_def']) or {}).get('access')
+            if not access or 'public' not in access:
+                found.append(f"{outlet}:{name}={access}")
+    return found
+
+
+class TestPublicMapsLoadOnlyPublicLayers(unittest.TestCase):
+    def setUp(self):
+        with open(CONFIG_DIR / 'shared_layers_config.json') as f:
+            self.shared = json.load(f)
+
+    def test_active_atlases(self):
+        for atlas in ACTIVE_ATLASES:
+            with self.subTest(atlas=atlas):
+                with open(CONFIG_DIR / f'{atlas}.geojson') as f:
+                    props = json.load(f)['features'][0]['properties']
+                self.assertEqual(unpublishable_map_layers(props, self.shared), [])
+
+    def test_starters(self):
+        for path in sorted(CONFIG_DIR.glob('*_starter.json')):
+            with self.subTest(starter=path.name):
+                with open(path) as f:
+                    data = json.load(f)
+                props = {**(data.get('properties') or {}), **data}
+                self.assertEqual(unpublishable_map_layers(props, self.shared), [])
+
+    def test_detects_undeclared_and_admin_layers(self):
+        props = {'cloud': {'outlets': ['webmap']},
+                 'layers': {'roads': {}, 'regions': {'layer_def': 'regions'},
+                            'ok': {'access': ['public']}},
+                 'assets': {'webmap': {'in_layers': ['roads', 'regions', 'ok']}}}
+        self.assertEqual(unpublishable_map_layers(props, {'regions': {'access': ['admin']}}),
+                         ["webmap:roads=None", "webmap:regions=['admin']"])
+
 
 class TestStarterBundles(unittest.TestCase):
     """Single-file starter bundles used by the /create dropdown.

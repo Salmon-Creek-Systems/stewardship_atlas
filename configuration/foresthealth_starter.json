@@ -4,10 +4,11 @@
   "layers": {
     "regions": {
       "geometry_type": "polygon", "color": [50, 50, 50], "fill_opacity": 0.3,
-      "interaction": "interface", "access": ["admin"],
+      "interaction": "interface", "access": ["public"],
       "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
     },
     "roads": {
+      "access": ["public"],
       "geometry_type": "linestring",
       "color": [20, 20, 20], "add_labels": true, "label_color": [220, 0, 0],
       "label_expression": "if(\"name\" IS NOT NULL AND length(trim(\"name\")) > 3, \"name\", NULL)",
@@ -26,16 +27,19 @@
       ]
     },
     "creeks": {
+      "access": ["public"],
       "geometry_type": "linestring", "add_labels": true, "color": [50, 50, 200],
       "interaction": "interface", "vector_width": true,
       "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
     },
     "landmarks": {
+      "access": ["public"],
       "geometry_type": "point", "color": [20, 155, 200], "add_labels": true,
       "interaction": "interface",
       "editable_columns": [{ "name": "name", "type": "string", "default": "" }]
     },
     "inaturalist": {
+      "access": ["public"],
       "geometry_type": "point", "color": [0, 180, 100], "add_labels": true,
       "interaction": "interface", "show_attributes": true,
       "symbol": { "png": "flower.png", "icon": "flower" }, "icon-size": 1.5,
@@ -49,17 +53,17 @@
         { "name": "quality_grade", "type": "string", "default": "" }
       ]
     },
-    "canopy_density": { "geometry_type": "raster", "cog": true, "cog_color": "BrewerBuGn9,0,50,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
-    "ladder_fuel_density": { "geometry_type": "raster", "cog": true, "cog_color": "BrewerOrRd9,0,20,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
-    "landfire_evc": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
-    "landfire_evt": { "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
+    "canopy_density": { "access": ["public"], "geometry_type": "raster", "cog": true, "cog_color": "BrewerBuGn9,0,50,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
+    "ladder_fuel_density": { "access": ["public"], "geometry_type": "raster", "cog": true, "cog_color": "BrewerOrRd9,0,20,c", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.7 } },
+    "landfire_evc": { "access": ["public"], "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
+    "landfire_evt": { "access": ["public"], "geometry_type": "raster", "vis": { "layout": { "visibility": "none" } }, "paint": { "raster-opacity": 0.5 } },
     "terrain_dem": { "geometry_type": "raster" },
     "basemap": { "geometry_type": "raster" },
     "hillshade_tiles": { "geometry_type": "raster" },
-    "roads_index": { "geometry_type": "polygon", "color": [100, 55, 50], "fill_color": [100, 55, 50], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
-    "creeks_index": { "geometry_type": "polygon", "color": [50, 55, 255], "fill_color": [50, 55, 255], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "roads_index": { "access": ["public"], "geometry_type": "polygon", "color": [100, 55, 50], "fill_color": [100, 55, 50], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "creeks_index": { "access": ["public"], "geometry_type": "polygon", "color": [50, 55, 255], "fill_color": [50, 55, 255], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
     "burns_index": { "geometry_type": "polygon", "color": [200, 55, 55], "fill_color": [200, 55, 55], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
-    "processing_sites_index": { "geometry_type": "polygon", "color": [128, 0, 128], "fill_color": [128, 0, 128], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
+    "processing_sites_index": { "access": ["admin"], "geometry_type": "polygon", "color": [128, 0, 128], "fill_color": [128, 0, 128], "fill_opacity": 0.3, "vis": { "layout": { "visibility": "none" } } },
     "burns": {
       "geometry_type": "polygon", "color": [155, 5, 5], "fill_color": [255, 50, 50],
       "add_labels": true, "interaction": "interface", "access": ["admin"], "fill_opacity": 0.4,
@@ -95,7 +99,7 @@
     },
     "webmap": {
       "type": "outlet", "name": "webmap", "config_def": "webmap",
-      "in_layers": ["regions", "roads", "creeks", "landmarks", "inaturalist", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index", "processing_sites_index", "processing_sites"],
+      "in_layers": ["regions", "roads", "creeks", "landmarks", "inaturalist", "landfire_evc", "landfire_evt", "canopy_density", "ladder_fuel_density", "roads_index", "creeks_index"],
       "access": ["public", "internal", "admin"]
     },
     "webedit": {
