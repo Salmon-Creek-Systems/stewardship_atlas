@@ -230,6 +230,33 @@ class TestWriteBack(SessionTestCase):
         self.assertEqual(session.written['restat'], 1)
 
 
+class TestPartialSession(SessionTestCase):
+    """A session that hydrates only declared inputs (Phase 4c)."""
+
+    def wanted(self, rel):
+        return rel == 'atlas_config.json' or rel.startswith('layers/roads/')
+
+    def test_rebuilding_an_output_it_did_not_download(self):
+        with self.session(wanted=self.wanted) as session:
+            self.assertFalse(self.local('outlets/runbook/old.pdf').exists())
+            out = session.staging_dir / 'outlets/runbook/old.pdf'
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text('new pdf')
+        self.assertEqual(self.remote('outlets/runbook/old.pdf'), 'new pdf')
+
+    def test_what_it_did_not_download_survives(self):
+        with self.session(wanted=self.wanted):
+            pass
+        self.assertEqual(self.remote(CREEKS), SEED[CREEKS])
+        self.assertEqual(self.remote('outlets/runbook/old.pdf'), 'pdf')
+
+    def test_a_full_session_after_a_partial_one_gets_everything(self):
+        with self.session(wanted=self.wanted):
+            pass
+        with self.session():
+            self.assertEqual(self.local(CREEKS).read_text(), SEED[CREEKS])
+
+
 class TestFailure(SessionTestCase):
     def test_body_failure_writes_nothing_and_the_next_session_resets(self):
         with self.assertRaises(RuntimeError):

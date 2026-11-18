@@ -157,7 +157,8 @@ class TestPlanHydrate(unittest.TestCase):
         plan = ws.plan_hydrate({'atlas_config.json': remote('"c"')},
                                manifest({'atlas_config.json': entry('"c"', 10, 7)}),
                                {'atlas_config.json': (10, 7)})
-        self.assertEqual(plan, {'download': [], 'remove': [], 'unchanged': ['atlas_config.json']})
+        self.assertEqual(plan, {'download': [], 'remove': [], 'unchanged': ['atlas_config.json'],
+                                'remote_only': {}})
 
     def test_remote_change_is_downloaded(self):
         plan = ws.plan_hydrate({'atlas_config.json': remote('"new"')},
@@ -214,6 +215,44 @@ class TestPlanHydrate(unittest.TestCase):
                                wanted=lambda rel: rel.startswith('layers/roads/'))
         self.assertEqual(plan['download'], ['layers/roads/roads.geojson'])
         self.assertEqual(plan['remove'], ['layers/creeks/creeks.geojson'])
+
+
+    def test_partial_hydrate_records_what_it_did_not_download(self):
+        listing = {'layers/roads/roads.geojson': remote('"r"'),
+                   'outlets/webmap/index.html': remote('"w"'),
+                   'deltas/roads/work/a__1__create.geojson': remote('"a"')}
+        plan = ws.plan_hydrate(listing, ws.empty_manifest(), {},
+                               wanted=lambda rel: rel.startswith('layers/roads/'))
+        # the archive is never recorded; it is never written back either
+        self.assertEqual(plan['remote_only'], {'outlets/webmap/index.html': '"w"'})
+
+    def test_full_hydrate_has_nothing_remote_only(self):
+        listing = {'layers/roads/roads.geojson': remote('"r"')}
+        plan = ws.plan_hydrate(listing, ws.empty_manifest(), {})
+        self.assertEqual(plan['remote_only'], {})
+
+    def test_unhydrated_entry_is_never_in_sync(self):
+        listing = {'outlets/webmap/index.html': remote('"w"')}
+        m = manifest({'outlets/webmap/index.html': {'etag': '"w"', 'hydrated': False}})
+        plan = ws.plan_hydrate(listing, m, {})
+        self.assertEqual(plan['download'], ['outlets/webmap/index.html'])
+
+
+class TestPartialWriteback(unittest.TestCase):
+    """Declared inputs (#159 Phase 4c): a job hydrates only what it reads."""
+
+    def test_output_over_an_unhydrated_object_overwrites_conditionally(self):
+        m = manifest({'outlets/webmap/index.html': {'etag': '"w"', 'hydrated': False}})
+        plan = ws.plan_writeback(m, {'outlets/webmap/index.html': (5, 9)}, lambda rel: 'sha-new')
+        self.assertEqual(plan['upload'], [{'rel': 'outlets/webmap/index.html',
+                                           'sha256': 'sha-new', 'if_match': '"w"'}])
+
+    def test_absent_unhydrated_object_is_not_deleted(self):
+        m = manifest({'layers/creeks/creeks.geojson': {'etag': '"c"', 'hydrated': False},
+                      'layers/roads/roads.geojson': entry('"r"', 20, 8)})
+        plan = ws.plan_writeback(m, {'layers/roads/roads.geojson': (20, 8)}, no_hashing)
+        self.assertEqual(plan['delete'], [])
+        self.assertEqual(plan['upload'], [])
 
 
 class TestPlanWriteback(unittest.TestCase):

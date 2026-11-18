@@ -181,8 +181,16 @@ def listing_from_objects(objects, prefix: str) -> dict:
 
 def _in_sync(known, local, remote) -> bool:
     return (known is not None and local is not None
+            and is_hydrated(known)
             and known['etag'] == remote['etag']
             and (known['size'], known['mtime_ns']) == tuple(local))
+
+
+def is_hydrated(entry) -> bool:
+    """False for a manifest entry that records an S3 object this workspace
+    did not download (a partial hydrate): it carries the object's ETag and
+    nothing about any local file."""
+    return entry.get('hydrated', True) is not False
 
 
 def plan_hydrate(listing: dict, manifest: dict, local_state: dict, wanted=None) -> dict:
@@ -200,7 +208,11 @@ def plan_hydrate(listing: dict, manifest: dict, local_state: dict, wanted=None) 
     serverless follow-up); a file that is not wanted and not verified is
     removed rather than left untrusted.
 
-    Returns ``{'download': [rel], 'remove': [rel], 'unchanged': [rel]}``.
+    Returns ``{'download': [rel], 'remove': [rel], 'unchanged': [rel],
+    'remote_only': {rel: etag}}``. ``remote_only`` lists the objects a partial
+    hydrate leaves in S3: the manifest still records their ETags, so a job
+    that writes one of them overwrites it conditionally instead of failing a
+    create-only upload, and write-back never reads their absence as a delete.
     Anything in the manifest that is in none of those lists is stale and
     should be dropped from it.
     """
@@ -209,18 +221,22 @@ def plan_hydrate(listing: dict, manifest: dict, local_state: dict, wanted=None) 
     def include(rel):
         return not is_archive_path(rel) and (wanted is None or wanted(rel))
 
-    download, remove, unchanged = [], [], []
+    download, remove, unchanged, remote_only = [], [], [], {}
     for rel in sorted(listing):
         local = local_state.get(rel)
         if _in_sync(files.get(rel), local, listing[rel]):
             unchanged.append(rel)
         elif include(rel):
             download.append(rel)
-        elif local is not None:
-            remove.append(rel)
+        else:
+            if local is not None:
+                remove.append(rel)
+            if not is_archive_path(rel):
+                remote_only[rel] = listing[rel]['etag']
 
     remove.extend(rel for rel in sorted(local_state) if rel not in listing)
-    return {'download': download, 'remove': sorted(remove), 'unchanged': unchanged}
+    return {'download': download, 'remove': sorted(remove), 'unchanged': unchanged,
+            'remote_only': remote_only}
 
 
 def plan_writeback(manifest: dict, local_state: dict, content_hash) -> dict:
@@ -253,6 +269,10 @@ def plan_writeback(manifest: dict, local_state: dict, content_hash) -> dict:
     for rel in sorted(local_state):
         size, mtime_ns = local_state[rel]
         known = files.get(rel)
+        if known is not None and not is_hydrated(known):
+            # Written by the run over an object it never downloaded.
+            upload.append({'rel': rel, 'sha256': content_hash(rel), 'if_match': known['etag']})
+            continue
         if known is not None and (known['size'], known['mtime_ns']) == (size, mtime_ns):
             unchanged.append(rel)
             continue
@@ -266,6 +286,8 @@ def plan_writeback(manifest: dict, local_state: dict, content_hash) -> dict:
     for rel in sorted(files):
         if rel in local_state:
             continue
+        if not is_hydrated(files[rel]):
+            continue  # never downloaded, so its absence is not a deletion
         if is_archive_path(rel):
             logger.warning(f"atlas_workspace: archived delta {rel} is missing locally; "
                            f"leaving the S3 copy in place")
@@ -406,6 +428,9 @@ def execute_hydrate(client, bucket: str, atlas_name: str, workspace_root,
             (root / rel).unlink()
         except FileNotFoundError:
             pass
+
+    for rel, etag in (plan.get('remote_only') or {}).items():
+        files[rel] = {'etag': etag, 'hydrated': False}
 
     partial_root = partial_dir(workspace_root, atlas_name)
     for rel in plan['download']:
