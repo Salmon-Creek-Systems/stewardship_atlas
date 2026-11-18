@@ -54,6 +54,24 @@ class TestAssetInputs(unittest.TestCase):
             'atlas.geojson', 'atlas_config.json', 'deltas/hydrants/', 'layers/hydrants/'])
 
 
+    def test_layer_change_adds_the_outlets_it_rematerializes(self):
+        got = ai.layer_change_inputs(CONFIG, 'hydrants', ['webmap', 'console', 'webedit'])
+        self.assertIn('deltas/hydrants/', got)
+        self.assertIn('layers/roads/', got)                 # the webmap's
+        self.assertIn('outlets/sqldb/atlas.db', got)        # the console's
+        # an outlet the atlas does not have (webedit) is skipped
+
+    def test_layer_change_through_a_full_outlet_is_everything(self):
+        self.assertIsNone(ai.layer_change_inputs(CONFIG, 'hydrants', ai.ADD_LAYER_OUTLETS))
+
+    def test_layer_rebuild_adds_its_inlets(self):
+        self.assertEqual(ai.layer_inlets(CONFIG, 'roads'), ['overture_roads'])
+        self.assertEqual(ai.layer_rebuild_inputs(CONFIG, 'roads'),
+                         ai.layer_refresh_inputs('roads'))   # the inlet reads nothing more
+        self.assertEqual(ai.layer_rebuild_inputs(CONFIG, 'hydrants'),
+                         ai.layer_refresh_inputs('hydrants'))
+
+
 class TestWanted(unittest.TestCase):
     def test_exact_files_and_dir_prefixes(self):
         w = ai.wanted(['atlas_config.json', 'layers/roads/'])

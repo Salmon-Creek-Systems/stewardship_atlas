@@ -107,6 +107,43 @@ def layer_refresh_inputs(layer_name: str):
     return sorted(set(ALWAYS) | {f'layers/{layer_name}/', f'deltas/{layer_name}/'})
 
 
+def layer_change_inputs(config: dict, layer_name: str, outlets) -> list:
+    """A layer operation that then re-materializes ``outlets`` (add/edit layer):
+    the layer's own inputs plus each outlet's. None if any outlet needs everything."""
+    prefixes = set(layer_refresh_inputs(layer_name))
+    for outlet in outlets:
+        if outlet not in (config.get('assets') or {}):
+            continue
+        more = asset_inputs(config, outlet)
+        if more is None:
+            return None
+        prefixes |= set(more)
+    return sorted(prefixes)
+
+
+def layer_inlets(config: dict, layer_name: str) -> list:
+    """The inlets that write ``layer_name`` (its ``out_layer``, else the asset's own name)."""
+    return sorted(name for name, asset in (config.get('assets') or {}).items()
+                  if _kind(asset) == 'inlet'
+                  and (_field(asset, 'out_layer') or name) == layer_name)
+
+
+def layer_rebuild_inputs(config: dict, layer_name: str):
+    """refresh_layer mode=rebuild without cascade: the layer, plus its inlets' inputs."""
+    prefixes = set(layer_refresh_inputs(layer_name))
+    for inlet in layer_inlets(config, layer_name):
+        more = asset_inputs(config, inlet)
+        if more is None:
+            return None
+        prefixes |= set(more)
+    return sorted(prefixes)
+
+
+# The consumers atlas.add_layer appends a new layer to (plan_add_layer's
+# default) and re-materializes, then the console.
+ADD_LAYER_OUTLETS = ('webmap', 'webedit', 'sqldb', 'html', 'console')
+
+
 def wanted(prefixes):
     """The ``open_session(wanted=...)`` predicate for a prefix list; None stays None."""
     if prefixes is None:

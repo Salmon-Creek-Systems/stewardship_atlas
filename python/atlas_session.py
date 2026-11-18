@@ -40,6 +40,7 @@ import os
 import threading
 import time
 
+import asset_inputs
 import atlas_lock
 import atlas_shared
 import atlas_store
@@ -126,15 +127,39 @@ def _counts(plan: dict) -> dict:
     return {name: len(items) for name, items in plan.items()}
 
 
-def _hydrate(client, bucket, atlas_name, root, wanted) -> dict:
+def _hydrate(client, bucket, atlas_name, root, wanted, listing=None) -> dict:
     staging = ws.staging_dir(root, atlas_name)
     manifest = ws.load_manifest(ws.manifest_path(root, atlas_name))
-    listing = ws.list_staging(client, bucket, atlas_name)
+    if listing is None:
+        listing = ws.list_staging(client, bucket, atlas_name)
     plan = ws.plan_hydrate(listing, manifest, ws.snapshot_local(staging), wanted=wanted)
     ws.execute_hydrate(client, bucket, atlas_name, root, plan, manifest)
     counts = _counts(plan)
     logger.info(f"atlas_session: hydrated '{atlas_name}' {counts}")
     return counts
+
+
+def _hydrate_for_inputs(client, bucket, atlas_name, root, inputs, require_config) -> dict:
+    """Hydrate in two passes: the config first, then what ``inputs(config)`` names.
+
+    The job's inputs are worked out from the config, which is itself in S3. Doing
+    both passes under the session's lease means the config the inputs were
+    planned from is the one the job runs with. Both passes plan against one
+    listing. ``inputs`` returning None hydrates everything.
+    """
+    listing = ws.list_staging(client, bucket, atlas_name)
+    first = _hydrate(client, bucket, atlas_name, root,
+                     asset_inputs.wanted(asset_inputs.ALWAYS), listing)
+    probe = Session(atlas_name=atlas_name, workspace_root=root,
+                    staging_dir=ws.staging_dir(root, atlas_name), bucket=bucket, lease=None)
+    config = _load_config(probe, require_config)
+    prefixes = inputs(config) if config is not None else None
+    wanted = (None if prefixes is None
+              else asset_inputs.wanted(sorted(set(prefixes) | set(asset_inputs.ALWAYS))))
+    second = _hydrate(client, bucket, atlas_name, root, wanted, listing)
+    second['download'] += first['download']
+    second['remove'] += first['remove']
+    return second
 
 
 def _read_marker(marker) -> dict:
@@ -217,8 +242,8 @@ def _load_config(session: Session, require_config: bool):
 def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str = None,
                  workspace_root=None, wait: float = 0.0,
                  ttl: float = atlas_lock.DEFAULT_TTL_SECONDS, heartbeat_interval: float = None,
-                 wanted=None, require_config: bool = True, read_only: bool = False,
-                 clock=time.time):
+                 wanted=None, inputs=None, require_config: bool = True,
+                 read_only: bool = False, clock=time.time):
     """Lock, hydrate and yield a ``Session``; write back and release on exit.
 
     ``wait``: seconds to wait for a busy atlas before raising ``AtlasLocked``.
@@ -226,6 +251,9 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
     and ``0`` disables the heartbeat (tests, and bodies known to be short).
     ``wanted``: optional predicate restricting what is hydrated — see
     ``atlas_workspace.plan_hydrate``.
+    ``inputs``: optional ``config -> prefixes | None`` (``asset_inputs``), for a
+    caller whose inputs depend on the config it has not seen yet. The session
+    hydrates the config, asks, then hydrates those prefixes. Not with ``wanted``.
     ``require_config``: ``False`` for creating an atlas, which starts with
     nothing in S3; ``session.config`` is then ``None``.
     ``read_only``: take no lease and write nothing back. For queries and status
@@ -233,6 +261,8 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
     corrupt anything by reading a moment-old state. Anything such a body writes
     into the workspace is discarded by the next hydrate.
     """
+    if wanted is not None and inputs is not None:
+        raise ValueError("open_session takes wanted= or inputs=, not both")
     client = client or atlas_store._s3()
     bucket = bucket or atlas_store.cloud_settings({})['private_bucket']
     root = Path(workspace_root) if workspace_root is not None else workspace_root_from_env()
@@ -263,6 +293,9 @@ def open_session(atlas_name: str, purpose: str = '', *, client=None, bucket: str
             logger.warning(f"atlas_session: read-only session on '{atlas_name}' is using the "
                            f"workspace as-is; a write-back is still pending")
             session.hydrated = {'download': 0, 'remove': 0, 'unchanged': 0}
+        elif inputs is not None:
+            session.hydrated = _hydrate_for_inputs(client, bucket, atlas_name, root,
+                                                   inputs, require_config)
         else:
             session.hydrated = _hydrate(client, bucket, atlas_name, root, wanted)
         # staging/local points at the workspace's shared cache, so the file

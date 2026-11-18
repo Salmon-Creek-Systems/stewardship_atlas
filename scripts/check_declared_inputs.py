@@ -4,6 +4,7 @@ outputs from only the files asset_inputs says it reads?
 
     ./scripts/check_declared_inputs.py kennedy                 # its light outlets
     ./scripts/check_declared_inputs.py kennedy webmap console  # these assets
+    ./scripts/check_declared_inputs.py kennedy layer:hydrants  # a delta apply
 
 For each asset, in two read-only sessions (no lock, nothing written back):
 
@@ -90,7 +91,11 @@ def run(atlas_name: str, asset: str, workspace: Path, wanted, hook: MissingOpens
         hook.missing = set()
         error = None
         try:
-            atlas.materialize(session.config, asset)
+            if asset.startswith('layer:'):
+                import dataswale_geojson
+                dataswale_geojson.refresh_vector_layer(session.config, asset[len('layer:'):])
+            else:
+                atlas.materialize(session.config, asset)
         except Exception:
             error = traceback.format_exc(limit=3)
         finally:
@@ -127,7 +132,8 @@ def main():
 
     failures = 0
     for asset in assets:
-        prefixes = asset_inputs.asset_inputs(config, asset)
+        prefixes = (asset_inputs.layer_refresh_inputs(asset[len('layer:'):])
+                    if asset.startswith('layer:') else asset_inputs.asset_inputs(config, asset))
         if prefixes is None:
             print(f"  skip  {asset}: full hydrate by declaration")
             continue

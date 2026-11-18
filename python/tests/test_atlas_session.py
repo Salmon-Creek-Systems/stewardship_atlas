@@ -257,6 +257,40 @@ class TestPartialSession(SessionTestCase):
             self.assertEqual(self.local(CREEKS).read_text(), SEED[CREEKS])
 
 
+class TestInputsSession(SessionTestCase):
+    """inputs=: the config is hydrated first, then what the config says the job reads."""
+
+    def test_inputs_sees_the_hydrated_config_and_only_its_prefixes_arrive(self):
+        seen = []
+
+        def inputs(config):
+            seen.append(config['name'])
+            return ['layers/roads/']
+
+        with self.session(inputs=inputs) as session:
+            self.assertEqual(seen, [ATLAS])
+            self.assertEqual(self.local(ROADS).read_text(), SEED[ROADS])
+            self.assertFalse(self.local(CREEKS).exists())
+            self.assertFalse(self.local('outlets/runbook/old.pdf').exists())
+            self.assertEqual(session.config['name'], ATLAS)
+        self.assertEqual(self.remote(CREEKS), SEED[CREEKS])   # not a delete
+
+    def test_inputs_returning_none_hydrates_everything(self):
+        with self.session(inputs=lambda config: None):
+            self.assertEqual(self.local(CREEKS).read_text(), SEED[CREEKS])
+
+    def test_a_write_to_an_undeclared_file_still_reaches_s3(self):
+        with self.session(inputs=lambda config: ['layers/roads/']) as session:
+            (session.staging_dir / CREEKS).parent.mkdir(parents=True, exist_ok=True)
+            (session.staging_dir / CREEKS).write_text('rewritten')
+        self.assertEqual(self.remote(CREEKS), 'rewritten')
+
+    def test_wanted_and_inputs_together_are_refused(self):
+        with self.assertRaises(ValueError):
+            with self.session(wanted=lambda rel: True, inputs=lambda config: None):
+                pass
+
+
 class TestStagingCatalog(SessionTestCase):
     """Write-back keeps {atlas}/catalog/staging/ in step with the objects."""
 

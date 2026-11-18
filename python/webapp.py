@@ -294,7 +294,8 @@ async def dereference_url(payload: dict):
 @app.post("/import_gsheet/{swalename}/{layer_name}")
 async def import_gsheet(swalename: str, layer_name: str):
     try:
-        with write_session(swalename, f"import_gsheet {layer_name}") as session:
+        with write_session(swalename, f"import_gsheet {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             ac = session.config
             layer_fc = outlets.import_gsheet(ac, 'spreadsheet_import', layer_name)
 
@@ -318,7 +319,8 @@ async def export_gsheet(swalename: str, layer_name: str):
     try:
         # A write session: the export stamps spreadsheet URLs back into the
         # config, and that edit has to reach S3.
-        with write_session(swalename, f"export_gsheet {layer_name}") as session:
+        with write_session(swalename, f"export_gsheet {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             ac = session.config
             ac['assets']['spreadsheet_export']['in_layers'] = [layer_name]
             outlets.gsheet_export(ac, 'spreadsheet_export', layer_name)
@@ -344,7 +346,8 @@ async def export_gsheet(swalename: str, layer_name: str):
 async def import_sheet_endpoint(swalename: str, layer_name: str):
     """Import data from Google Sheet and refresh the layer."""
     try:
-        with write_session(swalename, f"import_sheet {layer_name}") as session:
+        with write_session(swalename, f"import_sheet {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             ac = session.config
 
             # Call vector_inlets.import_sheet to get delta paths
@@ -370,7 +373,8 @@ async def import_sheet_endpoint(swalename: str, layer_name: str):
 @app.get("/clear_layer/{swalename}/{layer_name}")
 async def clear_layer(swalename: str, layer_name: str):
     try:
-        with write_session(swalename, f"clear_layer {layer_name}") as session:
+        with write_session(swalename, f"clear_layer {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             dataswale_geojson.clear_vector_layer(session.config, layer_name)
         return {
             "status": "success",
@@ -384,7 +388,8 @@ async def clear_layer(swalename: str, layer_name: str):
 @app.get("/copy_layer/{swalename}/{layer_name}")
 async def copy_layer(swalename: str, layer_name: str, new_name: str):
     try:
-        with write_session(swalename, f"copy_layer {layer_name} -> {new_name}") as session:
+        with write_session(swalename, f"copy_layer {layer_name} -> {new_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             atlas.copy_layer(session.config, layer_name, new_name)
         return {
             "status": "success",
@@ -419,7 +424,9 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
                 s3_key = key
             else:
                 s3_key = s3_url
-        with write_session(swalename, f"add_layer {layer_name}") as session:
+        with write_session(swalename, f"add_layer {layer_name}",
+                               inputs=lambda c: asset_inputs.layer_change_inputs(
+                                   c, layer_name, asset_inputs.ADD_LAYER_OUTLETS)) as session:
             atlas.add_layer(session.config, layer_name, s3_key=s3_key, s3_bucket=s3_bucket,
                             color=color, geometry_type=geometry)
         return {
@@ -486,7 +493,9 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
                          f"s3://{ADD_LAYER_UPLOAD_BUCKET}/{s3_key}")
 
         def run():
-            with write_session(swalename, f"add_layer {layer_name}") as session:
+            with write_session(swalename, f"add_layer {layer_name}",
+                               inputs=lambda c: asset_inputs.layer_change_inputs(
+                                   c, layer_name, asset_inputs.ADD_LAYER_OUTLETS)) as session:
                 atlas.add_layer(
                     session.config, layer_name,
                     s3_key=s3_key, s3_bucket=ADD_LAYER_UPLOAD_BUCKET,
@@ -532,7 +541,9 @@ async def edit_layer_post(swalename: str, layer_name: str, request: Request):
         atlas.validate_layer_name(layer_name)
 
         def run():
-            with write_session(swalename, f"edit_layer {layer_name}") as session:
+            with write_session(swalename, f"edit_layer {layer_name}",
+                               inputs=lambda c: asset_inputs.layer_change_inputs(
+                                   c, layer_name, atlas.styling_outlets(c, layer_name) + ['console'])) as session:
                 return atlas.edit_layer(session.config, layer_name, body)
 
         _, materialized = await run_in_threadpool(run)
@@ -651,7 +662,8 @@ async def json_upload(payload: JSONPayload, swalename: str):
         if apply_now:
             try:
                 # Cheap update-refresh of the target layer only, no cascade.
-                with write_session(swalename, f"apply delta {layer}") as session:
+                with write_session(swalename, f"apply delta {layer}",
+                                   inputs=lambda c: asset_inputs.layer_refresh_inputs(layer)) as session:
                     res = dataswale_geojson.refresh_vector_layer(session.config, layer)
                 applied = True
                 message = f"Data stored successfully, refreshed: {res}"
@@ -790,7 +802,8 @@ async def add_comment(payload: CommentPayload, swalename: str, layer_name: str):
                 }
             }]
         }
-        with write_session(swalename, f"comment {layer_name}") as session:
+        with write_session(swalename, f"comment {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             ac = session.config
             deltas_geojson.write_delta(ac, layer_name, delta_fc, "match", source="comment")
 
@@ -820,7 +833,8 @@ async def store_json(swalename: str, payload: JSONPayload):
         #outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
         #outpath = outpath_template.format(layer=layer, version=version)
 
-        with write_session(swalename, f"store {layer}") as session:
+        with write_session(swalename, f"store {layer}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer)) as session:
             ac = session.config
             outpath = deltas_geojson.write_delta(ac, layer, dict(payload.data), "create",
                                                  source="api_store")
@@ -864,7 +878,8 @@ async def refresh(swale: str, asset: str):
     try:
         # Synchronous, and a QGIS outlet can take minutes — the lease heartbeat
         # keeps it held for as long as the materialize actually runs.
-        with write_session(swale, f"refresh {asset}") as session:
+        with write_session(swale, f"refresh {asset}",
+                           inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
             res = atlas.materialize(session.config, asset)
         res_json = {
             "status": "success",
@@ -895,6 +910,17 @@ refresh_layer_status = {
     "success": None,
     "error": None,
 }
+
+
+def _refresh_layer_inputs(config, layer, mode, cascade):
+    """What a /refresh_layer job reads. A cascade re-derives everything
+    downstream, so it hydrates everything (the union over the Dagster
+    selection is a later refinement)."""
+    if cascade:
+        return None
+    if mode == "rebuild":
+        return asset_inputs.layer_rebuild_inputs(config, layer)
+    return asset_inputs.layer_refresh_inputs(layer)
 
 
 @app.get("/refresh_layer")
@@ -935,7 +961,8 @@ async def refresh_layer_endpoint(swale: str, layer: str, background_tasks: Backg
             # The whole cascade is one session: hydrate once, write back once.
             # The response has already gone out, so a busy atlas is recorded in
             # the status rather than raised.
-            with write_session(swale, f"refresh_layer {layer} ({mode})") as session:
+            with write_session(swale, f"refresh_layer {layer} ({mode})",
+                               inputs=lambda c: _refresh_layer_inputs(c, layer, mode, cascade)) as session:
                 result = atlas_dagster.refresh_layer(session.config, layer,
                                                      mode=mode, cascade=cascade)
                 refresh_layer_status["success"] = bool(result.success)
@@ -1014,7 +1041,8 @@ async def materialize_asset_endpoint(swale: str, asset: str, background_tasks: B
         try:
             # The response has already gone out, so a busy atlas is recorded in
             # the status rather than raised.
-            with write_session(swale, f"materialize {asset}") as session:
+            with write_session(swale, f"materialize {asset}",
+                               inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
                 result = atlas_dagster.materialize_asset(session.config, asset)
                 materialize_status["success"] = bool(result.success)
         except atlas_lock.AtlasLocked as e:
@@ -1791,7 +1819,8 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        with write_session(payload.atlas_name, f"ingest email_photo {layer_name}") as session:
+        with write_session(payload.atlas_name, f"ingest email_photo {layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(layer_name)) as session:
             deltas_geojson.write_delta(session.config, layer_name, fc, "create",
                                        source="email_photo")
             # Refresh layer
@@ -1867,7 +1896,8 @@ async def ingest_web_photo(payload: WebPhotoPayload):
             extra_props=extra_props,
         )
         fc = {"type": "FeatureCollection", "features": [feature]}
-        with write_session(payload.atlas_name, f"ingest web_photo {payload.layer_name}") as session:
+        with write_session(payload.atlas_name, f"ingest web_photo {payload.layer_name}",
+                           inputs=lambda c: asset_inputs.layer_refresh_inputs(payload.layer_name)) as session:
             deltas_geojson.write_delta(session.config, payload.layer_name, fc, "create",
                                        source="web_photo")
             dataswale_geojson.refresh_vector_layer(session.config, payload.layer_name)
