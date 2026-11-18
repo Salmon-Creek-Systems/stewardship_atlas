@@ -31,6 +31,18 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **An outlet's access is the most restrictive of its own and its inputs' (#228).** Scot's rule; not implemented yet. Today only `console/(admin|internal)` is gated, so a `game_kit` declared admin still loads without a login.
 - **Don't roll the `overture_roads` touch-the-atlas query (`ab53843`) out to atlases with hand-edited roads** (scvfd, kennedy, gilhamhike) until rebuild replays deltas (#200, #223). The rollout path is `config_only` + rebuild, and a rebuild drops those edits.
 - **Atlas tours don't live in this repo.** A tour (an overview walkthrough of one atlas, with preset map-view links) is a markdown file in `Salmon-Creek-Systems.github.io/_tours/`, auto-listed at salmoncreeksystems.com/tours/. Chosen over a fireatlas.org render step because it reuses Jekyll and existing styling and doesn't add to the box being retired. Tour links point at `staging/` deliberately; CURRENT may be stale, so revisit them during the cloud migration. Don't put tours in `documents/release_notes/`.
+- **Slides come from a tour (`slides` outlet, 2026-11).**
+  - **What it renders:** `"tour": "<name>"` reads `_tours/<name>.md` from GitHub `main`. Each `[text](…/outlets/…)` link is a slide: the link text is the title, and the paragraph it sits in (else the previous one) is the notes.
+  - **What it writes:** `NN_slug.png`, `slides.json`, a remark.js `index.html` (console tokens; fireatlas.org dark panel on the title slide) and, with `gslides: true`, one Google Slides deck per outlet.
+    - The deck's id is in `gslides.json`, and re-runs rebuild that same deck, overwriting edits made in Google Slides.
+    - It's shared with `admin_emails` as writers plus anyone with the link (the gspread service account, `scs-scvfd` project; Slides API enabled 2026-11-14).
+  - **Rendering:** headless Chromium with `?chrome=0`, waiting for `window.atlasMapReady`. A 3D view can take ~130 s on software WebGL, so the 3D wait is 240 s.
+  - **Animated routes:** the bare view skips route playback, so a route (`p`) view renders its opening camera position.
+  - **How to run it:** not from `/refresh` yet (async endpoint vs `sync_playwright`, #231). Use `scripts/tour_slides.py <atlas> <tour> --gslides` on the box. A tour edit only shows after a full re-render; `--deck-only` reuses old PNGs.
+- **3D views must list `in_layers`** (#232). Without it every layer is draped, admin ones included, and SFE loaded ~35 MB. `visible_layers` picks which start on; any linestring in it is offered in Animate Camera. Done for scvfd and SFE only.
+- **3D sky is a CSS gradient behind `#map`.** MapLibre 4.7 draws nothing above the horizon. A real `sky` needs MapLibre 5.
+- **`s3_map_polygons` traces colored outlines off a GeoPDF/GeoTIFF** (`map_trace.py`; scvfd `thp_boundaries`). It reads PDFs with system `osgeo.gdal` because rasterio's bundled GDAL has no PDF driver. Re-running it, like any s3 inlet, appends duplicates (#190).
+- **scvfd `federated` is a static copy** of the kennedy and mineralkinsey atlas boundaries (an s3_geojson inlet), not federation; it won't follow boundary changes.
 
 ## Core Architecture Concepts
 
@@ -668,7 +680,7 @@ atlas.materialize(config, "webmap")    # outlet
 | `sqlquery` | SQL query outlet |
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
-| `3dview` | 3D terrain view |
+| `3dview` | 3D terrain view (set `in_layers`/`visible_layers`, #232) |
 | `overlook` | Public progress page (`overlook.py`): headline numbers, changes since the last release (from delta provenance), field photos, products table. Materialize last, after the outlets it reports on. Only public layers; derived GeoJSON is property-allowlisted. Spike, kennedy only — `documents/development/homepage_design.md` |
 | `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Any role left out is found by conventional layer name. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (edge crossings per road network; re-run skips existing points); with no such layer, exits are generated in memory at build. Roads with no route to safety are drawn in red (see `documents/game_kit.md`) |
 
@@ -782,6 +794,7 @@ Code references paths like `/root/swales/` which don't exist locally. For local 
 
 ### MapLibre Legend Library (`@watergis/maplibre-gl-legend`)
 
+- **Pinned to `@2.0.7`** in `map.html` and `edit_map.html`. `@latest` became 3.0.0 on 2026-11-03, which dropped the UMD build, so `MaplibreLegendControl` went undefined and every webmap broke. Keep CDN URLs version-pinned (#230).
 - "Only rendered" checkbox class: `maplibregl-legend-onlyRendered-checkbox`
 - Default position: `top-right` (our code places it at `bottom-left`)
 - **Known bug**: unchecked layers reappear when toggling "only rendered" off then on (issue #67)
