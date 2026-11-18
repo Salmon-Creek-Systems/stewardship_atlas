@@ -197,3 +197,13 @@ class TestTwoWorkspacesOneProcess(SharedTestCase):
         second = self.config()
         path = atlas_shared.local_path(second, 'icons/hydrant.png', client=self.s3, bucket=BUCKET)
         self.assertEqual(path.read_bytes(), b'png')
+
+    def test_a_cache_deleted_under_a_live_process_is_refilled(self):
+        import shutil
+        self.put('icons/hydrant.png', b'png')
+        config = self.config()
+        atlas_shared.local_path(config, 'icons/hydrant.png', client=self.s3, bucket=BUCKET)
+        shutil.rmtree(self.root)
+        config = self.config()
+        path = atlas_shared.local_path(config, 'icons/hydrant.png', client=self.s3, bucket=BUCKET)
+        self.assertEqual(path.read_bytes(), b'png')

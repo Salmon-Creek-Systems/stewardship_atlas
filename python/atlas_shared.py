@@ -219,7 +219,10 @@ def ensure(config: dict, rel: str, client=None, bucket: str = None) -> Path:
     # file verified in one cache says nothing about another.
     root = cache_dir(config['data_root'])
     memo = str(root.resolve())
-    outstanding = [r for r in wanted if (memo, bucket, r) not in _verified]
+    # ...and only while the file is actually there: a cache can be deleted
+    # and recreated at the same path under a live process.
+    outstanding = [r for r in wanted
+                   if (memo, bucket, r) not in _verified or not (root / r).exists()]
     if not outstanding:
         return path
 

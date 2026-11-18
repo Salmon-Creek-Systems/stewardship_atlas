@@ -35,9 +35,11 @@ EXTRA = {
     # outlet_webmap: the Regions dropdown reads layers/regions/ for every map.
     'webmap': ('layers/regions/',),
     'webedit': ('layers/regions/',),
-    # make_swale_html: the console links the webmap only if it was built, and
-    # the SQL page introspects the sqldb outlet's atlas.db.
-    'console': ('outlets/webmap/index.html', 'outlets/sqldb/atlas.db'),
+    # make_swale_html: the console links the webmap only if it was built, the
+    # SQL page introspects the sqldb outlet's atlas.db, and every layer page's
+    # attribution.html reads the attributions layer.
+    'console': ('outlets/webmap/index.html', 'outlets/sqldb/atlas.db',
+                'layers/attributions/'),
 }
 
 # Layer-list fields an asset may name, top level or under 'config'.
