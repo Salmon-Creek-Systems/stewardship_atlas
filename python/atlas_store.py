@@ -366,25 +366,38 @@ def plan_upload(local_dir, key_prefix: str) -> list:
 
 
 def plan_publish(config: dict, version_path, outlet_names=None) -> list:
-    """Upload plan for every publishable outlet directory in a version.
+    """Plan for every publishable outlet's files under ``{atlas}/current/outlets/``.
 
-    ``version_path`` is the snapshot directory ``publish_new_version`` just
-    created. Outlets with no directory on disk are skipped with a warning
-    rather than failing the publish — a never-materialized outlet should not
-    take the whole push down.
+    ``version_path`` is the staging tree (a directory, or a
+    ``staging_tree.CatalogTree``). Outlets with nothing built are skipped with a
+    warning rather than failing the publish. Non-public role-variant
+    subdirectories are pruned — see ``PROTECTED_OUTLET_SUBDIRS``.
     """
-    version_path = Path(version_path)
+    import staging_tree
+    tree = staging_tree.as_tree(version_path)
     atlas_name = config['name']
     names = publishable_outlets(config) if outlet_names is None else outlet_names
 
     plan = []
     for name in names:
-        outlet_dir = version_path / 'outlets' / name
-        if not outlet_dir.is_dir():
-            logger.warning(f"atlas_store: no built directory for public outlet '{name}' "
-                           f"at {outlet_dir} — skipping")
+        base = f'outlets/{name}/'
+        rels = tree.rels(base)
+        if not rels:
+            logger.warning(f"atlas_store: no built files for public outlet '{name}' "
+                           f"under {base} — skipping")
             continue
-        plan.extend(plan_upload(outlet_dir, f"{current_prefix(atlas_name)}/outlets/{name}"))
+        pruned = set()
+        for rel in rels:
+            relative = rel[len(base):]
+            if is_protected_path(relative):
+                pruned.add(relative.partition('/')[0])
+                continue
+            plan.append((tree.source(rel),
+                         f"{current_prefix(atlas_name)}/outlets/{name}/{relative}",
+                         content_type_for(relative)))
+        if pruned:
+            logger.info(f"atlas_store: pruned role-variant subdirs from {name}: "
+                        f"{sorted(pruned)}")
     return plan
 
 
@@ -450,7 +463,8 @@ def plan_current_layers(config: dict, version_path, stub_dir=None,
     import atlas_catalog
     import map_style
 
-    version_path = Path(version_path)
+    import staging_tree
+    tree = staging_tree.as_tree(version_path)
     atlas_name = config['name']
     layers = (config.get('dataswale') or {}).get('layers') or []
     layers_dict = {l['name']: l for l in layers if l.get('name')}
@@ -479,14 +493,11 @@ def plan_current_layers(config: dict, version_path, stub_dir=None,
                 f"public bucket. The outlet will not be able to load it (#177).")
             continue
 
-        layer_dir = version_path / 'layers' / layer_name
-        found = []
-        if layer_dir.is_dir():
-            found = sorted(f for f in (p.name for p in layer_dir.iterdir()
-                                       if p.is_file())
-                           if atlas_catalog.is_servable_file(f, layer_name))
+        found = [f for f in staging_tree.children(tree, f'layers/{layer_name}')
+                 if atlas_catalog.is_servable_file(f, layer_name)]
         for filename in found:
-            plan.append((layer_dir / filename, f"{prefix}/{layer_name}/{filename}",
+            plan.append((tree.source(f'layers/{layer_name}/{filename}'),
+                         f"{prefix}/{layer_name}/{filename}",
                          content_type_for(filename)))
 
         if not found and stub_dir is not None:
@@ -592,13 +603,25 @@ def list_keys(bucket: str, prefix: str, client=None) -> list:
 
 
 def upload_plan(bucket: str, plan: list, client=None) -> int:
-    """Upload every entry of a plan. Returns the byte count moved."""
+    """Put every entry of a plan in place. Returns the byte count moved.
+
+    A source that is a local file is uploaded. A source that is already in S3
+    (`staging_tree.StagingObject`, the normal case since publish promotes the
+    staging catalog) is copied server-side, so no bytes pass through the job;
+    the copy keeps the staging object's content type and sha256 metadata.
+    """
+    import staging_tree
     client = client or _s3()
     total = 0
-    for path, key, content_type in plan:
-        client.upload_file(str(path), bucket, key,
+    for source, key, content_type in plan:
+        if isinstance(source, staging_tree.StagingObject):
+            client.copy_object(Bucket=bucket, Key=key,
+                               CopySource={'Bucket': source.bucket, 'Key': source.key})
+            total += source.size
+            continue
+        client.upload_file(str(source), bucket, key,
                            ExtraArgs={'ContentType': content_type})
-        total += path.stat().st_size
+        total += Path(source).stat().st_size
     return total
 
 
@@ -974,9 +997,10 @@ def plan_layer_uploads(config: dict, version_path, version: str,
     checksum matched, so the content is identical to what the older version
     holds, and this is the copy known to be present.
     """
+    import staging_tree
     atlas_name = config['name']
     settings = cloud_settings(config)
-    version_path = Path(version_path)
+    tree = staging_tree.as_tree(version_path)
 
     plan = []
     for name in sorted(layer_versions):
@@ -988,14 +1012,13 @@ def plan_layer_uploads(config: dict, version_path, version: str,
             logger.warning(f"atlas_store: no bucket configured for layer '{name}' "
                            f"(access={access_by_layer.get(name)}) — skipping")
             continue
-        layer_dir = version_path / 'layers' / name
         for filename in spec.get('files') or [Path(spec['href']).name]:
-            path = layer_dir / filename
-            if not path.is_file():
-                logger.warning(f"atlas_store: {path} named by the catalog but not "
-                               f"on disk — skipping")
+            rel = f'layers/{name}/{filename}'
+            if not tree.is_file(rel):
+                logger.warning(f"atlas_store: {rel} named by the catalog but not "
+                               f"in staging — skipping")
                 continue
-            plan.append((path, bucket,
+            plan.append((tree.source(rel), bucket,
                          layer_key(atlas_name, name, layer_versions[name], filename),
                          content_type_for(filename)))
     return plan
@@ -1044,7 +1067,7 @@ def outlet_key(atlas_name: str, outlet_name: str, version: str, relative: str) -
 
 
 def plan_outlet_uploads(config: dict, outlets_root, outlet_specs: dict,
-                        outlet_versions: dict) -> list:
+                        outlet_versions: dict, base: str = '') -> list:
     """`(Path, bucket, key, content_type)` for every file of every archived outlet.
 
     Like `plan_layer_uploads`, this describes the desired end state rather than
@@ -1053,10 +1076,11 @@ def plan_outlet_uploads(config: dict, outlets_root, outlet_specs: dict,
     Reuse is decided on the local catalog, which knows nothing about S3, so
     planning only what changed would skip everything on a first push.
     """
+    import staging_tree
     settings = cloud_settings(config)
     bucket = settings.get('private_bucket') or ''
     atlas_name = config['name']
-    outlets_root = Path(outlets_root)
+    tree = staging_tree.as_tree(outlets_root)
 
     if not bucket:
         logger.warning(f"atlas_store: no private bucket configured — not "
@@ -1068,14 +1092,13 @@ def plan_outlet_uploads(config: dict, outlets_root, outlet_specs: dict,
         spec = outlet_specs.get(name)
         if not spec:
             continue
-        outlet_dir = outlets_root / name
         for relative in sorted(spec.get('files') or {}):
-            path = outlet_dir / relative
-            if not path.is_file():
-                logger.warning(f"atlas_store: {path} named by the catalog but not "
-                               f"on disk — skipping")
+            rel = f'{base}{name}/{relative}'
+            if not tree.is_file(rel):
+                logger.warning(f"atlas_store: {rel} named by the catalog but not "
+                               f"in staging — skipping")
                 continue
-            plan.append((path, bucket,
+            plan.append((tree.source(rel), bucket,
                          outlet_key(atlas_name, name, outlet_versions[name], relative),
                          content_type_for(relative)))
     return plan
@@ -1095,9 +1118,9 @@ def publish_outlet_archive(config: dict, source_path, catalog_summary: dict,
     re-upload is never needed.
     """
     desired = plan_outlet_uploads(
-        config, Path(source_path) / 'outlets',
+        config, source_path,
         catalog_summary.get('outlet_specs') or {},
-        catalog_summary.get('outlet_versions') or {})
+        catalog_summary.get('outlet_versions') or {}, base='outlets/')
     if not desired:
         return {'status': 'ok', 'objects': 0, 'bytes': 0, 'already_present': 0,
                 'note': 'no built outlets to archive'}

@@ -32,6 +32,7 @@ import json
 import logging
 
 import federation
+import staging_tree
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:  # match versioning.py: visible under uvicorn
@@ -70,20 +71,19 @@ def sha256_multihash(path, chunk_size: int = 1 << 20) -> str:
     return '1220' + digest.hexdigest()
 
 
-def find_layer_file(layers_root, name):
-    """The primary file for one layer, or None if the layer has no data yet.
+def find_layer_rel(tree, base: str, name: str):
+    """The primary file of one layer, as a tree-relative path, or None.
 
     Convention is `layers/{name}/{name}.{ext}` (see `dataswale_geojson`), so
-    the name-matched file wins. Falls back to the largest file in the directory
-    so an oddly-named raster is still catalogued rather than silently dropped.
+    the name-matched file wins. Falls back to the largest servable file in the
+    directory so an oddly-named raster is still catalogued rather than dropped.
+    `base` is where layer directories live in the tree (``'layers/'`` for a
+    staging tree).
     """
-    layer_dir = Path(layers_root) / name
-    if not layer_dir.is_dir():
-        return None
-
+    layer_dir = f'{base}{name}'
     for suffix in LAYER_FILE_SUFFIXES:
-        candidate = layer_dir / f'{name}{suffix}'
-        if candidate.is_file():
+        candidate = f'{layer_dir}/{name}{suffix}'
+        if tree.is_file(candidate):
             return candidate
 
     # The fallback must apply the same allowlist as the sibling scan. It did
@@ -91,14 +91,21 @@ def find_layer_file(layers_root, name):
     # all — selected `.htpasswd` as its primary asset and published it. A
     # denylist filtered in one place and not the other is worse than no filter,
     # because the gap only shows on the one layer that takes the odd path.
-    files = [p for p in layer_dir.iterdir()
-             if p.is_file() and is_servable_file(p.name, name)]
+    files = [f'{layer_dir}/{n}' for n in staging_tree.children(tree, layer_dir)
+             if is_servable_file(n, name)]
     if not files:
         return None
-    largest = max(files, key=lambda p: p.stat().st_size)
+    largest = max(files, key=tree.size)
     logger.info(f"atlas_catalog: layer '{name}' has no {name}.* file; "
-                f"cataloguing largest servable file {largest.name}")
+                f"cataloguing largest servable file {Path(largest).name}")
     return largest
+
+
+def find_layer_file(layers_root, name):
+    """The primary file for one layer on disk, or None if it has no data yet."""
+    tree = staging_tree.LocalTree(layers_root)
+    rel = find_layer_rel(tree, '', name)
+    return None if rel is None else tree.source(rel)
 
 
 def is_servable_file(filename: str, layer_name: str) -> bool:
@@ -141,15 +148,18 @@ def find_outlet_entry(outlet_dir):
     build, or an asset that writes files without a page. The caller reports it
     as missing rather than cataloguing an Item whose entry href 404s.
     """
-    outlet_dir = Path(outlet_dir)
+    return _outlet_entry(staging_tree.as_tree(outlet_dir), '')
+
+
+def _outlet_entry(tree, base: str):
     for rel in OUTLET_ENTRY_CANDIDATES:
-        if (outlet_dir / rel).is_file():
+        if tree.is_file(f'{base}{rel}'):
             return rel
     return None
 
 
-def iter_outlet_files(outlet_dir):
-    """(relative posix path, Path) for every archivable file under an outlet.
+def outlet_files(tree, base: str) -> list:
+    """Archivable files under an outlet, relative to it.
 
     Dotfiles and dot-directories are skipped at every level. The one that
     matters is `.htpasswd`, which `atlas.add_htpasswds()` writes into outlet
@@ -158,89 +168,100 @@ def iter_outlet_files(outlet_dir):
     to be in the directory is how `lpss` published its own (see
     `is_servable_file`).
     """
-    outlet_dir = Path(outlet_dir)
-    for path in sorted(outlet_dir.rglob('*')):
-        if not path.is_file():
+    out = []
+    for rel in tree.rels(base):
+        inner = rel[len(base):]
+        if any(segment.startswith('.') for segment in inner.split('/')):
             continue
-        rel = path.relative_to(outlet_dir).as_posix()
-        if any(segment.startswith('.') for segment in rel.split('/')):
-            continue
-        yield rel, path
+        out.append(inner)
+    return out
 
 
-def scan_outlet_dir(outlet_dir) -> dict:
-    """Describe one built outlet directory, or None if it holds no entry page.
+def iter_outlet_files(outlet_dir):
+    """(relative posix path, Path) for every archivable file under an outlet dir."""
+    tree = staging_tree.LocalTree(outlet_dir)
+    for inner in outlet_files(tree, ''):
+        yield inner, tree.source(inner)
 
-    Every file is hashed, for two reasons at once: the roll-up is what decides
-    whether this outlet can be *reused* from the previous version instead of
-    re-uploading several hundred objects, and the per-file hashes are what the
-    upload planner skips already-present objects with.
+
+def scan_outlet(tree, base: str):
+    """Describe one built outlet, or None if it holds no entry page.
+
+    Every file's checksum is recorded, for two reasons at once: the roll-up is
+    what decides whether this outlet can be *reused* from the previous version
+    instead of re-uploading several hundred objects, and the per-file sums are
+    what the upload planner skips already-present objects with.
     """
-    outlet_dir = Path(outlet_dir)
-    if not outlet_dir.is_dir():
-        return None
-    entry = find_outlet_entry(outlet_dir)
+    entry = _outlet_entry(tree, base)
     if entry is None:
         return None
-
     files = {}
     total = 0
-    for rel, path in iter_outlet_files(outlet_dir):
-        files[rel] = sha256_multihash(path)
-        total += path.stat().st_size
-
+    for inner in outlet_files(tree, base):
+        files[inner] = tree.checksum(f'{base}{inner}')
+        total += tree.size(f'{base}{inner}')
     return {
         'entry': entry,
         'files': files,
         'checksum': federation.content_checksum(files),
-        'entry_size': (outlet_dir / entry).stat().st_size,
+        'entry_size': tree.size(f'{base}{entry}'),
         'file_count': len(files),
         'bytes': total,
     }
 
 
-def scan_outlets(outlets_root, names) -> dict:
+def scan_outlet_dir(outlet_dir) -> dict:
+    """`scan_outlet` for a directory on disk."""
+    if not Path(outlet_dir).is_dir():
+        return None
+    return scan_outlet(staging_tree.LocalTree(outlet_dir), '')
+
+
+def scan_outlets(source, names, base: str = '') -> dict:
     """`{outlet_name: spec}` for the outlets that were actually built.
 
-    Outlets with no directory, or with a directory holding no entry page, are
-    simply absent — the caller reports them as missing. A never-materialized
-    outlet must not take a publish down.
+    `source` is a directory of outlet dirs, or a staging tree with
+    ``base='outlets/'``. Outlets with no entry page are simply absent — the
+    caller reports them as missing. A never-materialized outlet must not take
+    a publish down.
     """
-    outlets_root = Path(outlets_root)
+    tree = staging_tree.as_tree(source)
     found = {}
     for name in names:
-        spec = scan_outlet_dir(outlets_root / name)
+        spec = scan_outlet(tree, f'{base}{name}/')
         if spec is None:
             logger.info(f"atlas_catalog: outlet '{name}' has no built entry page "
-                        f"under {outlets_root / name} — not cataloguing it")
+                        f"under {base}{name}/ — not cataloguing it")
             continue
         found[name] = spec
     return found
 
 
-def scan_layers(layers, layers_root, data_base_url: str = '') -> dict:
+def scan_layers(layers, source, data_base_url: str = '', base: str = '') -> dict:
     """Build the `layer_assets` mapping `build_atlas_catalog()` expects.
 
-    Only layers named in the config are looked at — a directory on disk that
-    the config does not declare is not catalogued (see #173). Layers with no
-    file are simply absent from the result and come back as `missing`.
+    `source` is the layers directory, or a staging tree with ``base='layers/'``.
+    Only layers named in the config are looked at — a directory that the config
+    does not declare is not catalogued (see #173). Layers with no file are
+    simply absent from the result and come back as `missing`.
     """
-    layers_root = Path(layers_root)
+    tree = staging_tree.as_tree(source)
     assets = {}
     for layer in layers:
         name = layer.get('name')
         if not name:
             continue
-        path = find_layer_file(layers_root, name)
-        if path is None:
+        rel = find_layer_rel(tree, base, name)
+        if rel is None:
             continue
-        siblings = sorted(p.name for p in path.parent.iterdir()
-                          if p.is_file() and is_servable_file(p.name, name))
+        filename = Path(rel).name
+        siblings = [n for n in staging_tree.children(tree, f'{base}{name}')
+                    if is_servable_file(n, name)]
         assets[name] = {
-            'path': path,
-            'href': f'{data_base_url}{name}/{path.name}',
-            'size': path.stat().st_size,
-            'checksum': sha256_multihash(path),
+            'path': tree.source(rel),
+            'href': f'{data_base_url}{name}/{filename}',
+            'size': tree.size(rel),
+            'checksum': tree.checksum(rel),
             # Every servable file in the layer dir, not just the primary one. A
             # webmap asks for `basemap.tiff.jpg` while the layer's primary file
             # is `basemap.tiff`, so recording one file per layer is not enough
@@ -451,8 +472,9 @@ def publish_catalog(config: dict, source_path, version: str, *,
                     client=None, bucket: str = None) -> dict:
     """Build the STAC documents describing a new version of an atlas.
 
-    `source_path` is the **staging** tree — there is no version directory any
-    more. A version is not a copy of staging; it is a Catalog naming the
+    `source_path` is the **staging** tree: a hydrated directory, or a
+    `staging_tree.CatalogTree` read from the staging catalog, so a publish
+    need hydrate nothing. There is no version directory any more. A version is not a copy of staging; it is a Catalog naming the
     immutable objects that constitute it, most of which the previous version
     already put in S3.
 
@@ -462,7 +484,6 @@ def publish_catalog(config: dict, source_path, version: str, *,
     """
     import atlas_store
 
-    source_path = Path(source_path)
     layers = config.get('dataswale', {}).get('layers', [])
     bbox = config['dataswale']['bbox']
     atlas_id = config['name']
@@ -474,10 +495,11 @@ def publish_catalog(config: dict, source_path, version: str, *,
     # Relative within the layer tree. `set_layer_hrefs` promotes each asset to
     # its absolute S3/CloudFront URL and keeps this as `alternate.local`, which
     # is how a workspace — or an offline copy — resolves the same layer.
-    layer_assets = scan_layers(layers, source_path / 'layers')
+    tree = staging_tree.as_tree(source_path)
+    layer_assets = scan_layers(layers, tree, base='layers/')
 
-    outlet_specs = scan_outlets(source_path / 'outlets',
-                                atlas_store.archivable_outlets(config))
+    outlet_specs = scan_outlets(tree, atlas_store.archivable_outlets(config),
+                                base='outlets/')
     outlet_assets = build_outlet_assets(config, outlet_specs, version)
 
     history, previous_versions = ({}, [])

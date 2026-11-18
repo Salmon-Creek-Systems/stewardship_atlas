@@ -97,6 +97,11 @@ def asset_inputs(config: dict, asset_name: str):
     return sorted(set(prefixes))
 
 
+def publish_inputs():
+    """Publish promotes the staging catalog in S3; it needs only the config."""
+    return list(ALWAYS)
+
+
 def layer_refresh_inputs(layer_name: str):
     """A delta apply: the layer, its pending deltas, and the config."""
     return sorted(set(ALWAYS) | {f'layers/{layer_name}/', f'deltas/{layer_name}/'})

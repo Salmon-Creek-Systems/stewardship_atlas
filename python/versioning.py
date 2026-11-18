@@ -7,6 +7,7 @@ import atlas_store
 import atlas_workspace
 import delta_provenance
 import federation
+import staging_tree
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def atlas_file(p, mode='rt'):
 
 
     
-def publish_new_version(config, version=None, *, client=None):
+def publish_new_version(config, version=None, *, client=None, source=None):
     """Publish a new version of the atlas.
 
     A version is no longer a copy of staging. It is a STAC Catalog naming the
@@ -62,11 +63,14 @@ def publish_new_version(config, version=None, *, client=None):
     the version live. A catalog can never outlive the bytes it describes, and a
     failure at any step leaves the previous version serving. Raises rather than
     logging — a publish whose push failed is not a publish.
+
+    **What it publishes from** (2026-11-18): the staging STAC catalog
+    (`staging_catalog`), read from S3 — publish hydrates nothing and copies
+    changed objects server-side, so it can run anywhere. `source` overrides
+    that with a staging directory (tests, and a box without a catalog yet).
     """
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    staging_path = atlas_path(config, version='staging')
-    logger.info(f"Publishing NEW VERSION: {version} from {staging_path}")
 
     # Before anything is written: an allowlisted outlet with no declared
     # access would silently drop out of the public copy (#175).
@@ -77,6 +81,23 @@ def publish_new_version(config, version=None, *, client=None):
 
     client = client or atlas_store._s3()
     catalog_bucket = atlas_store.catalog_bucket(config)
+
+    if source is None:
+        settings = atlas_store.cloud_settings(config)
+        staging_path = staging_tree.CatalogTree.load(
+            client, catalog_bucket, settings['private_bucket'], config['name'])
+        declared = (config.get('dataswale') or {}).get('layers') or []
+        if declared and not staging_path.files:
+            # An empty staging catalog would publish a version with no data and
+            # prune the public mirror to match — a wipe of the published site.
+            raise ValueError(
+                f"publish refused for {config['name']}: its staging catalog is empty "
+                f"or missing — rebuild it (staging_catalog.rebuild) before publishing")
+        described = f"staging catalog ({len(staging_path.files)} files)"
+    else:
+        staging_path = source
+        described = str(source)
+    logger.info(f"Publishing NEW VERSION: {version} from {described}")
 
     # 1. Describe the version. Reads staging, reads the previous catalog from
     #    S3 for reuse, and writes nothing.

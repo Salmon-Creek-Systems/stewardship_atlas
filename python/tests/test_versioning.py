@@ -15,8 +15,35 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import atlas_store
 import atlas_workspace
 import versioning
-from versioning import atlas_path, atlas_file, publish_new_version
+from versioning import atlas_path, atlas_file
 from fake_s3 import FakeS3
+import staging_catalog
+
+
+def publish_new_version(config, version=None, *, client, **kwargs):
+    """Publish the way production does: from the staging catalog in S3.
+
+    These tests build staging as a local directory, so first do what session
+    write-back does — put every file in the private bucket's staging prefix
+    with its sha256, drop what was removed, and rebuild the staging catalog —
+    then publish with no local source at all.
+    """
+    staging = Path(config['data_root']) / config['name'] / 'staging'
+    prefix = atlas_workspace.staging_prefix(config['name'])
+    settings = atlas_store.cloud_settings(config)
+    private, outlets = settings['private_bucket'], settings['outlets_bucket']
+    local = set()
+    for path in sorted(staging.rglob('*')):
+        if path.is_file() and not path.is_symlink():
+            rel = path.relative_to(staging).as_posix()
+            local.add(rel)
+            client.put_object(Bucket=private, Key=prefix + rel, Body=path.read_bytes(),
+                              Metadata={'sha256': atlas_workspace.sha256_file(path)})
+    for (b, k) in list(client.objects):
+        if b == private and k.startswith(prefix) and k[len(prefix):] not in local:
+            del client.objects[(b, k)]
+    staging_catalog.rebuild(client, outlets, private, config['name'])
+    return versioning.publish_new_version(config, version, client=client, **kwargs)
 
 class TestVersioning(unittest.TestCase):
     def setUp(self):
@@ -153,8 +180,11 @@ class TestPublishNewVersion(unittest.TestCase):
                                            client=self.client)
 
     def keys(self, bucket, prefix=''):
+        """Keys publish wrote: excludes the staging tree and the staging
+        catalog, which are write-back's (set up by the publish helper)."""
         return sorted(k for (b, k) in self.client.objects
-                      if b == bucket and k.startswith(prefix))
+                      if b == bucket and k.startswith(prefix)
+                      and '/staging/' not in k and not k.startswith('testatlas/catalog/staging'))
 
     def test_refused_before_writing_when_an_allowlisted_outlet_has_no_access(self):
         """#175: fail closed, and before step 1 — never a half-written version."""
@@ -162,7 +192,7 @@ class TestPublishNewVersion(unittest.TestCase):
         del config['assets']['webmap']['access']
         with self.assertRaisesRegex(ValueError, 'declare no access'):
             publish_new_version(config, version='v1', client=self.client)
-        self.assertEqual(self.client.objects, {})
+        self.assertEqual(self.keys(OUT) + self.keys(PRIV), [])
 
     # -- nothing local ----------------------------------------------------
 
@@ -525,3 +555,40 @@ class TestResetStaging(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPublishFromTheStagingCatalog(unittest.TestCase):
+    """Publish promotes the staging catalog: nothing hydrated, bytes copied in S3."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.client = FakeS3()
+
+    def test_layers_and_outlets_are_copied_server_side_not_uploaded(self):
+        config = make_atlas(self.root)
+        uploads = []
+        orig = self.client.upload_file
+        self.client.upload_file = lambda *a, **k: (uploads.append(a), orig(*a, **k))
+        # delete the local staging after the helper syncs it: publish must not need it
+        staging = self.root / 'testatlas' / 'staging'
+        real = versioning.publish_new_version
+
+        def publish_without_local(config, version, client, **kw):
+            shutil.rmtree(staging)
+            return real(config, version, client=client, **kw)
+        with mock.patch.object(versioning, 'publish_new_version', publish_without_local):
+            result = publish_new_version(config, version='v1', client=self.client)
+        self.assertEqual(result['catalog']['written_layers'], ['roads'])
+        self.assertIn('webmap', result['catalog']['written_outlets'])
+        self.assertTrue(any(k.startswith('testatlas/current/outlets/webmap/')
+                            for (b, k) in self.client.objects if b == OUT))
+        # only #135 stubs may be uploaded; real content is copied
+        self.assertEqual([a for a in uploads if 'stub' not in str(a[0])], [])
+
+    def test_an_empty_staging_catalog_is_refused(self):
+        config = make_atlas(self.root)
+        with self.assertRaisesRegex(ValueError, 'staging catalog is empty'):
+            versioning.publish_new_version(config, version='v1', client=self.client)
+        self.assertEqual([k for (b, k) in self.client.objects], [])

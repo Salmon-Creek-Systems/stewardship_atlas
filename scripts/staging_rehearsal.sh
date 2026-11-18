@@ -113,10 +113,12 @@ step "4/5  publishing (in-process, staging buckets)"
 PYTHONPATH="$REPO/python" python3 - "$ATLAS" <<'PY'
 import logging, sys
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s: %(message)s')
-import atlas_session, versioning
+import asset_inputs, atlas_session, versioning
 
 name = sys.argv[1]
-with atlas_session.open_session(name, purpose='rehearsal publish') as session:
+# Publish promotes the staging catalog: only the config is hydrated.
+with atlas_session.open_session(name, purpose='rehearsal publish',
+                                wanted=asset_inputs.wanted(asset_inputs.publish_inputs())) as session:
     result = versioning.publish_new_version(session.config)
 print(f"published: {result['version']}")
 print(f"  layers  : {len(result['catalog']['written_layers'])} written, "

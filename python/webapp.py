@@ -33,6 +33,7 @@ import sys, os, subprocess, time, json, string, random, math
 # our Imports|
 import atlas
 import atlas_lock
+import asset_inputs
 import atlas_session
 import atlas_store
 import atlas_workspace
@@ -1096,9 +1097,11 @@ async def publish(swale: str, background_tasks: BackgroundTasks):
             try:
                 publish_status["log"].append(  [ ('Publishing new version', datetime.now().isoformat()) ])
 
-                # Under the lease: publish reads the whole staging tree and
-                # writes a version, so nothing may edit the atlas underneath it.
-                with write_session(swale, "publish") as session:
+                # Under the lease, so nothing edits the atlas mid-publish. It
+                # promotes the staging catalog from S3 and copies objects
+                # server-side, so only the config is hydrated.
+                with write_session(swale, "publish",
+                                   wanted=asset_inputs.wanted(asset_inputs.publish_inputs())) as session:
                     res = versioning.publish_new_version(session.config)
                 publish_status["log"].append(  [ ('Finished publishing new version', datetime.now().isoformat()) ])
                 publish_status["finished_at"] = datetime.now().isoformat()
