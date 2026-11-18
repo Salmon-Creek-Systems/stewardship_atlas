@@ -225,19 +225,72 @@ Green on `kennedy`, `scvfd`, `westport`, `fhe` (2026-09-15).
 - ~~**#181 — site-wide `/local/` assets have no cloud home.**~~ **Done.** The console stylesheets, help pages, manuals, about/contact and the default logo are built from the repo by `python/site_assets.py` and published to the `local/` prefix at the root of the outlets bucket by `scripts/publish_site_assets.py` — which the distribution's default behaviour already serves at `/`, so the baked `/local/...` URLs resolve with no CloudFront change. **Run that script once at cutover**; an atlas materialize deliberately no longer regenerates them. What is left is cosmetic: the prefix name (#182) and the unsprited-icon fallback (#183).
 - Six atlases have no `cloud.outlets` allowlist and would publish nothing; `abi_demo` has an empty one deliberately.
 
-### Phase 4 — API → Lambda · *M–L*
-- **4a.** FastAPI as a Lambda container image (Lambda Web Adapter or Mangum), behind API Gateway/Function URL with a Cognito authorizer on writes.
-- **4b.** Move all non-QGIS compute into it (inlets, eddies, COG/tiles/pmtiles, webmap/html/console, publish-snapshot).
-- **4c.** Retire the monolith API on the box.
-- **4d. (inherited from 2d)** Flip traffic to CloudFront: path-rewrite for the legacy `/staging/outlets/…` and `/CURRENT/outlets/…` URL shapes, protected reads through the Lambda with Cognito, then DNS. Only now can the box actually go private.
+### Phase 4 — API → Lambda, and the one cutover · *L*
 
-**Deliverable:** scale-to-zero API. Box now runs **only** QGIS, with no public exposure.
+**Plan changed 2026-11-17.** Phases 3 and 4 land in production together, in **one cutover**: all active atlases at once, about a day of downtime, no per-atlas strangler. Phase 3 is not deployed on its own, because once S3 holds the data the box's nginx has no local `staging/` or `CURRENT/` to serve, and the only alternative was a throwaway nginx-serves-the-workspace step. The big parts of Phases 5–6 (containerized QGIS, retiring the box) come after the cutover; the box keeps QGIS, privately.
+
+**Deliverable:** fireatlas.org served by CloudFront; the API on Lambda; S3 the only source of truth; the box running only queued heavy jobs, with no public exposure.
+
+#### 4a. The API as a Lambda container image
+
+FastAPI in the `atlas-api-{env}` image (Lambda Web Adapter), behind the existing CloudFront → function URL path. `infrastructure/api/Dockerfile` copies `python/`, `templates/` and the shared `configuration/` files; CI builds it as today. Every request that touches atlas data already runs in a session (Phase 3), so the handler needs no new storage code — the workspace root becomes `/tmp`.
+
+#### 4b. Which jobs run where
+
+Lambda has no lasting disk, a 15-minute limit and 10 GB of `/tmp`. So jobs split in two:
+
+- **On Lambda:** delta apply, config rebuild, config edits, webmap/webedit/console/3dview/overlook materialize, publish, versions/rollback, SQL query, sheet import/export, email/web photo ingest.
+- **Queued to the box:** QGIS outlets (runbook, game_kit board), slides (headless Chromium), and any inlet or eddy that is slow or large (DEM, hillshade, terrain, lidar, Overture, H3 at fine resolution). This is a minimal Phase 5a — the existing `atlas-render-{env}` SQS queue, a worker on the box that opens a session like any other compute, and a status object the console polls. Which assets go to the queue is a per-asset flag, not a hardcoded list.
+
+#### 4c. Declared inputs: hydrate only what a job reads
+
+A full staging copy is fine on the box, where the workspace cache persists and only changed files download. On Lambda every cold start would be a full copy (westport ~800 MB). So each asset declares what it reads, and the session hydrates only that plus `atlas_config.json`:
+
+- Most of it already exists: `in_layer`, `in_layers`, and an outlet's `in_layers`.
+- Undeclared reads found so far: the console checks the webmap exists; `sqldb` reads every layer; inlets read `local/`; delta apply reads the layer's own `deltas/`.
+- **Verified, not trusted:** during the staging rehearsal each job logs the files it actually opens, and the rehearsal fails if a job opened something outside its declared set.
+- The planner's `wanted` argument (`atlas_workspace.plan_hydrate`) is where this plugs in; it has been there since Phase 3 for this purpose.
+- Write-back needs one change. Deletes are already safe: only files in the manifest can be deleted, and an unhydrated file is never in it, so a partial hydrate cannot read as a wipe. Overwrites are not: a job that rewrites an output it did not hydrate (any outlet rebuild) uploads with no `If-Match`, and the create-only PUT refuses it because the object exists. The fix is to record the listing's ETags for every file in the manifest without downloading the unwanted ones.
+
+Direct S3 reads (#174) stay a later optimization, worth it only for large inputs (COGs via `/vsis3/`, Overture via DuckDB httpfs).
+
+#### 4d. Atlas configs live in S3
+
+Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded from `configuration/` and versioned by the private bucket. The repo copies of the active atlases are deleted at cutover so there is one copy. `shared_*.json` and starters stay in git — they are code and ship in the image.
+
+- `scripts/atlas_config.py pull <atlas>` copies it out through a read-only session; `push <atlas>` takes the lock, prints a diff against S3, validates, writes it back, appends a line to a change log in the atlas's staging, and optionally runs a `config_only` rebuild.
+- The checks in `tests/test_json_configs.py` (`versioned_outlets` empty, `cloud.outlets` present, …) move into a function that both `push` and the console's config writes call.
+- This closes #195 (console edits never committed).
+
+#### 4e. Traffic flip (inherited from 2d)
+
+- **Public outlets:** already on CloudFront under `{atlas}/current/`. A CloudFront Function rewrites the legacy shapes: `/{atlas}/CURRENT/outlets/…` → `/{atlas}/current/outlets/…`, `/{atlas}/outlets/html/…` → `console`, and the old per-version paths.
+- **Protected and staging pages** (admin/internal console, webedit, `/{atlas}/staging/…`) are served by CloudFront straight from the private bucket, gated by **CloudFront signed cookies** (decided 2026-11-17, in keeping with "CloudFront is the single front door"). After a Cognito login a small Lambda issues one cookie set per atlas and tier, each scoped by its custom policy and cookie `Path` (e.g. `/kennedy/staging/*`), so someone admin on several atlases holds several sets. Needs a second origin on the private bucket restricted to those prefixes, and a CloudFront key group with the signing key in Secrets Manager.
+- **Auth:** Cognito user pool (exists). For cutover, the existing htpasswd accounts (westport, scvfd, …) become Cognito users with the same usernames in each atlas's `{atlas}-admin`/`{atlas}-internal` group and new passwords — htpasswd hashes cannot be migrated. Google SSO stays available for per-person accounts later.
+- **Box-hosted pages that move:** `/create`, `/usage/`, `/identify_as_scs`, help pages under `/local/`. The usage report reads nginx logs, so it needs CloudFront logs instead.
+- **Inbound integrations to repoint:** the email-photo Lambda posts to the box's `:9000`.
+- **DNS last.** Then the box's security group closes to the public.
+
+#### Cutover sequence (outline)
+
+1. Re-rehearse every active atlas on the staging substrate, Lambda path included.
+2. Freeze edits; final seed of every active atlas (abandoned ones are not seeded — the EBS snapshot keeps them).
+3. Publish each atlas; publish site assets.
+4. Deploy the API image and worker; flip DNS; verify every atlas through `verify_published.py`.
+5. Close the box to the public.
+
+#### Known gaps at cutover
+
+- **Jupyter** reads the box's staging directly, so it stops seeing current data. Deferred since Phase 3; rethink after cutover.
+- Delta `base_version` and overlook's "since the last release" read `config['dataswale']['versions']`, which Phase 3 stopped updating on publish. Must read the catalog before cutover.
 
 ### Phase 5 — QGIS as an async SQS worker · *M*
 - **5a.** Lambda enqueues render jobs `{atlas, asset, version}` to SQS; a worker on the box consumes them, **opens a session** like any other compute (not `/vsis3/` — see Phase 3), writes PDFs to S3, updates a status object the client polls (matches submit→spinner→poll).
 - **5b.** Box shrinks to a minimal private worker; optionally scale-from-zero on queue depth.
 
 **Deliverable:** QGIS fully decoupled; box has no public exposure and no other job.
+
+A minimal 5a (queue + box worker) ships with the Phase 4 cutover; what is left here is shrinking the box and scale-from-zero.
 
 ### Phase 6 — Containerize QGIS, retire the box · *L, finish line*
 - **6a.** Bake QGIS into a Lambda container image (10 GB ceiling fits renders; each invocation gets its own memory, so stacking can never OOM a shared box again). Worker becomes a Lambda on the same queue.
@@ -252,7 +305,7 @@ Green on `kennedy`, `scvfd`, `westport`, `fhe` (2026-09-15).
 - **Cost curve:** idle burn drops at Phase 2 (reads off box), again at 4 (API off box), to ~zero at 6.
 - **Staging for free:** the CDK stack can deploy a second instance (separate buckets/prefixes) — a real staging env at last, retiring "prod == `swales_dev` with `--reload`".
 - **Local dev improves:** the API container runs locally against a dev S3 prefix — more runnable locally than today. Weave tests in as each module is touched.
-- **Strangler throughout:** old box serves un-migrated atlases; per-atlas cutover; temp hostname until the apex flip.
+- ~~**Strangler throughout:**~~ abandoned 2026-09-09 and again 2026-11-17: one cutover for every atlas.
 
 ## Pause points
 
@@ -279,6 +332,8 @@ private. Revisit after Phase 2:
 3. **File tracking issues** — a P0 for Phase 0 safety, then an epic per phase, with triage labels.
 
 ## Decision log
+
+- **2026-11-17: one cutover for Phases 3 and 4; Phases 5–6 after.** Atlas configs move to S3 (`staging/atlas.geojson`). Lambda hydrates only declared inputs; slow, large and QGIS jobs queue to the box. Existing htpasswd accounts become Cognito users with new passwords. Post-migration: storage format (GeoParquet), STAC as the read path, and the delta rethink (#223, federation v2) go together.
 
 - **CloudFront is the single front door, not Lambda** — preserves static-first (cost, perf, OOM-independence). Public static; protected gated per-prefix.
 - **Cognito + Google SSO, group-based authz** — passwordless (deletes the htpasswd/leak/rotation problem); enforcement binary, roles expressed as data (groups); fail-closed by default.
