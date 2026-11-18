@@ -44,6 +44,7 @@ import atlas_lock
 import atlas_shared
 import atlas_store
 import atlas_workspace as ws
+import staging_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -136,16 +137,52 @@ def _hydrate(client, bucket, atlas_name, root, wanted) -> dict:
     return counts
 
 
+def _read_marker(marker) -> dict:
+    """What an interrupted write-back recorded: ``{'deleted': [...], 'uploading': [...]}``.
+
+    The marker used to hold only a timestamp; anything unreadable reads as
+    nothing recorded.
+    """
+    try:
+        data = json.loads(marker.read_text())
+    except (FileNotFoundError, ValueError):
+        return {'deleted': [], 'uploading': []}
+    if not isinstance(data, dict):
+        return {'deleted': [], 'uploading': []}
+    return {'deleted': list(data.get('deleted') or []),
+            'uploading': list(data.get('uploading') or [])}
+
+
 def _write_back(client, bucket, atlas_name, root) -> dict:
+    """Upload and delete what the run changed, then update the staging catalog.
+
+    The staging catalog must never fall behind the objects. So the files about
+    to change are recorded in the marker *before* any object moves, merged with
+    whatever an interrupted attempt recorded: a resumed write-back plans nothing
+    for uploads that already landed, and only the marker still knows them.
+    """
     staging = ws.staging_dir(root, atlas_name)
     manifest = ws.load_manifest(ws.manifest_path(root, atlas_name))
     plan = ws.plan_writeback(manifest, ws.snapshot_local(staging),
                              lambda rel: ws.sha256_file(staging / rel))
     marker = marker_path(root, atlas_name)
-    if plan['upload'] or plan['delete']:
+    pending = _read_marker(marker)
+    uploading = sorted(set(pending['uploading']) | {op['rel'] for op in plan['upload']})
+    deleted = sorted(set(pending['deleted']) | {op['rel'] for op in plan['delete']})
+    if uploading or deleted:
         marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(datetime.now().isoformat())
-    ws.execute_writeback(client, bucket, atlas_name, root, plan, manifest)
+        marker.write_text(json.dumps({'started': datetime.now().isoformat(),
+                                      'uploading': uploading, 'deleted': deleted}))
+    updated = ws.execute_writeback(client, bucket, atlas_name, root, plan, manifest)
+
+    changes = {rel: None for rel in deleted}
+    for rel in uploading:
+        f = (updated.get('files') or {}).get(rel)
+        if f and ws.is_hydrated(f):
+            changes[rel] = {'sha256': f['sha256'], 'size': f['size'], 'etag': f['etag']}
+    if changes:
+        outlets_bucket = atlas_store.cloud_settings({})['outlets_bucket']
+        staging_catalog.update(client, outlets_bucket, bucket, atlas_name, changes)
     # Unconditional: a resumed write-back can find its work already done.
     if marker.exists():
         marker.unlink()

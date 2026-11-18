@@ -257,6 +257,52 @@ class TestPartialSession(SessionTestCase):
             self.assertEqual(self.local(CREEKS).read_text(), SEED[CREEKS])
 
 
+class TestStagingCatalog(SessionTestCase):
+    """Write-back keeps {atlas}/catalog/staging/ in step with the objects."""
+
+    def tree(self):
+        import atlas_store
+        import staging_catalog
+        return staging_catalog.load_tree(self.s3, atlas_store.cloud_settings({})['outlets_bucket'],
+                                         ATLAS)
+
+    def test_written_files_are_catalogued_and_deletes_removed(self):
+        with self.session() as session:
+            (session.staging_dir / ROADS).write_text('new roads')
+            (session.staging_dir / CREEKS).unlink()
+            out = session.staging_dir / 'outlets/webmap/index.html'
+            out.parent.mkdir(parents=True)
+            out.write_text('<html>')
+        tree = self.tree()
+        self.assertEqual(tree[ROADS]['sha256'], ws.sha256_file(self.local(ROADS)))
+        self.assertIn('outlets/webmap/index.html', tree)
+        self.assertNotIn(CREEKS, tree)
+        self.assertNotIn('atlas_config.json', tree)       # config is not catalogued
+
+    def test_an_interrupted_writeback_still_catalogues_what_landed_first(self):
+        class Flaky(FakeS3):
+            staging_puts = 0
+
+            def put_object(self, Bucket, Key, **kwargs):
+                if Key.startswith(PREFIX):
+                    self.staging_puts += 1
+                    if self.staging_puts == 2:
+                        raise FakeClientError('InternalError', 500, 'PutObject')
+                return FakeS3.put_object(self, Bucket=Bucket, Key=Key, **kwargs)
+
+        with self.assertRaises(FakeClientError):
+            with self.session(s3=self.shared(Flaky)) as session:
+                (session.staging_dir / CREEKS).write_text('new creeks')   # lands
+                (session.staging_dir / ROADS).write_text('new roads')     # fails
+        with self.assertLogs('atlas_session', level='WARNING'):
+            with self.session():
+                pass
+        tree = self.tree()
+        self.assertEqual(self.remote(CREEKS), 'new creeks')
+        self.assertEqual(tree[CREEKS]['sha256'], ws.sha256_file(self.local(CREEKS)))
+        self.assertEqual(tree[ROADS]['sha256'], ws.sha256_file(self.local(ROADS)))
+
+
 class TestFailure(SessionTestCase):
     def test_body_failure_writes_nothing_and_the_next_session_resets(self):
         with self.assertRaises(RuntimeError):
