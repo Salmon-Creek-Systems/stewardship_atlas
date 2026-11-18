@@ -17,13 +17,17 @@ Every delta records where it came from, in two places:
    written. A delta with ``base_version == V`` belongs to the release after V;
    ``None`` means the atlas had never been published.
 
-Stdlib only, so the overlook outlet and tests can use it without DuckDB/GDAL.
+Stdlib only at import, so the overlook outlet and tests can use it without
+DuckDB/GDAL. ``latest_version`` reaches S3 through a lazy import of
+``versioning`` and falls back to the config when that is unavailable.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
@@ -73,11 +77,60 @@ def validate_source(source: Optional[str]) -> str:
     return source
 
 
-def latest_version(config: Dict[str, Any]) -> Optional[str]:
-    """Newest published version named in the config, or None if never published."""
-    versions = (config.get('dataswale') or {}).get('versions') or []
-    parsed = [v for v in versions if parse_version(v) is not None]
+logger = logging.getLogger(__name__)
+
+# atlas name -> (monotonic time fetched, newest version or None)
+_CATALOG_CACHE: Dict[str, tuple] = {}
+CATALOG_CACHE_SECONDS = 60
+
+
+def _newest(versions) -> Optional[str]:
+    parsed = [v for v in versions or [] if parse_version(v) is not None]
     return max(parsed, key=parse_version) if parsed else None
+
+
+def _newest_from_catalog(config: Dict[str, Any]) -> Optional[str]:
+    """Newest version the atlas's S3 root Catalog names, or None.
+
+    Cached briefly per atlas: a burst of deltas (an inlet run, a sheet import)
+    would otherwise read the catalog once per file. Publish clears the entry
+    (``forget_latest_version``) so a delta written right after a publish
+    names the new version. Any failure — no boto3, no credentials, no
+    catalog — reads as None and the caller falls back to the config.
+    """
+    name = config.get('name')
+    if not name:
+        return None
+    hit = _CATALOG_CACHE.get(name)
+    if hit and time.monotonic() - hit[0] < CATALOG_CACHE_SECONDS:
+        return hit[1]
+    try:
+        import versioning  # lazy: keeps this module stdlib-only at import
+        newest = _newest(versioning.published_versions(config))
+    except Exception as exc:
+        logger.debug(f"delta_provenance: catalog unreadable for {name}: {exc}")
+        newest = None
+    _CATALOG_CACHE[name] = (time.monotonic(), newest)
+    return newest
+
+
+def forget_latest_version(atlas_name: str) -> None:
+    """Drop the cached newest version for an atlas; called after a publish."""
+    _CATALOG_CACHE.pop(atlas_name, None)
+
+
+def latest_version(config: Dict[str, Any]) -> Optional[str]:
+    """Newest published version, or None if never published.
+
+    The S3 catalog is the index of what has been published (Phase 3): publish
+    no longer rewrites ``config['dataswale']['versions']``, so that list is
+    only as fresh as the last config rebuild. It is the fallback.
+    """
+    from_catalog = _newest_from_catalog(config)
+    from_config = _newest((config.get('dataswale') or {}).get('versions'))
+    if from_catalog and from_config:
+        return max(from_catalog, from_config, key=parse_version)
+    return from_catalog or from_config
 
 
 def parse_version(version: str) -> Optional[datetime]:

@@ -47,6 +47,54 @@ class TestRecord(unittest.TestCase):
         self.assertIsNone(rec['base_version'])
 
 
+class TestLatestFromCatalog(unittest.TestCase):
+    """Phase 3 stopped rewriting config versions on publish, so the newest
+    version comes from the S3 catalog, with the config as the fallback."""
+
+    def setUp(self):
+        import types
+        self.calls = 0
+        self.catalog = []
+
+        def published_versions(config, client=None):
+            self.calls += 1
+            if self.catalog is None:
+                raise RuntimeError("no S3 here")
+            return sorted(self.catalog, reverse=True)
+
+        self._saved = sys.modules.get('versioning')
+        sys.modules['versioning'] = types.SimpleNamespace(published_versions=published_versions)
+        dp.forget_latest_version('testatlas')
+
+    def tearDown(self):
+        # Restore, never leave a stub behind for other suites (#153).
+        if self._saved is None:
+            sys.modules.pop('versioning', None)
+        else:
+            sys.modules['versioning'] = self._saved
+        dp.forget_latest_version('testatlas')
+
+    def test_catalog_newer_than_stale_config_wins(self):
+        self.catalog = ['2026-01-01_00-00-00', '2026-04-01_00-00-00']
+        cfg = _config('/x', ['2026-01-01_00-00-00'])
+        self.assertEqual(dp.latest_version(cfg), '2026-04-01_00-00-00')
+
+    def test_unreachable_catalog_falls_back_to_config(self):
+        self.catalog = None
+        cfg = _config('/x', ['2026-01-01_00-00-00'])
+        self.assertEqual(dp.latest_version(cfg), '2026-01-01_00-00-00')
+
+    def test_cached_until_forgotten(self):
+        self.catalog = ['2026-01-01_00-00-00']
+        cfg = _config('/x')
+        dp.latest_version(cfg)
+        self.catalog = ['2026-01-01_00-00-00', '2026-05-01_00-00-00']
+        self.assertEqual(dp.latest_version(cfg), '2026-01-01_00-00-00')
+        self.assertEqual(self.calls, 1)
+        dp.forget_latest_version('testatlas')   # what publish does
+        self.assertEqual(dp.latest_version(cfg), '2026-05-01_00-00-00')
+
+
 class TestRead(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())

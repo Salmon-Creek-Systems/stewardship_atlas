@@ -5,6 +5,7 @@ import logging
 import atlas_catalog
 import atlas_store
 import atlas_workspace
+import delta_provenance
 import federation
 
 # Configure logging
@@ -105,6 +106,9 @@ def publish_new_version(config, version=None, *, client=None):
     push = atlas_store.publish_public_outlets(
         config, staging_path, version, client=client)
     logger.info(f"S3 outlet publish: {push}")
+
+    # Deltas written from here on belong to the release after this one.
+    delta_provenance.forget_latest_version(config['name'])
 
     return {
         'version': version,
