@@ -29,6 +29,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     SecretValue,
+    Size,
     Stack,
     aws_certificatemanager as acm,
     aws_cloudfront as cloudfront,
@@ -37,6 +38,7 @@ from aws_cdk import (
     aws_ecr as ecr,
     aws_iam as iam,
     aws_lambda as lambda_,
+    aws_lambda_event_sources as lambda_events,
     aws_s3 as s3,
     aws_sqs as sqs,
 )
@@ -205,6 +207,29 @@ class AtlasCloudStack(Stack):
             dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=render_dlq),
         )
 
+        # --- Light-jobs queue (Phase 4, task 4) ------------------------------
+        # Publish, plain layer refreshes and light builds: work that outlives an
+        # API request but needs no QGIS. Consumed by the jobs Lambda (below),
+        # while the render queue above is consumed by the box worker. Both carry
+        # {atlas, id}; the job itself is {atlas}/jobs/{id}.json (python/atlas_jobs.py).
+        jobs_dlq = sqs.Queue(
+            self, "JobsDlq",
+            queue_name=f"atlas-jobs-dlq-{env_name}",
+            retention_period=Duration.days(14),
+            enforce_ssl=True,
+        )
+        jobs_queue = sqs.Queue(
+            self, "JobsQueue",
+            queue_name=f"atlas-jobs-{env_name}",
+            # At least the jobs Lambda's 15-minute timeout, so a running job is
+            # not handed out again; a busy atlas shortens it to 60 s itself.
+            visibility_timeout=Duration.minutes(16),
+            retention_period=Duration.days(4),
+            enforce_ssl=True,
+            # A busy atlas is a receive too; leave room for several retries.
+            dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=10, queue=jobs_dlq),
+        )
+
         # --- API Lambda + its image repository (Phase 4) ---------------------
         api_repo = ecr.Repository(
             self, "ApiRepo",
@@ -219,6 +244,10 @@ class AtlasCloudStack(Stack):
             "PRIVATE_BUCKET": private_data.bucket_name,
             "PUBLIC_BUCKET": public_outlets.bucket_name,
             "RENDER_QUEUE_URL": render_queue.queue_url,
+            # The names python/ reads (webapp.JOBS_QUEUE_ENV, atlas_job_consumer).
+            "ATLAS_RENDER_QUEUE_URL": render_queue.queue_url,
+            "ATLAS_JOBS_QUEUE_URL": jobs_queue.queue_url,
+            "ATLAS_JOBS_REGION": self.region,
         }
 
         # Deliberately unnamed. Switching between a zip and a container image
@@ -252,6 +281,30 @@ class AtlasCloudStack(Stack):
         private_data.grant_read_write(api_fn)
         public_outlets.grant_read_write(api_fn)
         render_queue.grant_send_messages(api_fn)
+        jobs_queue.grant_send_messages(api_fn)
+
+        if api_image_tag:
+            # The jobs Lambda: the API image with the queue consumer as its
+            # handler. Separate from the API function for its limits — a
+            # publish or a layer refresh may take minutes, and hydrating an
+            # atlas into /tmp needs room — not for its code.
+            jobs_fn = lambda_.DockerImageFunction(
+                self, "JobsFunction",
+                code=lambda_.DockerImageCode.from_ecr(
+                    api_repo, tag_or_digest=api_image_tag,
+                    cmd=["atlas_job_consumer.lambda_handler"]),
+                memory_size=3008,
+                ephemeral_storage_size=Size.gibibytes(10),
+                timeout=Duration.minutes(15),
+                environment=api_env,
+            )
+            jobs_fn.add_event_source(lambda_events.SqsEventSource(
+                jobs_queue, batch_size=1, report_batch_item_failures=True))
+            private_data.grant_read_write(jobs_fn)
+            private_data.grant_delete(jobs_fn, objects_key_pattern="*/staging/*")
+            private_data.grant_delete(jobs_fn, objects_key_pattern="*/lock")
+            public_outlets.grant_read_write(jobs_fn)
+            public_outlets.grant_delete(jobs_fn)
 
         # IAM auth on the function URL: the only caller allowed to sign requests
         # is this distribution, via OAC. There is no unauthenticated public URL.
@@ -398,6 +451,10 @@ class AtlasCloudStack(Stack):
         # marker and keeps the previous version.
         private_data.grant_delete(webapp_role, objects_key_pattern="*/staging/*")
         private_data.grant_delete(webapp_role, objects_key_pattern="*/lock")
+        # Phase 4, task 4: the box is the render-queue worker
+        # (scripts/atlas_worker.py). Receive, delete and extend visibility; job
+        # status objects are {atlas}/jobs/*.json, covered by the put above.
+        render_queue.grant_consume_messages(webapp_role)
         webapp_role.add_to_principal_policy(iam.PolicyStatement(
             actions=["cloudfront:CreateInvalidation"],
             resources=[
@@ -498,6 +555,7 @@ class AtlasCloudStack(Stack):
         CfnOutput(self, "PrivateDataBucket", value=private_data.bucket_name)
         CfnOutput(self, "PublicOutletsBucket", value=public_outlets.bucket_name)
         CfnOutput(self, "RenderQueueUrl", value=render_queue.queue_url)
+        CfnOutput(self, "JobsQueueUrl", value=jobs_queue.queue_url)
         CfnOutput(self, "ApiRepositoryUri", value=api_repo.repository_uri)
         CfnOutput(self, "ApiFunctionName", value=api_fn.function_name)
         CfnOutput(self, "UserPoolId", value=user_pool.user_pool_id)
