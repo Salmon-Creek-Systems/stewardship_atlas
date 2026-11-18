@@ -116,7 +116,8 @@
     "console": {
         "asset_type": "outlet",
         "fetch_type": "console",
-        "interaction": "backend"
+        "interaction": "backend",
+        "access": ["public", "internal", "admin"]
     },
     "overlook": {
         "asset_type": "outlet",

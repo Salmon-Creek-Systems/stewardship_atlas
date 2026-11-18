@@ -121,7 +121,13 @@ class TestCloudSettings(unittest.TestCase):
         self.assertEqual(settings['public_base_url'], 'https://next.fireatlas.org')
 
 
-def _config(assets, versioned=None, cloud=None):
+def _config(assets, versioned=None, cloud=None, raw=False):
+    # An outlet must declare access to be published (#175). Tests aimed at
+    # other filters get `public` filled in; `raw=True` leaves assets as given.
+    if not raw:
+        assets = {n: ({**a, 'access': ['public']}
+                      if a.get('type') == 'outlet' and atlas_store.asset_access(a) is None else a)
+                  for n, a in assets.items()}
     dataswale = {'layers': []}
     if versioned is not None:
         dataswale['versioned_outlets'] = versioned
@@ -198,14 +204,27 @@ class TestOutletAllowlist(unittest.TestCase):
         }, cloud={'outlets': ['roads']})
         self.assertEqual(atlas_store.publishable_outlets(config), [])
 
-    def test_allowlisted_but_untiered_outlet_is_warned(self):
-        # It passes the tier check only by atlas.py's fail-open default (#175),
-        # so it publishes, but never silently.
-        config = _config({'webmap': {'type': 'outlet'}}, cloud={'outlets': ['webmap']})
-        with self.assertLogs('atlas_store', level='WARNING') as captured:
+    def test_allowlisted_but_untiered_outlet_is_refused(self):
+        # It used to pass the tier check by atlas.py's fail-open default (#175).
+        config = _config({'webmap': {'type': 'outlet'}}, cloud={'outlets': ['webmap']}, raw=True)
+        with self.assertLogs('atlas_store', level='ERROR') as captured:
             names = atlas_store.publishable_outlets(config)
-        self.assertEqual(names, ['webmap'])
-        self.assertIn('fail-open default', ''.join(captured.output))
+        self.assertEqual(names, [])
+        self.assertIn('declares no access', ''.join(captured.output))
+        self.assertEqual(atlas_store.outlets_missing_access(config), ['webmap'])
+
+    def test_access_from_the_shared_template_counts(self):
+        # A config_def's keys are merged under asset['config'] (#53).
+        config = _config({'console': {'type': 'outlet',
+                                      'config': {'access': ['public', 'internal', 'admin']}}},
+                         cloud={'outlets': ['console']}, raw=True)
+        self.assertEqual(atlas_store.publishable_outlets(config), ['console'])
+        self.assertEqual(atlas_store.outlets_missing_access(config), [])
+
+    def test_template_admin_access_is_not_promoted(self):
+        config = _config({'gazetteer': {'type': 'outlet', 'config': {'access': ['admin']}}},
+                         cloud={'outlets': ['gazetteer']}, raw=True)
+        self.assertEqual(atlas_store.publishable_outlets(config), [])
 
     def test_explicit_public_is_not_warned(self):
         config = _config({'webmap': {'type': 'outlet', 'access': ['public']}},

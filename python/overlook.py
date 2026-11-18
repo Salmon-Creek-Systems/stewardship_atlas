@@ -459,8 +459,7 @@ def products(config: Dict[str, Any], self_name: str) -> List[Dict[str, Any]]:
         fetch_type = (asset.get('config') or {}).get('fetch_type') or ''
         if fetch_type in PIPELINE_FETCH_TYPES:
             continue
-        access = atlas_store.normalize_access(
-            asset.get('access', (asset.get('config') or {}).get('access')))
+        access = atlas_store.normalize_access(atlas_store.asset_access(asset))
         public = atlas_store.is_public(access)
         # Most restrictive tier names who can see it.
         tier = 'public' if public else next((t for t in ('internal', 'admin', 'technical') if t in access), access[0])

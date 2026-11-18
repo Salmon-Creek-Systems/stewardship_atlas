@@ -68,6 +68,13 @@ def publish_new_version(config, version=None, *, client=None):
     staging_path = atlas_path(config, version='staging')
     logger.info(f"Publishing NEW VERSION: {version} from {staging_path}")
 
+    # Before anything is written: an allowlisted outlet with no declared
+    # access would silently drop out of the public copy (#175).
+    undeclared = atlas_store.outlets_missing_access(config)
+    if undeclared:
+        raise ValueError(f"publish refused for {config['name']}: allowlisted outlet(s) "
+                         f"{undeclared} declare no access (#175)")
+
     client = client or atlas_store._s3()
     catalog_bucket = atlas_store.catalog_bucket(config)
 

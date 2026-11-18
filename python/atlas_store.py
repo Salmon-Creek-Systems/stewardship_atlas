@@ -118,6 +118,32 @@ def is_public(access) -> bool:
     return 'public' in normalize_access(access)
 
 
+def asset_access(asset: dict):
+    """An asset's declared access tiers, or None when it declares none.
+
+    Read from the asset itself first, then from its shared template: a
+    ``config_def`` is merged under ``asset['config']`` (#53), so ``access``
+    set in ``shared_outlets_config.json`` lives there and was invisible to
+    every check that read only the top level.
+    """
+    if asset.get('access') is not None:
+        return asset['access']
+    return (asset.get('config') or {}).get('access')
+
+
+def outlets_missing_access(config: dict) -> list:
+    """Allowlisted outlets that declare no access tier anywhere (#175).
+
+    Such an outlet used to pass the public check by the fail-open default.
+    It is now refused, and publish checks this list before writing anything.
+    """
+    assets = config.get('assets') or {}
+    allowlist = (config.get('cloud') or {}).get('outlets') or []
+    return sorted(name for name in allowlist
+                  if (assets.get(name) or {}).get('type') == 'outlet'
+                  and asset_access(assets[name]) is None)
+
+
 # Bucket and distribution names describe the deployed substrate, not any one
 # atlas, so they default in code and are overridden by environment. That is
 # what lets `-c env_name=staging` run the entire system against a parallel set
@@ -209,19 +235,22 @@ def publishable_outlets(config: dict) -> list:
     for name, asset in assets.items():
         if asset.get('type') != 'outlet':
             continue
+        if name not in allowlist:
+            continue
+        access = asset_access(asset)
+        if access is None:
+            # Fail closed (#175): no declared tier is not a public tier.
+            logger.error(
+                f"atlas_store: outlet '{name}' is allowlisted but declares no "
+                f"access, so it is not published. Set `access` on the asset or "
+                f"its shared template (#175).")
+            continue
         # Checked even when an allowlist names it — a typo must never be able
         # to push an admin outlet into a public bucket.
-        if not is_public(asset.get('access')):
-            continue
-        if name not in allowlist:
+        if not is_public(access):
             continue
         if versioned and name not in versioned:
             continue
-        if asset.get('access') is None:
-            logger.warning(
-                f"atlas_store: outlet '{name}' is allowlisted but has no explicit "
-                f"access level, so it passes the tier check only by the fail-open "
-                f"default. Set `access` on the asset (#175).")
         names.append(name)
     return sorted(names)
 

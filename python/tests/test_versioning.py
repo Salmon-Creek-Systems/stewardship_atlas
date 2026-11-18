@@ -156,6 +156,14 @@ class TestPublishNewVersion(unittest.TestCase):
         return sorted(k for (b, k) in self.client.objects
                       if b == bucket and k.startswith(prefix))
 
+    def test_refused_before_writing_when_an_allowlisted_outlet_has_no_access(self):
+        """#175: fail closed, and before step 1 — never a half-written version."""
+        config = make_atlas(self.root)
+        del config['assets']['webmap']['access']
+        with self.assertRaisesRegex(ValueError, 'declare no access'):
+            publish_new_version(config, version='v1', client=self.client)
+        self.assertEqual(self.client.objects, {})
+
     # -- nothing local ----------------------------------------------------
 
     def test_no_version_directory_is_created(self):
