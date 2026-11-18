@@ -14,14 +14,21 @@ files and renders the board.
 
 Asset config (on top of the shared `game_kit` def):
   roles:          {role: [layer, ...]} for roads, safe_locations, helispots,
-                  landmarks, residences, hazards, water. An unassigned role is
-                  reported by the readiness check.
-  road_filter:    {"field": property, "keep": [values]} — road categories on the
-                  board. Other roads stay only if they serve a safe location,
-                  helispot or landmark, or residence_min residences.
+                  landmarks, residences, hazards, water. A role left out is
+                  filled by conventional layer name (game_kit.DEFAULT_ROLE_LAYERS);
+                  one with no layer is reported by the readiness check.
+  name_field:     road property holding its name (default the layer's label_field,
+                  then "name")
+  road_filter:    {"field": property, "keep" or "drop": [values]} — road categories
+                  on the board. Other roads stay only if they serve a safe location,
+                  helispot or landmark, or residence_min residences. Unset, the
+                  field is detected and only foot-only classes are dropped.
+  main_roads:     class values that each get their own exit when seeding (default
+                  by field, game_kit.ROAD_CLASS_FIELDS)
   residence_min:  buildings a road must pass to be kept for them (default 3)
   in_layers:      atlas layers drawn under the overlays (styled as in the runbook);
-                  leave roads out, the board draws its own filtered roads
+                  leave roads out, the board draws its own filtered roads. Unset,
+                  a basemap, creeks and buildings where they exist
   label_layers:   which of those keep their labels (default creeks)
   title, alert_system, step_m, target_spaces, board_size_in, feature_scale
 """
@@ -58,9 +65,22 @@ def outlet_game_kit(config, outlet_name):
     board_dir = out_dir / "board"
     board_dir.mkdir(parents=True, exist_ok=True)
 
+    layers_config = {x['name']: x for x in config['dataswale']['layers']}
+    roles = game_kit.resolve_roles(outlet_config.get('roles'), set(layers_config))
+    outlet_config['in_layers'] = outlet_config.get('in_layers') or game_kit.default_base_layers(set(layers_config))
     role_layers = {role: {name: _read_layer(config, name) for name in layers}
-                   for role, layers in outlet_config.get('roles', {}).items()}
-    board = build_board(bbox, role_layers, outlet_config)
+                   for role, layers in roles.items()}
+    roads = [f for fs in role_layers.get('roads', {}).values() for f in fs]
+    road_layer = layers_config.get(next(iter(role_layers.get('roads', {})), None))
+    road_config = game_kit.road_options(roads, outlet_config, road_layer)
+    game_kit.apply_name_field(roads, road_config['name_field'])
+
+    # With no exit layer to read, the board still plays: seed exits for this run only.
+    if roads and not any(role_layers.get('safe_locations', {}).values()):
+        role_layers['safe_locations'] = {'auto-generated': game_roads.edge_exits(
+            roads, bbox, road_config['road_filter'], main_roads=road_config['main_roads'])}
+
+    board = build_board(bbox, role_layers, outlet_config, road_config['road_filter'])
     kit = game_kit.build_kit(config['name'], bbox, role_layers, board, outlet_config)
 
     overlay_paths = {}
@@ -89,18 +109,20 @@ def outlet_game_kit(config, outlet_name):
             'cards': len(kit['cards']), 'output': str(out_dir)}
 
 
-def build_board(bbox, role_layers, outlet_config):
+def build_board(bbox, role_layers, outlet_config, road_filter):
     """Filter the roads (DuckDB), then lay out spaces and safe locations (game_board)."""
     def feats(role):
         return [f for fs in role_layers.get(role, {}).values() for f in fs]
 
     targets = {role: (feats(role), 1) for role in ("safe_locations", "helispots", "landmarks")}
     targets["residences"] = (feats("residences"), outlet_config.get("residence_min", 3))
-    parts = game_roads.road_parts(feats("roads"), bbox, outlet_config.get("road_filter"),
+    parts = game_roads.road_parts(feats("roads"), bbox, road_filter,
                                   {kind: t for kind, t in targets.items() if t[0]})
+    residences = [p for p in (game_kit._point(f) for f in feats("residences")) if p]
     board = game_board.build_board(parts, bbox, game_kit.safe_points(feats("safe_locations")),
                                    step_m=outlet_config.get("step_m"),
-                                   target_spaces=outlet_config.get("target_spaces", game_board.TARGET_SPACES))
+                                   target_spaces=outlet_config.get("target_spaces", game_board.TARGET_SPACES),
+                                   residence_points=residences)
     logger.info(f"game_kit: {len(parts)} road parts -> {len(board['roads'])} board edges, "
                 f"{board['kept_m'] / 1000:.0f}/{board['total_m'] / 1000:.0f} km, step {board['step_m']} m, "
                 f"{len(board['spaces'])} spaces, {len(board['safe'])} safe")
@@ -123,11 +145,16 @@ def _style_overlay(layer, stem):
         casing = QgsLineSymbol.createSimple({
             'line_color': '255,255,255', 'line_width': '4.6', 'capstyle': 'round', 'joinstyle': 'round'})
         symbol.insertSymbolLayer(0, casing.symbolLayer(0).clone())
+    elif stem == "game_roads_stranded":
+        symbol = QgsLineSymbol.createSimple({
+            'line_color': '205,40,30', 'line_width': '3.0', 'capstyle': 'round', 'joinstyle': 'round'})
     else:
         marker = {
             "game_grid_labels": {'name': 'circle', 'size': '0', 'outline_style': 'no'},
             "game_spaces": {'name': 'circle', 'size': '4.5', 'color': '255,255,255',
                             'outline_color': '60,60,60', 'outline_width': '0.5'},
+            "game_spaces_stranded": {'name': 'circle', 'size': '4.5', 'color': '255,225,220',
+                                     'outline_color': '205,40,30', 'outline_width': '0.7'},
             "game_places": {'name': 'circle', 'size': '11', 'color': '255,255,255',
                             'outline_color': '0,0,0', 'outline_width': '0.9'},
             "game_safe": {'name': 'circle', 'size': '30', 'color': '40,160,80,110',
@@ -142,6 +169,7 @@ def _style_overlay(layer, stem):
         # stem: (field, size pt, color, around the point rather than on it)
         "game_grid_labels": ("label", 60, (90, 90, 90), False),
         "game_roads": ("name", 13, (90, 60, 0), False),
+        "game_roads_stranded": ("name", 13, (150, 25, 20), False),
         "game_places": ("label", 16, (0, 0, 0), False),
         "game_safe": ("label", 22, (20, 110, 50), False),
         "game_helispots": ("label", 18, (0, 0, 0), False),
@@ -187,8 +215,8 @@ def _label(layer, field, size_pt, rgb, around):
 
 
 # Bottom to top.
-OVERLAY_ORDER = ["game_grid", "game_roads", "game_safe", "game_spaces", "game_helispots",
-                 "game_places", "game_grid_labels"]
+OVERLAY_ORDER = ["game_grid", "game_roads", "game_roads_stranded", "game_safe", "game_spaces",
+                 "game_spaces_stranded", "game_helispots", "game_places", "game_grid_labels"]
 
 
 def _panel_text(kit):
@@ -202,6 +230,8 @@ def _panel_text(kit):
     lines += [] if places else ["  none mapped"]
     lines += ["", f"One space = about {kit['step_m']} m of road.",
               "Grid cells 1–12 match the Fire Location spinner."]
+    if kit['stranded_spaces']:
+        lines += ["Red roads have no route to a safe location."]
     gaps = [c for c in kit['readiness'] if c['status'] != 'ok']
     if gaps:
         lines += ["", "THIS ATLAS IS MISSING"] + [f"  ✗  {c['label']}" for c in gaps]

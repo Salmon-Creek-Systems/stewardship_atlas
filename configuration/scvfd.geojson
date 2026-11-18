@@ -1055,6 +1055,72 @@
                                 "default": ""
                             }
                         ]
+                    },
+                    "federated": {
+                        "name": "federated",
+                        "geometry_type": "polygon",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            0,
+                            150,
+                            160
+                        ],
+                        "fill_color": [
+                            0,
+                            150,
+                            160
+                        ],
+                        "fill_opacity": 0.5,
+                        "add_labels": true,
+                        "interaction": "interface"
+                    },
+                    "thp_boundaries": {
+                        "name": "thp_boundaries",
+                        "geometry_type": "polygon",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "fill_color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "fill_opacity": 0.3,
+                        "add_labels": true,
+                        "interaction": "interface"
+                    },
+                    "miranda_to_kennedy": {
+                        "name": "miranda_to_kennedy",
+                        "geometry_type": "linestring",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            255,
+                            0,
+                            255
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff00ff",
+                            "line-width": 9,
+                            "line-opacity": 1.0
+                        },
+                        "editable_columns": [
+                            {
+                                "name": "name",
+                                "type": "string",
+                                "default": ""
+                            }
+                        ]
                     }
                 },
                 "assets": {
@@ -1090,6 +1156,22 @@
                         "type": "outlet",
                         "name": "3dview",
                         "config_def": "3dview",
+                        "in_layers": [
+                            "thp_boundaries",
+                            "roads",
+                            "creeks",
+                            "ponds",
+                            "buildings",
+                            "hydrants",
+                            "watertanks",
+                            "hazards",
+                            "miranda_to_kennedy"
+                        ],
+                        "visible_layers": [
+                            "thp_boundaries",
+                            "roads",
+                            "creeks"
+                        ],
                         "access": [
                             "public",
                             "internal",
@@ -1156,6 +1238,32 @@
                         "out_layer": "turnouts",
                         "config_def": "local_turnouts"
                     },
+                    "federated_boundaries": {
+                        "type": "inlet",
+                        "out_layer": "federated",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/federated.geojson"
+                    },
+                    "thp_from_map": {
+                        "type": "inlet",
+                        "out_layer": "thp_boundaries",
+                        "config_def": "s3_map_polygons",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/crk_thp_slope_dr2.pdf",
+                        "color": [
+                            230,
+                            0,
+                            0
+                        ],
+                        "names": [
+                            "clear cut",
+                            "selective"
+                        ],
+                        "properties": {
+                            "note": "Approximate; traced from the THP slope map (Noel Soucy, 2026)"
+                        }
+                    },
                     "webmap": {
                         "show_user_location": true,
                         "type": "outlet",
@@ -1164,6 +1272,8 @@
                             "basemap",
                             "ponds",
                             "contours",
+                            "federated",
+                            "thp_boundaries",
                             "roads",
                             "mileage_markers",
                             "creeks",
@@ -1171,7 +1281,8 @@
                             "hydrants",
                             "watertanks",
                             "hazards",
-                            "circuit"
+                            "circuit",
+                            "miranda_to_kennedy"
                         ],
                         "hidden_layers": [],
                         "config_def": "webmap",
@@ -1278,7 +1389,8 @@
                             "mileage_zones_oneloop",
                             "mileage_markers_oneloop",
                             "circuit",
-                            "safe_locations"
+                            "safe_locations",
+                            "miranda_to_kennedy"
                         ],
                         "config_def": "webedit"
                     },
@@ -1344,7 +1456,8 @@
                             "roads",
                             "creeks",
                             "culverts",
-                            "circuit"
+                            "circuit",
+                            "miranda_to_kennedy"
                         ]
                     },
                     "sqlquery": {
@@ -1436,11 +1549,7 @@
                         "name": "safe_exits",
                         "config_def": "game_safe_exits",
                         "in_layer": "roads",
-                        "out_layer": "safe_locations",
-                        "road_filter": {
-                            "field": "FUNCTIONAL",
-                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors"]
-                        }
+                        "out_layer": "safe_locations"
                     },
                     "game_kit": {
                         "type": "outlet",
@@ -1451,7 +1560,7 @@
                         "in_layers": ["lidar_basemap", "creeks", "buildings"],
                         "road_filter": {
                             "field": "FUNCTIONAL",
-                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads"]
+                            "keep": ["Principal Arterials", "Major Collectors", "Minor Collectors", "Local Roads", "Unclassified", "Private"]
                         },
                         "residence_min": 3,
                         "roles": {

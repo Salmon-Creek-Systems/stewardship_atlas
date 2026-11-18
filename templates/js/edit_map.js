@@ -386,6 +386,7 @@ document.getElementById('save-button').addEventListener('click', function() {
         "type": "FeatureCollection",
         "layer": EDIT_CONFIG.layerName,
         "action": EDIT_CONFIG.action,
+        "source": "webedit",
         "features": features
     };
     
@@ -435,6 +436,7 @@ document.getElementById('delete-confirm-button').addEventListener('click', funct
         "type": "FeatureCollection",
         "layer": EDIT_CONFIG.layerName,
         "action": "delete",
+        "source": "webedit",
         "features": features
     };
     var xmlhttp = new XMLHttpRequest();
@@ -599,6 +601,7 @@ document.getElementById('upload-button').addEventListener('click', function() {
                 // Add layer name to the GeoJSON
                 geojson.layer = EDIT_CONFIG.layerName;
                 geojson.action = EDIT_CONFIG.action;
+                geojson.source = 'webedit_upload';
                 // Send to server using the same API as store button
                 var xmlhttp = new XMLHttpRequest();
                 xmlhttp.open("POST", EDIT_CONFIG.appUrl + '/delta_upload/' + EDIT_CONFIG.swalename);

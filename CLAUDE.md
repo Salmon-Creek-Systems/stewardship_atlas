@@ -16,6 +16,7 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **Roadmap**: `documents/roadmap.md` - Strategic project roadmap
 - **Cloud-Native Plan**: `documents/cloud_native_plan.md` - Phased migration to S3/CloudFront + Lambda; Phase 1 done
 - **CDK Runbook**: `infrastructure/cdk/README.md` - Stacks, toolchain, first-deploy steps
+- **Federation v2 Design**: `documents/development/federation_v2_design.md` - Post-cloud, one layer with many sources; design only (#224)
 
 ## Decisions & Constraints (2026-10)
 
@@ -25,6 +26,23 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **`/create` writes `configuration/{slug}.geojson`** in the shared checkout (not `staging/atlas.geojson`), because every console layer action and `atlas_full_refresh.sh` read the source from there. Still uncommitted on the box like other console edits (#195). On older `/create` atlases, `staging/atlas.geojson` is a stale birth copy — the repo file is the source.
 - **Help pages:** every `documents/help/*.md` starts `# Title` then `<!-- audience: user|admin|developer -->` (`python/help_docs.py`). The manuals (`user_manual.md`, `admin_manual.md`) are short narrative that links to help pages instead of repeating them; `user_guide.md` is now `developers_guide.md`. In-app `?` links open the most specific page in a new tab (`/local/documents/help/{page}.html` or a manual `#section`). `tests/test_help_docs.py` fails on a missing tag, an unlinked page, or any `?` whose target or anchor doesn't exist — add the page and a manual link together.
 - **Customer-facing copy uses US spelling.**
+- **Federation v2 is design only and post-cloud (#224).** No branch or code until Scot says to start, and don't design for the box. Federated features are read-only to the consumer and consumer-side changes are out of v2, because a real answer needs the delta rethink (#223). Don't add anything just to prohibit chains; they're expected eventually. All share changes wait for the source's next publish, which keeps the data flow simple. `documents/federation-overview.md` still describes v1.
+- **Evacuation Game (`game_kit`) runs on any atlas, using only what the atlas has.** The atlas bbox is the game world: don't add data, connect roads across the crop, or add a connector step. A road reaching the edge is an exit there, and each clipped piece is judged on its own network. One main-network exit is a real finding the readiness page calls out, not a bug; admins edit `safe_locations` if they disagree.
+- **An outlet's access is the most restrictive of its own and its inputs' (#228).** Scot's rule; not implemented yet. Today only `console/(admin|internal)` is gated, so a `game_kit` declared admin still loads without a login.
+- **Don't roll the `overture_roads` touch-the-atlas query (`ab53843`) out to atlases with hand-edited roads** (scvfd, kennedy, gilhamhike) until rebuild replays deltas (#200, #223). The rollout path is `config_only` + rebuild, and a rebuild drops those edits.
+- **Atlas tours don't live in this repo.** A tour (an overview walkthrough of one atlas, with preset map-view links) is a markdown file in `Salmon-Creek-Systems.github.io/_tours/`, auto-listed at salmoncreeksystems.com/tours/. Chosen over a fireatlas.org render step because it reuses Jekyll and existing styling and doesn't add to the box being retired. Tour links point at `staging/` deliberately; CURRENT may be stale, so revisit them during the cloud migration. Don't put tours in `documents/release_notes/`.
+- **Slides come from a tour (`slides` outlet, 2026-11).**
+  - **What it renders:** `"tour": "<name>"` reads `_tours/<name>.md` from GitHub `main`. Each `[text](…/outlets/…)` link is a slide: the link text is the title, and the paragraph it sits in (else the previous one) is the notes.
+  - **What it writes:** `NN_slug.png`, `slides.json`, a remark.js `index.html` (console tokens; fireatlas.org dark panel on the title slide) and, with `gslides: true`, one Google Slides deck per outlet.
+    - The deck's id is in `gslides.json`, and re-runs rebuild that same deck, overwriting edits made in Google Slides.
+    - It's shared with `admin_emails` as writers plus anyone with the link (the gspread service account, `scs-scvfd` project; Slides API enabled 2026-11-14).
+  - **Rendering:** headless Chromium with `?chrome=0`, waiting for `window.atlasMapReady`. A 3D view can take ~130 s on software WebGL, so the 3D wait is 240 s.
+  - **Animated routes:** the bare view skips route playback, so a route (`p`) view renders its opening camera position.
+  - **How to run it:** not from `/refresh` yet (async endpoint vs `sync_playwright`, #231). Use `scripts/tour_slides.py <atlas> <tour> --gslides` on the box. A tour edit only shows after a full re-render; `--deck-only` reuses old PNGs.
+- **3D views must list `in_layers`** (#232). Without it every layer is draped, admin ones included, and SFE loaded ~35 MB. `visible_layers` picks which start on; any linestring in it is offered in Animate Camera. Done for scvfd and SFE only.
+- **3D sky is a CSS gradient behind `#map`.** MapLibre 4.7 draws nothing above the horizon. A real `sky` needs MapLibre 5.
+- **`s3_map_polygons` traces colored outlines off a GeoPDF/GeoTIFF** (`map_trace.py`; scvfd `thp_boundaries`). It reads PDFs with system `osgeo.gdal` because rasterio's bundled GDAL has no PDF driver. Re-running it, like any s3 inlet, appends duplicates (#190).
+- **scvfd `federated` is a static copy** of the kennedy and mineralkinsey atlas boundaries (an s3_geojson inlet), not federation; it won't follow boundary changes.
 
 ## Core Architecture Concepts
 
@@ -54,18 +72,18 @@ DEFAULT_MATERIALIZERS = (
 )
 ```
 
-**Config resolution**: Each asset in `{atlas}_assets.json` has a `config_def` field that references a template in `shared_*.json`. The shared template is loaded first, then per-asset overrides are applied. The merged result lives in `config['assets'][name]` at runtime. Use `atlas.create_config()` to inspect the merged result.
+**Config resolution**: Each asset in `{atlas}_assets.json` has a `config_def` field that references a template in `shared_*.json`. The shared template is loaded first, then per-asset overrides are applied. Overrides must be **top-level keys on the asset**: a `config` block in the atlas source is discarded (`atlas.py:237`, #53 item 7), so read the built config to see what an atlas really runs. The merged result lives in `config['assets'][name]` at runtime. Use `atlas.create_config()` to inspect the merged result.
 
 ### Deltas
 
-Delta files are stored at `deltas/{layer_name}/{asset_name}__{timestamp}__{action}.geojson`. Actions:
+Delta files are stored at `deltas/{layer_name}/{source}__{timestamp}__{action}.geojson`. `source` is the inlet asset name or an interactive source (`webedit`, `email_photo`, `sheet_import`, … — `delta_provenance.SOURCES`). **Every delta names its source; `assetless` is refused for new writes** (legacy files read as `unrecorded`). Each delta also carries a `provenance` member with `base_version` (the newest published version when it was written), which is how "changed since the last publish" is answered. Write through `deltas_geojson.write_delta(config, layer, fc, action, source)`; `/delta_upload` clients send `source` alongside `apply`. Apply order is by the timestamp field (`delta_sort_key`), not the whole filename. Actions:
 - `"create"` — append new features
 - `"annotate"` — update properties on existing features (spatial: features the drawn polygon intersects)
 - `"match"` — update properties by `atlas_id`
 - `"reshape"` — replace geometry by `atlas_id`, properties untouched (webedit Reshape page; `python/reshape.py`)
 - `"delete"` — remove features the drawn polygon intersects
 
-`atlas_id` is stable: it lives in the layer file, an update applies deltas on top of it, and a rebuild re-runs inlets without replaying archived `work/` deltas.
+`atlas_id` is stable across updates, because it lives in the layer file and deltas apply on top of it. It is **not** stable across a rebuild: the fresh inlet base gets new UUIDs. A rebuild re-runs inlets without replaying archived `work/` deltas, so hand edits drop out of the layer, though the files survive (#200).
 
 Deltas are applied in timestamp order by `deltas_geojson.apply_deltas()`.
 
@@ -662,8 +680,9 @@ atlas.materialize(config, "webmap")    # outlet
 | `sqlquery` | SQL query outlet |
 | `jupyter_notebook` | Jupyter notebook outlet |
 | `config_editor` | Config editor UI |
-| `3dview` | 3D terrain view |
-| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (main-road edge crossings; re-run skips existing points) |
+| `3dview` | 3D terrain view (set `in_layers`/`visible_layers`, #232) |
+| `overlook` | Public progress page (`overlook.py`): headline numbers, changes since the last release (from delta provenance), field photos, products table. Materialize last, after the outlets it reports on. Only public layers; derived GeoJSON is property-allowlisted. Spike, kennedy only — `documents/development/homepage_design.md` |
+| `game_kit` | Printable local Wildfire Resilience board game (36×24 board PDF, local chance cards, readiness check). Roads filtered in DuckDB (`game_roads.py`: `road_filter` category + roads serving safe locations/helispots/landmarks/≥`residence_min` buildings), spaces from the road graph (`game_board.py`, ~32 spaces across), cards/pages in `game_kit.py`, render in `outlets_game_kit.py`. Layers map to game roles via the asset's `roles`. Any role left out is found by conventional layer name. Safe locations are a hand-edited point layer seeded by the `game_safe_exits` inlet (edge crossings per road network; re-run skips existing points); with no such layer, exits are generated in memory at build. Roads with no route to safety are drawn in red (see `documents/game_kit.md`) |
 
 **Outlet build order**: `webmap` must come before `console` — the console checks if `outlets/webmap/index.html` exists at generation time.
 
@@ -673,7 +692,7 @@ atlas.materialize(config, "webmap")    # outlet
 
 **`ssurgo_enrich`** (`eddies.py`) — enriches a layer with NRCS soil properties via the SDA REST API. Writes `ssurgo_mukey`, `ssurgo_compname`, `ssurgo_drainagecl`, `ssurgo_ph`, `ssurgo_om`, `ssurgo_sand/silt/clay` onto each feature. Works on Point layers (direct lookup) and Polygon/MultiPolygon layers (centroid used for lookup). Config: `in_layer` (required), `out_layer` (defaults to `in_layer`, i.e. enriches in place).
 
-**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: its deltas are `assetless__…` and a re-run appends a duplicate grid.
+**`h3_count`** (`eddies.py`) — hex-bins other layers onto an H3 grid. Config: `in_layer` (a grid with `h3_index`, e.g. from `h3_grid`), `in_layers` (list of layers to count; named so Dagster sees them as inputs), `out_layer`. Writes a copy of the grid with `{layer}_count` per cell (0 kept). Works for any vector layer. Each feature goes to exactly one cell via its centroid → `latlng_to_cell`: an O(N) index join with no point-in-polygon test. Polyfill would drop features smaller than a cell or double-count edge ones. Writes a separate layer because the grid is delta-built and a refresh of it would wipe in-place counts. South_fork_eel has two reference instances: `buildings_count_h3_r8` and `inaturalist_threatened_count_h3_r9`. To refresh after a counted layer changes, use `/refresh_layer?layer=<counted layer>&mode=rebuild&cascade=true`. Never re-`/refresh` an `h3_grid` inlet: a re-run appends a duplicate grid (its old deltas are `assetless__…`; new ones carry the asset name).
 
 **`h3_count` sparse mode** — give `resolution` and no `in_layer` and only occupied cells are written. Use it for fine resolutions: a full r11 grid over SFE would be ~370k cells / ~190 MB, while sparse `buildings_count_h3_r11` is 3,142 cells.
 
@@ -775,6 +794,7 @@ Code references paths like `/root/swales/` which don't exist locally. For local 
 
 ### MapLibre Legend Library (`@watergis/maplibre-gl-legend`)
 
+- **Pinned to `@2.0.7`** in `map.html` and `edit_map.html`. `@latest` became 3.0.0 on 2026-11-03, which dropped the UMD build, so `MaplibreLegendControl` went undefined and every webmap broke. Keep CDN URLs version-pinned (#230).
 - "Only rendered" checkbox class: `maplibregl-legend-onlyRendered-checkbox`
 - Default position: `top-right` (our code places it at `bottom-left`)
 - **Known bug**: unchecked layers reappear when toggling "only rendered" off then on (issue #67)

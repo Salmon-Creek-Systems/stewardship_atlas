@@ -32,13 +32,16 @@ def _is_default_visible(name: str) -> bool:
     return any(p in name_lower for p in _DEFAULT_VISIBLE_PATTERNS)
 
 
-def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -> Tuple[dict, list, list]:
+def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None,
+                          visible_layers: List[str] = None) -> Tuple[dict, list, list]:
     """
     Build MapLibre sources, layers, and toggle info for non-index vector layers.
     Returns (sources_dict, layers_list, toggle_list).
     Layer order: polygons first, then lines, then points.
     Each toggle_list item: {ids, label, visible} where ids covers geometry + label layers.
     If in_layers is provided, only those layers are included (order preserved from config).
+    If visible_layers is provided, exactly those start visible; otherwise the name
+    patterns in _DEFAULT_VISIBLE_PATTERNS decide.
     """
     sources = {}
     polygon_layers: List[dict] = []
@@ -56,7 +59,7 @@ def _build_vector_overlay(config: Dict[str, Any], in_layers: List[str] = None) -
         if in_layers is not None and name not in in_layers:
             continue
 
-        visible = _is_default_visible(name)
+        visible = (name in visible_layers) if visible_layers is not None else _is_default_visible(name)
         visibility = 'visible' if visible else 'none'
 
         sources[name] = {'type': 'geojson', 'data': f'../../layers/{name}/{name}.geojson'}
@@ -500,8 +503,10 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     center_lng = (bbox['west'] + bbox['east']) / 2
     center_lat = (bbox['south'] + bbox['north']) / 2
 
-    in_layers = config.get('assets', {}).get('3dview', {}).get('in_layers')
-    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers)
+    view_asset = config.get('assets', {}).get('3dview', {})
+    in_layers = view_asset.get('in_layers')
+    visible_layers = view_asset.get('visible_layers')
+    vector_sources, vector_layers, toggle_list = _build_vector_overlay(config, in_layers, visible_layers)
     view_panel_html = _build_view_panel_html(toggle_list)
 
     route_layers = [t for t in toggle_list if t['geometry_type'] == 'linestring']
@@ -566,6 +571,16 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
     # Keys: a=lat, o=lng, z=zoom, t=pitch, r=bearing, e=exaggeration, l=visible layer names;
     # with a camera route chosen, also p=route layer, h=height (m), c=camera angle, d=duration (s).
     interaction_js = """
+        // Snapshot mode (?chrome=0), used by the slides outlet (outlets_slides.py):
+        // hide the panels and controls, don't play a camera route, and set
+        // window.atlasMapReady on the first idle once the view state is applied.
+        const BARE_MODE = new URLSearchParams(window.location.search).get('chrome') === '0';
+        if (BARE_MODE) {
+            const bareStyle = document.createElement('style');
+            bareStyle.textContent = '.panel, .maplibregl-ctrl-group, .success-notification, .back-link { display: none !important; }';
+            document.head.appendChild(bareStyle);
+        }
+
         function encode3DState(s) { return btoa(JSON.stringify(s)); }
         function decode3DState(s) { try { return JSON.parse(atob(s)); } catch (e) { return null; } }
 
@@ -615,7 +630,7 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
             CHECKBOX_LISTENERS
 
             const st = decode3DState(new URLSearchParams(window.location.search).get('s'));
-            if (typeof initRouteFromUrl === 'function') initRouteFromUrl(st);
+            if (typeof initRouteFromUrl === 'function' && !BARE_MODE) initRouteFromUrl(st);
             if (!st) return;
             if (typeof st.a === 'number' && typeof st.o === 'number') map.setCenter([st.o, st.a]);
             if (typeof st.z === 'number') map.setZoom(st.z);
@@ -639,6 +654,13 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
                     });
                 });
             }
+        });
+
+        // Registered after the state handler, so this idle comes after the camera,
+        // terrain and layer visibility from ?s= are applied.
+        map.on('load', () => {
+            map.once('idle', () => { window.atlasMapReady = true; });
+            map.triggerRepaint();
         });""".replace('CHECKBOX_LISTENERS', checkbox_listener_js)
 
     html_content = f"""<!DOCTYPE html>
@@ -660,6 +682,11 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         html, body, #map {{
             height: 100%;
             width: 100%;
+        }}
+        /* Sky: MapLibre 4 draws nothing above the horizon, so the canvas is
+           transparent there and this shows through (5.x adds style `sky`). */
+        #map {{
+            background: linear-gradient(to bottom, #4a7fc1 0%, #8fb8e3 45%, #d6e6f3 75%, #eef4f8 100%);
         }}
         .map-container {{
             position: relative;

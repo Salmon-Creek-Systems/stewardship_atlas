@@ -337,6 +337,7 @@
                                     const geojson = JSON.parse(e.target.result);
                                     geojson.layer = item.name;
                                     geojson.action = 'create';
+                                    geojson.source = 'console_upload';
                                     var xmlhttp = new XMLHttpRequest();
                                     xmlhttp.open("POST", `${apiurl}/delta_upload/${swalename}`);
                                     xmlhttp.setRequestHeader("Content-Type", "application/json");

@@ -406,6 +406,14 @@
               ]
             }
           },
+          "game_kit": {
+            "type": "outlet",
+            "name": "game_kit",
+            "config_def": "game_kit",
+            "access": [
+              "admin"
+            ]
+          },
           "notebook": {
             "type": "outlet",
             "name": "notebook",

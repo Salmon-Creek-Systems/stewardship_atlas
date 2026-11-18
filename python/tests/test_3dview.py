@@ -79,3 +79,40 @@ class TestCameraRoute(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestInitialVisibility(unittest.TestCase):
+    """Which layers start checked: visible_layers if given, else the name patterns."""
+
+    def _toggles(self, cfg):
+        view = cfg['assets'].get('3dview', {})
+        return dview._build_vector_overlay(cfg, view.get('in_layers'), view.get('visible_layers'))[2]
+
+    def test_name_patterns_without_visible_layers(self):
+        on = {t['ids'][0] for t in self._toggles(_config(LAYERS)) if t['visible']}
+        self.assertEqual(on, {'roads-layer'})
+
+    def test_visible_layers_decides_exactly(self):
+        cfg = _config(LAYERS)
+        cfg['assets']['3dview'] = {'visible_layers': ['parcels', 'hydrants']}
+        on = {t['ids'][0] for t in self._toggles(cfg) if t['visible']}
+        self.assertEqual(on, {'parcels-layer', 'hydrants-layer'})  # roads no longer on by pattern
+
+    def test_visible_layers_sets_layout_visibility(self):
+        cfg = _config(LAYERS)
+        cfg['assets']['3dview'] = {'visible_layers': ['parcels']}
+        _, layers, _ = dview._build_vector_overlay(cfg, None, ['parcels'])
+        vis = {l['id']: l['layout']['visibility'] for l in layers if l['id'].endswith('-layer')}
+        self.assertEqual(vis['parcels-layer'], 'visible')
+        self.assertEqual(vis['roads-layer'], 'none')
+
+    def test_empty_visible_layers_starts_all_hidden(self):
+        cfg = _config(LAYERS)
+        cfg['assets']['3dview'] = {'visible_layers': []}
+        self.assertFalse(any(t['visible'] for t in self._toggles(cfg)))
+
+    def test_generated_page_reads_visible_layers(self):
+        cfg = _config(LAYERS, in_layers=['roads', 'parcels'])
+        cfg['assets']['3dview']['visible_layers'] = ['parcels']
+        html = dview.generate_3d_terrain_html(cfg)
+        self.assertRegex(html, r'"id": "parcels-layer"[^}]*"visibility": "visible"')

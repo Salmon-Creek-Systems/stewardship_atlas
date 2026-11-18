@@ -19,7 +19,10 @@ build_board() then
   4. picks a step length so the longest trip across the board is ~TARGET_SPACES;
   5. places spaces at every junction and dead end, and evenly along each edge;
   6. snaps safe locations to their nearest space and counts how far every
-     space is from safety.
+     space is from safety;
+  7. finds the single roads and junctions whose loss cuts households off.
+
+seed_exits() chooses where the game_safe_exits inlet puts its points.
 
 Pure Python, lengths in local metres (game_kit.meters_per_degree).
 """
@@ -33,6 +36,9 @@ TARGET_SPACES = 32        # longest shortest trip across the board, in spaces
 SPUR_STEPS = 2            # a dead end shorter than this many steps, serving nothing, is pruned
 SAFE_SNAP_M = 250         # a safe location further than this from any board road isn't placed
 SNAP_DIGITS = 6           # vertices equal to ~0.1 m are the same node
+EXIT_MERGE_M = 300        # crossings this close are one exit
+MAX_CHOKEPOINTS = 8       # chokepoints reported, most households first
+NESTED_SHARE = 0.8        # a nested choke cutting this share of its parent's households adds nothing
 
 
 def _key(p):
@@ -233,9 +239,10 @@ def _point_along(coords, k, d):
 def place_spaces(g, step_m):
     """Spaces at every node, and n-1 more along each edge (n = its length in steps, at least 1).
 
-    Returns (spaces [[lon, lat]], links [(i, j)]) — links join neighbouring spaces.
+    Returns (spaces [[lon, lat]], links [(i, j)], link_edges [edge id]) — links
+    join neighbouring spaces, and link_edges[l] is the graph edge link l lies on.
     """
-    index, spaces, links = {}, [], []
+    index, spaces, links, link_edges = {}, [], [], []
 
     def node_space(n):
         if n not in index:
@@ -243,7 +250,7 @@ def place_spaces(g, step_m):
             spaces.append([n[0], n[1]])
         return index[n]
 
-    for e in g.edges.values():
+    for eid, e in g.edges.items():
         n = max(1, round(e["length"] / step_m))
         chain = [node_space(e["a"])]
         for i in range(1, n):
@@ -251,7 +258,8 @@ def place_spaces(g, step_m):
             chain.append(len(spaces) - 1)
         chain.append(node_space(e["b"]))
         links += list(zip(chain, chain[1:]))
-    return spaces, links
+        link_edges += [eid] * (len(chain) - 1)
+    return spaces, links, link_edges
 
 
 def snap_safe(safe_points, spaces, k, max_m=SAFE_SNAP_M):
@@ -290,12 +298,183 @@ def spaces_to_safety(n_spaces, links, safe_spaces):
     return dist
 
 
-def build_board(parts, bbox, safe_points, step_m=None, target_spaces=TARGET_SPACES):
+def networks(n_spaces, links, safe_spaces):
+    """Connected groups of spaces, biggest first: [{'spaces': count, 'safe': [space ids]}]."""
+    nbrs = defaultdict(list)
+    for i, j in links:
+        nbrs[i].append(j)
+        nbrs[j].append(i)
+    safe_set, seen, groups = set(safe_spaces), set(), []
+    for start in range(n_spaces):
+        if start in seen:
+            continue
+        seen.add(start)
+        members, stack = [start], [start]
+        while stack:
+            for j in nbrs[stack.pop()]:
+                if j not in seen:
+                    seen.add(j)
+                    members.append(j)
+                    stack.append(j)
+        groups.append({"spaces": len(members), "safe": sorted(safe_set.intersection(members))})
+    return sorted(groups, key=lambda g: -g["spaces"])
+
+
+def households_per_space(points, spaces, k):
+    """How many of the points (buildings) have each space as their nearest."""
+    counts = [0] * len(spaces)
+    if spaces:
+        for p in points:
+            counts[min(range(len(spaces)), key=lambda i: gk._dist_m(spaces[i], p, k))] += 1
+    return counts
+
+
+def chokepoints(n_spaces, links, link_rids, safe_spaces, households, limit=MAX_CHOKEPOINTS):
+    """Single roads or junctions that, if blocked, cut households off from every safe location.
+
+    Join all safe spaces to one virtual "safety" node. A road link is then a
+    choke exactly when it is a bridge of that graph, and a space exactly when
+    it is an articulation point. One DFS from safety (Tarjan low-links) finds
+    both, and what each one cuts off is the DFS subtree below it. Spaces with
+    no route to safety aren't reached, so stranded roads never appear here.
+
+    Returns [{'kind': 'road'|'junction', 'space', 'rid', 'households', 'spaces_cut'}],
+    most households first. A choke nested inside a listed one that cuts off
+    nearly the same households adds nothing, so it is left out.
+    """
+    safety = n_spaces
+    adj = [[] for _ in range(n_spaces + 1)]
+    rid_at = [None] * n_spaces
+    for lid, (i, j) in enumerate(links):
+        rid_at[i] = rid_at[j] = link_rids[lid]
+        if i != j:
+            adj[i].append((j, lid))
+            adj[j].append((i, lid))
+    for s in set(safe_spaces):
+        adj[safety].append((s, -1 - s))             # negative ids: virtual links, never reported
+        adj[s].append((safety, -1 - s))
+
+    disc, low = [None] * (n_spaces + 1), [0] * (n_spaces + 1)
+    children = [[] for _ in range(n_spaces + 1)]
+    disc[safety], clock, order = 0, 1, [safety]
+    stack = [(safety, None, iter(adj[safety]))]
+    while stack:                                    # iterative: a long road is a deep DFS
+        v, parent_link, edges = stack[-1]
+        for w, lid in edges:
+            if lid == parent_link:
+                continue
+            if disc[w] is None:
+                disc[w] = low[w] = clock
+                clock += 1
+                order.append(w)
+                children[v].append((w, lid))
+                stack.append((w, lid, iter(adj[w])))
+                break
+            low[v] = min(low[v], disc[w])
+        else:
+            stack.pop()
+            if stack:
+                u = stack[-1][0]
+                low[u] = min(low[u], low[v])
+
+    below = {}
+    for v in reversed(order):
+        below[v] = {v}.union(*(below[w] for w, _ in children[v]))
+
+    found = []
+    for v in order:
+        cut_by_junction = set()
+        for w, lid in children[v]:
+            if low[w] > disc[v] and lid >= 0:
+                found.append({"kind": "road", "space": v, "rid": link_rids[lid], "cut": below[w]})
+            if v != safety and low[w] >= disc[v]:
+                cut_by_junction |= below[w]
+        if cut_by_junction:
+            found.append({"kind": "junction", "space": v, "rid": rid_at[v], "cut": cut_by_junction})
+    for c in found:
+        c["households"] = sum(households[i] for i in c["cut"])
+
+    listed = []
+    for c in sorted((c for c in found if c["households"] > 0),
+                    key=lambda c: (-c["households"], -len(c["cut"]), c["kind"] != "road", c["space"])):
+        if any(c["cut"] <= p["cut"] and c["households"] >= NESTED_SHARE * p["households"] for p in listed):
+            continue
+        listed.append(c)
+    return [{"kind": c["kind"], "space": c["space"], "rid": c["rid"],
+             "households": c["households"], "spaces_cut": len(c["cut"])} for c in listed[:limit]]
+
+
+def seed_exits(parts, bbox, main_classes=None, existing=(), class_order=(), merge_m=EXIT_MERGE_M):
+    """Where to seed exits, from road parts already clipped to the atlas.
+
+    The atlas box is the game world: a kept road that reaches its edge leaves
+    the map there. A road that leaves and comes back is two pieces, and each
+    piece is judged on its own network.
+
+      1. Main roads (cls in main_classes) get one exit per road, side and network.
+      2. Any other network that reaches the edge gets its best crossing: earliest
+         in class_order, then the longest road.
+
+    A network with a point in `existing` (lon/lat pairs) needs no second-pass
+    exit, and a crossing near one is skipped, so a re-run adds only what's new.
+    Returns [{'rid', 'name', 'side', 'lonlat'}].
+    """
+    k = gk.meters_per_degree(bbox)
+    kept = [p for p in parts if p["by_class"]]
+    g, _ = build_graph(kept, k)
+    network = {}
+    for number, comp in enumerate(components(g)):
+        for eid in comp:
+            network[g.edges[eid]["a"]] = network[g.edges[eid]["b"]] = number
+    has_exit = set()
+    for point in existing:                          # a point belongs to the one network nearest it
+        nearest = min(((gk._dist_m(point, c, k), network[e["a"]])
+                       for e in g.edges.values() for c in e["coords"]), default=None)
+        if nearest and nearest[0] <= SAFE_SNAP_M:
+            has_exit.add(nearest[1])
+
+    def rank(cls):
+        return class_order.index(cls) if cls in class_order else len(class_order)
+
+    crossings = []
+    for p in kept:
+        for end in (p["coords"][0], p["coords"][-1]):
+            net = network.get(_key(end))
+            if net is not None and gk._edge_dist_m(end, bbox, k) <= gk.EDGE_TOLERANCE_M:
+                crossings.append({"rid": p["rid"], "name": p.get("name"), "cls": p.get("cls"),
+                                  "side": gk._nearest_side(end, bbox), "lonlat": list(end[:2]),
+                                  "net": net, "length": _length(p["coords"], k)})
+    crossings.sort(key=lambda c: (rank(c["cls"]), -c["length"]))
+
+    exits, seen = [], set()
+    for c in crossings:
+        if c["cls"] not in (main_classes or ()):
+            continue
+        key = (c["name"] or c["rid"], c["side"], c["net"])
+        if key in seen:
+            continue
+        if any(gk._dist_m(c["lonlat"], point, k) < merge_m for point in existing):
+            seen.add(key)                           # this road's exit on this side already exists
+            continue
+        if all(gk._dist_m(c["lonlat"], e["lonlat"], k) >= merge_m for e in exits):
+            seen.add(key)
+            exits.append(c)
+            has_exit.add(c["net"])
+    for c in crossings:
+        if c["net"] not in has_exit:
+            has_exit.add(c["net"])
+            exits.append(c)
+    return [{"rid": e["rid"], "name": e["name"], "side": e["side"], "lonlat": e["lonlat"]} for e in exits]
+
+
+def build_board(parts, bbox, safe_points, step_m=None, target_spaces=TARGET_SPACES, residence_points=()):
     """The playable board from road parts and safe locations.
 
-    safe_points: [{'name', 'lonlat', 'source'}]. Returns a dict with roads
-    (kept edges: rid, coords), step_m, spaces, links, safe (placed, with
-    their space), unplaced_safe, to_safety (moves per space), kept_m, total_m.
+    safe_points: [{'name', 'lonlat', 'source'}]; residence_points: [[lon, lat]],
+    used to weigh chokepoints. Returns a dict with roads (kept edges: rid,
+    coords, stranded), step_m, spaces, links, safe (placed, with their space),
+    unplaced_safe, to_safety (moves per space), networks, chokepoints, kept_m,
+    total_m.
     """
     k = gk.meters_per_degree(bbox)
     full, part_of = build_graph(parts, k)
@@ -310,17 +489,23 @@ def build_board(parts, bbox, safe_points, step_m=None, target_spaces=TARGET_SPAC
     prune_spurs(g, SPUR_STEPS * first_step, protected=edge_nodes)
     step = step_m or step_for(diameter_m(g), target_spaces) or first_step
 
-    spaces, links = place_spaces(g, step)
+    spaces, links, link_edges = place_spaces(g, step)
     safe, unplaced = snap_safe(safe_points, spaces, k)
-    to_safety = spaces_to_safety(len(spaces), links, [s["space"] for s in safe])
+    safe_spaces = [s["space"] for s in safe]
+    to_safety = spaces_to_safety(len(spaces), links, safe_spaces)
+    stranded_edges = {eid for eid, (i, _) in zip(link_edges, links) if to_safety[i] is None}
     return {
-        "roads": [{"rid": e["rid"], "coords": e["coords"]} for e in g.edges.values()],
+        "roads": [{"rid": e["rid"], "coords": e["coords"], "stranded": eid in stranded_edges}
+                  for eid, e in g.edges.items()],
         "step_m": step,
         "spaces": spaces,
         "links": links,
         "safe": safe,
         "unplaced_safe": unplaced,
         "to_safety": to_safety,
+        "networks": networks(len(spaces), links, safe_spaces),
+        "chokepoints": chokepoints(len(spaces), links, [g.edges[eid]["rid"] for eid in link_edges],
+                                   safe_spaces, households_per_space(residence_points, spaces, k)),
         "kept_m": sum(e["length"] for e in g.edges.values()),
         "total_m": sum(e["length"] for e in full.edges.values()),
     }
