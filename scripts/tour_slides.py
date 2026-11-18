@@ -26,7 +26,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 import atlas_session  # noqa: E402
-import gslides  # noqa: E402
 import outlets_slides  # noqa: E402
 import slides  # noqa: E402
 
@@ -58,8 +57,7 @@ def render(config, staging_dir, args):
     ok = [r for r in manifest["slides"] if r["status"] == "ok"]
     (out / "index.html").write_text(slides.deck_html(meta, ok))
     if args.gslides:
-        url = gslides.sync_deck(out, meta, ok, f"{config['base_url'].rstrip('/')}/staging/outlets/slides",
-                                tuple(manifest["size"]), config.get("admin_emails", []))
+        url = outlets_slides.sync_google_deck(config, out, meta, ok, tuple(manifest["size"]))
         print(url)
 
 

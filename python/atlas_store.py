@@ -513,6 +513,46 @@ def stale_keys(existing: list, planned: list) -> list:
 # S3 — boto3 imported lazily, matching the convention elsewhere in python/
 # ---------------------------------------------------------------------------
 
+def temporary_urls(config: dict, files, purpose: str, *, expires: int = 3600, client=None):
+    """Context manager: short-lived URLs for local files, deleted on exit.
+
+    For a service that fetches a file once by URL and keeps its own copy —
+    Google Slides inserting an image. The files are uploaded to
+    ``{atlas}/tmp/{purpose}/{stamp}/`` in the outlets bucket (outside the
+    ``current/`` mirror, which publish prunes) and handed out as presigned GET
+    URLs. Only for files that are public content anyway: slides are
+    screenshots of the published pages.
+
+    Yields ``{file name: url}``.
+    """
+    import contextlib
+    import time
+
+    @contextlib.contextmanager
+    def _cm():
+        s3 = client or _s3()
+        bucket = cloud_settings(config)['outlets_bucket']
+        prefix = f"{config['name']}/tmp/{purpose}/{int(time.time())}"
+        keys, urls = [], {}
+        try:
+            for path in files:
+                path = Path(path)
+                key = f"{prefix}/{path.name}"
+                s3.upload_file(str(path), bucket, key,
+                               ExtraArgs={'ContentType': content_type_for(path.name)})
+                keys.append(key)
+                urls[path.name] = s3.generate_presigned_url(
+                    'get_object', Params={'Bucket': bucket, 'Key': key}, ExpiresIn=expires)
+            yield urls
+        finally:
+            for key in keys:
+                try:
+                    s3.delete_object(Bucket=bucket, Key=key)
+                except Exception as exc:  # a leftover temp object is harmless
+                    logger.warning(f"atlas_store: could not delete s3://{bucket}/{key}: {exc}")
+    return _cm()
+
+
 def _s3(region: str = None):
     import boto3
     return boto3.client('s3', region_name=region) if region else boto3.client('s3')

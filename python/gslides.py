@@ -7,8 +7,9 @@ export already uses.
 
 One deck per slides outlet. Its id is kept in `gslides.json` beside the PNGs, so
 a re-run rebuilds the same deck and its link stays stable (edits made in Google
-Slides are overwritten). Slides fetches each image from its public fireatlas.org
-URL, so the PNGs must be served before this runs.
+Slides are overwritten). Slides fetches each image once by URL and keeps a copy;
+the caller supplies those URLs (short-lived ones from
+`atlas_store.temporary_urls`, since staging is not public after cutover).
 
 Units: the API positions everything in EMU (914400 per inch, 12700 per point).
 """
@@ -225,8 +226,11 @@ def _create_and_share(session, title, writers):
     return pid
 
 
-def sync_deck(out_dir, meta, entries, image_base_url, image_size, writers):
-    """Create or rebuild the outlet's Google Slides deck. Returns its URL."""
+def sync_deck(out_dir, meta, entries, image_url, image_size, writers):
+    """Create or rebuild the outlet's Google Slides deck. Returns its URL.
+
+    ``image_url(file_name)`` returns a URL Google can fetch the PNG from.
+    """
     session = _session()
     state_path = out_dir / 'gslides.json'
     pid = None
@@ -244,10 +248,9 @@ def sync_deck(out_dir, meta, entries, image_base_url, image_size, writers):
         pres = _check(session.get(f"{SLIDES_API}/{pid}"), 'read new presentation')
         state_path.write_text(json.dumps({'presentation_id': pid}, indent=2))
 
-    # A cache-buster makes Slides fetch this run's PNGs, not a copy it fetched before.
     stamp = str(int(time.time()))
     reqs, slide_ids = deck_requests(
-        meta, entries, lambda f: f"{image_base_url}/{f}?v={stamp}", image_size,
+        meta, entries, image_url, image_size,
         old_slide_ids=[s['objectId'] for s in pres.get('slides', [])], run_id=stamp)
     _check(session.post(f"{SLIDES_API}/{pid}:batchUpdate", json={'requests': reqs}), 'build slides')
 

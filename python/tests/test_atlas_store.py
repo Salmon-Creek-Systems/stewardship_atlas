@@ -799,3 +799,38 @@ class TestShippedConfigsPinNoSubstrate(unittest.TestCase):
                 f"{Path(path).name} pins {sorted(offending)} in its cloud block; "
                 f"those belong in the environment, not the atlas")
         self.assertGreater(checked, 0, 'no cloud blocks found — test is vacuous')
+
+
+class TestTemporaryUrls(unittest.TestCase):
+    """Google Slides fetches each PNG once by URL; the objects go away after."""
+
+    def setUp(self):
+        sys.path.insert(0, str(Path(__file__).parent))
+        from fake_s3 import FakeS3
+        self.client = FakeS3()
+        self.tmp = Path(tempfile.mkdtemp())
+        self.files = []
+        for name in ('01_a.png', '02_b.png'):
+            (self.tmp / name).write_bytes(b'png')
+            self.files.append(self.tmp / name)
+        self.config = {'name': 'k', 'cloud': {'outlets_bucket': 'outb'}}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_urls_while_open_and_nothing_left_after(self):
+        with atlas_store.temporary_urls(self.config, self.files, 'gslides',
+                                        expires=600, client=self.client) as urls:
+            self.assertEqual(sorted(urls), ['01_a.png', '02_b.png'])
+            self.assertIn('X-Amz-Expires=600', urls['01_a.png'])
+            keys = [k for (b, k) in self.client.objects if b == 'outb']
+            self.assertEqual(len(keys), 2)
+            self.assertTrue(all(k.startswith('k/tmp/gslides/') for k in keys))
+        self.assertEqual(self.client.objects, {})
+
+    def test_deleted_even_when_the_body_raises(self):
+        with self.assertRaises(RuntimeError):
+            with atlas_store.temporary_urls(self.config, self.files, 'gslides',
+                                            client=self.client):
+                raise RuntimeError('google said no')
+        self.assertEqual(self.client.objects, {})

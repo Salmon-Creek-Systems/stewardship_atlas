@@ -108,6 +108,10 @@ class FakeS3:
             self.objects.pop((Bucket, key), None)
         return {'Deleted': [{'Key': k} for k in keys]}
 
+    def generate_presigned_url(self, ClientMethod, Params, ExpiresIn=3600):
+        self.calls.append(('generate_presigned_url', Params['Key']))
+        return f"https://{Params['Bucket']}.s3.example/{Params['Key']}?X-Amz-Expires={ExpiresIn}"
+
     def delete_object(self, Bucket, Key):
         self.calls.append(('delete_object', Key))
         self.objects.pop((Bucket, Key), None)
