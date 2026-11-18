@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / 'python'))
+import config_checks  # noqa: E402
 CONFIG_DIR = REPO_ROOT / 'configuration'
 
 
@@ -102,32 +104,13 @@ class TestJsonConfigs(unittest.TestCase):
                 f"webmap in_layers references '{lname}' not in starter_layers.json")
 
     def test_active_atlas_configs_are_current(self):
-        """Every active atlas is single-file, builds the new console (not the
-        retired html one), and its webmaps and cloud allowlist reference only
-        things it defines."""
-        shared_layers = self._load(CONFIG_DIR / 'shared_layers_config.json')
+        """Every active atlas passes config_checks — the same function
+        `scripts/atlas_config.py push` runs before writing a config to S3."""
+        shared = config_checks.load_shared(CONFIG_DIR)
         for atlas in ACTIVE_ATLASES:
             with self.subTest(atlas=atlas):
                 props = self._load(CONFIG_DIR / f'{atlas}.geojson')['features'][0]['properties']
-                self.assertNotIn('layers_path', props)
-                self.assertNotIn('assets_path', props)
-                layers, assets = props['layers'], props['assets']
-                self.assertIn('console', assets)
-                self.assertNotIn('html', assets)
-                # versioned_outlets filters the publish snapshot; a stale
-                # ["html", "webmap"] would leave the console out.
-                self.assertEqual(props.get('versioned_outlets', []), [])
-                for name, asset in assets.items():
-                    if asset.get('config_def') != 'webmap':
-                        continue
-                    self.assertTrue(asset.get('show_user_location'), f"{name} lacks show_user_location")
-                    for lname in asset.get('in_layers', []):
-                        self.assertTrue(lname in layers or lname in shared_layers,
-                                        f"{name} in_layers references undefined '{lname}'")
-                outlets = props.get('cloud', {}).get('outlets')
-                self.assertIsNotNone(outlets, "no cloud.outlets allowlist")
-                for o in outlets:
-                    self.assertIn(o, assets, f"cloud.outlets names '{o}', which is not an asset")
+                self.assertEqual(config_checks.atlas_config_problems(props, shared), [])
 
     def test_treatments_file(self):
         data = self._load(CONFIG_DIR / 'treatments' / 'default_treatments.json')
@@ -155,38 +138,7 @@ ACTIVE_ATLASES = [
 
 CORE_OUTLETS = {'console', 'webmap', 'webedit', 'notebook', '3dview'}
 
-# Outlets whose page fetches its layers in the browser, so every layer they list
-# must be in the public mirror (atlas_store.CLIENT_FETCHED_OUTLETS).
-PUBLIC_MAP_OUTLETS = ('webmap', '3dview')
-
-
-def unpublishable_map_layers(props, shared_layers):
-    """`outlet:layer=access` for every layer a public map loads that is not
-    explicitly declared public.
-
-    A missing `access` reads as public in atlas.py but as internal in the
-    publish guardrail (#175), so the map 403s on S3 while working on the box.
-    Declaring it is the only state both agree on.
-    """
-    layers = props.get('layers') or {}
-    allow = (props.get('cloud') or {}).get('outlets')
-    found = []
-    for outlet in PUBLIC_MAP_OUTLETS:
-        if allow is not None and outlet not in allow:
-            continue
-        asset = (props.get('assets') or {}).get(outlet) or {}
-        if 'public' not in (asset.get('access') or ['public']):
-            continue
-        for name in asset.get('in_layers') or []:
-            layer = layers.get(name)
-            if layer is None:
-                continue
-            access = layer.get('access')
-            if access is None and layer.get('layer_def'):
-                access = (shared_layers.get(layer['layer_def']) or {}).get('access')
-            if not access or 'public' not in access:
-                found.append(f"{outlet}:{name}={access}")
-    return found
+unpublishable_map_layers = config_checks.unpublishable_map_layers
 
 
 class TestPublicMapsLoadOnlyPublicLayers(unittest.TestCase):
@@ -590,3 +542,35 @@ class TestAtlasLayerConfigs(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestConfigChecks(unittest.TestCase):
+    def _props(self):
+        return {'versioned_outlets': [], 'cloud': {'outlets': ['webmap', 'console']},
+                'layers': {'roads': {'access': ['public']}},
+                'assets': {'console': {'config_def': 'console'},
+                           'webmap': {'config_def': 'webmap', 'show_user_location': True,
+                                      'access': ['public'], 'in_layers': ['roads']}}}
+
+    def _shared(self):
+        return {'layers': {}, 'outlets': {'console': {'access': ['public', 'internal', 'admin']},
+                                          'webmap': {}}}
+
+    def test_a_good_config_has_no_problems(self):
+        self.assertEqual(config_checks.atlas_config_problems(self._props(), self._shared()), [])
+
+    def test_each_rule_reports(self):
+        props = self._props()
+        props['versioned_outlets'] = ['html', 'webmap']
+        props['assets']['webmap']['show_user_location'] = False
+        props['assets']['webmap']['in_layers'].append('ghost')
+        props['layers']['creeks'] = {}
+        props['assets']['webmap']['in_layers'].append('creeks')
+        props['cloud']['outlets'].append('sqldb')
+        shared = self._shared()
+        shared['outlets']['console'] = {}
+        got = '\n'.join(config_checks.atlas_config_problems(props, shared))
+        for needle in ('versioned_outlets', 'show_user_location', "undefined 'ghost'",
+                       "'sqldb', which is not an asset", "'console' declares no access",
+                       'webmap:creeks=None'):
+            self.assertIn(needle, got)
