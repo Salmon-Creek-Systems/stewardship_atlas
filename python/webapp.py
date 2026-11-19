@@ -48,7 +48,12 @@ import vector_inlets
 import email_inlet
 import atlas_logs
 from biochar_routes import biochar_router
-app = FastAPI()
+import webapp_auth
+from fastapi import Depends
+
+# Every route passes webapp_auth.enforce first: a required role per route
+# (atlas_auth.ROUTE_ROLES), admin when unlisted. ATLAS_AUTH=off for tests only.
+app = FastAPI(dependencies=[Depends(webapp_auth.enforce)])
 logger.logger.setLevel(0)
 
 
@@ -82,6 +87,11 @@ def read_session(swalename: str, purpose: str, **kwargs):
 # handlers above map them to 409/404/503.
 SESSION_ERRORS = (atlas_lock.AtlasLocked, atlas_lock.LeaseLost,
                   atlas_session.AtlasNotSeeded, atlas_workspace.WritebackConflict)
+
+
+@app.exception_handler(webapp_auth.AuthRequired)
+async def _auth_required_handler(request: Request, exc: webapp_auth.AuthRequired):
+    return webapp_auth.auth_required_response(exc)
 
 
 @app.exception_handler(atlas_lock.AtlasLocked)
@@ -125,6 +135,7 @@ STORAGE_DIR = "/root/data/uploads/"
 _templates_dir = versioning.atlas_path(local_path='templates', version='app')
 app.mount("/templates", StaticFiles(directory=str(_templates_dir)), name="templates")
 app.include_router(biochar_router)
+app.include_router(webapp_auth.router)
 
 
 class JSONPayload(BaseModel):

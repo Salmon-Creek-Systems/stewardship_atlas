@@ -10,7 +10,9 @@ things the box has by construction:
   no-op instead of a download.
 * Secrets the box keeps as files or env: the Google service account and the
   Anthropic key, read from Secrets Manager by the names in
-  ``ATLAS_GSPREAD_SECRET`` and ``ATLAS_ANTHROPIC_SECRET``.
+  ``ATLAS_GSPREAD_SECRET`` and ``ATLAS_ANTHROPIC_SECRET``; and, for auth, the
+  CloudFront signing key and the service token (``ATLAS_CLOUDFRONT_KEY_SECRET``,
+  ``ATLAS_SERVICE_TOKEN_SECRET``).
 
 ``prepare()`` is idempotent and cheap after the first call in a container.
 """
@@ -61,6 +63,16 @@ def prepare(environ=None, secret=_secret, image_duckdb_home=IMAGE_DUCKDB_HOME):
         value = _read(secret, anthropic_secret)
         if value is not None:
             env['ANTHROPIC_API_KEY'] = value.strip()
+    # Auth (task 6): the CloudFront signing key and the email Lambda's service
+    # token. Without them, private-page cookies and email ingest stop working;
+    # everything else carries on.
+    for secret_env, target in (('ATLAS_CLOUDFRONT_KEY_SECRET', 'ATLAS_CLOUDFRONT_PRIVATE_KEY'),
+                               ('ATLAS_SERVICE_TOKEN_SECRET', 'ATLAS_SERVICE_TOKEN')):
+        name = env.get(secret_env)
+        if name and not env.get(target):
+            value = _read(secret, name)
+            if value is not None:
+                env[target] = value.strip() + ('\n' if target.endswith('PRIVATE_KEY') else '')
     _prepared = True
 
 

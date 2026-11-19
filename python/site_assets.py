@@ -39,6 +39,7 @@ LOGO_FILE = 'scs-smallgrass1.png'
 
 MANUALS = ('user_manual', 'admin_manual')
 SITE_PAGES = ('about', 'contact')
+LOGIN_REQUIRED_PAGE = 'auth/login-required.html'   # key local/auth/login-required.html
 
 
 def site_key(relative_posix: str) -> str:
@@ -89,6 +90,10 @@ def plan_site_assets(repo_root) -> list:
                         'source': templates / 'css' / name, 'required': True})
     entries.append({'path': LOGO_FILE, 'kind': 'copy',
                     'source': templates / LOGO_FILE, 'required': True})
+    # CloudFront's page for every 403: a private page without a login cookie
+    # (task 6). The distribution's error response names this key.
+    entries.append({'path': LOGIN_REQUIRED_PAGE, 'kind': 'copy',
+                    'source': templates / 'login_required.html', 'required': True})
 
     for source in sorted((documents / 'help').glob('*.md')):
         entries.append({'path': f'documents/help/{source.stem}.html',

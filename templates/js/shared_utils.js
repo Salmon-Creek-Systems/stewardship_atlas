@@ -1,3 +1,28 @@
+// Auth (cloud, task 6): every API auth failure is a 401. "login_required" goes
+// to the login page and comes back here; "forbidden" (logged in, lacking the
+// role) just says so. Harmless where the API never sends 401s (the box).
+(function () {
+    const realFetch = window.fetch.bind(window);
+    window.fetch = async function (input, init) {
+        const response = await realFetch(input, init);
+        if (response.status === 401) {
+            let body = null;
+            try { body = await response.clone().json(); } catch (e) { /* not ours */ }
+            if (body && body.error === 'login_required') {
+                window.location.href = '/api/auth/login?next=' +
+                    encodeURIComponent(location.pathname + location.search + location.hash);
+            } else if (body && body.error === 'forbidden') {
+                const msg = 'You need ' + (body.required || 'more') + ' access' +
+                    (body.atlas ? ' on ' + body.atlas : '') + ' to do that.';
+                if (typeof showToast === 'function') showToast(msg, true);
+                else if (typeof showErrorPopup === 'function') showErrorPopup(msg);
+                else alert(msg);
+            }
+        }
+        return response;
+    };
+})();
+
 // Shared utilities for webmap and webedit interfaces
 
 // Function to show error popup

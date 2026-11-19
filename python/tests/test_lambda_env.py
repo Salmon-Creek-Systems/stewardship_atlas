@@ -22,7 +22,9 @@ class TestPrepare(unittest.TestCase):
 
     def secret(self, name):
         self.asked.append(name)
-        return {'gs': '{"type": "service_account"}', 'ak': 'sk-test\n'}[name]
+        return {'gs': '{"type": "service_account"}', 'ak': 'sk-test\n',
+                'cf': '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+                'st': 'token123\n'}[name]
 
     def prepare(self, env):
         lambda_env.prepare(env, secret=self.secret, image_duckdb_home=self.image)
@@ -35,6 +37,14 @@ class TestPrepare(unittest.TestCase):
         self.assertEqual(sa.read_text(), '{"type": "service_account"}')
         self.assertEqual(env['ANTHROPIC_API_KEY'], 'sk-test')
         self.assertEqual(env['MPLCONFIGDIR'], str(self.home / '.matplotlib'))
+
+    def test_auth_secrets_land_in_env(self):
+        env = {'HOME': str(self.home), 'ATLAS_CLOUDFRONT_KEY_SECRET': 'cf',
+               'ATLAS_SERVICE_TOKEN_SECRET': 'st'}
+        self.prepare(env)
+        self.assertEqual(env['ATLAS_CLOUDFRONT_PRIVATE_KEY'],
+                         '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n')
+        self.assertEqual(env['ATLAS_SERVICE_TOKEN'], 'token123')
 
     def test_a_second_call_does_nothing(self):
         env = {'HOME': str(self.home), 'ATLAS_GSPREAD_SECRET': 'gs'}

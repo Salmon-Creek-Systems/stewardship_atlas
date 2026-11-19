@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in required</title>
+<!-- CloudFront serves this for every 403 (a private page without a login
+     cookie), at whatever URL was asked for, so links here are absolute. -->
+<link rel="stylesheet" href="/local/css/console.css">
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+  .login { display: inline-block; margin-top: 1rem; padding: .6rem 1.2rem; border-radius: 6px;
+           background: #2f5d3a; color: #fff; text-decoration: none; font-weight: 600; }
+  .muted { color: #666; font-size: .9rem; margin-top: 2rem; }
+</style>
+</head>
+<body>
+<h1>Log in to see this page</h1>
+<p>This page is private to the atlas's team. Log in and you'll come straight back here.</p>
+<a id="login" class="login" href="/api/auth/login">Log in</a>
+<p class="muted">Logged in already and still here? Your account may not include this atlas.
+  Contact Salmon Creek Systems.</p>
+<script>
+  document.getElementById('login').href = '/api/auth/login?next=' +
+    encodeURIComponent(location.pathname + location.search + location.hash);
+</script>
+</body>
+</html>

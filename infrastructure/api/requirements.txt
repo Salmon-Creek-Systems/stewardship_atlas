@@ -18,6 +18,10 @@ boto3==1.42.65
 requests==2.32.3
 anthropic==0.93.0
 
+# Auth (task 6): Cognito ID-token verification, CloudFront cookie signing
+PyJWT[crypto]==2.9.0
+cryptography==43.0.3
+
 # Orchestration
 dagster==1.7.15
 

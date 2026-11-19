@@ -25,6 +25,7 @@ def fixture_repo(root: Path, manuals=('user_manual',), help_pages=('draw_vector'
     for name in site_assets.CSS_FILES:
         (root / 'templates' / 'css' / name).write_text('body {}')
     (root / 'templates' / site_assets.LOGO_FILE).write_bytes(b'PNG')
+    (root / 'templates' / 'login_required.html').write_text('<html>log in</html>')
     (root / 'templates' / 'help.html').write_text(
         '<html><title>{title}</title><body>{content}</body></html>')
 
@@ -95,6 +96,14 @@ class TestMissingSources(SiteAssetsTestCase):
         (self.repo / 'documents' / 'site' / 'about.md').unlink()
         with self.assertRaises(FileNotFoundError):
             site_assets.build_site_assets(self.repo, self.tmp / 'out')
+
+
+class TestLoginRequiredPage(SiteAssetsTestCase):
+    def test_published_where_the_distribution_expects_it(self):
+        entries = {e['path']: e for e in site_assets.plan_site_assets(self.repo)}
+        self.assertIn('auth/login-required.html', entries)
+        self.assertEqual(site_assets.site_key('auth/login-required.html'),
+                         'local/auth/login-required.html')
 
 
 class TestHelpIndex(SiteAssetsTestCase):
