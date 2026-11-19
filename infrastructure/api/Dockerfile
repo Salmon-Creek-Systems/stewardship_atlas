@@ -30,7 +30,9 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # DuckDB's spatial extension, installed at build so a cold start never fetches
 # it. lambda_env copies it under $HOME (/tmp on Lambda) where duckdb looks.
-RUN HOME=/opt/duckdb-home python -c "import duckdb; duckdb.sql('INSTALL spatial; LOAD spatial;')"
+RUN mkdir -p /opt/duckdb-home \
+ && HOME=/opt/duckdb-home python -c "import duckdb; duckdb.sql('INSTALL spatial; LOAD spatial;')" \
+ && chmod -R a+rX /opt/duckdb-home
 
 # Application code. Paths match the repo, because the code finds templates and
 # shared configs relative to python/.
