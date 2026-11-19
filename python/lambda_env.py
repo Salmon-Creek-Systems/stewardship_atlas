@@ -46,14 +46,27 @@ def prepare(environ=None, secret=_secret, image_duckdb_home=IMAGE_DUCKDB_HOME):
     if source.is_dir() and not target.exists():
         shutil.copytree(source, target)
 
+    # A missing or unreadable secret disables the feature that needs it (sheets,
+    # NL->SQL), not the whole function: it is logged and the cold start goes on.
     gspread_secret = env.get('ATLAS_GSPREAD_SECRET')
-    if gspread_secret:
-        path = home / '.config' / 'gspread' / 'service_account.json'
-        if not path.exists():
+    path = home / '.config' / 'gspread' / 'service_account.json'
+    if gspread_secret and not path.exists():
+        value = _read(secret, gspread_secret)
+        if value is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(secret(gspread_secret))
+            path.write_text(value)
             path.chmod(0o600)
     anthropic_secret = env.get('ATLAS_ANTHROPIC_SECRET')
     if anthropic_secret and not env.get('ANTHROPIC_API_KEY'):
-        env['ANTHROPIC_API_KEY'] = secret(anthropic_secret).strip()
+        value = _read(secret, anthropic_secret)
+        if value is not None:
+            env['ANTHROPIC_API_KEY'] = value.strip()
     _prepared = True
+
+
+def _read(secret, name):
+    try:
+        return secret(name)
+    except Exception as exc:
+        logger.error(f"lambda_env: secret {name!r} unavailable, its feature is off: {exc}")
+        return None

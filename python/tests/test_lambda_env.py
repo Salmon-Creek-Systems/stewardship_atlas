@@ -46,6 +46,16 @@ class TestPrepare(unittest.TestCase):
         self.prepare({'HOME': str(self.home)})
         self.assertEqual(self.asked, [])
 
+    def test_a_missing_secret_is_logged_not_fatal(self):
+        def missing(name):
+            raise RuntimeError('ResourceNotFoundException')
+        env = {'HOME': str(self.home), 'ATLAS_GSPREAD_SECRET': 'gs', 'ATLAS_ANTHROPIC_SECRET': 'ak'}
+        with self.assertLogs('lambda_env', level='ERROR'):
+            lambda_env.prepare(env, secret=missing, image_duckdb_home=self.image)
+        self.assertFalse((self.home / '.config/gspread/service_account.json').exists())
+        self.assertNotIn('ANTHROPIC_API_KEY', env)
+        self.assertTrue((self.home / '.duckdb').exists())
+
     def test_an_existing_key_is_kept(self):
         env = {'HOME': str(self.home), 'ATLAS_ANTHROPIC_SECRET': 'ak', 'ANTHROPIC_API_KEY': 'mine'}
         self.prepare(env)
