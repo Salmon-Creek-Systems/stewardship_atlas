@@ -8,7 +8,8 @@ import matplotlib as mpl
 import numpy as np
 import duckdb
 import geojson
-from osgeo import gdal, ogr
+# osgeo (system GDAL) is imported inside the functions that need it: the
+# Lambda image has no system GDAL, and those eddies run on the box (runs_on).
 import subprocess
 import versioning
 import utils
@@ -45,6 +46,7 @@ def contours_gdal(config:Dict[str, Any],eddy_name:str):
         output_dir (str): Directory to save output contours
         interval (float): Contour interval in meters
     """
+    from osgeo import gdal, ogr
     eddy = config['assets'][eddy_name]
     in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
     output_path = str(versioning.atlas_path(config, 'layers') / eddy['out_layer'] / f'{eddy["out_layer"]}.geojson')
@@ -112,6 +114,7 @@ def contours_gdal(config:Dict[str, Any],eddy_name:str):
 
 
 def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
+    from osgeo import gdal
     # Open DEM and get data
     eddy = config['assets'][eddy_name]
     in_path = versioning.atlas_path(config, 'layers') / eddy['in_layer'] / f'{eddy["in_layer"]}.tiff'
@@ -171,6 +174,7 @@ def hillshade_gdal(  config:Dict[str, Any], eddy_name:str):
     return out_path
 
 def centroid_gdal(config:Dict[str, Any], eddy_name:str):
+    from osgeo import gdal
     eddy = config['assets'][eddy_name]
     in_layer = eddy['in_layer']
     out_layer = eddy['out_layer']

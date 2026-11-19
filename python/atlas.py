@@ -27,9 +27,6 @@ import utils
 import map_style
 import layer_plans
 import outlets
-import outlets_qgis_atlas
-import outlets_game_kit
-import outlets_slides
 import vector_inlets
 import raster_inlets
 import eddies
@@ -62,7 +59,44 @@ DEFAULT_CONFIG = {
     }
 }
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
-DEFAULT_MATERIALIZERS =  outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods  |  outlets_qgis_atlas.asset_methods | outlets_game_kit.asset_methods | outlets_slides.asset_methods
+# Materializers whose modules need what only the box has — QGIS, headless
+# Chromium, the game_kit's PDF stack — are imported the first time an asset uses
+# them, so the API and jobs Lambdas (no QGIS, no system GDAL) can import this
+# module. Their assets carry runs_on: box, so a Lambda never asks for them.
+# tests/test_lazy_materializers.py checks this table against each module's
+# asset_methods, so the two cannot drift.
+LAZY_MATERIALIZER_MODULES = {
+    'outlet_runbook_qgis_atlas': 'outlets_qgis_atlas',
+    'qgis_gazetteer': 'outlets_qgis_atlas',
+    'outlet_game_kit': 'outlets_game_kit',
+    'outlet_slides': 'outlets_slides',
+}
+
+
+class Materializers(dict):
+    """fetch_type -> function; lazy entries import their module on first lookup."""
+
+    def __init__(self, eager, lazy):
+        super().__init__(eager)
+        self.lazy = dict(lazy)
+
+    def __missing__(self, fetch_type):
+        module_name = self.lazy.get(fetch_type)
+        if module_name is None:
+            raise KeyError(fetch_type)
+        import importlib
+        function = importlib.import_module(module_name).asset_methods[fetch_type]
+        self[fetch_type] = function
+        return function
+
+    def __contains__(self, fetch_type):
+        return dict.__contains__(self, fetch_type) or fetch_type in self.lazy
+
+
+DEFAULT_MATERIALIZERS = Materializers(
+    outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods
+    | raster_inlets.asset_methods,
+    LAZY_MATERIALIZER_MODULES)
 
 
 def shared_config_directory():
