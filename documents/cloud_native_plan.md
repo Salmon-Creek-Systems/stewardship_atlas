@@ -249,6 +249,15 @@ Lambda has no lasting disk, a 15-minute limit and 10 GB of `/tmp`. So jobs split
   - Verified on staging: a scvfd runbook job went queued → running → succeeded on the box worker, its PDFs were written back to staging, and the staging catalog was updated. Kennedy's runbook makes 0 pages on the September seed even run by hand (0 of 1 region reprojected; hydrants/lpss/ponds missing). That is a data or runbook problem to look at with the fresh seed, not the job path.
   - Collapsing duplicate jobs (repeat clicks, a refresh covered by a queued cascade) is deferred.
   - Cutover: rebuild every config (`config_only`) so the built configs carry `runs_on`; until then everything routes to Lambda.
+- **API and jobs Lambdas, as built (2026-11-19, task 5).**
+  - The image uses the OSGeo GDAL base (`ghcr.io/osgeo/gdal:ubuntu-small-3.9.3`), chosen over the AWS Python base because light paths shell out to `ogr2ogr`, `gdal_translate` and `gdalwarp`. It adds `awslambdaric` and pip pins matching the box, and installs DuckDB's spatial extension at build. CI builds it from the repo root without attestations (Lambda rejects an OCI index) and smoke-imports its entry points before pushing.
+  - Two handlers share the image: `api_handler` (Mangum, strips CloudFront's `/api` prefix) and `jobs_handler`. At cold start, `lambda_env.prepare()` gives a writable `HOME` under `/tmp`, the DuckDB extension, and the gspread service account from Secrets Manager (`atlas/gspread-service-account`). A missing secret turns off only its feature.
+  - QGIS, game_kit and slides materializers load lazily (`atlas.LAZY_MATERIALIZER_MODULES`). `test_lazy_materializers` checks that every asset needing a box-only library resolves to `runs_on: box`.
+  - `/refresh`, `add_layer`, `edit_layer` and `delete_layer` are jobs, so none can outlast the API's 30 s timeout.
+  - Verified on staging: `/api/job-status` through CloudFront; a kennedy webmap job on the jobs Lambda took 21 s, cold start included; a kennedy publish job took 17 s, with webmap, console and 3D view returning 200 from `current/`.
+  - Cold start settles at 5–8 s (init 4.8–6.8 s) once the image is cached; warm requests take about 0.4 s. The first starts after a new image can exceed the 10 s init limit and the 30 s timeout. To cut it: lazy-import the heavy modules webapp pulls in at load (geopandas, matplotlib, dagster, rasterio), give it more memory (more CPU), or keep one instance warm with provisioned concurrency (~$20/month at 2 GB).
+  - **The staging API is unauthenticated until task 6** (Cognito + signed cookies): anyone who finds the CloudFront URL can write to staging.
+  - The OIDC trust allows `feature/cloud-phase3-compute` (staging only; the workflow refuses prod off main). **Revert it at cutover.**
 - **Staging CDK deploys need all three flags:** `cdk deploy AtlasCloud-staging -c env_name=staging -c atlas_domain= -c certificate_arn=`. `cdk.json` pins the prod domain and cert, so without them staging tries to claim `next.fireatlas.org` (a 409 that rolls back, 2026-11-18).
 
 #### 4c. Declared inputs: hydrate only what a job reads
