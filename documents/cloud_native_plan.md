@@ -366,6 +366,7 @@ private. Revisit after Phase 2:
 
 ## Decision log
 
+- **2026-11-19: 13 atlases migrate.** mather, isf_920, laytonville and cahto_creek_ranch were dropped from `config_checks.ACTIVE_ATLASES` (none was ever published; the EBS snapshots keep them), joining the atlases abandoned on 2026-11-17.
 - **2026-11-17: one cutover for Phases 3 and 4; Phases 5–6 after.** Atlas configs move to S3 (`staging/atlas.geojson`). Lambda hydrates only declared inputs; slow, large and QGIS jobs queue to the box. Existing htpasswd accounts become Cognito users with new passwords. Post-migration: storage format (GeoParquet), STAC as the read path, and the delta rethink (#223, federation v2) go together.
 
 - **CloudFront is the single front door, not Lambda** — preserves static-first (cost, perf, OOM-independence). Public static; protected gated per-prefix.

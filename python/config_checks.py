@@ -12,11 +12,12 @@ from pathlib import Path
 # Atlases kept current, migrated at cutover, and checked by the tests. The rest
 # on the box (samuelsloop, layt1, king_range_hike, wildwood, ft*,
 # south_fork_eel_2026_10_02, backups) are abandoned and not seeded (decided
-# 2026-11-17); the EBS snapshot keeps them.
+# 2026-11-17); so are mather, isf_920, laytonville and cahto_creek_ranch
+# (dropped 2026-11-19). The EBS snapshots keep them all.
 ACTIVE_ATLASES = [
     'scvfd', 'kennedy', 'westport', 'fhe', 'gilhamhike', 'king_range', 'napachar',
-    'south_fork_eel', 'abi_demo', 'mineralkinsey', 'isf_920', 'nfsc_refugia',
-    'mather', 'angelo', 'sherwood_ranch', 'laytonville', 'cahto_creek_ranch',
+    'south_fork_eel', 'abi_demo', 'mineralkinsey', 'nfsc_refugia', 'angelo',
+    'sherwood_ranch',
 ]
 
 # Outlets whose page fetches its layers in the browser, so every layer they

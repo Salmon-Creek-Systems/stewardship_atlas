@@ -311,13 +311,15 @@ class TestMigrationList(unittest.TestCase):
     def test_the_list_is_explicit_and_deduplicated(self):
         """A directory scan would carry 37 directories — backups, test atlases
         and superseded duplicates — into the thing that replaces them."""
-        self.assertEqual(len(atlas_seed.MIGRATE), 17)
-        self.assertEqual(len(set(atlas_seed.MIGRATE)), 17)
+        self.assertEqual(len(atlas_seed.MIGRATE), 13)
+        self.assertEqual(len(set(atlas_seed.MIGRATE)), 13)
 
     def test_superseded_and_throwaway_atlases_are_not_on_it(self):
-        # Abandoned atlases are not seeded (decided 2026-11-17).
+        # Abandoned atlases are not seeded (decided 2026-11-17; four more
+        # dropped 2026-11-19).
         for dropped in ('westportdev', 'king_range_hike', 'samuelsloop', 'wildwood',
-                        'ft1', 'ft5', 'ft6', 'demo', 'layt1', 'south_fork_eel_2026_10_02'):
+                        'ft1', 'ft5', 'ft6', 'demo', 'layt1', 'south_fork_eel_2026_10_02',
+                        'mather', 'isf_920', 'laytonville', 'cahto_creek_ranch'):
             self.assertNotIn(dropped, atlas_seed.MIGRATE)
 
     def test_the_paying_and_anchor_customers_are(self):
