@@ -29,7 +29,6 @@ import layer_plans
 import outlets
 import vector_inlets
 import raster_inlets
-import eddies
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -59,10 +58,10 @@ DEFAULT_CONFIG = {
     }
 }
 DEFAULT_ROLES = {"internal": "internal","admin": "admin"}
-# Materializers whose modules need what only the box has — QGIS, headless
-# Chromium, the game_kit's PDF stack — are imported the first time an asset uses
-# them, so the API and jobs Lambdas (no QGIS, no system GDAL) can import this
-# module. Their assets carry runs_on: box, so a Lambda never asks for them.
+# Materializers imported the first time an asset uses them. Two reasons: the
+# QGIS, Chromium and game_kit modules need what only the box has (their assets
+# carry runs_on: box), and eddies is heavy to load — the API Lambda's cold start
+# is mostly reading imported modules off the image.
 # tests/test_lazy_materializers.py checks this table against each module's
 # asset_methods, so the two cannot drift.
 LAZY_MATERIALIZER_MODULES = {
@@ -70,6 +69,27 @@ LAZY_MATERIALIZER_MODULES = {
     'qgis_gazetteer': 'outlets_qgis_atlas',
     'outlet_game_kit': 'outlets_game_kit',
     'outlet_slides': 'outlets_slides',
+    # eddies is lazy for load time, not because it needs the box: it pulls in
+    # matplotlib, networkx, rasterio and pyproj, which the API never needs.
+    # Its GDAL eddies import osgeo themselves and carry runs_on: box.
+    'derived_hillshade': 'eddies',
+    'gdal_contours': 'eddies',
+    'contours': 'eddies',
+    'h3_cells': 'eddies',
+    'mask_properties': 'eddies',
+    'hillshade_tiles': 'eddies',
+    'terrain_rgb_tiles': 'eddies',
+    'fuel_mass_landfire': 'eddies',
+    'biochar_simulation': 'eddies',
+    'tiff_to_cog': 'eddies',
+    'terrain_rgb_tiff': 'eddies',
+    'road_lrs': 'eddies',
+    'road_lrs_markers': 'eddies',
+    'ssurgo_enrich': 'eddies',
+    'merge_h3': 'eddies',
+    'h3_count': 'eddies',
+    'h3_raster_stats': 'eddies',
+    'dst_match_simplified': 'eddies',
 }
 
 
@@ -94,8 +114,7 @@ class Materializers(dict):
 
 
 DEFAULT_MATERIALIZERS = Materializers(
-    outlets.asset_methods | eddies.asset_methods | vector_inlets.asset_methods
-    | raster_inlets.asset_methods,
+    outlets.asset_methods | vector_inlets.asset_methods | raster_inlets.asset_methods,
     LAZY_MATERIALIZER_MODULES)
 
 

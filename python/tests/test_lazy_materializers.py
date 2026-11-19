@@ -23,7 +23,7 @@ sys.path.insert(0, str(PY))
 import config_checks  # noqa: E402
 
 BOX_ONLY_IMPORTS = ('osgeo', 'qgis', 'playwright')
-EAGER_MODULES = ('outlets', 'eddies', 'vector_inlets', 'raster_inlets')
+EAGER_MODULES = ('outlets', 'vector_inlets', 'raster_inlets')
 
 
 def tree(module):
@@ -63,9 +63,16 @@ def lazy_table():
     return ast.literal_eval(literal_assignment('atlas', 'LAZY_MATERIALIZER_MODULES'))
 
 
+# Modules that need the box as a whole (QGIS; Chromium; the game_kit's PDF
+# stack). Other lazy modules (eddies) are lazy only for load time.
+BOX_ONLY_MODULES = ('outlets_qgis_atlas', 'outlets_game_kit', 'outlets_slides')
+
+
 def box_only_fetch_types():
-    found = set(lazy_table())
-    for module in EAGER_MODULES:
+    table = lazy_table()
+    found = {k for k, m in table.items() if m in BOX_ONLY_MODULES}
+    scanned = set(EAGER_MODULES) | {m for m in table.values() if m not in BOX_ONLY_MODULES}
+    for module in sorted(scanned):
         t = tree(module)
         top_level = any(imports_box_only(n) for n in t.body
                         if isinstance(n, (ast.Import, ast.ImportFrom)))
@@ -97,6 +104,14 @@ class TestLazyTable(unittest.TestCase):
 
     def test_eager_modules_import_nothing_box_only_at_top_level(self):
         box_only_fetch_types()        # asserts as it goes
+
+    def test_no_fetch_type_is_registered_twice(self):
+        eager = set()
+        for module in EAGER_MODULES:
+            keys = set(asset_methods(module))
+            self.assertFalse(keys & eager, module)
+            eager |= keys
+        self.assertFalse(eager & set(lazy_table()))
 
     def test_gdal_eddies_are_found(self):
         self.assertTrue({'derived_hillshade', 'gdal_contours', 'outlet_runbook_qgis_atlas',

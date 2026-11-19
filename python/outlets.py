@@ -4,11 +4,10 @@ from html import escape as html_escape
 import re
 import sys,os,time
 from io import StringIO
+# geopandas, pandas and nbformat are imported where used: they are heavy, and
+# the API Lambda's cold start is mostly loading modules.
 from pathlib import Path
 import duckdb
-import geopandas as gpd
-import pandas as pd
-import nbformat
 from PIL import Image
 import io
 
@@ -1417,6 +1416,8 @@ def build_region_map_grass(config, outlet_name, region):
     return outpath
 
 def process_region(layer_config: dict, region_extract_path: str):
+    import geopandas as gpd
+    import pandas as pd
     """Process a region extract for a layer.
     Current this means only show each name value once.
     Args:
@@ -2909,6 +2910,7 @@ def outlet_3dview(config, name):
     return dview.create_3d_terrain_view(config)
 
 def outlet_notebook_jupyter(config, outlet_name):
+    import nbformat
     """Generate a Jupyter notebook for the outlet."""
  
 

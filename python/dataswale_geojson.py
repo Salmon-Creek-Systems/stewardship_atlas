@@ -3,7 +3,6 @@ import logging, json
 import shutil
 import uuid
 from typing import Iterator, Dict, Any, List, Tuple
-import eddies
 import deltas_geojson as deltas
 
 DQB=deltas.apply_deltas
@@ -367,6 +366,7 @@ def layer_as_path(config:Dict[str, Any], name:str):
 def eddy(config:Dict[str, Any], eddy_name:str):
     """Apply Eddy to transform a dataswale layer into a new layer."
     """
+    import eddies   # heavy (matplotlib, rasterio, networkx); loaded on use
     eddy_config = config['assets'][eddy_name]
     f = eddies.asset_methods[eddy_name]
     return f(config, eddy_name)
