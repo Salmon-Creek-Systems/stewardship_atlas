@@ -88,7 +88,11 @@ jobs:
           IMAGE="${{ steps.ecr.outputs.registry }}/${{ steps.target.outputs.ecr_repo }}:${GITHUB_SHA}"
           # Built from the repo root: the image carries python/, templates/
           # and configuration/ (see infrastructure/api/Dockerfile, .dockerignore).
-          docker build -f infrastructure/api/Dockerfile -t "$IMAGE" .
+          # No provenance/SBOM attestations: they make the push an OCI image
+          # index, and Lambda accepts only a plain image manifest
+          # ("image manifest ... media type ... is not supported").
+          docker build --provenance=false --sbom=false \
+            -f infrastructure/api/Dockerfile -t "$IMAGE" .
           # The image must import its entry points before it ships.
           docker run --rm --entrypoint python -e SWALES_ROOT=/tmp/x "$IMAGE" -c \
             "import api_handler, jobs_handler, atlas; from osgeo import gdal; print('imports ok', gdal.__version__)"
