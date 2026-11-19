@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import sys
+from pathlib import Path
+
 import aws_cdk as cdk
 from email_photo_stack import EmailPhotoStack
 from atlas_provisioning_stack import AtlasDnsStack, AtlasSecurityGroupStack
@@ -62,18 +65,13 @@ AtlasSecurityGroupStack(
 
 CLOUD_ENV = cdk.Environment(account=ATLAS_ACCOUNT, region="us-east-1")
 
-# Atlases that get Cognito groups ({atlas}-admin, {atlas}-internal). Adding an
-# atlas here needs a deploy; adding a *user* to a group does not.
-ATLASES = [
-    "scvfd",
-    "wvfd",
-    "wvfd_dev",
-    "kennedy",
-    "MineralKinsey",
-    "wildwood",
-    "king_range",
-    "samuelsloop",
-]
+# Atlases that get Cognito groups ({atlas}-admin, {atlas}-internal): the active
+# ones, from the same list the code and tests use. Adding an atlas there needs a
+# deploy; adding a *user* to a group does not. config_checks is stdlib only.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python"))
+from config_checks import ACTIVE_ATLASES  # noqa: E402
+
+ATLASES = list(ACTIVE_ATLASES)
 
 env_name = app.node.try_get_context("env_name") or "prod"
 domain_name = app.node.try_get_context("atlas_domain")

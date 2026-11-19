@@ -53,6 +53,11 @@ The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the 
 - **`runs_on: box`** on an asset or template sends its jobs to the box worker; everything else runs on Lambda. Anything that needs QGIS, Chromium or a function that imports `osgeo` must be `runs_on: box`; `tests/test_lazy_materializers.py` enforces it. New box-only materializer modules go in `atlas.LAZY_MATERIALIZER_MODULES`, not in eager imports.
 - **Keep heavy imports out of webapp's import path** (geopandas, pandas, matplotlib, networkx, rasterio, eddies). The API Lambda's cold start is mostly module loading: 2,082 → 1,093 modules took it from 5–8 s to 3–4 s.
 - **Access (task 6):** one private tier per atlas for data (`admin` aliases `internal`, retired organically); roles are capabilities checked by the API. Don't merge the consoles before cutover.
+- **Auth (task 6, `atlas_auth.py`, `webapp_auth.py`):**
+  - **The API never returns 403.** The distribution turns every 403 into the login page, so auth failures are 401 with `error: login_required|forbidden`.
+  - **A new route is admin-only** until it's listed in `atlas_auth.ROUTE_ROLES`.
+  - **Sessions last 1 day,** Cognito's ID-token cap.
+  - **Tests run with `ATLAS_AUTH=off`** (`tests/conftest.py`).
 - **Staging CDK deploys need** `-c env_name=staging -c atlas_domain= -c certificate_arn=`; without them staging tries to claim `next.fireatlas.org`. CI adds them for non-prod.
 - **The OIDC trust temporarily includes this branch** (staging deploys only). Revert at cutover (#236).
 

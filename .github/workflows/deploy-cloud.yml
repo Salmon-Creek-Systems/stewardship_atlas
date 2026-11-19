@@ -58,8 +58,13 @@ jobs:
           echo "env_name=$ENV_NAME" >> "$GITHUB_OUTPUT"
           # cdk.json pins prod's domain and certificate; any other environment
           # must blank them or it tries to claim next.fireatlas.org.
+          # With no domain, the Cognito callback host can't come from the
+          # distribution (a dependency cycle; see atlas_cloud_stack.py), so
+          # staging names its CloudFront host here.
           if [ "$ENV_NAME" = "prod" ]; then
             echo "context_flags=" >> "$GITHUB_OUTPUT"
+          elif [ "$ENV_NAME" = "staging" ]; then
+            echo "context_flags=-c atlas_domain= -c certificate_arn= -c callback_host=d1y2f6bmf8ds3m.cloudfront.net" >> "$GITHUB_OUTPUT"
           else
             echo "context_flags=-c atlas_domain= -c certificate_arn=" >> "$GITHUB_OUTPUT"
           fi
@@ -95,7 +100,7 @@ jobs:
             -f infrastructure/api/Dockerfile -t "$IMAGE" .
           # The image must import its entry points before it ships.
           docker run --rm --entrypoint python -e SWALES_ROOT=/tmp/x "$IMAGE" -c \
-            "import api_handler, jobs_handler, atlas; from osgeo import gdal; print('imports ok', gdal.__version__)"
+            "import api_handler, jobs_handler, atlas, jwt, cryptography; from osgeo import gdal; print('imports ok', gdal.__version__)"
           docker push "$IMAGE"
 
       - uses: actions/setup-python@v5

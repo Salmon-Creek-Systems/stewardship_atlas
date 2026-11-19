@@ -64,11 +64,34 @@ aws secretsmanager create-secret \
   --region us-east-1 --profile atlas
 ```
 
-Then set `google_client_id` in `cdk.json`. Authorized redirect URI on the Google
-side is `https://scs-atlas-prod.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`.
+Then set `google_client_id` in `cdk.json`. Authorized redirect URIs on the
+Google side are `https://scs-atlas-auth-{prod,staging}.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`
+(the `scs-atlas-auth-` domains belong to the pools created 2026-11-19; the old
+`scs-atlas-{env}` ones went with the retired pools).
 
 If either value is missing the stack still deploys — it just omits the Google
 provider, leaving a Cognito-only pool.
+
+**1b. Auth secrets (task 6), per environment.** The CloudFront signing key and
+the email Lambda's service token. The private key goes straight to Secrets
+Manager and is deleted locally; the public half is committed as
+`keys/cloudfront-{env}.pem` and becomes the distribution's key group:
+
+```bash
+umask 077; ENV=staging
+openssl genrsa -out /tmp/cf.key 2048
+openssl rsa -in /tmp/cf.key -pubout -out keys/cloudfront-$ENV.pem
+aws secretsmanager create-secret --name atlas/cloudfront-signing-key-$ENV \
+  --secret-string file:///tmp/cf.key --region us-east-1 --profile atlas
+rm /tmp/cf.key
+openssl rand -hex 32 | tr -d '\n' > /tmp/st
+aws secretsmanager create-secret --name atlas/service-token-$ENV \
+  --secret-string file:///tmp/st --region us-east-1 --profile atlas
+rm /tmp/st
+```
+
+Rotating the key: replace both halves together and deploy; existing logins
+fail at CloudFront until their next login.
 
 **2. Certificate.** `fireatlas.org`'s Route 53 zone is in the *personal* AWS
 account, so validation is a manual record:
@@ -118,10 +141,29 @@ replacement — so find it via the `ApiFunctionName` output rather than guessing
 
 ## Notes
 
-- **Access model:** every resource is either public (CloudFront → S3, OAC) or
-  gated (CloudFront → API Lambda, Cognito). Authorization is Cognito group
-  membership — `{atlas}-admin`, `{atlas}-internal` — so onboarding is a group
-  edit, not a deploy. A federated user with no groups gets nothing.
+- **Access model (task 6):** public outlets come from the outlets bucket with no
+  login. `/{atlas}/staging/*` comes from the private bucket for holders of that
+  atlas's CloudFront signed cookies, which `/api/auth/callback` sets for every
+  atlas in the user's groups. The API checks the Cognito ID-token cookie against
+  a role per route (`python/atlas_auth.py`). Groups: `{atlas}-admin`,
+  `{atlas}-internal` and `scs-admin`; onboarding is a group edit, not a deploy.
+  A federated user with no groups gets nothing.
+- **Every 403 is the login page.** The distribution answers any 403 with
+  `/local/auth/login-required.html` (published by `scripts/publish_site_assets.py`),
+  which is how a logged-out visitor to a private page finds the login. So both
+  buckets grant CloudFront `ListBucket` (a missing key is a 404) and the API
+  never returns 403: its auth failures are 401.
+- **Accounts** are created by hand, no email needed:
+  ```bash
+  POOL=$(aws cloudformation describe-stacks --stack-name AtlasCloud-staging --region us-east-1 \
+    --profile atlas --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
+  aws cognito-idp admin-create-user --user-pool-id $POOL --username scvfd \
+    --message-action SUPPRESS --region us-east-1 --profile atlas
+  aws cognito-idp admin-set-user-password --user-pool-id $POOL --username scvfd \
+    --password '…' --permanent --region us-east-1 --profile atlas
+  aws cognito-idp admin-add-user-to-group --user-pool-id $POOL --username scvfd \
+    --group-name scvfd-admin --region us-east-1 --profile atlas
+  ```
 - **Buckets are RETAIN on delete**, as is the user pool. Destroying the stack
   will not take data or accounts with it.
 - **Adding an atlas** to the `ATLASES` list in `app.py` creates its groups on the

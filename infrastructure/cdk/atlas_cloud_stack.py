@@ -23,6 +23,7 @@ See README.md in this directory for the toolchain and the one-time manual steps.
 """
 
 import re
+from pathlib import Path
 
 from aws_cdk import (
     CfnOutput,
@@ -95,6 +96,24 @@ WEBAPP_EC2_ROLE_NAME = "atlas-webapp-ec2-role"
 # the box's gspread service_account.json and its Anthropic key.
 GSPREAD_SECRET_NAME = "atlas/gspread-service-account"
 ANTHROPIC_SECRET_NAME = "atlas/anthropic-api-key"
+
+# Auth (Phase 4, task 6). Per environment, created by hand once (see README):
+# the private half of the CloudFront signing key, and the token the email
+# Lambda presents to /ingest/email_photo. The public half of the key is
+# committed in keys/ and becomes the distribution's key group.
+CLOUDFRONT_KEY_SECRET = "atlas/cloudfront-signing-key-{env}"
+SERVICE_TOKEN_SECRET = "atlas/service-token-{env}"
+KEYS_DIR = Path(__file__).parent / "keys"
+
+# For the few API routes that name no atlas (/create_atlas, /files...).
+SCS_ADMIN_GROUP = "scs-admin"
+
+# CloudFront serves this for every 403 from any origin: a private page without
+# a valid cookie. Published by scripts/publish_site_assets.py. The API never
+# sends 403 for that reason (its auth failures are 401), and both buckets grant
+# ListBucket so a missing object is a 404, not a 403 that would read as
+# "please log in".
+LOGIN_REQUIRED_PAGE = "/local/auth/login-required.html"
 
 
 def _logical(name: str) -> str:
@@ -271,6 +290,20 @@ class AtlasCloudStack(Stack):
             secretsmanager.Secret.from_secret_name_v2(self, "AnthropicSecret", ANTHROPIC_SECRET_NAME),
         ]
 
+        # --- Signed cookies for the private tier (task 6) ---------------------
+        signing_key = cloudfront.PublicKey(
+            self, "SigningKey",
+            encoded_key=(KEYS_DIR / f"cloudfront-{env_name}.pem").read_text(),
+            comment=f"Atlas private-tier cookies ({env_name})",
+        )
+        key_group = cloudfront.KeyGroup(self, "SigningKeyGroup", items=[signing_key])
+        auth_secrets = [
+            secretsmanager.Secret.from_secret_name_v2(
+                self, "CloudFrontKeySecret", CLOUDFRONT_KEY_SECRET.format(env=env_name)),
+            secretsmanager.Secret.from_secret_name_v2(
+                self, "ServiceTokenSecret", SERVICE_TOKEN_SECRET.format(env=env_name)),
+        ]
+
         # Deliberately unnamed. Switching between a zip and a container image
         # replaces the function, and CloudFormation refuses to replace a
         # custom-named resource — the new one would collide with the old one's
@@ -307,8 +340,14 @@ class AtlasCloudStack(Stack):
         render_queue.grant_send_messages(api_fn)
         jobs_queue.grant_send_messages(api_fn)
 
-        for secret in app_secrets:
+        for secret in app_secrets + auth_secrets:
             secret.grant_read(api_fn)
+        # API only: the jobs Lambda neither signs cookies nor checks tokens.
+        api_fn.add_environment("ATLAS_CLOUDFRONT_KEY_SECRET",
+                               CLOUDFRONT_KEY_SECRET.format(env=env_name))
+        api_fn.add_environment("ATLAS_SERVICE_TOKEN_SECRET",
+                               SERVICE_TOKEN_SECRET.format(env=env_name))
+        api_fn.add_environment("CLOUDFRONT_KEY_PAIR_ID", signing_key.public_key_id)
 
         # IAM auth on the function URL: the only caller allowed to sign requests
         # is this distribution, via OAC. There is no unauthenticated public URL.
@@ -336,6 +375,13 @@ class AtlasCloudStack(Stack):
             comment="Append index.html to directory URIs",
         )
 
+        # LIST only from the helper (a missing key is a 404, not a 403 that
+        # would read as "please log in"; no viewer request becomes a listing).
+        # GetObject is granted by hand below, narrower than the helper's
+        # whole-bucket grant.
+        private_origin = origins.S3BucketOrigin.with_origin_access_control(
+            private_data, origin_access_levels=[cloudfront.AccessLevel.LIST])
+
         certificate = None
         if certificate_arn and domain_name:
             certificate = acm.Certificate.from_certificate_arn(
@@ -346,7 +392,12 @@ class AtlasCloudStack(Stack):
             self, "Distribution",
             comment=f"Stewardship Atlas {env_name}",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3BucketOrigin.with_origin_access_control(public_outlets),
+                # LIST so that a missing key is a 404: with READ alone S3 says
+                # 403, which the error response below would turn into "log in".
+                origin=origins.S3BucketOrigin.with_origin_access_control(
+                    public_outlets,
+                    origin_access_levels=[cloudfront.AccessLevel.READ,
+                                          cloudfront.AccessLevel.LIST]),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=outlet_cache_policy,
                 compress=True,
@@ -366,7 +417,36 @@ class AtlasCloudStack(Stack):
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
+                # The private tier (task 6): each atlas's staging tree, from the
+                # private bucket, for holders of that atlas's signed cookies
+                # (set by /api/auth/callback with a policy for
+                # https://{host}/{atlas}/staging/*). The pattern's `*` also
+                # matches slashes, so the bucket policy below narrows what
+                # CloudFront may read to keys with a staging/ segment.
+                "/*/staging/*": cloudfront.BehaviorOptions(
+                    origin=private_origin,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    trusted_key_groups=[key_group],
+                    # Staging changes on every edit; nothing here is worth a stale copy.
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    compress=True,
+                    function_associations=[
+                        cloudfront.FunctionAssociation(
+                            function=directory_index,
+                            event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                        ),
+                    ],
+                ),
             },
+            # Every 403, from any origin. Not cached, so it can't outlive a login.
+            error_responses=[
+                cloudfront.ErrorResponse(
+                    http_status=403,
+                    response_http_status=403,
+                    response_page_path=LOGIN_REQUIRED_PAGE,
+                    ttl=Duration.seconds(0),
+                ),
+            ],
             default_root_object="index.html",
             domain_names=[domain_name] if certificate else None,
             certificate=certificate,
@@ -388,6 +468,15 @@ class AtlasCloudStack(Stack):
                 f"{distribution.distribution_id}"
             ),
         )
+
+        distribution_arn = (f"arn:aws:cloudfront::{self.account}:distribution/"
+                            f"{distribution.distribution_id}")
+        private_data.add_to_resource_policy(iam.PolicyStatement(
+            actions=["s3:GetObject"],
+            resources=[private_data.arn_for_objects("*/staging/*")],
+            principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+            conditions={"StringEquals": {"AWS:SourceArn": distribution_arn}},
+        ))
 
         # --- The box writes the read path (Phase 2) --------------------------
         # Publishing an atlas mirrors its public outlets to the outlets bucket
@@ -507,21 +596,37 @@ class AtlasCloudStack(Stack):
             ))
 
         # --- Cognito ---------------------------------------------------------
+        # Replaced 2026-11-19 (task 6): sign-in by username with email optional,
+        # because the accounts are shared logins (`scvfd`, westport's `admin`
+        # and `internal`) with no mailbox behind them, and a relaxed password
+        # policy so their current passwords carry over. Sign-in aliases can't
+        # change in place, so this is a new pool under a new construct id. The
+        # old pool (0 users) is RETAIN and stays in the account, holding the
+        # old domain prefix -- hence the new one.
         user_pool = cognito.UserPool(
-            self, "UserPool",
-            user_pool_name=f"atlas-{env_name}",
+            self, "Users",
+            user_pool_name=f"atlas-users-{env_name}",
             self_sign_up_enabled=False,
-            sign_in_aliases=cognito.SignInAliases(email=True),
+            sign_in_aliases=cognito.SignInAliases(username=True),
+            sign_in_case_sensitive=False,
             standard_attributes=cognito.StandardAttributes(
-                email=cognito.StandardAttribute(required=True, mutable=True),
+                email=cognito.StandardAttribute(required=False, mutable=True),
             ),
+            password_policy=cognito.PasswordPolicy(
+                min_length=8,
+                require_lowercase=False,
+                require_uppercase=False,
+                require_digits=False,
+                require_symbols=False,
+            ),
+            # No email to recover through; an admin resets passwords.
+            account_recovery=cognito.AccountRecovery.NONE,
             removal_policy=RemovalPolicy.RETAIN,
         )
+        cognito_domain_prefix = f"scs-atlas-auth-{env_name}"
         user_pool.add_domain(
-            "UserPoolDomain",
-            cognito_domain=cognito.CognitoDomainOptions(
-                domain_prefix=f"scs-atlas-{env_name}",
-            ),
+            "UsersDomain",
+            cognito_domain=cognito.CognitoDomainOptions(domain_prefix=cognito_domain_prefix),
         )
 
         identity_providers = [cognito.UserPoolClientIdentityProvider.COGNITO]
@@ -570,9 +675,14 @@ class AtlasCloudStack(Stack):
                     cognito.OAuthScope.EMAIL,
                     cognito.OAuthScope.PROFILE,
                 ],
-                callback_urls=[f"https://{callback_host}/auth/callback"],
+                # CloudFront routes /api/* to the API, which serves /auth/*.
+                callback_urls=[f"https://{callback_host}/api/auth/callback"],
                 logout_urls=[f"https://{callback_host}/"],
             ),
+            # The ID token is the session (python/webapp_auth.py), and a day is
+            # Cognito's limit for it; the CloudFront cookies expire with it.
+            id_token_validity=Duration.days(1),
+            access_token_validity=Duration.days(1),
         )
         if google_idp is not None:
             # The client can't reference the IdP before it exists.
@@ -588,9 +698,18 @@ class AtlasCloudStack(Stack):
                     group_name=f"{atlas_name}-{role}",
                     description=f"{role} access to the {atlas_name} atlas",
                 )
+        cognito.CfnUserPoolGroup(
+            self, "GroupScsAdmin",
+            user_pool_id=user_pool.user_pool_id,
+            group_name=SCS_ADMIN_GROUP,
+            description="SCS staff: the API routes that name no atlas",
+        )
 
         api_fn.add_environment("USER_POOL_ID", user_pool.user_pool_id)
         api_fn.add_environment("USER_POOL_CLIENT_ID", web_client.user_pool_client_id)
+        api_fn.add_environment(
+            "COGNITO_DOMAIN", f"{cognito_domain_prefix}.auth.{self.region}.amazoncognito.com")
+        api_fn.add_environment("ATLAS_PUBLIC_HOST", callback_host)
 
         # --- Outputs ---------------------------------------------------------
         CfnOutput(self, "DistributionDomain", value=distribution.distribution_domain_name)
@@ -603,3 +722,4 @@ class AtlasCloudStack(Stack):
         CfnOutput(self, "ApiFunctionName", value=api_fn.function_name)
         CfnOutput(self, "UserPoolId", value=user_pool.user_pool_id)
         CfnOutput(self, "UserPoolClientId", value=web_client.user_pool_client_id)
+        CfnOutput(self, "SigningKeyId", value=signing_key.public_key_id)
