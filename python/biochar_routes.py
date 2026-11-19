@@ -16,7 +16,13 @@ from pydantic import BaseModel
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
-from eddies import dst_match_point, sda_lookup_point
+# eddies is imported where used: it is heavy (matplotlib, rasterio, networkx)
+# and loading it here put it on every API cold start.
+
+
+def _eddies():
+    import eddies
+    return eddies
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +117,7 @@ def biochar_suitability(req: SuitabilityRequest):
     if not goal_def:
         raise HTTPException(status_code=400, detail=f"Unknown goal: {req.goal!r}")
 
-    ranked = dst_match_point(
+    ranked = _eddies().dst_match_point(
         soil_ph=req.soil_ph,
         soil_om=req.soil_om,
         soil_sand=req.soil_sand,
@@ -152,7 +158,7 @@ def ssurgo_point(lat: float, lng: float):
     Returns soil properties in the same schema as the PMTiles layer so the
     frontend can use both paths identically.
     """
-    props = sda_lookup_point(lat, lng)
+    props = _eddies().sda_lookup_point(lat, lng)
     if 'error' in props:
         raise HTTPException(status_code=404, detail=props['error'])
     return props
@@ -220,7 +226,7 @@ def biochar_landscape(req: LandscapeRequest):
         soil_om = float(soil_om_raw) if soil_om_raw is not None else None
 
         # Pass all biochars so normalization works; find the selected one by id
-        ranked = dst_match_point(
+        ranked = _eddies().dst_match_point(
             soil_ph=soil_ph,
             soil_om=soil_om,
             soil_sand=soil_sand,
