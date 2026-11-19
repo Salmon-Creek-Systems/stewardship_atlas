@@ -44,6 +44,18 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **`s3_map_polygons` traces colored outlines off a GeoPDF/GeoTIFF** (`map_trace.py`; scvfd `thp_boundaries`). It reads PDFs with system `osgeo.gdal` because rasterio's bundled GDAL has no PDF driver. Re-running it, like any s3 inlet, appends duplicates (#190).
 - **scvfd `federated` is a static copy** of the kennedy and mineralkinsey atlas boundaries (an s3_geojson inlet), not federation; it won't follow boundary changes.
 
+## Cloud Migration Decisions (branch `feature/cloud-phase3-compute`, 2026-11)
+
+The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the constraints to know before touching the code:
+
+- **One cutover for Phases 3+4, 13 atlases** (`config_checks.ACTIVE_ATLASES`). The branch stays open until then. Merging it to main *is* the cutover: the box pulls main, and CI deploys the prod API.
+- **Every "started, poll it" endpoint is a job** (`atlas_jobs`): publish, `/refresh`, `/materialize_asset`, `/refresh_layer`, add/edit/delete layer. Reason: on Lambda a FastAPI background task never runs. Status lives in S3 at `{atlas}/jobs/{id}.json`, and `/job-status` returns it. Don't add `BackgroundTasks` or in-memory status dicts.
+- **`runs_on: box`** on an asset or template sends its jobs to the box worker; everything else runs on Lambda. Anything that needs QGIS, Chromium or a function that imports `osgeo` must be `runs_on: box`; `tests/test_lazy_materializers.py` enforces it. New box-only materializer modules go in `atlas.LAZY_MATERIALIZER_MODULES`, not in eager imports.
+- **Keep heavy imports out of webapp's import path** (geopandas, pandas, matplotlib, networkx, rasterio, eddies). The API Lambda's cold start is mostly module loading: 2,082 → 1,093 modules took it from 5–8 s to 3–4 s.
+- **Access (task 6):** one private tier per atlas for data (`admin` aliases `internal`, retired organically); roles are capabilities checked by the API. Don't merge the consoles before cutover.
+- **Staging CDK deploys need** `-c env_name=staging -c atlas_domain= -c certificate_arn=`; without them staging tries to claim `next.fireatlas.org`. CI adds them for non-prod.
+- **The OIDC trust temporarily includes this branch** (staging deploys only). Revert at cutover (#236).
+
 ## Core Architecture Concepts
 
 The system uses a water/flow metaphor:
