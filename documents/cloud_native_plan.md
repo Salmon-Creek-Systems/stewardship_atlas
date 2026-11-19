@@ -241,6 +241,15 @@ Lambda has no lasting disk, a 15-minute limit and 10 GB of `/tmp`. So jobs split
 
 - **On Lambda:** delta apply, config rebuild, config edits, webmap/webedit/console/3dview/overlook materialize, publish, versions/rollback, SQL query, sheet import/export, email/web photo ingest.
 - **Queued to the box:** QGIS outlets (runbook, game_kit board), slides (headless Chromium), and any inlet or eddy that is slow or large (DEM, hillshade, terrain, lidar, Overture, H3 at fine resolution). This is a minimal Phase 5a — the existing `atlas-render-{env}` SQS queue, a worker on the box that opens a session like any other compute, and a status object the console polls. Which assets go to the queue is a per-asset flag, not a hardcoded list.
+- **Jobs, as built (2026-11-18):** on Lambda a background task never runs, because the container freezes once the response goes out. So *everything* that answers "started" and gets polled is a job: publish, `/refresh_layer`, `/materialize_asset`, and `/refresh` of a box asset.
+  - `python/atlas_jobs.py` keeps each job's status at `{atlas}/jobs/{id}.json` in the private bucket (queued → running → succeeded|failed). `route()` reads the asset's `runs_on` (`box` is set on 29 shared templates: QGIS, slides, game_kit, DEM/terrain/hillshade, Overture, LANDFIRE…). Box assets and cascades go to `atlas-render-{env}`; everything else, publish included, goes to `atlas-jobs-{env}`.
+  - Consumers live in `python/atlas_job_consumer.py`: a jobs Lambda (same image, created once task 5 ships it) and the box worker (`scripts/atlas_worker.py`, systemd). The box takes one job at a time, keeps the message invisible while it runs, waits up to 10 min for the lease, and does a full hydrate. A redelivered finished job is skipped; a busy atlas retries after 60 s.
+  - `/job-status?swale=&id=` replaced the three in-memory status endpoints, and the console polls it by job id.
+  - Dagster is unchanged: a job's runner calls it in-process. SQS stands in for the Dagster daemon, which would need an always-on host.
+  - Verified on staging: a scvfd runbook job went queued → running → succeeded on the box worker, its PDFs were written back to staging, and the staging catalog was updated. Kennedy's runbook makes 0 pages on the September seed even run by hand (0 of 1 region reprojected; hydrants/lpss/ponds missing). That is a data or runbook problem to look at with the fresh seed, not the job path.
+  - Collapsing duplicate jobs (repeat clicks, a refresh covered by a queued cascade) is deferred.
+  - Cutover: rebuild every config (`config_only`) so the built configs carry `runs_on`; until then everything routes to Lambda.
+- **Staging CDK deploys need all three flags:** `cdk deploy AtlasCloud-staging -c env_name=staging -c atlas_domain= -c certificate_arn=`. `cdk.json` pins the prod domain and cert, so without them staging tries to claim `next.fireatlas.org` (a 409 that rolls back, 2026-11-18).
 
 #### 4c. Declared inputs: hydrate only what a job reads
 
