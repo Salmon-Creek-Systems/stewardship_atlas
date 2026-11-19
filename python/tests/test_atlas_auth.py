@@ -305,7 +305,8 @@ class TestEnforcement(unittest.TestCase):
         self.assertIn('redirect_uri=https%3A%2F%2Fatlas.example%2Fapi%2Fauth%2Fcallback',
                       response.headers['location'])
         state_cookie = response.cookies.get(self.webapp_auth.STATE_COOKIE)
-        self.assertTrue(state_cookie.endswith('|/'))
+        self.assertEqual(self.webapp_auth._parse_state(state_cookie)[1], '/')
+        self.assertNotIn('"', state_cookie)
 
     def test_callback_sets_session_and_cloudfront_cookies(self):
         from cryptography.hazmat.primitives import serialization
@@ -313,14 +314,15 @@ class TestEnforcement(unittest.TestCase):
                                        serialization.PrivateFormat.PKCS8,
                                        serialization.NoEncryption()).decode()
         token = self.mint(**{'cognito:groups': ['scvfd-admin', 'westport-internal']})
-        self.client.cookies.set(self.webapp_auth.STATE_COOKIE, 'st8|/scvfd/staging/x/')
+        self.client.cookies.set(self.webapp_auth.STATE_COOKIE,
+                                self.webapp_auth._state_value('st8', '/scvfd/staging/x/?a=1'))
         with patch.dict(os.environ, {'ATLAS_CLOUDFRONT_PRIVATE_KEY': pem,
                                      'CLOUDFRONT_KEY_PAIR_ID': 'K1'}), \
                 patch.object(self.webapp_auth, 'exchange_code', return_value={'id_token': token}):
             response = self.client.get('/auth/callback', params={'code': 'c', 'state': 'st8'},
                                        follow_redirects=False)
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers['location'], '/scvfd/staging/x/')
+        self.assertEqual(response.headers['location'], '/scvfd/staging/x/?a=1')
         set_cookies = response.headers.get_list('set-cookie')
         session = [c for c in set_cookies if c.startswith(atlas_auth.SESSION_COOKIE + '=')]
         self.assertEqual(len(session), 1)
@@ -334,7 +336,8 @@ class TestEnforcement(unittest.TestCase):
                               'CloudFront-Signature'], atlas_name)
 
     def test_callback_refuses_a_mismatched_state(self):
-        self.client.cookies.set(self.webapp_auth.STATE_COOKIE, 'st8|/')
+        self.client.cookies.set(self.webapp_auth.STATE_COOKIE,
+                                self.webapp_auth._state_value('st8', '/'))
         response = self.client.get('/auth/callback', params={'code': 'c', 'state': 'other'},
                                    follow_redirects=False)
         self.assertEqual(response.status_code, 400)

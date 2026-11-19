@@ -20,6 +20,7 @@ Environment (set by the CDK stack; the secrets by lambda_env at cold start):
 A missing pool id fails closed: nobody has a session, so only public routes
 (and the service token) work.
 """
+import base64
 import logging
 import os
 import secrets
@@ -144,6 +145,21 @@ def _cookie(response, name, value, path, max_age):
                         httponly=True, samesite='lax')
 
 
+def _state_value(state, next_url):
+    """``{state}.{base64url(next)}``: cookie-safe, so it is never quoted."""
+    encoded = base64.urlsafe_b64encode(next_url.encode()).decode().rstrip('=')
+    return f'{state}.{encoded}'
+
+
+def _parse_state(value):
+    state, _, encoded = (value or '').partition('.')
+    try:
+        next_url = base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4)).decode()
+    except Exception:
+        next_url = '/'
+    return state, next_url
+
+
 @router.get('/auth/login')
 async def auth_login(next: str = '/'):
     state = secrets.token_urlsafe(16)
@@ -152,14 +168,14 @@ async def auth_login(next: str = '/'):
                        'state': state})
     response = RedirectResponse(f"https://{_env('COGNITO_DOMAIN')}/oauth2/authorize?{query}",
                                 status_code=302)
-    _cookie(response, STATE_COOKIE, f'{state}|{atlas_auth.safe_next(next)}',
+    _cookie(response, STATE_COOKIE, _state_value(state, atlas_auth.safe_next(next)),
             f'{API_PATH}/auth', STATE_TTL)
     return response
 
 
 @router.get('/auth/callback')
 async def auth_callback(request: Request, code: str = None, state: str = None):
-    expected, _, next_url = (request.cookies.get(STATE_COOKIE) or '').partition('|')
+    expected, next_url = _parse_state(request.cookies.get(STATE_COOKIE))
     if not code or not state or not expected or not secrets.compare_digest(state, expected):
         return JSONResponse(status_code=400, content={
             'error': 'bad_login_state', 'detail': 'Login expired or was started elsewhere; try again.'})
