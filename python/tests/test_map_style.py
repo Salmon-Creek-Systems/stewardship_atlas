@@ -437,5 +437,26 @@ class TestAtlasDisplayName(unittest.TestCase):
             map_style.atlas_display_name({'name': 'scvfd', 'description': 'Underscripted'}), 'scvfd')
 
 
+class TestLegendTargetId(unittest.TestCase):
+    """A labelled layer's legend row points at the geometry for lines and
+    polygons (so "Only rendered" follows the lines, not the sparse labels) and
+    at the label layer for points (which carries the icon)."""
+
+    def test_line_targets_geometry_layer(self):
+        self.assertEqual(
+            map_style.legend_target_id({'id': 'roads-layer', 'type': 'line'}, 'roads-label-layer'),
+            'roads-layer')
+
+    def test_polygon_targets_geometry_layer(self):
+        self.assertEqual(
+            map_style.legend_target_id({'id': 'ponds-layer', 'type': 'fill'}, 'ponds-label-layer'),
+            'ponds-layer')
+
+    def test_point_keeps_label_layer_for_its_icon(self):
+        self.assertEqual(
+            map_style.legend_target_id({'id': 'hydrants-layer', 'type': 'circle'}, 'hydrants-label-layer'),
+            'hydrants-label-layer')
+
+
 if __name__ == '__main__':
     unittest.main()

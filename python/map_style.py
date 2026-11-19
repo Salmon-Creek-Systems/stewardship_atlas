@@ -348,6 +348,22 @@ def edit_page_layers(in_layers, edit_layer):
     return layers if edit_layer in layers else layers + [edit_layer]
 
 
+def legend_target_id(primary_layer, label_layer_id):
+    """Which style layer a grouped legend entry points at.
+
+    A layer and its label layer are one legend row, and the row's checkbox
+    toggles the whole `metadata.group` (installLayerGroupVisibility), so this
+    choice only decides two things: the row's swatch, and whether "Only
+    rendered" lists it. Points keep the label layer, which carries their icon.
+    Lines and polygons use the geometry layer. Their labels are sparse and
+    often start at a higher zoom (`label_minzoom`), and "Only rendered" would
+    drop the row whenever no label was drawn, even with the lines on screen.
+    """
+    if primary_layer.get('type') in ('line', 'fill'):
+        return primary_layer['id']
+    return label_layer_id
+
+
 def legend_hidden(style_layer):
     """Whether a style layer asked to stay out of the legend.
 
