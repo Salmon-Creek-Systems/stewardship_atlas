@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, logger
-from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -425,15 +424,12 @@ async def add_layer(swalename: str, layer_name: str, s3_url: str = None,
                 s3_key = key
             else:
                 s3_key = s3_url
-        with write_session(swalename, f"add_layer {layer_name}",
-                               inputs=lambda c: asset_inputs.layer_change_inputs(
-                                   c, layer_name, asset_inputs.ADD_LAYER_OUTLETS)) as session:
-            atlas.add_layer(session.config, layer_name, s3_key=s3_key, s3_bucket=s3_bucket,
-                            color=color, geometry_type=geometry)
-        return {
-            "status": "success",
-            "message": f"Layer '{layer_name}' added and materialized.",
-            "layer": layer_name}
+        # A job: the import and the rebuilt webmaps/console outlast a request.
+        with _config_session(swalename, f"validate add_layer {layer_name}") as session:
+            config = session.config
+        job = submit_job(config, 'add_layer', layer=layer_name, s3_key=s3_key,
+                         s3_bucket=s3_bucket, color=color, geometry_type=geometry)
+        return _started(job, layer=layer_name)
     except (HTTPException, *SESSION_ERRORS):
         raise
     except (ValueError, FileExistsError, FileNotFoundError) as e:
@@ -493,27 +489,23 @@ async def add_layer_post(swalename: str, layer_name: str, request: Request):
             logging.info(f"add_layer: uploaded {n} features to "
                          f"s3://{ADD_LAYER_UPLOAD_BUCKET}/{s3_key}")
 
-        def run():
-            with write_session(swalename, f"add_layer {layer_name}",
-                               inputs=lambda c: asset_inputs.layer_change_inputs(
-                                   c, layer_name, asset_inputs.ADD_LAYER_OUTLETS)) as session:
-                atlas.add_layer(
-                    session.config, layer_name,
-                    s3_key=s3_key, s3_bucket=ADD_LAYER_UPLOAD_BUCKET,
-                    geometry_type=geometry,
-                    source='s3' if source == 'upload' else 'empty',
-                    color=body.get('color'), width=body.get('width'),
-                    label_property=body.get('label_property') or None,
-                    label_field=body.get('label_field') or None,
-                    icon=body.get('icon') or None,
-                    opacity=body.get('opacity'),
-                    polygon_shape=body.get('polygon_shape') or None,
-                    colormap=body.get('colormap') or None)
-
-        await run_in_threadpool(run)
-        return {"status": "success",
-                "message": f"Layer '{layer_name}' added and materialized.",
-                "layer": layer_name}
+        # The upload is validated and stored here; the import and the rebuilt
+        # webmaps/console run as a job (Phase 4) and the console polls it.
+        with _config_session(swalename, f"validate add_layer {layer_name}") as session:
+            config = session.config
+        job = submit_job(
+            config, 'add_layer', layer=layer_name,
+            s3_key=s3_key, s3_bucket=ADD_LAYER_UPLOAD_BUCKET,
+            geometry_type=geometry,
+            source='s3' if source == 'upload' else 'empty',
+            color=body.get('color'), width=body.get('width'),
+            label_property=body.get('label_property') or None,
+            label_field=body.get('label_field') or None,
+            icon=body.get('icon') or None,
+            opacity=body.get('opacity'),
+            polygon_shape=body.get('polygon_shape') or None,
+            colormap=body.get('colormap') or None)
+        return _started(job, layer=layer_name)
     except SESSION_ERRORS:
         raise
     except (ValueError, FileExistsError, FileNotFoundError, KeyError) as e:
@@ -541,20 +533,13 @@ async def edit_layer_post(swalename: str, layer_name: str, request: Request):
         body = await request.json()
         atlas.validate_layer_name(layer_name)
 
-        def run():
-            with write_session(swalename, f"edit_layer {layer_name}",
-                               inputs=lambda c: asset_inputs.layer_change_inputs(
-                                   c, layer_name, atlas.styling_outlets(c, layer_name) + ['console'])) as session:
-                return atlas.edit_layer(session.config, layer_name, body)
-
-        _, materialized = await run_in_threadpool(run)
-        return {
-            "status": "success",
-            "message": f"Layer '{layer_name}' restyled.",
-            "layer": layer_name,
-            "materialized": materialized,
-            "note": "PDF and other slow outlets keep their old styling until rebuilt.",
-        }
+        with _config_session(swalename, f"validate edit_layer {layer_name}") as session:
+            config = session.config
+        if layer_name not in [l.get('name') for l in config.get('dataswale', {}).get('layers', [])]:
+            raise ValueError(f"No layer '{layer_name}' in atlas '{swalename}'")
+        job = submit_job(config, 'edit_layer', layer=layer_name, changes=body)
+        return _started(job, layer=layer_name,
+                        note="PDF and other slow outlets keep their old styling until rebuilt.")
     except SESSION_ERRORS:
         raise
     except (ValueError, FileNotFoundError, KeyError) as e:
@@ -577,23 +562,17 @@ async def delete_layer_post(swalename: str, layer_name: str, request: Request):
     try:
         body = await request.json()
         atlas.validate_layer_name(layer_name)
+        # The plan reads only the config and the source atlas.geojson.
+        with _config_session(swalename, f"delete_layer {layer_name} (plan)") as session:
+            config = session.config
+            plan = atlas.delete_layer(config, layer_name, dry_run=True)
         if body.get('dry_run'):
-            with read_session(swalename, f"delete_layer {layer_name} (dry run)") as session:
-                plan = atlas.delete_layer(session.config, layer_name, dry_run=True)
             return {"status": "success", "dry_run": True, "plan": plan}
         if body.get('confirm') != layer_name:
             raise ValueError(f"Type the layer name ('{layer_name}') to confirm.")
-
-        def run():
-            with write_session(swalename, f"delete_layer {layer_name}") as session:
-                return atlas.delete_layer(session.config, layer_name)
-
-        plan = await run_in_threadpool(run)
-        return {
-            "status": "success",
-            "message": f"Layer '{layer_name}' deleted.",
-            "plan": plan,
-        }
+        if plan.get('blockers'):
+            raise ValueError(f"'{layer_name}' cannot be deleted yet: {plan['blockers']}")
+        return _started(submit_job(config, 'delete_layer', layer=layer_name), layer=layer_name)
     except SESSION_ERRORS:
         raise
     except (ValueError, FileNotFoundError, KeyError) as e:
@@ -926,26 +905,15 @@ async def job_status(swale: str, id: str):
 
 @app.get("/refresh")
 async def refresh(swale: str, asset: str):
-    """Re-materialize one asset. Light assets run here and answer when done; an
-    asset that runs on the box (runs_on: box) is queued and answers with a job."""
+    """Re-materialize one asset, as a job (the same as /materialize_asset):
+    even a light outlet can outlast the API's request timeout on a cold
+    hydrate. Poll /job-status with the returned job_id."""
     try:
         with _config_session(swale, f"validate refresh {asset}") as session:
             config = session.config
         if asset not in config.get('assets', {}):
             raise HTTPException(status_code=400, detail=f"No asset '{asset}' in atlas '{swale}'")
-        if atlas_jobs.asset_runs_on(config, asset) == 'box':
-            return _started(submit_job(config, 'materialize', asset=asset), asset=asset,
-                            message=f"Queued {asset} on the render worker")
-        with write_session(swale, f"refresh {asset}",
-                           inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
-            res = atlas.materialize(session.config, asset)
-        res_json = {
-            "status": "success",
-            "message": f"Refreshed asset {asset}: {res}",
-            "asset": asset,
-        }
-        print(res_json)
-        return res_json
+        return _started(submit_job(config, 'materialize', asset=asset), asset=asset)
     except (HTTPException, *SESSION_ERRORS):
         raise
     except Exception as e:

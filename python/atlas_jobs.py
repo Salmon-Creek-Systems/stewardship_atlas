@@ -29,7 +29,8 @@ import json
 import traceback
 import uuid
 
-KINDS = ('materialize', 'refresh_layer', 'publish', 'slides')
+KINDS = ('materialize', 'refresh_layer', 'publish', 'slides',
+         'add_layer', 'edit_layer', 'delete_layer')
 QUEUED, RUNNING, SUCCEEDED, FAILED = 'queued', 'running', 'succeeded', 'failed'
 FINISHED = (SUCCEEDED, FAILED)
 TARGETS = ('lambda', 'box')
@@ -95,7 +96,8 @@ def route(config: dict, job: dict, layer_inlets=None) -> str:
     (``asset_inputs.layer_inlets``); passed in to keep this module stdlib-only.
     """
     kind, params = job['kind'], job['params']
-    if kind == 'publish':
+    if kind in ('publish', 'add_layer', 'edit_layer', 'delete_layer'):
+        # Layer changes re-materialize the webmaps and console, never a PDF.
         return 'lambda'
     if kind == 'slides':
         return 'box'                          # headless Chromium

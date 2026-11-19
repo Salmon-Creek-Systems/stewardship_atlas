@@ -628,6 +628,23 @@ function firstLine(text) {
     return String(text || 'unknown error').split('\n')[0];
 }
 
+// Resolves with the finished job (succeeded or failed); onState sees each poll.
+function waitForJob(jobId, onState) {
+    return new Promise(function(resolve, reject) {
+        function poll() {
+            fetch(jobStatusUrl(jobId))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (onState) onState(d.state);
+                    if (d.state === 'queued' || d.state === 'running') setTimeout(poll, 3000);
+                    else resolve(d);
+                })
+                .catch(reject);
+        }
+        poll();
+    });
+}
+
 function pollJobStatus(jobId, btn, idleLabel, doneMsg) {
     fetch(jobStatusUrl(jobId))
         .then(function(r) { return r.json(); })
@@ -798,8 +815,14 @@ function submitDeleteLayer() {
     })
         .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, d: d}; }); })
         .then(function(res) {
-            if (!res.ok) throw new Error(res.d.detail || 'Unknown');
-            showToast(res.d.message + ' ' + res.d.note);
+            if (!res.ok || !res.d.job_id) throw new Error(res.d.detail || 'Unknown');
+            return waitForJob(res.d.job_id, function(state) {
+                if (state === 'running') dlStatus('Deleting “' + dlLayer + '” and rebuilding the maps…');
+            });
+        })
+        .then(function(job) {
+            if (job.state !== 'succeeded') throw new Error(firstLine(job.error));
+            showToast(job.result || 'Layer deleted.');
             closeDeleteLayerModal();
             setTimeout(function() { location.reload(); }, 1500);  // the console itself was rebuilt
         })
@@ -1531,13 +1554,23 @@ function submitAddLayer() {
     })
         .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
         .then(function(res) {
-            if (res.ok && res.body.status === 'success') {
-                closeAddLayerModal();
-                showToast(editing ? 'Styled "' + name + '" — reload the map to see it'
-                                  : 'Layer "' + name + '" added — reload to see it');
-            } else {
+            if (!res.ok || !res.body.job_id) {
                 alSetStatus('Failed: ' + (res.body.detail || 'unknown error'), true);
+                return;
             }
+            return waitForJob(res.body.job_id, function(state) {
+                if (state === 'queued') alSetStatus('Queued…');
+                if (state === 'running') alSetStatus(editing ? 'Restyling and rebuilding the maps…'
+                                                             : 'Importing and rebuilding the maps…');
+            }).then(function(job) {
+                if (job.state === 'succeeded') {
+                    closeAddLayerModal();
+                    showToast(editing ? 'Styled "' + name + '" — reload the map to see it'
+                                      : 'Layer "' + name + '" added — reload to see it');
+                } else {
+                    alSetStatus('Failed: ' + firstLine(job.error), true);
+                }
+            });
         })
         .catch(function(err) { alSetStatus('Error: ' + err, true); })
         .finally(function() { btn.disabled = false; btn.textContent = original; });

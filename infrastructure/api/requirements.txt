@@ -1,2 +1,53 @@
-# Placeholder API has no dependencies yet. Phase 4 brings fastapi, mangum (or the
-# Lambda Web Adapter), and the geo stack.
+# The API and jobs Lambda image (infrastructure/api/Dockerfile).
+#
+# Pinned to the versions the box runs today, so a job behaves the same on
+# Lambda as on the box. Not here: QGIS, Playwright/Chromium and mapnik — box-only
+# (runs_on: box), loaded lazily (atlas.LAZY_MATERIALIZER_MODULES). The GDAL
+# Python bindings (osgeo) and CLI tools come from the base image.
+
+# Lambda plumbing
+awslambdaric==2.2.1
+mangum==0.17.0
+
+# API
+fastapi==0.115.7
+starlette==0.45.3
+pydantic==2.8.2
+python-multipart==0.0.20
+boto3==1.42.65
+requests==2.32.3
+anthropic==0.93.0
+
+# Orchestration
+dagster==1.7.15
+
+# Geo and data
+geojson==3.1.0
+shapely==2.0.5
+pyproj==3.6.1
+geopandas==1.0.1
+pyogrio==0.9.0
+pandas==2.2.2
+numpy==1.26.4
+duckdb==1.0.0
+rasterio==1.4.3
+affine==2.4.0
+h3==4.3.1
+mercantile==1.2.1
+networkx==3.3
+pmtiles==3.7.0
+deltalake==0.18.2
+overpass==0.7
+pystac==1.10.1
+pystac-client==0.8.3
+planetary-computer==1.0.0
+
+# Outlets
+matplotlib==3.9.2
+pillow==11.1.0
+qrcode==8.2
+pypdf==6.19.0
+nbformat==5.1.3
+Markdown==3.8.2
+gspread==6.1.2
+google-auth==2.34.0

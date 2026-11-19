@@ -1,0 +1,11 @@
+# Build context for infrastructure/api/Dockerfile (built from the repo root).
+# Only what the image copies; everything else stays out of the context.
+*
+!infrastructure/api/requirements.txt
+!python/
+!templates/
+!configuration/
+!documents/help/
+python/tests/
+python/docs/
+**/__pycache__/

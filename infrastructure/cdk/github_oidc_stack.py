@@ -50,8 +50,14 @@ class GithubOidcStack(Stack):
                         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
                     },
                     "StringLike": {
-                        "token.actions.githubusercontent.com:sub":
+                        "token.actions.githubusercontent.com:sub": [
                             f"repo:{repo}:ref:refs/heads/main",
+                            # TEMPORARY (2026-11-19): the cloud migration branch
+                            # deploys the staging substrate before cutover. The
+                            # workflow refuses prod from any ref but main.
+                            # Remove at cutover.
+                            f"repo:{repo}:ref:refs/heads/feature/cloud-phase3-compute",
+                        ],
                     },
                 },
             ),

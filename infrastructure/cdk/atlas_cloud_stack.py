@@ -39,6 +39,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_events,
+    aws_secretsmanager as secretsmanager,
     aws_s3 as s3,
     aws_sqs as sqs,
 )
@@ -88,6 +89,12 @@ function handler(event) {
 # cross-stack reference: the role belongs to AtlasEmailPhotoStack, and an export
 # would couple the two stacks' deploy order for what is just a policy attachment.
 WEBAPP_EC2_ROLE_NAME = "atlas-webapp-ec2-role"
+
+# Secrets Manager names the API and jobs Lambdas read at cold start
+# (python/lambda_env.py). Created by hand, once per account — the values are
+# the box's gspread service_account.json and its Anthropic key.
+GSPREAD_SECRET_NAME = "atlas/gspread-service-account"
+ANTHROPIC_SECRET_NAME = "atlas/anthropic-api-key"
 
 
 def _logical(name: str) -> str:
@@ -248,7 +255,21 @@ class AtlasCloudStack(Stack):
             "ATLAS_RENDER_QUEUE_URL": render_queue.queue_url,
             "ATLAS_JOBS_QUEUE_URL": jobs_queue.queue_url,
             "ATLAS_JOBS_REGION": self.region,
+            "ATLAS_PRIVATE_BUCKET": private_data.bucket_name,
+            "ATLAS_OUTLETS_BUCKET": public_outlets.bucket_name,
+            # Lambda's only writable disk. Sessions hydrate here; a warm
+            # container keeps what it has, so a repeat job downloads only changes.
+            "ATLAS_WORKSPACE_ROOT": "/tmp/atlas_workspace",
+            "SWALES_ROOT": "/tmp/atlas_workspace",
+            "ATLAS_SHARED_DIR": "/tmp/atlas_shared",
+            # Read by lambda_env.prepare() at cold start; values never in the template.
+            "ATLAS_GSPREAD_SECRET": GSPREAD_SECRET_NAME,
+            "ATLAS_ANTHROPIC_SECRET": ANTHROPIC_SECRET_NAME,
         }
+        app_secrets = [
+            secretsmanager.Secret.from_secret_name_v2(self, "GspreadSecret", GSPREAD_SECRET_NAME),
+            secretsmanager.Secret.from_secret_name_v2(self, "AnthropicSecret", ANTHROPIC_SECRET_NAME),
+        ]
 
         # Deliberately unnamed. Switching between a zip and a container image
         # replaces the function, and CloudFormation refuses to replace a
@@ -260,7 +281,10 @@ class AtlasCloudStack(Stack):
             api_fn = lambda_.DockerImageFunction(
                 self, "ApiFunction",
                 code=lambda_.DockerImageCode.from_ecr(api_repo, tag_or_digest=api_image_tag),
-                memory_size=1024,
+                # Synchronous edits (a delta apply, a comment) hydrate one layer;
+                # anything longer is a job (Phase 4, task 5).
+                memory_size=2048,
+                ephemeral_storage_size=Size.gibibytes(4),
                 timeout=Duration.seconds(30),
                 environment=api_env,
             )
@@ -283,28 +307,8 @@ class AtlasCloudStack(Stack):
         render_queue.grant_send_messages(api_fn)
         jobs_queue.grant_send_messages(api_fn)
 
-        if api_image_tag:
-            # The jobs Lambda: the API image with the queue consumer as its
-            # handler. Separate from the API function for its limits — a
-            # publish or a layer refresh may take minutes, and hydrating an
-            # atlas into /tmp needs room — not for its code.
-            jobs_fn = lambda_.DockerImageFunction(
-                self, "JobsFunction",
-                code=lambda_.DockerImageCode.from_ecr(
-                    api_repo, tag_or_digest=api_image_tag,
-                    cmd=["atlas_job_consumer.lambda_handler"]),
-                memory_size=3008,
-                ephemeral_storage_size=Size.gibibytes(10),
-                timeout=Duration.minutes(15),
-                environment=api_env,
-            )
-            jobs_fn.add_event_source(lambda_events.SqsEventSource(
-                jobs_queue, batch_size=1, report_batch_item_failures=True))
-            private_data.grant_read_write(jobs_fn)
-            private_data.grant_delete(jobs_fn, objects_key_pattern="*/staging/*")
-            private_data.grant_delete(jobs_fn, objects_key_pattern="*/lock")
-            public_outlets.grant_read_write(jobs_fn)
-            public_outlets.grant_delete(jobs_fn)
+        for secret in app_secrets:
+            secret.grant_read(api_fn)
 
         # IAM auth on the function URL: the only caller allowed to sign requests
         # is this distribution, via OAC. There is no unauthenticated public URL.
@@ -462,6 +466,45 @@ class AtlasCloudStack(Stack):
                 f"{distribution.distribution_id}"
             ],
         ))
+
+        if api_image_tag:
+            # The jobs Lambda: the API image with the queue consumer as its
+            # handler. Separate from the API function for its limits — a
+            # publish or a layer refresh may take minutes, and hydrating an
+            # atlas into /tmp needs room — not for its code.
+            jobs_fn = lambda_.DockerImageFunction(
+                self, "JobsFunction",
+                code=lambda_.DockerImageCode.from_ecr(
+                    api_repo, tag_or_digest=api_image_tag,
+                    cmd=["jobs_handler.handler"]),
+                memory_size=3008,
+                ephemeral_storage_size=Size.gibibytes(10),
+                timeout=Duration.minutes(15),
+                environment=dict(
+                    api_env,
+                    # Publish mirrors to the outlets bucket and invalidates the
+                    # atlas prefix. Only the jobs Lambda publishes, and unlike the
+                    # API function it is not an origin of this distribution, so
+                    # naming the distribution here makes no dependency cycle.
+                    ATLAS_DISTRIBUTION_ID=distribution.distribution_id,
+                    ATLAS_PUBLIC_BASE_URL=(f"https://{domain_name}" if domain_name else
+                                           f"https://{distribution.distribution_domain_name}"),
+                ),
+            )
+            jobs_fn.add_event_source(lambda_events.SqsEventSource(
+                jobs_queue, batch_size=1, report_batch_item_failures=True))
+            private_data.grant_read_write(jobs_fn)
+            private_data.grant_delete(jobs_fn, objects_key_pattern="*/staging/*")
+            private_data.grant_delete(jobs_fn, objects_key_pattern="*/lock")
+            public_outlets.grant_read_write(jobs_fn)
+            public_outlets.grant_delete(jobs_fn)
+            for secret in app_secrets:
+                secret.grant_read(jobs_fn)
+            jobs_fn.add_to_role_policy(iam.PolicyStatement(
+                actions=["cloudfront:CreateInvalidation"],
+                resources=[f"arn:aws:cloudfront::{self.account}:distribution/"
+                           f"{distribution.distribution_id}"],
+            ))
 
         # --- Cognito ---------------------------------------------------------
         user_pool = cognito.UserPool(

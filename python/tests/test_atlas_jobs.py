@@ -57,6 +57,10 @@ class TestRouting(unittest.TestCase):
         self.assertEqual(jobs.route(CONFIG, self.job('publish')), 'lambda')
         self.assertEqual(jobs.route(CONFIG, self.job('slides', asset='slides')), 'box')
 
+    def test_layer_changes_run_on_lambda(self):
+        for kind in ('add_layer', 'edit_layer', 'delete_layer'):
+            self.assertEqual(jobs.route(CONFIG, self.job(kind, layer='roads')), 'lambda')
+
     def test_layer_refresh(self):
         r = lambda **p: jobs.route(CONFIG, self.job('refresh_layer', **p), inlets)
         self.assertEqual(r(layer='hydrants', mode='update', cascade=False), 'lambda')

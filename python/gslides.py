@@ -13,6 +13,7 @@ the caller supplies those URLs (short-lived ones from
 
 Units: the API positions everything in EMU (914400 per inch, 12700 per point).
 """
+import os
 import json
 import logging
 import time
@@ -50,7 +51,8 @@ LINK_TEXT = 'Open the live view →'
 
 SCOPES = ['https://www.googleapis.com/auth/presentations',
           'https://www.googleapis.com/auth/drive']
-SERVICE_ACCOUNT_FILE = '/root/.config/gspread/service_account.json'
+# Where gspread.service_account() looks too; HOME is /root on the box, /tmp on Lambda.
+SERVICE_ACCOUNT_FILE = os.path.expanduser('~/.config/gspread/service_account.json')
 SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 DRIVE_API = 'https://www.googleapis.com/drive/v3/files'
 

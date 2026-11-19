@@ -76,18 +76,20 @@ fi
 step "1/5  rebuilding config from $ATLAS.geojson"
 python3 "$REPO/scripts/build_atlas.py" config_only "$CONFIG"
 
-# refresh is synchronous and returns JSON; a non-success status is fatal here
+# refresh is a job: submit, then poll its status. A failure is fatal here,
 # because everything after it would build on a stale asset.
 refresh() {
-  local asset="$1"
-  curl -sS --max-time 900 "$API_URL/refresh?swale=$ATLAS&asset=$asset" \
-    | python3 -c "
-import json,sys
-try: r = json.load(sys.stdin)
-except Exception: print('unparseable response'); sys.exit(1)
-print('   ' + str(r.get('message', r))[:200])
-sys.exit(0 if r.get('status') == 'success' else 1)
-" || die "refresh of '$asset' failed"
+  local asset="$1" job state
+  job=$(curl -sS --max-time 60 "$API_URL/refresh?swale=$ATLAS&asset=$asset" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["job_id"])') \
+    || die "refresh of '$asset' was not accepted"
+  for _ in $(seq 1 180); do          # 180 * 5s = 15 min
+    state=$(curl -sS --max-time 15 "$API_URL/job-status?swale=$ATLAS&id=$job" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state", "unknown"))' 2>/dev/null)
+    case "$state" in queued|running) sleep 5 ;; *) break ;; esac
+  done
+  [ "$state" = "succeeded" ] || die "refresh of '$asset' ended $state (job $job)"
+  echo "   $asset: succeeded (job $job)"
 }
 
 # webmap before console: the console checks whether the webmap exists at

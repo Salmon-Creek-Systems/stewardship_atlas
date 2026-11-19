@@ -112,6 +112,49 @@ class TestMaterializeAndRefresh(JobEndpointTest):
         self.assertEqual((url, body['target']), ('q-render', 'box'))
 
 
+class TestLayerChanges(JobEndpointTest):
+    def test_refresh_of_a_light_asset_is_a_lambda_job_too(self):
+        url, body = self.queue_of(self.client.get("/refresh?swale=testatlas&asset=webmap"))
+        self.assertEqual((url, body['target']), ('q-jobs', 'lambda'))
+
+    def test_edit_layer_queues_its_changes(self):
+        url, body = self.queue_of(self.client.post("/edit_layer/testatlas/roads",
+                                                   json={'color': '#ff0000'}))
+        self.assertEqual(url, 'q-jobs')
+        self.assertEqual(self.status(body['job_id'])['params'],
+                         {'layer': 'roads', 'changes': {'color': '#ff0000'}})
+
+    def test_edit_of_an_unknown_layer_is_refused(self):
+        self.assertEqual(self.client.post("/edit_layer/testatlas/nope", json={}).status_code, 400)
+        self.assertEqual(self.sqs.sent, [])
+
+    def test_add_an_empty_layer(self):
+        url, body = self.queue_of(self.client.post(
+            "/add_layer/testatlas/hydrants", json={'geometry': 'point', 'source': 'empty'}))
+        params = self.status(body['job_id'])['params']
+        self.assertEqual((params['layer'], params['source'], params['s3_key']),
+                         ('hydrants', 'empty', None))
+
+    def test_delete_needs_the_name_typed_back(self):
+        plan = {'blockers': [], 'assets_removed': []}
+        with patch('atlas.delete_layer', return_value=plan) as dl:
+            self.assertEqual(self.client.post("/delete_layer/testatlas/roads",
+                                              json={'confirm': 'nope'}).status_code, 400)
+            self.assertEqual(self.client.post("/delete_layer/testatlas/roads",
+                                              json={'dry_run': True}).json()['plan'], plan)
+            self.assertEqual(self.sqs.sent, [])
+            url, _ = self.queue_of(self.client.post("/delete_layer/testatlas/roads",
+                                                    json={'confirm': 'roads'}))
+        self.assertEqual(url, 'q-jobs')
+        self.assertTrue(all(c.kwargs.get('dry_run') for c in dl.call_args_list))
+
+    def test_a_blocked_delete_queues_nothing(self):
+        with patch('atlas.delete_layer', return_value={'blockers': ['used by runbook']}):
+            self.assertEqual(self.client.post("/delete_layer/testatlas/roads",
+                                              json={'confirm': 'roads'}).status_code, 400)
+        self.assertEqual(self.sqs.sent, [])
+
+
 class TestPublishAndStatus(JobEndpointTest):
     def test_publish_is_a_lambda_job(self):
         url, body = self.queue_of(self.client.get("/publish?swale=testatlas"))

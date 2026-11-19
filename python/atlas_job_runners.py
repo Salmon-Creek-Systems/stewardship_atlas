@@ -66,7 +66,38 @@ def run_slides(job):
         return outlets_slides.outlet_slides(config, 'slides')
 
 
+def run_add_layer(job):
+    import atlas
+    p = dict(job['params'])
+    layer = p.pop('layer')
+    with _session(job, inputs=lambda c: asset_inputs.layer_change_inputs(
+            c, layer, asset_inputs.ADD_LAYER_OUTLETS)) as session:
+        atlas.add_layer(session.config, layer, **p)
+        return f"Layer '{layer}' added and materialized."
+
+
+def run_edit_layer(job):
+    import atlas
+    layer, changes = job['params']['layer'], job['params']['changes']
+    with _session(job, inputs=lambda c: asset_inputs.layer_change_inputs(
+            c, layer, atlas.styling_outlets(c, layer) + ['console'])) as session:
+        _, materialized = atlas.edit_layer(session.config, layer, changes)
+        return f"Layer '{layer}' restyled; rebuilt {', '.join(materialized) or 'nothing'}."
+
+
+def run_delete_layer(job):
+    import atlas
+    layer = job['params']['layer']
+    # Archives the layer and edits every asset naming it: everything is read.
+    with _session(job) as session:
+        plan = atlas.delete_layer(session.config, layer)
+        return f"Layer '{layer}' deleted; rebuilt {', '.join(plan.get('materialized') or []) or 'nothing'}."
+
+
 RUNNERS = {
+    'add_layer': run_add_layer,
+    'edit_layer': run_edit_layer,
+    'delete_layer': run_delete_layer,
     'materialize': run_materialize,
     'refresh_layer': run_refresh_layer,
     'publish': run_publish,
