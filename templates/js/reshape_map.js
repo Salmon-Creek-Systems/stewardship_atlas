@@ -6,6 +6,7 @@
 // Edit page for those. One feature at a time.
 
 const map = new maplibregl.Map(MAP_CONFIG);
+installLayerGroupVisibility(map);  // legend toggles line + label together
 map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
 
 const LAYER = EDIT_CONFIG.layerName;
