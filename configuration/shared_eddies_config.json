@@ -140,7 +140,7 @@
         "lrs_zones_layer": null,
         "lrs_anchor_coordinates": null,
         "attribution": {
-            "description": "Road LRS — cumulative network distance from per-zone anchors via H3 graph"
+            "description": "Road LRS \u2014 cumulative network distance from per-zone anchors via H3 graph"
         }
     },
     "road_lrs_markers": {
@@ -216,5 +216,16 @@
         "in_layer": "ssurgo_polk_or",
         "biochar_layer": "biochar_properties_pnw",
         "goal": "raise_ph"
+    },
+    "camera_route_smooth": {
+        "type": "eddy",
+        "fetch_type": "camera_route_smooth",
+        "interaction": "backend",
+        "attribution": {
+            "url": "https://registry.opendata.aws/terrain-tiles/",
+            "description": "Camera route smoothed for the 3D view; ground from AWS Terrain Tiles (Terrarium)",
+            "license": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+            "citation": "Mapzen Terrain Tiles on AWS Open Data"
+        }
     }
 }

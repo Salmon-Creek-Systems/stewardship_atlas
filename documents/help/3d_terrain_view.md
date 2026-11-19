@@ -46,6 +46,16 @@ in the layer is followed in turn, so a layer with many separate lines (such as a
 whole road network) makes the camera jump from one to the next. For a clean flight,
 draw the route as one line in its own layer.
 
+### Smoothed routes
+
+A layer whose name ends in `_smoothed` is a copy of a route prepared for the camera.
+Its sharp corners are rounded into curves, and it holds the camera up between ridges
+so the flight glides over the terrain instead of rising and dropping with every
+hill. The height setting still applies; on a smoothed route the camera flies at
+least that high, and higher where it is bridging a valley. To change the route, edit the
+original layer, then ask your atlas administrator to re-run its smoothing (the
+`camera_route_smooth` eddy).
+
 The height is measured above the spot the camera is looking at, and the camera sits
 back from that spot. On a steep descent the hillside behind can rise above the camera;
 the map then lifts the camera and flattens its angle for a moment rather than going

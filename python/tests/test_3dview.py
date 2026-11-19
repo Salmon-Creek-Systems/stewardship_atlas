@@ -76,6 +76,12 @@ class TestCameraRoute(unittest.TestCase):
         self.assertNotRegex(html, r'__[A-Z_]+__')
         self.assertIn('routeNumber(routeEls.angle, 45, 0, 85)', html)
 
+    def test_route_reads_smoothed_lift_on_top_of_slider(self):
+        # camera_route_smooth layers carry per-vertex lift; the slider height stays the base
+        html = dview.generate_3d_terrain_html(_config(LAYERS))
+        self.assertIn('camera_lift_m', html)
+        self.assertIn('p.h + here.lift + lag', html)
+
 
 if __name__ == '__main__':
     unittest.main()

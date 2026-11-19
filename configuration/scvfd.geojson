@@ -1121,9 +1121,35 @@
                                 "default": ""
                             }
                         ]
+                    },
+                    "miranda_to_kennedy_smoothed": {
+                        "name": "miranda_to_kennedy_smoothed",
+                        "display_name": "Miranda to Kennedy (smoothed camera route)",
+                        "geometry_type": "linestring",
+                        "access": [
+                            "public"
+                        ],
+                        "color": [
+                            0,
+                            200,
+                            255
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#00c8ff",
+                            "line-width": 4,
+                            "line-opacity": 1.0
+                        }
                     }
                 },
                 "assets": {
+                    "miranda_to_kennedy_smoothed": {
+                        "type": "eddy",
+                        "config_def": "camera_route_smooth",
+                        "in_layer": "miranda_to_kennedy",
+                        "out_layer": "miranda_to_kennedy_smoothed"
+                    },
                     "dem": {
                         "type": "inlet",
                         "out_layer": "elevation",
@@ -1165,7 +1191,8 @@
                             "hydrants",
                             "watertanks",
                             "hazards",
-                            "miranda_to_kennedy"
+                            "miranda_to_kennedy",
+                            "miranda_to_kennedy_smoothed"
                         ],
                         "visible_layers": [
                             "thp_boundaries",
