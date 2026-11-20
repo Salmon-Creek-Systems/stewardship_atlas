@@ -1096,6 +1096,47 @@
                         "add_labels": true,
                         "interaction": "interface"
                     },
+                    "easement_986_236": {
+                        "name": "easement_986_236",
+                        "display_name": "60 ft easement (Bk 986 OR p 236)",
+                        "geometry_type": "polygon",
+                        "access": [
+                            "admin"
+                        ],
+                        "color": [
+                            255,
+                            212,
+                            0
+                        ],
+                        "fill_color": [
+                            255,
+                            212,
+                            0
+                        ],
+                        "fill_opacity": 0.35,
+                        "add_labels": false,
+                        "interaction": "interface"
+                    },
+                    "thp_haul_route": {
+                        "name": "thp_haul_route",
+                        "display_name": "THP 1-26-00170-HUM haul route (from narrative)",
+                        "geometry_type": "linestring",
+                        "access": [
+                            "admin"
+                        ],
+                        "color": [
+                            255,
+                            45,
+                            45
+                        ],
+                        "interaction": "interface",
+                        "add_labels": false,
+                        "paint": {
+                            "line-color": "#ff2d2d",
+                            "line-width": 4,
+                            "line-opacity": 0.9
+                        }
+                    },
                     "miranda_to_kennedy": {
                         "name": "miranda_to_kennedy",
                         "geometry_type": "linestring",
@@ -1272,6 +1313,20 @@
                         "s3_bucket": "scs-atlas-private-prod",
                         "s3_key": "scvfd/imports/federated.geojson"
                     },
+                    "easement_986_236_import": {
+                        "type": "inlet",
+                        "out_layer": "easement_986_236",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/easement_986_236.geojson"
+                    },
+                    "thp_haul_route_import": {
+                        "type": "inlet",
+                        "out_layer": "thp_haul_route",
+                        "config_def": "s3_geojson_inlet",
+                        "s3_bucket": "scs-atlas-private-prod",
+                        "s3_key": "scvfd/imports/thp_haul_route.geojson"
+                    },
                     "thp_from_map": {
                         "type": "inlet",
                         "out_layer": "thp_boundaries",
@@ -1374,7 +1429,9 @@
                             "lpss",
                             "photos",
                             "private_notes",
-                            "hazards"
+                            "hazards",
+                            "easement_986_236",
+                            "thp_haul_route"
                         ],
                         "hidden_layers": [
                             "lpss"
