@@ -56,6 +56,8 @@ The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the 
 - **Auth (task 6, `atlas_auth.py`, `webapp_auth.py`):**
   - **The API never returns 403.** The distribution turns every 403 into the login page, so auth failures are 401 with `error: login_required|forbidden`.
   - **A new route is admin-only** until it's listed in `atlas_auth.ROUTE_ROLES`.
+  - **`scs-admin` is admin on every atlas** (Scot's default unless he says otherwise); an SCS account needs no per-atlas groups.
+  - **Webedit always requires a login.** Don't make `delta_upload` or other editing routes public.
   - **Sessions last 1 day,** Cognito's ID-token cap.
   - **Tests run with `ATLAS_AUTH=off`** (`tests/conftest.py`).
 - **Staging CDK deploys need** `-c env_name=staging -c atlas_domain= -c certificate_arn=`; without them staging tries to claim `next.fireatlas.org`. CI adds them for non-prod.

@@ -146,7 +146,8 @@ replacement — so find it via the `ApiFunctionName` output rather than guessing
   atlas's CloudFront signed cookies, which `/api/auth/callback` sets for every
   atlas in the user's groups. The API checks the Cognito ID-token cookie against
   a role per route (`python/atlas_auth.py`). Groups: `{atlas}-admin`,
-  `{atlas}-internal` and `scs-admin`; onboarding is a group edit, not a deploy.
+  `{atlas}-internal` and `scs-admin` (admin on every atlas, so an SCS account
+  needs only that one); onboarding is a group edit, not a deploy.
   A federated user with no groups gets nothing.
 - **Every 403 is the login page.** The distribution answers any 403 with
   `/local/auth/login-required.html` (published by `scripts/publish_site_assets.py`),

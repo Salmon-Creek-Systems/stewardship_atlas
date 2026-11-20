@@ -26,8 +26,17 @@ class TestRoles(unittest.TestCase):
     def test_roles_are_per_atlas(self):
         self.assertEqual(atlas_auth.roles(['scvfd-admin'], 'westport'), set())
 
-    def test_scs_admin_is_not_a_wildcard(self):
-        self.assertEqual(atlas_auth.roles(['scs-admin'], 'scvfd'), set())
+    def test_scs_admin_is_admin_everywhere(self):
+        self.assertEqual(atlas_auth.roles(['scs-admin'], 'scvfd'), {ADMIN, INTERNAL})
+        self.assertEqual(atlas_auth.roles(['scs-admin'], 'made_yesterday'), {ADMIN, INTERNAL})
+        self.assertIsNone(atlas_auth.authorize(ADMIN, 'westport', ['scs-admin']))
+
+    def test_cookie_scopes(self):
+        self.assertEqual(atlas_auth.cookie_scopes(['westport-internal', 'scvfd-admin']),
+                         [('scvfd', '/scvfd/'), ('westport', '/westport/')])
+        # scs-admin gets one all-atlas set and nothing else, even with atlas groups.
+        self.assertEqual(atlas_auth.cookie_scopes(['scvfd-admin', 'scs-admin']), [(None, '/')])
+        self.assertEqual(atlas_auth.cookie_scopes(None), [])
 
     def test_private_atlases_from_any_atlas_group(self):
         groups = ['westport-internal', 'south_fork_eel-admin', 'scs-admin', 'westport-admin',
@@ -119,6 +128,8 @@ class TestCloudFrontCookies(unittest.TestCase):
             atlas_auth.cloudfront_policy('scvfd', 'next.fireatlas.org', 1763600000.9),
             '{"Statement":[{"Resource":"https://next.fireatlas.org/scvfd/staging/*",'
             '"Condition":{"DateLessThan":{"AWS:EpochTime":1763600000}}}]}')
+        self.assertIn('"Resource":"https://h.example/*/staging/*"',
+                      atlas_auth.cloudfront_policy(None, 'h.example', 1))
 
     def test_b64_alphabet(self):
         self.assertEqual(atlas_auth.cloudfront_b64(b'\xfb\xff\xfe'), '-~~-')
@@ -334,6 +345,24 @@ class TestEnforcement(unittest.TestCase):
             self.assertEqual(sorted(c.split('=')[0] for c in mine),
                              ['CloudFront-Key-Pair-Id', 'CloudFront-Policy',
                               'CloudFront-Signature'], atlas_name)
+
+    def test_callback_gives_scs_admin_one_root_cookie_set(self):
+        from cryptography.hazmat.primitives import serialization
+        pem = _rsa_key().private_bytes(serialization.Encoding.PEM,
+                                       serialization.PrivateFormat.PKCS8,
+                                       serialization.NoEncryption()).decode()
+        token = self.mint(**{'cognito:groups': ['scs-admin', 'scvfd-admin']})
+        self.client.cookies.set(self.webapp_auth.STATE_COOKIE,
+                                self.webapp_auth._state_value('st8', '/'))
+        with patch.dict(os.environ, {'ATLAS_CLOUDFRONT_PRIVATE_KEY': pem,
+                                     'CLOUDFRONT_KEY_PAIR_ID': 'K1'}), \
+                patch.object(self.webapp_auth, 'exchange_code', return_value={'id_token': token}):
+            response = self.client.get('/auth/callback', params={'code': 'c', 'state': 'st8'},
+                                       follow_redirects=False)
+        cloudfront = [c for c in response.headers.get_list('set-cookie')
+                      if c.startswith('CloudFront-')]
+        self.assertEqual(len(cloudfront), 3)
+        self.assertTrue(all('Path=/;' in c or c.endswith('Path=/') for c in cloudfront), cloudfront)
 
     def test_callback_refuses_a_mismatched_state(self):
         self.client.cookies.set(self.webapp_auth.STATE_COOKIE,

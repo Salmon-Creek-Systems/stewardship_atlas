@@ -8,7 +8,8 @@ The rules are in atlas_auth (pure); this wires them into FastAPI and Cognito.
   cookie, and raises AuthRequired (a 401) when the role is missing.
 * ``/auth/login`` -> Cognito hosted UI -> ``/auth/callback`` sets the ID-token
   cookie (``Path=/api``) and one set of CloudFront cookies per atlas the user
-  belongs to (``Path=/{atlas}/``), all expiring with the token (1 day).
+  belongs to (``Path=/{atlas}/``; scs-admin gets one set at ``Path=/`` for
+  every atlas), all expiring with the token (1 day).
 * ``/auth/logout`` clears them and ends the Cognito session; ``/me`` says who
   you are.
 
@@ -196,16 +197,16 @@ async def auth_callback(request: Request, code: str = None, state: str = None):
 
     private_key = _env('ATLAS_CLOUDFRONT_PRIVATE_KEY')
     key_pair_id = _env('CLOUDFRONT_KEY_PAIR_ID')
-    atlases = atlas_auth.private_atlases(atlas_auth.token_groups(claims))
-    if atlases and not (private_key and key_pair_id):
+    scopes = atlas_auth.cookie_scopes(atlas_auth.token_groups(claims))
+    if scopes and not (private_key and key_pair_id):
         logger.error("auth: no CloudFront signing key; private pages will 403")
-    elif atlases:
-        for atlas_name in atlases:
+    elif scopes:
+        for atlas_name, path in scopes:
             cookies = atlas_auth.cloudfront_cookies(
                 atlas_name, _env('ATLAS_PUBLIC_HOST'), key_pair_id, private_key, claims['exp'])
             for name, value in cookies.items():
-                _cookie(response, name, value, f'/{atlas_name}/', max_age)
-    logger.info(f"auth: login {claims.get('cognito:username')} -> {atlases}")
+                _cookie(response, name, value, path, max_age)
+    logger.info(f"auth: login {claims.get('cognito:username')} -> {[p for _, p in scopes]}")
     return response
 
 
@@ -220,9 +221,10 @@ async def auth_logout(request: Request):
     response = RedirectResponse(f"https://{_env('COGNITO_DOMAIN')}/logout?{query}",
                                 status_code=302)
     response.delete_cookie(atlas_auth.SESSION_COOKIE, path=API_PATH)
-    for atlas_name in sorted(atlases):
+    paths = ['/'] + [f'/{atlas_name}/' for atlas_name in sorted(atlases)]
+    for path in paths:
         for name in ('CloudFront-Policy', 'CloudFront-Signature', 'CloudFront-Key-Pair-Id'):
-            response.delete_cookie(name, path=f'/{atlas_name}/')
+            response.delete_cookie(name, path=path)
     return response
 
 
@@ -237,6 +239,7 @@ async def me(request: Request):
         'email': claims.get('email'),
         'groups': groups,
         'expires': claims['exp'],
+        'all_atlases': atlas_auth.SCS_ADMIN_GROUP in groups,
         'atlases': {a: sorted(atlas_auth.roles(groups, a))
                     for a in atlas_auth.private_atlases(groups)},
     }

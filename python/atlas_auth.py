@@ -7,9 +7,10 @@ The model (documents/cloud_native_plan.md, 4e):
   signed cookies. A user in either of that atlas's groups gets its cookies.
 * **Roles are capabilities, checked by the API.** Cognito groups
   ``{atlas}-internal`` and ``{atlas}-admin``; admin includes internal.
-  ``scs-admin`` is for the few routes that name no atlas (``/create_atlas``,
-  ``/files``, ``/log``...). It is not a wildcard: an SCS account is also put
-  in every ``{atlas}-admin`` group, explicitly.
+* **``scs-admin`` is admin on every atlas** (Scot, 2026-11-20), including ones
+  made after the account, and is the only group allowed the few routes that
+  name no atlas (``/create_atlas``, ``/files``, ``/log``...). Its CloudFront
+  cookies are one set at ``Path=/`` covering ``/*/staging/*``.
 * **Every route has a required role in ROUTE_ROLES; an unlisted route needs
   admin.** Fail closed: a new endpoint is admin-only until someone lists it.
 
@@ -101,9 +102,11 @@ def required_role(route_path):
 def roles(groups, atlas):
     """The roles ``groups`` hold on ``atlas``: a subset of {'admin', 'internal'}.
 
-    Admin includes internal. ``scs-admin`` grants nothing on an atlas by itself.
+    Admin includes internal. ``scs-admin`` is admin on every atlas.
     """
     groups = set(groups or ())
+    if SCS_ADMIN_GROUP in groups:
+        return {ADMIN, INTERNAL}
     held = set()
     if f'{atlas}-{ADMIN}' in groups:
         held |= {ADMIN, INTERNAL}
@@ -113,7 +116,10 @@ def roles(groups, atlas):
 
 
 def private_atlases(groups):
-    """Atlases whose private tier ``groups`` may see: any atlas group at all."""
+    """Atlases named by ``groups``' atlas groups (``scs-admin`` names none).
+
+    For scs-admin, which sees every atlas, use ``cookie_scopes``.
+    """
     atlases = set()
     for group in groups or ():
         if group == SCS_ADMIN_GROUP:
@@ -122,6 +128,17 @@ def private_atlases(groups):
         if sep and atlas and role in ATLAS_ROLES:
             atlases.add(atlas)
     return sorted(atlases)
+
+
+def cookie_scopes(groups):
+    """The CloudFront cookie sets to issue: a list of (atlas, cookie path).
+
+    ``atlas`` None is the all-atlases set for scs-admin, issued alone so no
+    browser ever holds two cookies of the same name for one URL.
+    """
+    if SCS_ADMIN_GROUP in (groups or ()):
+        return [(None, '/')]
+    return [(atlas, f'/{atlas}/') for atlas in private_atlases(groups)]
 
 
 def authorize(required, atlas, groups, service_ok=False):
@@ -216,9 +233,13 @@ def cloudfront_b64(data: bytes) -> str:
 
 
 def cloudfront_policy(atlas, host, expires):
-    """The custom policy for one atlas's private tier, as compact JSON."""
+    """The custom policy for one atlas's private tier, as compact JSON.
+
+    ``atlas`` None covers every atlas's (``/*/staging/*``; CloudFront's ``*``
+    matches slashes too), for scs-admin.
+    """
     statement = {
-        'Resource': f'https://{host}/{atlas}/staging/*',
+        'Resource': f"https://{host}/{atlas or '*'}/staging/*",
         'Condition': {'DateLessThan': {'AWS:EpochTime': int(expires)}},
     }
     return json.dumps({'Statement': [statement]}, separators=(',', ':'))
@@ -227,8 +248,8 @@ def cloudfront_policy(atlas, host, expires):
 def cloudfront_cookies(atlas, host, key_pair_id, private_key_pem, expires):
     """The three cookie values for one atlas: {name: value}.
 
-    Set each with ``Path=/{atlas}/`` so atlases' cookie sets don't collide (the
-    names are fixed by CloudFront). Signature is RSA-SHA1, PKCS#1 v1.5, over the
+    Set each with the path ``cookie_scopes`` gives, so atlases' cookie sets
+    don't collide (the names are fixed by CloudFront). Signature is RSA-SHA1, PKCS#1 v1.5, over the
     policy's exact bytes, as CloudFront requires.
     """
     from cryptography.hazmat.primitives import hashes, serialization
