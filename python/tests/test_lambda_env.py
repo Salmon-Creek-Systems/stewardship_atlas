@@ -24,7 +24,7 @@ class TestPrepare(unittest.TestCase):
         self.asked.append(name)
         return {'gs': '{"type": "service_account"}', 'ak': 'sk-test\n',
                 'cf': '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
-                'st': 'token123\n'}[name]
+                'st': 'token123\n', 'ot': 'origin456\n'}[name]
 
     def prepare(self, env):
         lambda_env.prepare(env, secret=self.secret, image_duckdb_home=self.image)
@@ -40,11 +40,12 @@ class TestPrepare(unittest.TestCase):
 
     def test_auth_secrets_land_in_env(self):
         env = {'HOME': str(self.home), 'ATLAS_CLOUDFRONT_KEY_SECRET': 'cf',
-               'ATLAS_SERVICE_TOKEN_SECRET': 'st'}
+               'ATLAS_SERVICE_TOKEN_SECRET': 'st', 'ATLAS_ORIGIN_TOKEN_SECRET': 'ot'}
         self.prepare(env)
         self.assertEqual(env['ATLAS_CLOUDFRONT_PRIVATE_KEY'],
                          '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n')
         self.assertEqual(env['ATLAS_SERVICE_TOKEN'], 'token123')
+        self.assertEqual(env['ATLAS_ORIGIN_TOKEN'], 'origin456')
 
     def test_a_second_call_does_nothing(self):
         env = {'HOME': str(self.home), 'ATLAS_GSPREAD_SECRET': 'gs'}

@@ -297,6 +297,22 @@ class TestEnforcement(unittest.TestCase):
                                     headers={atlas_auth.SERVICE_TOKEN_HEADER: 'svc-secret'})
         self.assertNotEqual(response.status_code, 401)   # 422: past auth, bad payload
 
+    def test_origin_token_required_when_configured(self):
+        with patch.dict(os.environ, {'ATLAS_ORIGIN_TOKEN_SECRET': 'atlas/origin-token-x',
+                                     'ATLAS_ORIGIN_TOKEN': 'cf-secret'}):
+            response = self.client.get('/status')
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json(), {'error': 'not_via_cloudfront'})
+            response = self.client.get('/status', headers={'x-atlas-origin-token': 'cf-secret'})
+            self.assertEqual(response.status_code, 200)
+
+    def test_origin_token_fails_closed_when_unreadable(self):
+        with patch.dict(os.environ, {'ATLAS_ORIGIN_TOKEN_SECRET': 'atlas/origin-token-x',
+                                     'ATLAS_AUTH': 'off'}):
+            os.environ.pop('ATLAS_ORIGIN_TOKEN', None)
+            response = self.client.get('/status', headers={'x-atlas-origin-token': ''})
+            self.assertEqual(response.status_code, 401)
+
     def test_auth_off(self):
         with patch.dict(os.environ, {'ATLAS_AUTH': 'off'}):
             response = self.client.get('/reset-staging/scvfd')

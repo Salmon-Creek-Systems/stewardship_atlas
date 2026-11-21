@@ -103,6 +103,11 @@ ANTHROPIC_SECRET_NAME = "atlas/anthropic-api-key"
 # committed in keys/ and becomes the distribution's key group.
 CLOUDFRONT_KEY_SECRET = "atlas/cloudfront-signing-key-{env}"
 SERVICE_TOKEN_SECRET = "atlas/service-token-{env}"
+# CloudFront sends this as ORIGIN_TOKEN_HEADER on every /api/* request; the API
+# refuses requests without it, so the open function URL is only usable via the
+# distribution. Must match webapp_auth.ORIGIN_TOKEN_HEADER.
+ORIGIN_TOKEN_SECRET = "atlas/origin-token-{env}"
+ORIGIN_TOKEN_HEADER = "x-atlas-origin-token"
 KEYS_DIR = Path(__file__).parent / "keys"
 
 # For the few API routes that name no atlas (/create_atlas, /files...).
@@ -302,6 +307,8 @@ class AtlasCloudStack(Stack):
                 self, "CloudFrontKeySecret", CLOUDFRONT_KEY_SECRET.format(env=env_name)),
             secretsmanager.Secret.from_secret_name_v2(
                 self, "ServiceTokenSecret", SERVICE_TOKEN_SECRET.format(env=env_name)),
+            secretsmanager.Secret.from_secret_name_v2(
+                self, "OriginTokenSecret", ORIGIN_TOKEN_SECRET.format(env=env_name)),
         ]
 
         # Deliberately unnamed. Switching between a zip and a container image
@@ -347,11 +354,19 @@ class AtlasCloudStack(Stack):
                                CLOUDFRONT_KEY_SECRET.format(env=env_name))
         api_fn.add_environment("ATLAS_SERVICE_TOKEN_SECRET",
                                SERVICE_TOKEN_SECRET.format(env=env_name))
+        api_fn.add_environment("ATLAS_ORIGIN_TOKEN_SECRET",
+                               ORIGIN_TOKEN_SECRET.format(env=env_name))
         api_fn.add_environment("CLOUDFRONT_KEY_PAIR_ID", signing_key.public_key_id)
 
-        # IAM auth on the function URL: the only caller allowed to sign requests
-        # is this distribution, via OAC. There is no unauthenticated public URL.
-        api_url = api_fn.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM)
+        # An open function URL (auth NONE), not OAC. OAC to a function URL
+        # needs every POST/PUT client to send x-amz-content-sha256 (the body's
+        # hash), or the signature fails with a 403 before the function runs.
+        # The API checks auth on every route itself (task 6), so OAC's only
+        # job was "CloudFront is the only way in"; the origin-token header
+        # does that instead (webapp_auth.check_origin).
+        api_url = api_fn.add_function_url(auth_type=lambda_.FunctionUrlAuthType.NONE)
+        origin_token = SecretValue.secrets_manager(
+            ORIGIN_TOKEN_SECRET.format(env=env_name)).unsafe_unwrap()
 
         # --- CloudFront: the single front door -------------------------------
         # Phase 2 wired invalidation into publish (atlas_store.invalidate_current),
@@ -411,7 +426,8 @@ class AtlasCloudStack(Stack):
             additional_behaviors={
                 # Everything mutating, and every protected read, goes here.
                 "/api/*": cloudfront.BehaviorOptions(
-                    origin=origins.FunctionUrlOrigin.with_origin_access_control(api_url),
+                    origin=origins.FunctionUrlOrigin(
+                        api_url, custom_headers={ORIGIN_TOKEN_HEADER: origin_token}),
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
@@ -451,22 +467,6 @@ class AtlasCloudStack(Stack):
             domain_names=[domain_name] if certificate else None,
             certificate=certificate,
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
-        )
-
-        # Lambda-URL OAC needs *two* grants, and CDK's
-        # with_origin_access_control() only adds the first. Without this second
-        # one CloudFront's signed request is rejected before the function is
-        # ever invoked — a 403 with no log group to show for it.
-        # See "Restrict access to an AWS Lambda function URL origin" in the
-        # CloudFront developer guide.
-        api_fn.add_permission(
-            "AllowCloudFrontInvoke",
-            principal=iam.ServicePrincipal("cloudfront.amazonaws.com"),
-            action="lambda:InvokeFunction",
-            source_arn=(
-                f"arn:aws:cloudfront::{self.account}:distribution/"
-                f"{distribution.distribution_id}"
-            ),
         )
 
         distribution_arn = (f"arn:aws:cloudfront::{self.account}:distribution/"

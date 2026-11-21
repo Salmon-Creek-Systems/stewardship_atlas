@@ -16,7 +16,13 @@ The rules are in atlas_auth (pure); this wires them into FastAPI and Cognito.
 Environment (set by the CDK stack; the secrets by lambda_env at cold start):
     USER_POOL_ID, USER_POOL_CLIENT_ID, COGNITO_DOMAIN, ATLAS_PUBLIC_HOST,
     CLOUDFRONT_KEY_PAIR_ID, ATLAS_CLOUDFRONT_PRIVATE_KEY, ATLAS_SERVICE_TOKEN,
-    AWS_REGION. ``ATLAS_AUTH=off`` disables enforcement: tests only.
+    ATLAS_ORIGIN_TOKEN(_SECRET), AWS_REGION. ``ATLAS_AUTH=off`` disables role
+    enforcement: tests only.
+
+The function URL is open (auth NONE; see the CDK stack on why not OAC), so
+``enforce`` first requires the origin token CloudFront adds to every request.
+It is required whenever ``ATLAS_ORIGIN_TOKEN_SECRET`` is set, which only the
+cloud stack does; if the secret couldn't be read, every request is refused.
 
 A missing pool id fails closed: nobody has a session, so only public routes
 (and the service token) work.
@@ -38,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+ORIGIN_TOKEN_HEADER = 'x-atlas-origin-token'
 STATE_COOKIE = 'atlas_auth_state'
 STATE_TTL = 600
 API_PATH = '/api'
@@ -106,8 +113,18 @@ def request_atlas(request: Request):
     return request.path_params.get('swalename') or request.query_params.get('swale')
 
 
+def check_origin(request: Request):
+    """Raise AuthRequired unless the request came through our CloudFront."""
+    if not _env('ATLAS_ORIGIN_TOKEN_SECRET'):
+        return
+    if not atlas_auth.service_token_ok(request.headers.get(ORIGIN_TOKEN_HEADER),
+                                       _env('ATLAS_ORIGIN_TOKEN')):
+        raise AuthRequired({'error': 'not_via_cloudfront'})
+
+
 async def enforce(request: Request):
     """The global dependency: raise AuthRequired unless the caller may use this route."""
+    check_origin(request)
     if not enabled():
         return
     route = request.scope.get('route')
