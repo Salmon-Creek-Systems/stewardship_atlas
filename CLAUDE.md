@@ -45,6 +45,8 @@ A geospatial data management system for creating and maintaining fire safety atl
 - **3D sky is a CSS gradient behind `#map`.** MapLibre 4.7 draws nothing above the horizon. A real `sky` needs MapLibre 5.
 - **`s3_map_polygons` traces colored outlines off a GeoPDF/GeoTIFF** (`map_trace.py`; scvfd `thp_boundaries`). It reads PDFs with system `osgeo.gdal` because rasterio's bundled GDAL has no PDF driver. Re-running it, like any s3 inlet, appends duplicates (#190).
 - **scvfd `federated` is a static copy** of the kennedy and mineralkinsey atlas boundaries (an s3_geojson inlet), not federation; it won't follow boundary changes.
+- **scvfd `easement_986_236` and `thp_haul_route` are static s3_geojson imports (2026-11-20),** admin-only and shown only in `private_webmap`. Scot accepted that "admin" is still world-readable on the box (#144) because every input is public record. They come from `scripts/easement_986_236/`, a deliberately ungeneralized record of one analysis: copy and edit it for the next easement, and generalize only then. Its README holds the method and the caveats that must travel with the result. The main caveat: the deed line is shifted ~60 ft to fit the county road on courses 1–8.
+- **No poppler locally, and no Homebrew.** `scripts/pdf_tools/*.swift` reads PDFs with macOS PDFKit: text, page renders, crops and contact sheets. Run them as `swift scripts/pdf_tools/pdftext.swift FILE FIRST LAST`. The Read tool can't render PDFs past 10 pages without them.
 
 ## Core Architecture Concepts
 
