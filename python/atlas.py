@@ -365,14 +365,11 @@ def create(config: Dict[str, Any] = None,
         if layer_config.get('access', ['public']).count('public') == 0:
             add_htpasswds(config, p / 'staging' / 'layers' / layer_config['name'], layer_config['access'])
     
-    # Store initial feature collection in layers/regions
-    if (p / 'staging' / 'layers' / 'regions').exists():
-        if feature_collection:
-            logger.info(f"Storing initial feature collection in {p / 'staging' / 'layers' / 'regions'}...")
-            regions_dir = p / 'staging' / 'layers' / 'regions'
-            geojson.dump(feature_collection, open(regions_dir / 'default_atlas_regions.geojson', "w"))
-            geojson.dump(feature_collection, open(regions_dir / 'regions.geojson', "w"))
-    
+    # No layer data is written here. `regions` used to be seeded with the
+    # atlas's own bbox feature, which overwrote hand-drawn regions on every full
+    # build (#188). It's an ordinary starter layer now: empty until a starter,
+    # upload or edit fills it (refresh_all_vector_layers initializes it).
+
     # Write config file
     config_path = p / 'staging' / 'atlas_config.json'
     logger.info(f"Writing config to {config_path}")
