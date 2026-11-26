@@ -21,3 +21,11 @@ body {
     line-height: 20px;
 }
 
+
+/* Embed mode (?embed=1, set by webmap.js): a small frame inside another page. Only the
+   map, the scale bar and the attribution stay; the full map is one link away. */
+html.embed #controls,
+html.embed .maplibregl-ctrl-top-right,
+html.embed .maplibregl-ctrl-bottom-left > :not(.maplibregl-ctrl-scale) {
+    display: none !important;
+}

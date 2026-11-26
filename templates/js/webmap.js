@@ -1,5 +1,13 @@
+// Embed mode (?embed=1): the map is shown in a small frame inside another page, e.g. a
+// tour on salmoncreeksystems.com. The panels and controls are hidden by the html.embed
+// rules in map.css, and cooperative gestures (Ctrl/Cmd + scroll, two fingers on a phone)
+// keep the map from capturing the scroll of the page around it.
+const EMBED = new URLSearchParams(window.location.search).get('embed') === '1';
+if (EMBED) document.documentElement.classList.add('embed');
+
 // Initialize the map
-const map = new maplibregl.Map(MAP_CONFIG);
+const map = new maplibregl.Map(
+    EMBED ? Object.assign({}, MAP_CONFIG, {cooperativeGestures: true}) : MAP_CONFIG);
 
 // Snapshot mode (?chrome=0), used by the slides outlet (outlets_slides.py): hide every
 // panel and control except the scale bar and attribution, so a headless render
