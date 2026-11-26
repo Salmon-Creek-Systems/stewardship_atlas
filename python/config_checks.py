@@ -80,6 +80,10 @@ def unpublishable_map_layers(props: dict, shared_layers: dict) -> list:
     return found
 
 
+# The API's path on every atlas page's own origin; see infrastructure/api.
+API_PATH = '/api'
+
+
 def atlas_config_problems(props: dict, shared: dict) -> list:
     """Every reason this atlas's source properties are not deployable; [] if none.
 
@@ -111,6 +115,11 @@ def atlas_config_problems(props: dict, shared: dict) -> list:
         for lname in asset.get('in_layers', []):
             if lname not in layers and lname not in shared['layers']:
                 problems.append(f"{name} in_layers references undefined '{lname}'")
+
+    # Pages call the API on their own origin (CloudFront's /api/*): an absolute
+    # app_url would send a cloud page's requests to the box (task 7).
+    if props.get('app_url') != API_PATH:
+        problems.append(f"app_url must be {API_PATH!r}, is {props.get('app_url')!r}")
 
     outlets = (props.get('cloud') or {}).get('outlets')
     if outlets is None:

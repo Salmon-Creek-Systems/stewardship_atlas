@@ -33,7 +33,7 @@
             "properties": {
                 "name": "south_fork_eel",
                 "description": "south_fork_eel",
-                "app_url": "https://fireatlas.org:9000",
+                "app_url": "/api",
                 "versioned_outlets": [],
                 "default_h3_resolution": 9,
                 "email_photo_default_layer": "photos",

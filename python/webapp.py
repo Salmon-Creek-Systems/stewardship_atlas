@@ -1127,7 +1127,7 @@ async def create_atlas_endpoint(payload: CreateAtlasRequest, background_tasks: B
             "properties": {
                 "name": slug,
                 "description": payload.name,
-                "app_url": "https://fireatlas.org:9000",
+                "app_url": "/api",   # same origin (config_checks.API_PATH)
                 "versioned_outlets": [],  # empty = snapshot every outlet (#131 C9)
                 "default_h3_resolution": _default_h3_resolution,
                 **starter_props,

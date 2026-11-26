@@ -24,7 +24,7 @@
                 "shared_dir": "/root/data/",
                 "admin_emails": ["gateless@gmail.com"],
                 "base_url": "https://fireatlas.org/abi_demo",
-                "app_url": "https://fireatlas.org:9000",
+                "app_url": "/api",
                 "port": 9000,
                 "logo_url": "",
                 "versioned_outlets": [],

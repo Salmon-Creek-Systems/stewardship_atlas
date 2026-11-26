@@ -33,7 +33,7 @@
       "properties": {
         "name": "nfsc_refugia",
         "description": "NFSC_refugia",
-        "app_url": "https://fireatlas.org:9000",
+        "app_url": "/api",
         "versioned_outlets": [],
         "default_h3_resolution": 11,
         "data_root": "/root/swales_dev",

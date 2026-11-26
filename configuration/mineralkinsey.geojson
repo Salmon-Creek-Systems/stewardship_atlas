@@ -35,7 +35,7 @@
                 "data_root": "/root/swales_dev",
                 "shared_dir": "/root/data",
                 "base_url": "https://fireatlas.org/mineralkinsey",
-                "app_url": "https://fireatlas.org:9000",
+                "app_url": "/api",
                 "port": 9000,
                 "admin_emails": [
                     "gateless@gmail.com"

@@ -33,7 +33,7 @@
             "properties": {
                 "name": "sherwood_ranch",
                 "description": "sherwood ranch",
-                "app_url": "https://fireatlas.org:9000",
+                "app_url": "/api",
                 "versioned_outlets": [],
                 "default_h3_resolution": 10,
                 "data_root": "/root/swales_dev",

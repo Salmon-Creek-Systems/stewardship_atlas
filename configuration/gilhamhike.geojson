@@ -33,7 +33,7 @@
       "properties": {
         "name": "gilhamhike",
         "description": "FOLC Gilham Butte Hike",
-        "app_url": "https://fireatlas.org:9000",
+        "app_url": "/api",
         "base_url": "https://fireatlas.org/gilhamhike",
         "port": 9000,
         "data_root": "/root/swales_dev",

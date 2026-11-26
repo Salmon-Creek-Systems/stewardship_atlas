@@ -33,7 +33,7 @@
       "properties": {
         "name": "napachar",
         "description": "napachar",
-        "app_url": "https://fireatlas.org:9000",
+        "app_url": "/api",
         "versioned_outlets": [],
         "cloud": {
           "outlets": ["webmap", "console"]

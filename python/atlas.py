@@ -242,7 +242,7 @@ def create_config(config: Dict[str, Any] = None,
 
         # Defaults for optional fields that may be absent from the GeoJSON
         config.setdefault('base_url', f"https://fireatlas.org/{props['name']}")
-        config.setdefault('app_url', "https://fireatlas.org")
+        config.setdefault('app_url', "/api")   # same origin: CloudFront's /api/*
         config.setdefault('atlasappport', 443)
         config.setdefault('logo', "/local/scs-smallgrass1.png")
         config.setdefault('admin_emails', [])

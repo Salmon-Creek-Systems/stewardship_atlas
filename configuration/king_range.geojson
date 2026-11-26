@@ -33,7 +33,7 @@
       "properties": {
         "name": "king_range",
         "description": "King Range",
-        "app_url": "https://fireatlas.org:9000",
+        "app_url": "/api",
         "versioned_outlets": [],
         "cloud": {
           "outlets": ["webmap", "console"]

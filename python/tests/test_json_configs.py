@@ -540,7 +540,8 @@ if __name__ == '__main__':
 
 class TestConfigChecks(unittest.TestCase):
     def _props(self):
-        return {'versioned_outlets': [], 'cloud': {'outlets': ['webmap', 'console']},
+        return {'versioned_outlets': [], 'app_url': '/api',
+                'cloud': {'outlets': ['webmap', 'console']},
                 'layers': {'roads': {'access': ['public']}},
                 'assets': {'console': {'config_def': 'console'},
                            'webmap': {'config_def': 'webmap', 'show_user_location': True,
@@ -552,6 +553,13 @@ class TestConfigChecks(unittest.TestCase):
 
     def test_a_good_config_has_no_problems(self):
         self.assertEqual(config_checks.atlas_config_problems(self._props(), self._shared()), [])
+
+    def test_an_absolute_app_url_is_refused(self):
+        # The box's API address: a cloud page would post its edits to the box.
+        props = self._props()
+        props['app_url'] = 'https://fireatlas.org:9000'
+        self.assertEqual(config_checks.atlas_config_problems(props, self._shared()),
+                         ["app_url must be '/api', is 'https://fireatlas.org:9000'"])
 
     def test_each_rule_reports(self):
         props = self._props()
