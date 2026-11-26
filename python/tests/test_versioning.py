@@ -339,6 +339,7 @@ class TestPublishNewVersion(unittest.TestCase):
         config = make_atlas(self.root)
         publish_new_version(config, version='v1', client=self.client)
         before = set(self.client.objects)
+        uploads_before = len([c for c in self.client.calls if c[0] == 'upload_file'])
 
         result = publish_new_version(config, version='v2', client=self.client)
 
@@ -346,10 +347,15 @@ class TestPublishNewVersion(unittest.TestCase):
         self.assertEqual(result['catalog']['reused_layers'], ['roads'])
         self.assertEqual(sorted(result['catalog']['reused_outlets']),
                          ['runbook', 'webmap'])
+        # Besides documents, only v2's served copy is new, and it is made by
+        # server-side copies of objects already in S3: no bytes are uploaded.
         new_objects = {k for k in set(self.client.objects) - before}
         self.assertTrue(all('/catalog/' in key or key.endswith('current.json')
+                            or key.startswith('testatlas/v2/')
                             for _, key in new_objects),
-                        f'only documents should be new, got {sorted(new_objects)}')
+                        f'only documents and the v2 copy should be new, got {sorted(new_objects)}')
+        uploads_after = len([c for c in self.client.calls if c[0] == 'upload_file'])
+        self.assertEqual(uploads_after, uploads_before)
 
     def test_an_edited_layer_is_rewritten_at_the_new_version(self):
         config = make_atlas(self.root)
@@ -373,6 +379,79 @@ class TestPublishNewVersion(unittest.TestCase):
         before = set(self.client.objects)
         publish_new_version(config, version='v1', client=self.client)
         self.assertEqual(set(self.client.objects), before)
+
+
+class TestVersionServedAtItsOwnPrefix(unittest.TestCase):
+    """Every publish is also served at {atlas}/{version}/, the box's URL shape,
+    so a page or a printed link into a version keeps showing that version."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.client = FakeS3()
+        self.addCleanup(self.tmp.cleanup)
+        self.config = make_atlas(self.root)
+
+    def publish(self, version, edit=None):
+        if edit is not None:
+            (self.root / 'testatlas' / 'staging' / 'layers' / 'roads' /
+             'roads.geojson').write_text(edit)
+        return publish_new_version(self.config, version=version, client=self.client)
+
+    def keys(self, prefix):
+        return sorted(k for (b, k) in self.client.objects
+                      if b == OUT and k.startswith(prefix))
+
+    def test_a_version_holds_what_current_holds(self):
+        self.publish('v1')
+        relative = lambda prefix: [k[len(prefix):] for k in self.keys(prefix)]
+        self.assertEqual(relative('testatlas/v1/'), relative('testatlas/current/'))
+        self.assertIn('testatlas/v1/outlets/webmap/index.html', self.keys('testatlas/v1/'))
+        self.assertIn('testatlas/v1/layers/roads/roads.geojson', self.keys('testatlas/v1/'))
+
+    def test_a_protected_outlet_stays_out_of_the_version(self):
+        self.publish('v1')
+        self.assertNotIn('testatlas/v1/outlets/runbook/index.html',
+                         self.keys('testatlas/v1/'))
+
+    def test_a_later_publish_leaves_an_older_version_alone(self):
+        self.publish('v1')
+        v1_roads = self.client.objects[(OUT, 'testatlas/v1/layers/roads/roads.geojson')]
+        self.publish('v2', edit='{"features": [1]}')
+        self.assertEqual(self.client.objects[(OUT, 'testatlas/v1/layers/roads/roads.geojson')],
+                         v1_roads)
+        self.assertNotEqual(self.client.objects[(OUT, 'testatlas/v2/layers/roads/roads.geojson')],
+                            v1_roads)
+
+    def test_rollback_leaves_version_prefixes_alone(self):
+        self.publish('v1')
+        self.publish('v2', edit='{"features": [1]}')
+        before = {k: self.client.objects[(OUT, k)]
+                  for k in self.keys('testatlas/v1/') + self.keys('testatlas/v2/')}
+        versioning.set_current_version(self.config, version='v1', client=self.client)
+        after = {k: self.client.objects[(OUT, k)]
+                 for k in self.keys('testatlas/v1/') + self.keys('testatlas/v2/')}
+        self.assertEqual(after, before)
+
+    def test_a_failed_version_copy_leaves_the_previous_version_live(self):
+        self.publish('v1')
+        with mock.patch('atlas_store.serve_version_copy',
+                        side_effect=RuntimeError('bucket unreachable')):
+            with self.assertRaises(RuntimeError):
+                self.publish('v2', edit='{"features": [1]}')
+        pointer = atlas_store.get_json(OUT, 'testatlas/current.json', client=self.client)
+        self.assertEqual(pointer['version'], 'v1')
+
+    def test_a_reserved_version_name_is_refused_before_writing(self):
+        for name in ('current', 'layers', 'catalog', 'jobs', 'tmp', 'a/b'):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    self.publish(name)
+        # The test helper's staging write-back puts the staging catalog in OUT;
+        # publish itself must have written nothing.
+        written = [k for k in self.keys('testatlas/')
+                   if not k.startswith('testatlas/catalog/staging')]
+        self.assertEqual(written, [])
 
 
 class TestVersionListAndRollback(unittest.TestCase):

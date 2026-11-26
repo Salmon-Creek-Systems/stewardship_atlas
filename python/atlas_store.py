@@ -267,14 +267,34 @@ def atlas_prefix(atlas_name: str) -> str:
 def current_prefix(atlas_name: str) -> str:
     """Key prefix serving the currently published version.
 
-    Phase 2 writes the published version's contents straight here rather than
-    to a versioned prefix with a pointer indirection. Reasons: URLs stay
-    static (no edge resolver needed), storage is not duplicated, and version
-    *history* already lives on the box. Phase 3 revisits this when S3 becomes
-    the source of truth — at which point a pointer object plus a CloudFront
-    KeyValueStore lookup is the better shape.
+    A copy, not a pointer: the live version's contents are written here, and
+    since task 7 (2026-11) every version is *also* served at its own
+    ``version_prefix``. A CloudFront KeyValueStore lookup that rewrites
+    ``current/`` to the live version would drop this copy; deferred because
+    publish, rollback and the verify scripts are proven against the copy.
     """
     return f"{atlas_prefix(atlas_name)}/current"
+
+
+# First path segments under {atlas}/ in the outlets bucket that aren't
+# versions. A version named like one of them would land on top of it.
+RESERVED_ATLAS_SEGMENTS = frozenset({
+    'current', 'current.json', 'staging', 'layers', 'catalog', 'jobs', 'tmp',
+    'media', 'outlets', 'CURRENT'})
+
+
+def version_prefix(atlas_name: str, version: str) -> str:
+    """Key prefix serving one published version: ``{atlas}/{version}``.
+
+    The same shape as the box's version directories, so a link to
+    ``/{atlas}/{version}/outlets/webmap/`` works on both. Written once at
+    publish and never pruned or overwritten: a version is immutable.
+    """
+    if (not version or '/' in version or version.startswith('.')
+            or version in RESERVED_ATLAS_SEGMENTS):
+        raise ValueError(f"'{version}' can't be a version name: it would collide "
+                         f"with {atlas_prefix(atlas_name)}/{version}/")
+    return f"{atlas_prefix(atlas_name)}/{version}"
 
 
 def pointer_key(atlas_name: str) -> str:
@@ -716,8 +736,12 @@ def copy_objects(pairs: list, client=None) -> int:
     return len(pairs)
 
 
-def plan_mirror_from_archive(config: dict, items: list, client=None) -> list:
+def plan_mirror_from_archive(config: dict, items: list, client=None,
+                             prefix: str = None) -> list:
     """`(src_bucket, src_key, dst_bucket, dst_key)` to serve a version from its archive.
+
+    Into ``{atlas}/current/`` by default; ``prefix`` names another target (a
+    version's own ``{atlas}/{version}/``, see `serve_version_copy`).
 
     Rebuilds exactly what a publish's mirror holds — the allowlisted public
     outlets and the public layers they reference — but from objects already in
@@ -737,7 +761,7 @@ def plan_mirror_from_archive(config: dict, items: list, client=None) -> list:
     settings = cloud_settings(config)
     atlas_name = config['name']
     public_bucket = settings.get('outlets_bucket') or ''
-    prefix = current_prefix(atlas_name)
+    prefix = prefix or current_prefix(atlas_name)
 
     outlets = set(publishable_outlets(config))
     wanted_layers = set(outlet_layer_names(config))
@@ -816,6 +840,29 @@ def serve_version(config: dict, version: str, items: list, client=None) -> dict:
                 f"({len(plan)} objects, pruned {removed})")
     return {'status': 'success', 'version': version, 'files': len(plan),
             'pruned': removed, 'invalidation': invalidation}
+
+
+def serve_version_copy(config: dict, version: str, items: list, client=None) -> dict:
+    """Serve a version at its own ``{atlas}/{version}/``, beside ``current/``.
+
+    What ``current/`` holds for this version, built the same way (the same
+    outlet allowlist, role-variant pruning and public-layers-only rule) but
+    never pruned afterwards and never invalidated: nothing else is ever written
+    under a version's prefix, so a page or a printed link into it stays put.
+    Server-side copies only. Versions published before this existed have no
+    prefix; they are not backfilled (Scot, 2026-11-25).
+    """
+    atlas_name = config['name']
+    prefix = version_prefix(atlas_name, version)
+    plan = plan_mirror_from_archive(config, items, client=client, prefix=prefix)
+    if not plan:
+        raise ValueError(f"version {version} of '{atlas_name}' has nothing "
+                         f"publicly servable")
+    copied = copy_objects(plan, client=client)
+    logger.info(f"atlas_store: serving {atlas_name} version {version} at "
+                f"{prefix}/ ({copied} objects)")
+    return {'status': 'success', 'version': version, 'prefix': prefix,
+            'files': copied}
 
 
 def invalidate_current(distribution_id: str, atlas_name: str, client=None) -> str:

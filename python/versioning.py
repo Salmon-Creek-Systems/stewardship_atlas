@@ -72,8 +72,10 @@ def publish_new_version(config, version=None, *, client=None, source=None):
     if not version:
         version = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
-    # Before anything is written: an allowlisted outlet with no declared
-    # access would silently drop out of the public copy (#175).
+    # Before anything is written: a version name that would land on another
+    # prefix ({atlas}/current/, layers/, ...), and an allowlisted outlet with
+    # no declared access, which would silently drop out of the public copy (#175).
+    atlas_store.version_prefix(config['name'], version)
     undeclared = atlas_store.outlets_missing_access(config)
     if undeclared:
         raise ValueError(f"publish refused for {config['name']}: allowlisted outlet(s) "
@@ -128,7 +130,17 @@ def publish_new_version(config, version=None, *, client=None, source=None):
     logger.info(f"STAC documents: {len(documents)} written to "
                 f"s3://{catalog_bucket}/{atlas_store.catalog_prefix(config['name'])}/")
 
-    # 4. The serving mirror and the pointer that makes this version current.
+    # 4. The version's own copy at {atlas}/{version}/, from the objects and
+    #    documents just written. Before the current/ mirror, so a failure here
+    #    still leaves the previous version live.
+    version_items = atlas_catalog.read_version_items(
+        client, catalog_bucket, config['name'], version,
+        atlas_store.catalog_base_url(config))
+    version_copy = atlas_store.serve_version_copy(
+        config, version, version_items, client=client)
+    logger.info(f"S3 version copy: {version_copy}")
+
+    # 5. The serving mirror and the pointer that makes this version current.
     #    Last, because until it moves the previous version is still the one
     #    being served — which is the safe outcome of any failure above.
     push = atlas_store.publish_public_outlets(
@@ -145,6 +157,7 @@ def publish_new_version(config, version=None, *, client=None, source=None):
             'written_outlets', 'reused_outlets', 'missing_outlets', 'versions')},
         'layers': layer_push,
         'outlet_archive': outlet_push,
+        'version_copy': version_copy,
         'published': push,
     }
 
