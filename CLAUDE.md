@@ -371,7 +371,7 @@ Stacks (all **us-east-1**, since CloudFront requires its ACM cert there):
 **CI/CD:** `.github/workflows/deploy-cloud.yml` — push to `main` touching `infrastructure/cdk/**` or `infrastructure/api/**` builds the API container, pushes to ECR tagged with the commit SHA, and runs `cdk deploy`. Auth is OIDC; no AWS keys are stored in GitHub. This is the mechanism that ends the live-checkout/`.git`-exposure/`--reload` class of problem — prod becomes an immutable image.
 
 **Gotchas:**
-- **Lambda function-URL OAC needs two grants.** CDK's `FunctionUrlOrigin.with_origin_access_control()` adds only `lambda:InvokeFunctionUrl`; AWS also requires `lambda:InvokeFunction` for the `cloudfront.amazonaws.com` principal. Symptom: 403 through CloudFront with **no log group ever created**.
+- **The API's function URL is open (auth `NONE`), not OAC** (2026-11-21). OAC to a function URL makes every POST/PUT client send `x-amz-content-sha256`, so all POSTs through CloudFront 403'd (and showed as the login page). CloudFront instead adds `x-atlas-origin-token` (`atlas/origin-token-{env}`), and `webapp_auth.check_origin` refuses requests without it (401 `not_via_cloudfront`). Don't go back to OAC for the API.
 - **Never set a custom `function_name` on a Lambda whose packaging might change.** Zip → container image is a *replacement*, and CloudFormation refuses to replace a custom-named resource. The API Lambda is deliberately unnamed; find it via the `ApiFunctionName` stack output.
 - An empty outlets bucket returns **403, not 404** — OAC grants no `ListBucket`.
 

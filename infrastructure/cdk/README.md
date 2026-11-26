@@ -72,8 +72,9 @@ Google side are `https://scs-atlas-auth-{prod,staging}.auth.us-east-1.amazoncogn
 If either value is missing the stack still deploys — it just omits the Google
 provider, leaving a Cognito-only pool.
 
-**1b. Auth secrets (task 6), per environment.** The CloudFront signing key and
-the email Lambda's service token. The private key goes straight to Secrets
+**1b. Auth secrets (task 6), per environment.** The CloudFront signing key,
+the email Lambda's service token, and the origin token CloudFront sends to the
+API's open function URL (the API refuses requests without it). The private key goes straight to Secrets
 Manager and is deleted locally; the public half is committed as
 `keys/cloudfront-{env}.pem` and becomes the distribution's key group:
 
@@ -88,6 +89,10 @@ openssl rand -hex 32 | tr -d '\n' > /tmp/st
 aws secretsmanager create-secret --name atlas/service-token-$ENV \
   --secret-string file:///tmp/st --region us-east-1 --profile atlas
 rm /tmp/st
+openssl rand -hex 32 | tr -d '\n' > /tmp/ot
+aws secretsmanager create-secret --name atlas/origin-token-$ENV \
+  --secret-string file:///tmp/ot --region us-east-1 --profile atlas
+rm /tmp/ot
 ```
 
 Rotating the key: replace both halves together and deploy; existing logins
