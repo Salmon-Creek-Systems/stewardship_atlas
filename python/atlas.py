@@ -90,6 +90,7 @@ LAZY_MATERIALIZER_MODULES = {
     'h3_count': 'eddies',
     'h3_raster_stats': 'eddies',
     'dst_match_simplified': 'eddies',
+    'camera_route_smooth': 'eddies',
 }
 
 

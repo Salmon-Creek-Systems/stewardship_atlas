@@ -69,8 +69,7 @@ class TestCreateLeavesRegionsAlone(unittest.TestCase):
 
     def _create(self):
         with patch.object(atlas, 'create_config', return_value=_config(self.root)):
-            atlas.create(data_root=str(self.root), shared_dir=self.shared,
-                         feature_collection=BBOX_FC)
+            atlas.create(data_root=str(self.root), feature_collection=BBOX_FC)
 
     def test_fresh_atlas_gets_no_bbox_region(self):
         self._create()
