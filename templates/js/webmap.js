@@ -1,5 +1,13 @@
+// Embed mode (?embed=1): the map is shown in a small frame inside another page, e.g. a
+// tour on salmoncreeksystems.com. The panels and controls are hidden by the html.embed
+// rules in map.css, and cooperative gestures (Ctrl/Cmd + scroll, two fingers on a phone)
+// keep the map from capturing the scroll of the page around it.
+const EMBED = new URLSearchParams(window.location.search).get('embed') === '1';
+if (EMBED) document.documentElement.classList.add('embed');
+
 // Initialize the map
-const map = new maplibregl.Map(MAP_CONFIG);
+const map = new maplibregl.Map(
+    EMBED ? Object.assign({}, MAP_CONFIG, {cooperativeGestures: true}) : MAP_CONFIG);
 
 // Snapshot mode (?chrome=0), used by the slides outlet (outlets_slides.py): hide every
 // panel and control except the scale bar and attribution, so a headless render
@@ -96,47 +104,8 @@ const urlZoom = getUrlParameter('zoom');
 
 console.log('URL parameters found:', { lat: urlLat, lng: urlLng, zoom: urlZoom });
 
-// Add group visibility control for related layers
-map.on('styledata', () => {
-    // Get all layers with group metadata
-    const style = map.getStyle();
-    const groupedLayers = {};
-    
-    // Build group mapping
-    style.layers.forEach(layer => {
-        if (layer.metadata && layer.metadata.group) {
-            if (!groupedLayers[layer.metadata.group]) {
-                groupedLayers[layer.metadata.group] = [];
-            }
-            groupedLayers[layer.metadata.group].push(layer.id);
-        }
-    });
-    
-    // Store group mapping globally for visibility control
-    window.LAYER_GROUPS = groupedLayers;
-});
-
-// Override layer visibility to sync group members
-const originalSetLayoutProperty = map.setLayoutProperty;
-map.setLayoutProperty = function(layerId, property, value) {
-    if (property === 'visibility' && window.LAYER_GROUPS) {
-        // Find which group this layer belongs to
-        for (const [groupName, layerIds] of Object.entries(window.LAYER_GROUPS)) {
-            if (layerIds.includes(layerId)) {
-                // Set visibility for all layers in the group
-                layerIds.forEach(id => {
-                    if (map.getLayer(id)) {
-                        originalSetLayoutProperty.call(this, id, property, value);
-                    }
-                });
-                return; // Exit after handling the group
-            }
-        }
-    }
-    
-    // Default behavior for non-grouped layers
-    return originalSetLayoutProperty.call(this, layerId, property, value);
-};
+// Legend toggles move a layer's whole group (line + label); see shared_utils.js
+const originalSetLayoutProperty = installLayerGroupVisibility(map);
 
 // Add satellite source and layer
 map.on('load', async () => {

@@ -517,8 +517,9 @@ def webmap_json(config, name, sprite_json=None, edit_layer=None):
         has_label_layer = any(l.get('id') == label_layer_id for l in map_layers)
         
         if has_label_layer:
-            # Point legend to label layer instead of primary layer (label has icons)
-            legend_targets[label_layer_id] = layer_name
+            # One row per group: the label layer for points (it has the icon),
+            # the geometry layer for lines/polygons (map_style.legend_target_id)
+            legend_targets[map_style.legend_target_id(layer, label_layer_id)] = layer_name
             
             # Preserve existing metadata if present, otherwise add basic legend properties
             existing_metadata = layer.get('metadata', {})

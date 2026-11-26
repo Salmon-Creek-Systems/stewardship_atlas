@@ -237,10 +237,13 @@ def _build_route_panel_html(route_layers: list) -> str:
 _ROUTE_JS = """
         const ROUTE_URLS = __ROUTE_URLS__;
         const ROUTE_LOOKAHEAD_M = 150;
+        const ROUTE_SMOOTH_M = 75;         // averaging half-window along the line
+        const ROUTE_SMOOTH_SAMPLES = 6;    // samples each side of the target
+        const ROUTE_BEARING_TAU_S = 0.6;   // bearing ease time constant
         const ROUTE_MAX_ZOOM = 22;
         const BASE_MAX_ZOOM = map.getMaxZoom();
         const route = {layer: '', legs: [], total: 0, playing: false, progress: 0,
-                       startedAt: 0, secs: 60, raf: null, bearing: null};
+                       startedAt: 0, secs: 60, raf: null, bearing: null, lastFrame: null};
         const routeEls = {
             layer: document.getElementById('route-layer'),
             details: document.getElementById('route-details'),
@@ -268,29 +271,39 @@ _ROUTE_JS = """
             return Math.atan2(y, x) / rad;
         }
 
-        // One leg per LineString (or MultiLineString part), with cumulative metres per vertex.
+        // One leg per LineString (or MultiLineString part), with cumulative metres per
+        // vertex. A smoothed layer (camera_route_smooth eddy) also carries
+        // camera_lift_m, one value per vertex: metres added to the height slider there.
+        // Lines without it get zero lift, so they fly exactly as before.
         function buildRouteLegs(fc) {
             const parts = [];
             ((fc && fc.features) || []).forEach(f => {
                 const g = f && f.geometry;
                 if (!g) return;
-                if (g.type === 'LineString') parts.push(g.coordinates);
-                else if (g.type === 'MultiLineString') g.coordinates.forEach(c => parts.push(c));
+                const lift = f.properties && f.properties.camera_lift_m;
+                if (g.type === 'LineString') parts.push({coords: g.coordinates, lift});
+                else if (g.type === 'MultiLineString') g.coordinates.forEach(c => parts.push({coords: c, lift: null}));
             });
             const legs = [];
-            parts.forEach(coords => {
-                const pts = (coords || []).filter(c => Array.isArray(c) && c.length >= 2)
-                    .map(c => [c[0], c[1]]);
+            parts.forEach(({coords, lift}) => {
+                const usable = Array.isArray(lift) && lift.length === (coords || []).length;
+                const pts = [], lifts = [];
+                (coords || []).forEach((c, i) => {
+                    if (!Array.isArray(c) || c.length < 2) return;
+                    pts.push([c[0], c[1]]);
+                    lifts.push(usable && Number.isFinite(lift[i]) ? lift[i] : 0);
+                });
                 if (pts.length < 2) return;
                 const cum = [0];
                 for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversineM(pts[i - 1], pts[i]));
                 const len = cum[cum.length - 1];
-                if (len > 0) legs.push({pts, cum, len});
+                if (len > 0) legs.push({pts, lifts, cum, len});
             });
             return legs;
         }
 
-        function pointAlong(leg, d) {
+        // Position and lift at distance d along a leg, interpolated between vertices.
+        function sampleAlong(leg, d) {
             d = Math.max(0, Math.min(leg.len, d));
             let lo = 1, hi = leg.cum.length - 1;
             while (lo < hi) {
@@ -300,7 +313,31 @@ _ROUTE_JS = """
             const seg = leg.cum[lo] - leg.cum[lo - 1];
             const t = seg > 0 ? (d - leg.cum[lo - 1]) / seg : 0;
             const a = leg.pts[lo - 1], b = leg.pts[lo];
-            return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+            return {pt: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+                    lift: leg.lifts[lo - 1] + (leg.lifts[lo] - leg.lifts[lo - 1]) * t};
+        }
+
+        // Triangle-weighted average of position and lift over +-ROUTE_SMOOTH_M along
+        // the leg: rounds any corner the eddy left (or a raw line's every corner) and
+        // the apex the eddy's lift has on ridge tops. Clamped at the leg's ends.
+        function smoothedAlong(leg, d) {
+            const n = ROUTE_SMOOTH_SAMPLES;
+            let x = 0, y = 0, lift = 0, wsum = 0;
+            for (let k = -n; k <= n; k++) {
+                const w = n + 1 - Math.abs(k);
+                const s = sampleAlong(leg, d + k * ROUTE_SMOOTH_M / n);
+                x += w * s.pt[0]; y += w * s.pt[1]; lift += w * s.lift; wsum += w;
+            }
+            return {pt: [x / wsum, y / wsum], lift: lift / wsum};
+        }
+
+        // Turn the camera toward `target` bearing at most as fast as an exponential
+        // ease with ROUTE_BEARING_TAU_S, the shorter way round.
+        function easeBearing(current, target, dtSecs) {
+            if (current === null) return target;
+            const diff = ((target - current + 540) % 360) - 180;
+            const k = 1 - Math.exp(-Math.max(0, dtSecs) / ROUTE_BEARING_TAU_S);
+            return current + diff * k;
         }
 
         function legAt(dist) {
@@ -348,17 +385,23 @@ _ROUTE_JS = """
             const p = routeParams();  // height and angle can be changed mid-flight
             const frac = Math.min(1, route.progress + (now - route.startedAt) / (route.secs * 1000));
             const {leg, d} = legAt(frac * route.total);
-            const center = pointAlong(leg, d);
-            const ahead = pointAlong(leg, d + ROUTE_LOOKAHEAD_M);
-            if (haversineM(center, ahead) > 1) route.bearing = bearingDeg(center, ahead);
+            const here = smoothedAlong(leg, d);
+            const center = here.pt;
+            const ahead = smoothedAlong(leg, d + ROUTE_LOOKAHEAD_M).pt;
+            const dt = route.lastFrame === null ? 0 : (now - route.lastFrame) / 1000;
+            route.lastFrame = now;
+            if (haversineM(center, ahead) > 1) {
+                route.bearing = easeBearing(route.bearing, bearingDeg(center, ahead), dt);
+            }
             // MapLibre refreshes the target's ground elevation only when it renders,
             // so it still holds the previous frame's ground. queryTerrainElevation
             // gives (new ground - that), which we add so the camera height is right
-            // even on slow devices where frames are far apart.
+            // even on slow devices where frames are far apart. here.lift is the
+            // smoothed layer's extra height (0 on a raw line), on top of the slider.
             const lag = map.queryTerrainElevation(center) || 0;
             map.jumpTo({
                 center,
-                zoom: zoomForHeight(Math.max(1, p.h + lag), p.c, center[1]),
+                zoom: zoomForHeight(Math.max(1, p.h + here.lift + lag), p.c, center[1]),
                 pitch: p.c,
                 bearing: route.bearing === null ? map.getBearing() : route.bearing,
             });
@@ -382,6 +425,7 @@ _ROUTE_JS = """
             route.secs = routeParams().d;
             route.playing = true;
             route.startedAt = performance.now();
+            route.lastFrame = null;
             map.setMaxZoom(ROUTE_MAX_ZOOM);
             setRouteButtons();
             route.raf = requestAnimationFrame(routeFrame);
@@ -875,6 +919,11 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         .back-link:hover {{
             background: rgba(255, 255, 255, 1);
         }}
+        /* Embed mode (?embed=1): only the map and its navigation buttons stay. */
+        html.embed .panel,
+        html.embed .back-link {{
+            display: none !important;
+        }}
     </style>
 </head>
 <body>
@@ -901,8 +950,15 @@ def generate_3d_terrain_html(config: Dict[str, Any]) -> str:
         maplibregl.addProtocol('pmtiles', protocol.tile);
         maplibregl.addProtocol('cog', MaplibreCOGProtocol.cogProtocol);
 
+        // Embed mode (?embed=1): shown in a small frame inside another page (a tour).
+        // Panels are hidden by the html.embed CSS rule; cooperative gestures keep the
+        // map from capturing the scroll of the page around it.
+        const EMBED = new URLSearchParams(window.location.search).get('embed') === '1';
+        if (EMBED) document.documentElement.classList.add('embed');
+
         const map = new maplibregl.Map({{
             container: 'map',
+            cooperativeGestures: EMBED,
             zoom: 14,
             center: [{center_lng}, {center_lat}],
             pitch: 60,

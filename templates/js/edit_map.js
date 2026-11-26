@@ -1,6 +1,9 @@
 // Initialize the map
 const map = new maplibregl.Map(MAP_CONFIG);
 
+// Legend toggles move a layer's whole group (line + label); see shared_utils.js
+installLayerGroupVisibility(map);
+
 // Add legend control
 map.addControl(new MaplibreLegendControl.MaplibreLegendControl(LEGEND_TARGETS, {reverseOrder: false}), 'bottom-left');
 

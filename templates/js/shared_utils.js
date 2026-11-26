@@ -25,6 +25,45 @@
 
 // Shared utilities for webmap and webedit interfaces
 
+// Make visibility changes apply to a layer's whole `metadata.group`.
+// outlets.py points the legend at a layer's *label* layer (so the legend can
+// show its icon), so without this, unchecking `roads` hides only the road
+// labels and leaves the lines drawn. Call it before adding the legend control.
+// Returns the original setLayoutProperty, for callers that need to set one
+// layer without touching its group.
+function installLayerGroupVisibility(map) {
+    map.on('styledata', () => {
+        const groupedLayers = {};
+        map.getStyle().layers.forEach(layer => {
+            if (layer.metadata && layer.metadata.group) {
+                if (!groupedLayers[layer.metadata.group]) {
+                    groupedLayers[layer.metadata.group] = [];
+                }
+                groupedLayers[layer.metadata.group].push(layer.id);
+            }
+        });
+        window.LAYER_GROUPS = groupedLayers;
+    });
+
+    const originalSetLayoutProperty = map.setLayoutProperty;
+    map.setLayoutProperty = function(layerId, property, value) {
+        if (property === 'visibility' && window.LAYER_GROUPS) {
+            for (const layerIds of Object.values(window.LAYER_GROUPS)) {
+                if (layerIds.includes(layerId)) {
+                    layerIds.forEach(id => {
+                        if (map.getLayer(id)) {
+                            originalSetLayoutProperty.call(this, id, property, value);
+                        }
+                    });
+                    return this;
+                }
+            }
+        }
+        return originalSetLayoutProperty.call(this, layerId, property, value);
+    };
+    return originalSetLayoutProperty;
+}
+
 // Function to show error popup
 function showErrorPopup(message) {
     const popup = document.createElement('div');

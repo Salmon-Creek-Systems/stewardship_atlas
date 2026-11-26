@@ -20,6 +20,8 @@ from datetime import datetime
 from collections import Counter
 
 import requests
+import math
+import camera_route
 import dataswale_geojson as dataswale
 import networkx as nx
 from pyproj import Geod
@@ -2367,7 +2369,122 @@ def dst_match_simplified(config: Dict[str, Any], asset_name: str):
     return str(out_path)
 
 
+TERRARIUM_TILE_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+
+
+class _TerrariumSampler:
+    """Ground elevation from the AWS Terrarium tiles the 3D view renders.
+
+    Bilinear between pixel centres, across tile edges; tiles are fetched once
+    and cached for the run.
+    """
+    def __init__(self, zoom):
+        self.zoom = zoom
+        self.tiles = {}
+
+    def _pixel(self, gx, gy):
+        tx, ty = gx // 256, gy // 256
+        tile = self.tiles.get((tx, ty))
+        if tile is None:
+            from PIL import Image
+            import io
+            url = TERRARIUM_TILE_URL.format(z=self.zoom, x=tx, y=ty)
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            tile = Image.open(io.BytesIO(resp.content)).convert('RGB').load()
+            self.tiles[(tx, ty)] = tile
+        return camera_route.terrarium_elevation(*tile[gx % 256, gy % 256])
+
+    def elevation(self, lng, lat):
+        tx, ty, px, py = camera_route.tile_pixel(lng, lat, self.zoom)
+        # global pixel coordinates, shifted so integer values are pixel centres
+        x, y = tx * 256 + px - 0.5, ty * 256 + py - 0.5
+        x0, y0 = math.floor(x), math.floor(y)
+        fx, fy = x - x0, y - y0
+        top = self._pixel(x0, y0) * (1 - fx) + self._pixel(x0 + 1, y0) * fx
+        bottom = self._pixel(x0, y0 + 1) * (1 - fx) + self._pixel(x0 + 1, y0 + 1) * fx
+        return top * (1 - fy) + bottom * fy
+
+
+def camera_route_smooth(config: Dict[str, Any], asset_name: str):
+    """
+    Smooth a line layer for the 3D view's Animate Camera (camera_route.py).
+
+    Each LineString (and each MultiLineString part) is simplified, its sharp
+    corners rounded and it is resampled evenly; then the ground along it is
+    sampled from the Terrarium tiles the 3D view renders, and each feature gets
+    `camera_lift_m`: one value per vertex, metres the 3D view adds to its
+    height slider there so the camera glides over ridges instead of copying
+    every bump. Lift is relative to the slider, so the slider still works.
+
+    Writes a new layer, regenerated in full on every run, so the source line
+    stays the editable one: edit it, then re-run this eddy.
+
+    Config:
+      in_layer: line layer to smooth (required)
+      out_layer: defaults to {in_layer}_smoothed
+      min_turn_deg (30), corner_radius_m (150), spacing_m (15), simplify_m (5):
+          horizontal smoothing; corners turning more than min_turn_deg become
+          curves starting corner_radius_m before the vertex
+      max_grade (0.15), blur_m (60): vertical; the camera's virtual ground
+          never climbs or falls steeper than max_grade
+      terrain_zoom (13): Terrarium zoom to sample (~15 m pixels at 40°N)
+    """
+    asset_config = config['assets'][asset_name]
+    in_layer = asset_config['in_layer']
+    out_layer = asset_config.get('out_layer') or f"{in_layer}_smoothed"
+    spacing_m = float(asset_config.get('spacing_m', 15))
+    sampler = _TerrariumSampler(int(asset_config.get('terrain_zoom', 13)))
+
+    source = dataswale.layer_as_featurecollection(config, in_layer)
+    out_features = []
+    for feature in (source or {}).get('features') or []:
+        geom = feature.get('geometry') or {}
+        if geom.get('type') == 'LineString':
+            parts = [geom['coordinates']]
+        elif geom.get('type') == 'MultiLineString':
+            parts = geom['coordinates']
+        else:
+            continue
+        for part in parts:
+            if len(part) < 2:
+                continue
+            coords = camera_route.smooth_line(
+                part,
+                simplify_m=float(asset_config.get('simplify_m', 5)),
+                min_turn_deg=float(asset_config.get('min_turn_deg', 30)),
+                radius_m=float(asset_config.get('corner_radius_m', 150)),
+                spacing_m=spacing_m)
+            local, _ = camera_route.to_local(coords)
+            dist = camera_route.cumulative(local)
+            ground = [sampler.elevation(lng, lat) for lng, lat in coords]
+            lift = camera_route.lift_profile(
+                dist, ground,
+                max_grade=float(asset_config.get('max_grade', 0.15)),
+                blur_m=float(asset_config.get('blur_m', 60)))
+            props = dict(feature.get('properties') or {})
+            props['camera_lift_m'] = [round(v, 1) for v in lift]
+            props['smoothed_from'] = in_layer
+            out_features.append({'type': 'Feature', 'properties': props,
+                                 'geometry': {'type': 'LineString',
+                                              'coordinates': [[round(c, 7) for c in p] for p in coords]}})
+            logger.info(f"camera_route_smooth: {len(part)} -> {len(coords)} vertices over "
+                        f"{dist[-1] / 1000:.1f} km; lift max {max(lift):.0f} m, "
+                        f"ground {min(ground):.0f}-{max(ground):.0f} m, "
+                        f"{len(sampler.tiles)} terrain tiles")
+
+    if not out_features:
+        raise Exception(f"camera_route_smooth: no lines in layer '{in_layer}'")
+    out_path = versioning.atlas_path(config, 'layers') / out_layer / f"{out_layer}.geojson"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        geojson.dump(geojson.FeatureCollection(out_features), f)
+    logger.info(f"camera_route_smooth: wrote {len(out_features)} lines to {out_path}")
+    return str(out_path)
+
+
 asset_methods = {
+    "camera_route_smooth": camera_route_smooth,
     "derived_hillshade": hillshade_gdal,
     "gdal_contours": contours_gdal,
     "contours": contours_gdal,  # legacy name, kept for config compatibility
