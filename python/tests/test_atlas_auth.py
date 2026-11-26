@@ -380,6 +380,14 @@ class TestEnforcement(unittest.TestCase):
         self.assertEqual(len(cloudfront), 3)
         self.assertTrue(all('Path=/;' in c or c.endswith('Path=/') for c in cloudfront), cloudfront)
 
+    def test_callback_shows_cognito_error(self):
+        response = self.client.get('/auth/callback', params={
+            'error': 'invalid_request', 'state': 'st8',
+            'error_description': 'Google Error - 401 invalid_client'}, follow_redirects=False)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()['cognito_error'], 'invalid_request')
+        self.assertIn('invalid_client', response.json()['detail'])
+
     def test_callback_refuses_a_mismatched_state(self):
         self.client.cookies.set(self.webapp_auth.STATE_COOKIE,
                                 self.webapp_auth._state_value('st8', '/'))

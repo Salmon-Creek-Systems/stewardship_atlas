@@ -192,7 +192,15 @@ async def auth_login(next: str = '/'):
 
 
 @router.get('/auth/callback')
-async def auth_callback(request: Request, code: str = None, state: str = None):
+async def auth_callback(request: Request, code: str = None, state: str = None,
+                        error: str = None, error_description: str = None):
+    if error:
+        # Cognito (or the IdP behind it) refused the login and says why; a
+        # bad Google client secret arrives this way. Show it, don't mask it.
+        logger.error(f"auth: login refused by Cognito: {error}: {error_description}")
+        return JSONResponse(status_code=502, content={
+            'error': 'login_failed', 'cognito_error': error,
+            'detail': error_description or error})
     expected, next_url = _parse_state(request.cookies.get(STATE_COOKIE))
     if not code or not state or not expected or not secrets.compare_digest(state, expected):
         return JSONResponse(status_code=400, content={

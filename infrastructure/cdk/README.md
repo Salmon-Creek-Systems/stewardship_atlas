@@ -95,6 +95,14 @@ aws secretsmanager create-secret --name atlas/origin-token-$ENV \
 rm /tmp/ot
 ```
 
+**Changing a secret's value doesn't reach Cognito.** The Google IdP's
+`client_secret` is a CloudFormation dynamic reference, resolved only when that
+resource otherwise changes; a deploy after `put-secret-value` changes nothing.
+Push it directly with `aws cognito-idp update-identity-provider` (describe the
+provider, swap `client_secret`, send all its `ProviderDetails` back). Google
+secrets are `GOCSPX-` plus 28 characters; a bad one shows on the login page as
+`Google Error - 401 invalid_client`.
+
 Rotating the key: replace both halves together and deploy; existing logins
 fail at CloudFront until their next login.
 
