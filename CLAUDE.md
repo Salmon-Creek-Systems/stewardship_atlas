@@ -64,6 +64,8 @@ The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the 
   - **Webedit always requires a login.** Don't make `delta_upload` or other editing routes public.
   - **Sessions last 1 day,** Cognito's ID-token cap.
   - **Tests run with `ATLAS_AUTH=off`** (`tests/conftest.py`).
+  - **Live and verified on staging (2026-11-25).** `scripts/cognito_login.sh USER PASS` logs a password user in from the shell for curl checks. Scot uses Google sign-in, not a password account.
+  - **Changing a Cognito IdP secret needs `update-identity-provider`;** a redeploy doesn't re-read a dynamic reference (`infrastructure/cdk/README.md`).
 - **Staging CDK deploys need** `-c env_name=staging -c atlas_domain= -c certificate_arn=`; without them staging tries to claim `next.fireatlas.org`. CI adds them for non-prod.
 - **The OIDC trust temporarily includes this branch** (staging deploys only). Revert at cutover (#236).
 
