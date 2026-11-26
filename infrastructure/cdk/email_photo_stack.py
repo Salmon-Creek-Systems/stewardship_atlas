@@ -19,6 +19,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_ses as ses,
     aws_ses_actions as ses_actions,
+    aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
 
@@ -28,6 +29,8 @@ class EmailPhotoStack(Stack):
     def __init__(self, scope: Construct, construct_id: str,
                  webapp_url: str,
                  receipt_addresses: list[str],
+                 service_token_secret: str = "",
+                 image_by_reference: bool = False,
                  **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
@@ -131,8 +134,16 @@ class EmailPhotoStack(Stack):
             memory_size=512,
             environment={
                 "WEBAPP_URL": webapp_url,
+                # Read by the handler at runtime, so the token is never in the
+                # function's configuration.
+                "SERVICE_TOKEN_SECRET": service_token_secret,
+                # Off until cutover: the box's code reads only inline images.
+                "IMAGE_BY_REFERENCE": "1" if image_by_reference else "0",
             },
         )
+        if service_token_secret:
+            secretsmanager.Secret.from_secret_name_v2(
+                self, "ServiceTokenSecret", service_token_secret).grant_read(email_lambda)
 
         # Allow SES to invoke the Lambda (needed if using Lambda action directly;
         # with S3 trigger this is handled by S3 notification permissions)

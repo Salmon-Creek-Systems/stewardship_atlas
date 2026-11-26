@@ -14,6 +14,23 @@ from utils import safe_float
 
 logger = logging.getLogger(__name__)
 
+# The email Lambda stages an image in the ingress bucket under this prefix and
+# sends its key (IMAGE_BY_REFERENCE): a function URL takes at most 6 MB.
+STAGED_IMAGE_PREFIX = "images/"
+DEFAULT_INGRESS_BUCKET = "atlas-ingress"
+
+
+def staged_image_key_ok(key) -> bool:
+    """True for a key the email Lambda could have staged: images/{email}/{file}.
+
+    The bucket is never taken from the request, and anything else in it (raw
+    emails, quarantine) is refused, so the endpoint can't be made to read them.
+    """
+    if not isinstance(key, str) or not key.startswith(STAGED_IMAGE_PREFIX):
+        return False
+    parts = key[len(STAGED_IMAGE_PREFIX):].split("/")
+    return len(parts) == 2 and all(p and p not in (".", "..") for p in parts)
+
 
 def parse_subject(subject: str) -> str:
     """Return email subject as the feature title.

@@ -95,6 +95,9 @@ ANTHROPIC_SECRET_NAME = "atlas/anthropic-api-key"
 # committed in keys/ and becomes the distribution's key group.
 CLOUDFRONT_KEY_SECRET = "atlas/cloudfront-signing-key-{env}"
 SERVICE_TOKEN_SECRET = "atlas/service-token-{env}"
+# Buckets from AtlasEmailPhotoStack, shared by every env.
+PHOTO_BUCKET = "scs-atlas-data"
+INGRESS_BUCKET = "atlas-ingress"
 # CloudFront sends this as ORIGIN_TOKEN_HEADER on every /api/* request; the API
 # refuses requests without it, so the open function URL is only usable via the
 # distribution. Must match webapp_auth.ORIGIN_TOKEN_HEADER.
@@ -349,6 +352,21 @@ class AtlasCloudStack(Stack):
         api_fn.add_environment("ATLAS_ORIGIN_TOKEN_SECRET",
                                ORIGIN_TOKEN_SECRET.format(env=env_name))
         api_fn.add_environment("CLOUDFRONT_KEY_PAIR_ID", signing_key.public_key_id)
+
+        # Photo ingest (email and web). Photos keep their box home in the
+        # public-read media prefix of scs-atlas-data, so existing image_urls
+        # stay valid; staging shares it (keys are timestamped). The email
+        # Lambda stages large images in atlas-ingress/images/ and sends the key.
+        api_fn.add_environment("ATLAS_DATA_BUCKET", PHOTO_BUCKET)
+        api_fn.add_environment("ATLAS_INGRESS_BUCKET", INGRESS_BUCKET)
+        api_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:PutObject"],
+            resources=[f"arn:aws:s3:::{PHOTO_BUCKET}/*/media/*"],
+        ))
+        api_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:GetObject"],
+            resources=[f"arn:aws:s3:::{INGRESS_BUCKET}/images/*"],
+        ))
 
         # An open function URL (auth NONE), not OAC. OAC to a function URL
         # needs every POST/PUT client to send x-amz-content-sha256 (the body's

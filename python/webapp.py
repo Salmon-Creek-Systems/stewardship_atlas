@@ -1479,7 +1479,8 @@ class EmailPhotoPayload(BaseModel):
     subject: str
     sender: str
     atlas_name: str
-    image_data: str       # base64-encoded image bytes
+    image_data: str | None = None   # base64-encoded image bytes (the box's form)
+    image_key: str | None = None    # or a key staged in the ingress bucket
     filename: str
     received_at: str
     body_text: str | None = None
@@ -1531,6 +1532,18 @@ async def get_log(swalename: str, n: int = 3):
     return {"useCases": atlas_logs.format_as_use_cases(invocations)}
 
 
+def _email_photo_bytes(payload, s3):
+    """The image, from the staged key or the inline base64."""
+    if payload.image_key is not None:
+        if not email_inlet.staged_image_key_ok(payload.image_key):
+            raise HTTPException(status_code=400, detail="image_key is not a staged image")
+        bucket = os.environ.get("ATLAS_INGRESS_BUCKET", email_inlet.DEFAULT_INGRESS_BUCKET)
+        return s3.get_object(Bucket=bucket, Key=payload.image_key)["Body"].read()
+    if payload.image_data is not None:
+        return base64.b64decode(payload.image_data)
+    raise HTTPException(status_code=400, detail="Send image_data or image_key")
+
+
 @app.post("/ingest/email_photo")
 async def ingest_email_photo(payload: EmailPhotoPayload):
     try:
@@ -1574,7 +1587,9 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             raise HTTPException(status_code=400, detail=f"Unknown layer: {layer_name}")
 
         # Decode image and extract GPS
-        image_bytes = base64.b64decode(payload.image_data)
+        import boto3
+        s3 = boto3.client("s3")
+        image_bytes = _email_photo_bytes(payload, s3)
         gps = email_inlet.extract_gps(image_bytes)
         if gps is None:
             atlas_addr = f"{payload.atlas_name}@fireatlas.org"
@@ -1596,8 +1611,6 @@ async def ingest_email_photo(payload: EmailPhotoPayload):
             raise HTTPException(status_code=400, detail="No GPS data found in image EXIF")
 
         # Upload image to S3
-        import boto3
-        s3 = boto3.client("s3")
         bucket = os.environ.get("ATLAS_DATA_BUCKET")
         if not bucket:
             raise HTTPException(status_code=500, detail="ATLAS_DATA_BUCKET env var not set")

@@ -5,7 +5,16 @@ Triggered by S3 ObjectCreated events on the atlas-ingress bucket.
 SES writes raw emails there; this handler unpacks them and POSTs to the webapp.
 
 Environment variables:
-  WEBAPP_URL  - base URL of the atlas webapp (e.g. https://atlas.fireatlas.org)
+  WEBAPP_URL            - base URL of the atlas API (the box's :9000, or the
+                          distribution's /api after cutover)
+  SERVICE_TOKEN_SECRET  - Secrets Manager name of the token sent as
+                          x-atlas-service-token (the cloud API requires it;
+                          the box ignores it). Unset: no header.
+  IMAGE_BY_REFERENCE    - "1": stage the image in this bucket under images/
+                          and send its key, not the bytes. A function URL takes
+                          at most 6 MB, and a base64 phone photo is often more.
+                          The box's code only reads image_data, so this stays
+                          off until cutover.
 """
 import base64
 import email
@@ -22,6 +31,34 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
 WEBAPP_URL = os.environ["WEBAPP_URL"]
+
+SERVICE_TOKEN_HEADER = "x-atlas-service-token"
+# Staged images go here. Not under incoming/, which triggers this Lambda.
+STAGED_IMAGE_PREFIX = "images/"
+
+_service_token = None
+
+
+def service_token():
+    """The service token, read once per container. None when not configured."""
+    global _service_token
+    name = os.environ.get("SERVICE_TOKEN_SECRET")
+    if not name:
+        return None
+    if _service_token is None:
+        secrets = boto3.client("secretsmanager")
+        _service_token = secrets.get_secret_value(SecretId=name)["SecretString"].strip()
+    return _service_token
+
+
+def image_by_reference():
+    return os.environ.get("IMAGE_BY_REFERENCE") == "1"
+
+
+def staged_image_key(email_key, filename):
+    """incoming/abc + IMG_1.jpg -> images/abc/IMG_1.jpg"""
+    email_id = email_key.split("/", 1)[-1]
+    return f"{STAGED_IMAGE_PREFIX}{email_id}/{os.path.basename(filename)}"
 
 
 def extract_body_text(msg) -> str:
@@ -76,15 +113,15 @@ def handler(event, context):
         return
 
     # Find first image attachment
-    image_data = None
+    image_bytes = None
     filename = None
     for part in msg.walk():
         if part.get_content_maintype() == "image":
-            image_data = base64.b64encode(part.get_payload(decode=True)).decode()
-            filename = part.get_filename() or "photo.jpg"
+            image_bytes = part.get_payload(decode=True)
+            filename = os.path.basename(part.get_filename() or "photo.jpg")
             break
 
-    if not image_data:
+    if not image_bytes:
         logger.info("No image attachment found — skipping")
         return
 
@@ -97,13 +134,31 @@ def handler(event, context):
         "subject": subject,
         "sender": sender,
         "atlas_name": atlas_name,
-        "image_data": image_data,
         "filename": filename,
         "received_at": datetime.now(timezone.utc).isoformat(),
         "body_text": body_text,
     }
+    staged_key = None
+    if image_by_reference():
+        staged_key = staged_image_key(key, filename)
+        s3.put_object(Bucket=bucket, Key=staged_key, Body=image_bytes)
+        payload["image_key"] = staged_key
+    else:
+        payload["image_data"] = base64.b64encode(image_bytes).decode()
 
-    resp = requests.post(f"{WEBAPP_URL}/ingest/email_photo", json=payload, timeout=30)
+    headers = {}
+    token = service_token()
+    if token:
+        headers[SERVICE_TOKEN_HEADER] = token
+
+    try:
+        resp = requests.post(f"{WEBAPP_URL}/ingest/email_photo", json=payload,
+                             headers=headers, timeout=30)
+    finally:
+        # The API has copied it (or refused it); the raw email is what is kept
+        # for a retry or for inspection.
+        if staged_key:
+            s3.delete_object(Bucket=bucket, Key=staged_key)
     logger.info(f"Webapp response: {resp.status_code} {resp.text}")
 
     if resp.status_code == 200:

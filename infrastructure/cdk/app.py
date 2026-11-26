@@ -15,7 +15,11 @@ app = cdk.App()
 # --- Email photo inlet (SES → S3 → Lambda → webapp) ---
 EmailPhotoStack(
     app, "AtlasEmailPhotoStack",
+    # Still the box until cutover; then the prod distribution's /api, with
+    # image_by_reference=True (the cloud API's 6 MB request limit).
     webapp_url="https://fireatlas.org:9000",
+    service_token_secret="atlas/service-token-prod",
+    image_by_reference=False,
     receipt_addresses=[
         "scvfd@fireatlas.org",
     ],
