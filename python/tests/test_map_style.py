@@ -324,7 +324,7 @@ class TestRegionViewUrl(unittest.TestCase):
 
     def test_state_decodes_to_what_webmap_js_reads(self):
         url = map_style.region_view_url(self.BBOX, 'https://fireatlas.org/sfe', ['roads_primary'])
-        self.assertTrue(url.startswith('https://fireatlas.org/sfe/staging/outlets/webmap/?s='))
+        self.assertTrue(url.startswith('https://fireatlas.org/sfe/current/outlets/webmap/?s='))
         state = self._state(url)
         self.assertAlmostEqual(state['a'], 39.705)
         self.assertAlmostEqual(state['o'], -123.6935)
@@ -380,6 +380,43 @@ class TestRegionsPanel(unittest.TestCase):
         # generate_map_page substitutes it into a str.format template.
         out = map_style.regions_panel_html([self._feature('A', 'u')])
         self.assertNotIn('{', out)
+
+
+class TestPageViewHref(unittest.TestCase):
+    """A stored feature link, as a built page should link to it: generated views
+    open on the page's own version; anything hand-set is followed as is."""
+
+    BASE = 'https://fireatlas.org/sfe'
+
+    def test_generated_link_becomes_relative_to_this_page(self):
+        stored = f'{self.BASE}/current/outlets/webmap/?s=abc%2B'
+        self.assertEqual(map_style.page_view_href(stored, self.BASE, '../webmap/'),
+                         '../webmap/?s=abc%2B')
+        self.assertEqual(map_style.page_view_href(stored, self.BASE, ''), '?s=abc%2B')
+
+    def test_old_staging_and_version_links_are_treated_the_same(self):
+        for version in ('staging', 'current', 'CURRENT', '2026-08-15_10-00-00'):
+            stored = f'{self.BASE}/{version}/outlets/webmap/?lat=1&lng=2&zoom=17'
+            self.assertEqual(map_style.page_view_href(stored, self.BASE, '../webmap/'),
+                             '../webmap/?lat=1&lng=2&zoom=17', version)
+
+    def test_overrides_and_foreign_links_are_left_alone(self):
+        for stored in ('https://example.com/x?s=1',                          # another site
+                       'https://fireatlas.org/kennedy/current/outlets/webmap/?s=1',  # another atlas
+                       f'{self.BASE}/current/outlets/webmap/',               # no view
+                       f'{self.BASE}/current/outlets/experimental_webmap/?s=1',
+                       f'{self.BASE}/a/b/outlets/webmap/?s=1'):
+            self.assertEqual(map_style.page_view_href(stored, self.BASE, '../webmap/'), stored)
+
+    def test_empty_stays_empty(self):
+        self.assertIsNone(map_style.page_view_href(None, self.BASE, ''))
+        self.assertEqual(map_style.page_view_href('', self.BASE, ''), '')
+
+    def test_regions_panel_options_stay_on_this_page(self):
+        feature = {'properties': {'name': 'A',
+                                  'webmap_url': f'{self.BASE}/current/outlets/webmap/?s=xyz'}}
+        out = map_style.regions_panel_html([feature], self.BASE)
+        self.assertIn('<option value="?s=xyz">A</option>', out)
 
 
 class TestEditPageLayers(unittest.TestCase):

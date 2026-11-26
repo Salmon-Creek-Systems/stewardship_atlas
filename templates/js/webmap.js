@@ -726,18 +726,15 @@ map.on('load', async () => {
         document.getElementById('location-input').focus();
     });
 
-    // Regions dropdown — each option is the region's stored webmap_url. Its ?s=
-    // view is opened on *this* page, so the staging, CURRENT or experimental map
-    // stays where it is; a link with no ?s= (e.g. a hand-set override) is followed.
+    // Regions dropdown — each option is a plain link, written at materialize
+    // (map_style.regions_panel_html): a bare `?s=…` for a generated view, which
+    // the browser resolves against this page (so a version's map stays in that
+    // version), or a hand-set override's own URL.
     const regionsSelect = document.getElementById('regions-select');
     if (regionsSelect) {
         regionsSelect.addEventListener('change', () => {
             if (!regionsSelect.value) return;
-            const target = new URL(regionsSelect.value, window.location.href);
-            const state = target.searchParams.get('s');
-            window.location.href = state
-                ? `${window.location.pathname}?s=${encodeURIComponent(state)}`
-                : target.href;
+            window.location.href = regionsSelect.value;
         });
     }
 

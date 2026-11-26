@@ -894,7 +894,9 @@ def outlet_webmap(config, name):
     
     output_path = webmap_dir / "index.html"
     logger.info(f"Creating webmap HTML in {output_path}.")
-    page_url = f"{config['base_url']}/staging/outlets/{name}/"
+    # The QR code's target. Baked at materialize, so it can't know the version it
+    # will be published in: it names the published copy, which anyone can open.
+    page_url = f"{config['base_url']}/current/outlets/{name}/"
     # Optional default view: a bare share-state blob applied when the map loads with no ?s= param.
     default_view = config['assets'][name].get('default_view', '')
     # Optional "show my location" control (off by default). When on, webmap.js adds a
@@ -910,7 +912,7 @@ def outlet_webmap(config, name):
     html_path = generate_map_page(config, map_style.atlas_display_name(config), map_config, output_path, sprite_json,
                                   page_url=page_url, default_view=default_view,
                                   show_user_location=show_user_location,
-                                  regions_panel=map_style.regions_panel_html(regions_features))
+                                  regions_panel=map_style.regions_panel_html(regions_features, config.get('base_url', '')))
   
     return output_path
 
@@ -1861,9 +1863,12 @@ def make_regions_index(config, outlet_name, regions):
         cname  = utils.canonicalize_name(r.get('name', f"region_{i}"))
         iname  = utils.canonicalize_name(str(r.get('index', f"region_{i}")))
         url = f"{base_url}/{iname}.pdf"
-        # The region's own webmap link, made when the regions layer was refreshed.
-        map_link = (f" &middot; <a href='{html_escape(r['webmap_url'], quote=True)}'>Map</a>"
-                    if r.get('webmap_url') else '')
+        # The region's own webmap view, made when the regions layer was refreshed,
+        # opened on this version's webmap (a relative link) unless hand-edited.
+        map_href = map_style.page_view_href(r.get('webmap_url'), config.get('base_url', ''),
+                                            '../webmap/')
+        map_link = (f" &middot; <a href='{html_escape(map_href, quote=True)}'>Map</a>"
+                    if map_href else '')
         index_html += f"<li><a href='{url}'>{r['name']}</a>{map_link}</li>\n"
     
     index_html += """            </ul>

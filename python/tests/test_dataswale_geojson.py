@@ -145,12 +145,12 @@ class TestFeatureWebmapUrls(unittest.TestCase):
     def test_regions_get_a_share_view_link(self):
         from dataswale_geojson import add_webmap_urls
         url = add_webmap_urls(self.CONFIG, 'regions', self._fc())['features'][0]['properties']['webmap_url']
-        self.assertIn('/staging/outlets/webmap/?s=', url)
+        self.assertTrue(url.startswith('https://fireatlas.org/sfe/current/outlets/webmap/?s='), url)
 
     def test_other_layers_keep_the_centroid_link(self):
         from dataswale_geojson import add_webmap_urls
         url = add_webmap_urls(self.CONFIG, 'roads_primary', self._fc())['features'][0]['properties']['webmap_url']
-        self.assertIn('?lat=', url)
+        self.assertTrue(url.startswith('https://fireatlas.org/sfe/current/outlets/webmap/?lat='), url)
         self.assertIn('&zoom=17', url)
 
     def test_override_wins(self):

@@ -283,10 +283,41 @@ def encode_view_state(lat, lng, zoom, layers):
     return base64.b64encode(json.dumps(state, separators=(',', ':')).encode()).decode()
 
 
+# Where a stored feature link points: the published webmap. Staging needs a
+# login on the cloud, and a stored link is read in places that are in no
+# version at all (exports, sheets, email), so the latest publish is the one
+# address that works for everyone. Pages inside a version don't follow the
+# stored path; they link to their own webmap (page_view_href).
+PUBLISHED_WEBMAP_PATH = "current/outlets/webmap/"
+
+
 def webmap_view_url(base_url, state):
-    """A staging webmap link for a state. Percent-encoded: base64 can contain
+    """A published-webmap link for a state. Percent-encoded: base64 can contain
     '+', which URLSearchParams would otherwise read back as a space."""
-    return f"{base_url}/staging/outlets/webmap/?s={quote(state, safe='')}"
+    return f"{base_url}/{PUBLISHED_WEBMAP_PATH}?s={quote(state, safe='')}"
+
+
+def page_view_href(stored_url, base_url, webmap_href):
+    """The link a built page should use for a feature's stored `webmap_url`.
+
+    A link this atlas generated (`{base_url}/{any version}/outlets/webmap/?…`)
+    becomes `webmap_href` plus its view, so a page in version 2026-08-15 opens
+    the 2026-08-15 webmap: a plain relative link, resolved by the browser.
+    Anything else (a hand-set `webmap_url_override`, another site, a link with
+    no view) is returned unchanged.
+    """
+    if not stored_url:
+        return stored_url
+    path, sep, query = stored_url.partition('?')
+    if not sep or not query:
+        return stored_url
+    prefix = f"{base_url}/" if base_url else ''
+    if not path.startswith(prefix) or not path.endswith('/outlets/webmap/'):
+        return stored_url
+    version_part = path[len(prefix):-len('/outlets/webmap/')]
+    if not version_part or '/' in version_part:
+        return stored_url
+    return f"{webmap_href}?{query}"
 
 
 def region_view_url(bbox, base_url, atlas_layer_names):
@@ -298,16 +329,18 @@ def region_view_url(bbox, base_url, atlas_layer_names):
     return webmap_view_url(base_url, state)
 
 
-def regions_panel_html(features):
+def regions_panel_html(features, base_url=''):
     """The webmap's Preset Views dropdown (one view per region), or '' when there
     are no linked regions. No label: the placeholder option names it.
 
-    Each option's value is the region feature's stored `webmap_url`, so an
-    edited link (webmap_url_override) is what the dropdown follows too."""
+    Each option's value comes from the region's stored `webmap_url`: a generated
+    link becomes a bare `?s=…`, which the browser resolves against this page, so
+    the dropdown stays in whatever version the map is; an edited link
+    (webmap_url_override) is followed as is."""
     options = []
     for i, feature in enumerate(features):
         props = feature.get('properties') or {}
-        url = props.get('webmap_url')
+        url = page_view_href(props.get('webmap_url'), base_url, '')
         if not url:
             continue
         name = props.get('name') or props.get('caption') or f"Region {i + 1}"

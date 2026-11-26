@@ -55,7 +55,8 @@ def centroid_view_url(config, layer_name, feature, zoom=17):
     """The default feature link: the webmap centred on the feature, with a pin."""
     from shapely.geometry import shape
     centroid = shape(feature['geometry']).centroid
-    return f"{config.get('base_url', '')}/staging/outlets/webmap/?lat={centroid.y}&lng={centroid.x}&zoom={zoom}"
+    return (f"{config.get('base_url', '')}/{map_style.PUBLISHED_WEBMAP_PATH}"
+            f"?lat={centroid.y}&lng={centroid.x}&zoom={zoom}")
 
 
 def region_view_url(config, layer_name, feature):
