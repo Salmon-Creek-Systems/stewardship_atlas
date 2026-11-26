@@ -68,6 +68,18 @@ The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the 
   - **Changing a Cognito IdP secret needs `update-identity-provider`;** a redeploy doesn't re-read a dynamic reference (`infrastructure/cdk/README.md`).
 - **Staging CDK deploys need** `-c env_name=staging -c atlas_domain= -c certificate_arn=`; without them staging tries to claim `next.fireatlas.org`. CI adds them for non-prod.
 - **The OIDC trust temporarily includes this branch** (staging deploys only). Revert at cutover (#236).
+- **Staging is login-only.** `/*/staging/*` is served from the private bucket behind signed cookies, so anonymous visitors get the login page. Reason: staging is unpublished work in progress. Old QR codes that point at `staging/` will land on the login page until cutover, and Scot has accepted that.
+- **Every published version is served at `{atlas}/{version}/`** as well as at `current/` (`atlas_store.serve_version_copy`). Reason: Scot wants older data to stay browsable; versions can be archived later if S3 grows. Box versions are not backfilled. A version name in `atlas_store.RESERVED_ATLAS_SEGMENTS` is refused before anything is written. `current/` stays a copy, not a pointer; a KeyValueStore pointer is a possible later change.
+- **Link rule for feature links.**
+  - **Stored links:** the stored `webmap_url` points at `{base_url}/current/outlets/webmap/?…` (`map_style.webmap_view_url`).
+  - **Page links:** pages link relatively, written at materialize time (`map_style.page_view_href`), so a version's runbook index and Regions dropdown stay inside that version.
+  - **No rewriting:** Scot rejected rewriting URLs in the browser and rewriting them at publish. Don't propose either again.
+  - **Exceptions:** exports (GeoPackage, sqldb, layer downloads) still point at `current/` (#246). The webmap QR code points at `current/`.
+- **`app_url` is `/api` on every atlas,** so pages call the API on their own origin (`config_checks.API_PATH`). The config check refuses anything else, which means `atlas_config.py push` can't send a box address to S3.
+- **The CloudFront viewer function took over nginx's URL rules** (`infrastructure/cdk/functions/viewer_request.js`; node tests in `viewer_request.test.mjs`).
+  - **What it covers:** old `{atlas}.fireatlas.org` hosts, `/identify_as_scs`, the landing page, bare `/{atlas}`, `CURRENT`→`current`, `html`→`console`, and directory index pages.
+  - **New paths:** a new top-level path that isn't an atlas must be added to its `RESERVED` list.
+  - **Function name:** it keeps the name `atlas-directory-index-{env}` so CloudFormation updates it in place.
 
 ## Core Architecture Concepts
 
