@@ -40,6 +40,8 @@ LOGO_FILE = 'scs-smallgrass1.png'
 MANUALS = ('user_manual', 'admin_manual')
 SITE_PAGES = ('about', 'contact')
 LOGIN_REQUIRED_PAGE = 'auth/login-required.html'   # key local/auth/login-required.html
+# The site's landing page; the distribution serves it at / (viewer_request.js).
+LANDING_PAGE = 'index.html'                        # key local/index.html
 
 
 def site_key(relative_posix: str) -> str:
@@ -94,6 +96,8 @@ def plan_site_assets(repo_root) -> list:
     # (task 6). The distribution's error response names this key.
     entries.append({'path': LOGIN_REQUIRED_PAGE, 'kind': 'copy',
                     'source': templates / 'login_required.html', 'required': True})
+    entries.append({'path': LANDING_PAGE, 'kind': 'copy',
+                    'source': documents / 'html' / 'index.html', 'required': True})
 
     for source in sorted((documents / 'help').glob('*.md')):
         entries.append({'path': f'documents/help/{source.stem}.html',

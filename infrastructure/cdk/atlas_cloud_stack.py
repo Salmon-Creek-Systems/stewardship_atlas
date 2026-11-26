@@ -67,24 +67,16 @@ def handler(event, context):
 """
 
 
-# Outlets are directories: /kennedy/current/outlets/webmap/ needs to resolve to
-# that directory's index.html. CloudFront's default_root_object only covers the
-# distribution root, and an S3 origin behind OAC does no directory indexing, so
-# without this every outlet URL 403s (an empty/missing key under OAC returns 403,
-# not 404 — see the Phase 1 gotchas). Viewer-request function on the static
-# behavior only; /api/* has its own behavior and is untouched.
-DIRECTORY_INDEX_SOURCE = """
-function handler(event) {
-    var request = event.request;
-    var uri = request.uri;
-    if (uri.endsWith('/')) {
-        request.uri = uri + 'index.html';
-    } else if (!uri.split('/').pop().includes('.')) {
-        request.uri = uri + '/index.html';
-    }
-    return request;
-}
-"""
+# The static behaviors' viewer-request function: directory index.html, the
+# old box URL shapes (CURRENT/, the retired html console, {atlas}.fireatlas.org
+# hosts, bare /{atlas}), the landing page and /identify_as_scs. Source and rule
+# table in functions/viewer_request.js; tests beside it (node --test).
+VIEWER_REQUEST_SOURCE = Path(__file__).parent / "functions" / "viewer_request.js"
+
+
+def viewer_request_code(domain_name: str) -> str:
+    """The function source for one distribution; no domain turns host redirects off."""
+    return VIEWER_REQUEST_SOURCE.read_text().replace("__ATLAS_DOMAIN__", domain_name or "")
 
 # The box publishes into the read path. Imported by ARN rather than wired as a
 # cross-stack reference: the role belongs to AtlasEmailPhotoStack, and an export
@@ -385,9 +377,9 @@ class AtlasCloudStack(Stack):
         directory_index = cloudfront.Function(
             self, "DirectoryIndex",
             function_name=f"atlas-directory-index-{env_name}",
-            code=cloudfront.FunctionCode.from_inline(DIRECTORY_INDEX_SOURCE),
+            code=cloudfront.FunctionCode.from_inline(viewer_request_code(domain_name)),
             runtime=cloudfront.FunctionRuntime.JS_2_0,
-            comment="Append index.html to directory URIs",
+            comment="Directory index, legacy box URLs, landing page",
         )
 
         # LIST only from the helper (a missing key is a 404, not a 403 that

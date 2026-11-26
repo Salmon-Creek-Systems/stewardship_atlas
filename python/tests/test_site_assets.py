@@ -35,6 +35,9 @@ def fixture_repo(root: Path, manuals=('user_manual',), help_pages=('draw_vector'
     for name in manuals:
         (root / 'documents' / f'{name}.md').write_text(f'# {name} title\n\ntext')
 
+    (root / 'documents' / 'html').mkdir(parents=True)
+    (root / 'documents' / 'html' / 'index.html').write_text('<html>landing</html>')
+
     (root / 'documents' / 'site').mkdir(parents=True)
     for name in site_assets.SITE_PAGES:
         (root / 'documents' / 'site' / f'{name}.md').write_text(f'# {name.title()}\n\ntext')
@@ -104,6 +107,16 @@ class TestLoginRequiredPage(SiteAssetsTestCase):
         self.assertIn('auth/login-required.html', entries)
         self.assertEqual(site_assets.site_key('auth/login-required.html'),
                          'local/auth/login-required.html')
+
+
+class TestLandingPage(SiteAssetsTestCase):
+    def test_published_where_the_viewer_function_points(self):
+        entries = {e['path']: e for e in site_assets.plan_site_assets(self.repo)}
+        self.assertIn('index.html', entries)
+        self.assertEqual(site_assets.site_key('index.html'), 'local/index.html')
+        fn = (Path(__file__).resolve().parents[2] / 'infrastructure' / 'cdk' /
+              'functions' / 'viewer_request.js').read_text()
+        self.assertIn("'/local/index.html'", fn)
 
 
 class TestHelpIndex(SiteAssetsTestCase):
