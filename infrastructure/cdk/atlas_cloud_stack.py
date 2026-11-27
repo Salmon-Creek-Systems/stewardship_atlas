@@ -95,6 +95,11 @@ ANTHROPIC_SECRET_NAME = "atlas/anthropic-api-key"
 # committed in keys/ and becomes the distribution's key group.
 CLOUDFRONT_KEY_SECRET = "atlas/cloudfront-signing-key-{env}"
 SERVICE_TOKEN_SECRET = "atlas/service-token-{env}"
+# The usage report (scripts/usage_report.py): raw CloudFront logs land under
+# this prefix in the log bucket; cleaned ones are kept in the private bucket.
+CLOUDFRONT_LOG_PREFIX = "cloudfront/"
+USAGE_LOGS_PREFIX = "usage/logs/"
+
 # Buckets from AtlasEmailPhotoStack, shared by every env.
 PHOTO_BUCKET = "scs-atlas-data"
 INGRESS_BUCKET = "atlas-ingress"
@@ -176,7 +181,29 @@ class AtlasCloudStack(Stack):
                 # upload_file, which goes multipart for the large rasters, so
                 # an interrupted seed or publish can leave them behind.
                 s3.LifecycleRule(abort_incomplete_multipart_upload_after=Duration.days(7)),
+                # The usage report's cleaned request logs (scripts/usage_report.py):
+                # 400 days, as the box's nginx logs were kept.
+                s3.LifecycleRule(prefix=USAGE_LOGS_PREFIX, expiration=Duration.days(400),
+                                 noncurrent_version_expiration=Duration.days(1)),
             ],
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+
+        # CloudFront's standard logs, for the usage report. They include the
+        # Cookie header (the SCS fa_owner cookie is how SCS traffic is left
+        # out), so they also hold session and signed cookies; those expire
+        # within a day, and the raw logs go after 30. The box's usage cron
+        # converts each one to a cleaned line keeping only fa_owner, stored
+        # under USAGE_LOGS_PREFIX in the private bucket. Standard logging
+        # writes with an ACL, so this bucket has ACLs on (owner preferred).
+        log_bucket = s3.Bucket(
+            self, "CloudFrontLogs",
+            bucket_name=f"scs-atlas-logs-{env_name}",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            lifecycle_rules=[s3.LifecycleRule(expiration=Duration.days(30))],
             removal_policy=RemovalPolicy.RETAIN,
         )
 
@@ -416,6 +443,10 @@ class AtlasCloudStack(Stack):
         distribution = cloudfront.Distribution(
             self, "Distribution",
             comment=f"Stewardship Atlas {env_name}",
+            enable_logging=True,
+            log_bucket=log_bucket,
+            log_file_prefix=CLOUDFRONT_LOG_PREFIX,
+            log_includes_cookies=True,
             default_behavior=cloudfront.BehaviorOptions(
                 # LIST so that a missing key is a 404: with READ alone S3 says
                 # 403, which the error response below would turn into "log in".
@@ -558,6 +589,9 @@ class AtlasCloudStack(Stack):
         # (scripts/atlas_worker.py). Receive, delete and extend visibility; job
         # status objects are {atlas}/jobs/*.json, covered by the put above.
         render_queue.grant_consume_messages(webapp_role)
+        # The usage cron reads the raw logs (it writes the report and cleaned
+        # logs to the private bucket, which it can already).
+        log_bucket.grant_read(webapp_role)
         webapp_role.add_to_principal_policy(iam.PolicyStatement(
             actions=["cloudfront:CreateInvalidation"],
             resources=[
@@ -724,6 +758,7 @@ class AtlasCloudStack(Stack):
         # --- Outputs ---------------------------------------------------------
         CfnOutput(self, "DistributionDomain", value=distribution.distribution_domain_name)
         CfnOutput(self, "DistributionId", value=distribution.distribution_id)
+        CfnOutput(self, "LogBucket", value=log_bucket.bucket_name)
         CfnOutput(self, "PrivateDataBucket", value=private_data.bucket_name)
         CfnOutput(self, "PublicOutletsBucket", value=public_outlets.bucket_name)
         CfnOutput(self, "RenderQueueUrl", value=render_queue.queue_url)

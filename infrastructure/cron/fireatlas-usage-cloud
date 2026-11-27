@@ -1,0 +1,7 @@
+# Hourly usage report from CloudFront's logs (scripts/usage_report.py
+# --source cloudfront), served at /usage -> /api/usage/ for scs-admin.
+# The environment file supplies ATLAS_PRIVATE_BUCKET and ATLAS_LOGS_BUCKET
+# (the stack's LogBucket output). Staging values below; at cutover, the prod
+# worker's env file and checkout. Install as a regular root-owned file:
+#   sudo install -m 644 -o root -g root infrastructure/cron/fireatlas-usage-cloud /etc/cron.d/
+27 * * * * root set -a; . /etc/atlas-worker-staging.env; set +a; /usr/bin/python3 /root/swales_phase3/scripts/usage_report.py --source cloudfront >> /var/log/fireatlas_usage_cloud.log 2>&1

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request, logger
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import json
@@ -888,6 +888,29 @@ def submit_job(config: dict, kind: str, **params) -> dict:
 def _started(job: dict, **extra) -> dict:
     return {"status": "started", "job_id": job["id"], "target": job["target"],
             "swale": job["atlas"], "submitted_at": job["submitted_at"], **extra}
+
+
+# The usage report (scripts/usage_report.py --source cloudfront, a box cron)
+# writes these to usage/ in the private bucket. Not in ROUTE_ROLES and naming
+# no atlas, so only scs-admin may read them. The viewer function sends
+# /usage to /api/usage/.
+USAGE_PAGES = ('index.html', 'report.html')
+
+
+@app.get("/usage/")
+@app.get("/usage/{page}")
+async def usage_page(page: str = 'index.html'):
+    if page not in USAGE_PAGES:
+        raise HTTPException(status_code=404, detail=f"no usage page {page!r}")
+    try:
+        obj = atlas_store._s3().get_object(
+            Bucket=atlas_store.cloud_settings({})['private_bucket'], Key=f"usage/{page}")
+    except Exception as exc:
+        if atlas_store.s3_error_code(exc) in atlas_store.MISSING_ERROR_CODES:
+            raise HTTPException(status_code=404, detail="the usage report has not run yet")
+        raise
+    return Response(content=obj['Body'].read(), media_type='text/html; charset=utf-8',
+                    headers={'Cache-Control': 'no-store'})
 
 
 @app.get("/job-status")

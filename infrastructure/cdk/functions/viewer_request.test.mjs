@@ -52,7 +52,7 @@ test('a bare atlas goes to its published public console', () => {
 });
 
 test('reserved top-level paths are not atlases', () => {
-    for (const uri of ['/local', '/usage', '/create', '/templates/']) {
+    for (const uri of ['/local', '/create', '/templates/']) {   // /usage: its own test
         const r = prod(event(uri));
         assert.ok(!r.statusCode, `${uri} should not redirect`);
     }
@@ -75,6 +75,14 @@ test('an outlet merely starting with html is not the retired console', () => {
 
 test('the landing page', () => {
     assert.equal(prod(event('/')).uri, '/local/index.html');
+});
+
+test('the usage report is served by the API', () => {
+    let r = prod(event('/usage'));
+    assert.equal(r.statusCode, 302);
+    assert.equal(location(r), '/api/usage/');
+    assert.equal(location(prod(event('/usage/'))), '/api/usage/');
+    assert.equal(location(prod(event('/usage/report.html'))), '/api/usage/report.html');
 });
 
 test('the create page', () => {
