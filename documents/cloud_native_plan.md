@@ -310,7 +310,7 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
     - The private bucket's `GetObject` grant is narrowed to `*/staging/*`.
   - **The API origin is an open function URL plus an origin-token header, not OAC** (deployed to staging 2026-11-21). OAC needs a body hash (`x-amz-content-sha256`) from every POST client; since the API checks auth itself, OAC's only job was "CloudFront is the only way in", which the header (`atlas/origin-token-{env}`, checked by `webapp_auth.check_origin`) does. Verified on staging: logins for all four accounts, private pages per atlas, every role refusal, and the direct URL refused.
   - **Capabilities:** the Cognito groups `{atlas}-internal` and `{atlas}-admin`, with admin ⊇ internal. Either group grants that atlas's private cookie. The API checks the ID token and gives every route a required role (`atlas_auth.ROUTE_ROLES`, enforced by `webapp_auth.enforce` as a global dependency).
-    - *Public:* reads, `/job-status`, `/sql_query`, `/select_features`, comments, web-photo ingest, the biochar lookups, and `/create`, `/create-preview`, `/create-starters` and `/create-status`.
+    - *Public:* reads, `/job-status`, `/sql_query`, `/select_features`, comments, web-photo ingest, the biochar lookups, and `/create`, `/create-preview` and `/create-starters` (`/create-status` was retired with the in-memory status; a create is polled through `/job-status`).
     - *Internal:* `delta_upload`, `move_features`, `store`, gsheet import/export, and `sql_generate` (it spends Anthropic credit).
     - *Admin:* everything else, listed or not (fail closed).
     - **`scs-admin` is admin on every atlas** (Scot, 2026-11-20: the default unless he says otherwise), including atlases created later, and is the only group allowed routes that name no atlas (`/create_atlas`, `/files`, `/dereference_url`). It gets one CloudFront cookie set at `Path=/` for `/*/staging/*` instead of one per atlas.
@@ -324,7 +324,15 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
   - **Accounts** (Scot, 2026-11-19): `scvfd` (scvfd admin), `admin` and `internal` (westport admin/internal; the names stay because no other atlas has customer logins), and Scot's SCS account, in `scs-admin` only. Scot signs in with **Google** (his existing account; a `google_…` user put in `scs-admin` after his first sign-in), not a password; the staging password account was deleted 2026-11-25. Prod repeats this at cutover. Other atlases have no customer logins. Scot supplies the current passwords, set as permanent: no forced change and no email needed. Cognito usernames are unique across the pool, so a future customer gets prefixed names (`{atlas}-admin`).
 - **Auth:** Cognito user pool (exists). For cutover, the existing htpasswd accounts (westport, scvfd, …) become Cognito users with the same usernames in each atlas's `{atlas}-admin`/`{atlas}-internal` group and new passwords — htpasswd hashes cannot be migrated. Google SSO stays available for per-person accounts later.
 - **Box-hosted pages that move:** `/create`, `/usage/`, `/identify_as_scs`, help pages under `/local/`. The usage report reads nginx logs, so it needs CloudFront logs instead.
+  - **`/create` (done, 2026-11-27):**
+    - **Page:** a site asset at `local/create/index.html`, which the viewer function serves at `/create`. It calls `/api`.
+    - **Job:** `/create_atlas` checks the request and submits a `create_atlas` job, always to the box queue (`atlas_create.py`). The page polls `/job-status` and shows the job's `progress` lines; every job runner now gets `report(message)`.
+    - **Email address:** SES registration runs only on prod with a logged-in creator, so an anonymous create (allowed later, perhaps) leaves it off.
+    - **Off the box later:** the job is queue-based, so moving it to a container (Lambda image or Fargate) changes only who consumes the queue.
+  - **`/identify_as_scs` and the landing page (done):** the viewer function.
 - **Inbound integrations to repoint:** the email-photo Lambda posts to the box's `:9000`.
+  - **Ready (2026-11-27):** it sends `x-atlas-service-token` (read from `atlas/service-token-{env}` at runtime). With `IMAGE_BY_REFERENCE=1`, it stages the photo in `atlas-ingress/images/` and sends the key instead of the bytes, because a function URL accepts at most 6 MB.
+  - **At cutover:** in `infrastructure/cdk/app.py`, set `webapp_url` to the prod distribution's `/api` and `image_by_reference=True`.
 - **DNS last.** Then the box's security group closes to the public.
 
 #### Cutover sequence (outline)
