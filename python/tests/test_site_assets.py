@@ -25,6 +25,9 @@ def fixture_repo(root: Path, manuals=('user_manual',), help_pages=('draw_vector'
     for name in site_assets.CSS_FILES + site_assets.CREATE_PAGE_CSS:
         (root / 'templates' / 'css' / name).write_text('body {}')
     (root / 'templates' / 'create_atlas.html').write_text('<html>create</html>')
+    (root / 'templates' / 'js').mkdir()
+    for name in site_assets.SITE_JS:
+        (root / 'templates' / 'js' / name).write_text('// js')
     (root / 'templates' / site_assets.LOGO_FILE).write_bytes(b'PNG')
     (root / 'templates' / 'login_required.html').write_text('<html>log in</html>')
     (root / 'templates' / 'help.html').write_text(
@@ -142,6 +145,14 @@ class TestCreatePage(SiteAssetsTestCase):
         self.assertIn("const API = '/api';", page)
         self.assertNotIn("fetch('/", page)
         self.assertNotIn('/templates/', page)
+
+
+class TestAuthLink(SiteAssetsTestCase):
+    def test_the_console_links_the_published_script(self):
+        self.assertIn('js/auth_link.js', self.paths())
+        console = (REPO_ROOT / 'templates' / 'console.html').read_text()
+        self.assertIn('<script src="/local/js/auth_link.js"></script>', console)
+        self.assertIn('data-auth-link hidden', console)
 
 
 class TestHelpIndex(SiteAssetsTestCase):

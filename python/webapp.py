@@ -128,10 +128,6 @@ app.add_middleware(
         allow_headers=["*"],
     )
 
-# Configure storage directory
-STORAGE_DIR = "/root/data/uploads/"
-# os.makedirs(f"{STORAGE_DIR}/roads_deltas", exist_ok=True)
-
 # Serve templates directory for the create-atlas UI
 _templates_dir = versioning.atlas_path(local_path='templates', version='app')
 app.mount("/templates", StaticFiles(directory=str(_templates_dir)), name="templates")
@@ -822,7 +818,6 @@ async def store_json(swalename: str, payload: JSONPayload):
         
         # Create versioned path
 
-        #outpath_template = os.path.join(STORAGE_DIR, swalename,  "{layer}", "data_{version}.json")
         #outpath = outpath_template.format(layer=layer, version=version)
 
         with write_session(swalename, f"store {layer}",
@@ -855,16 +850,6 @@ async def store_json(swalename: str, payload: JSONPayload):
         print(f"Error storing JSON data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/files")
-async def list_files():
-    try:
-        files = os.listdir(STORAGE_DIR)
-        return {
-            "files": files
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 # --- Jobs (Phase 4, task 4) ------------------------------------------------------
 #
 # On Lambda a FastAPI background task never runs: the container freezes once the

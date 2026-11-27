@@ -92,7 +92,7 @@ class TestRouteTable(unittest.TestCase):
         for path in ('/publish', '/refresh', '/refresh_layer', '/materialize_asset',
                      '/save_config/{swalename}', '/reset-staging/{swalename}',
                      '/set-current-version/{swalename}', '/clear_layer/{swalename}/{layer_name}',
-                     '/delete_layer/{swalename}/{layer_name}', '/create_atlas', '/files'):
+                     '/delete_layer/{swalename}/{layer_name}', '/create_atlas'):
             self.assertEqual(atlas_auth.required_role(path), ADMIN, path)
 
     def test_editing_routes_are_internal(self):

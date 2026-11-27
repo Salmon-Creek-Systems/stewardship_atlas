@@ -46,6 +46,8 @@ LANDING_PAGE = 'index.html'                        # key local/index.html
 # it links by absolute /local/css/ URL.
 CREATE_PAGE = 'create/index.html'                  # key local/create/index.html
 CREATE_PAGE_CSS = ('map.css', 'shared_controls.css')
+# Scripts every page links by absolute /local/js/ URL.
+SITE_JS = ('auth_link.js',)                        # the console's Log in / Log out
 
 
 def site_key(relative_posix: str) -> str:
@@ -107,6 +109,9 @@ def plan_site_assets(repo_root) -> list:
     for name in CREATE_PAGE_CSS:
         entries.append({'path': f'css/{name}', 'kind': 'copy',
                         'source': templates / 'css' / name, 'required': True})
+    for name in SITE_JS:
+        entries.append({'path': f'js/{name}', 'kind': 'copy',
+                        'source': templates / 'js' / name, 'required': True})
 
     for source in sorted((documents / 'help').glob('*.md')):
         entries.append({'path': f'documents/help/{source.stem}.html',

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/local/css/console.css">
+    <script src="/local/js/auth_link.js"></script>
 </head>
 <body>
     <header class="top-bar">
@@ -12,7 +13,10 @@
             <span class="atlas-name" id="swale-name"></span>
             <span class="console-type" id="console-type"></span>
         </div>
-        <a id="ab-toggle" class="ab-toggle" href="#" title="Switch between console and HTML view">A/B</a>
+        <div class="top-bar-actions">
+            <a id="ab-toggle" class="ab-toggle" href="#" title="Switch between console and HTML view">A/B</a>
+            <a class="ab-toggle auth-link" data-auth-link hidden></a>
+        </div>
     </header>
 
     <div class="console-layout">

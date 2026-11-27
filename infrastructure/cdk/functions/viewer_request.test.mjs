@@ -1,4 +1,4 @@
-// Run: node --test infrastructure/cdk/functions/
+// Run: node --test infrastructure/cdk/functions/*.test.mjs
 // (node is at ~/.local/node/bin on the laptop.) Loads viewer_request.js the way
 // the stack does, with the domain substituted, and checks the rewrite table.
 import { test } from 'node:test';

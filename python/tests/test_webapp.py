@@ -23,15 +23,11 @@ class TestWebApp(unittest.TestCase):
         
         # Create test client
         self.client = TestClient(app)
-        
-        # Patch the storage directory
-        self.storage_patcher = patch('webapp.STORAGE_DIR', self.storage_dir)
-        self.storage_patcher.start()
+
 
     def tearDown(self):
         # Clean up the temporary directory
         shutil.rmtree(self.test_dir)
-        self.storage_patcher.stop()
 
     def test_extract_coordinates_from_url(self):
         """Test coordinate extraction from various Google Maps URL formats"""

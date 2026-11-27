@@ -313,7 +313,7 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
     - *Public:* reads, `/job-status`, `/sql_query`, `/select_features`, comments, web-photo ingest, the biochar lookups, and `/create`, `/create-preview` and `/create-starters` (`/create-status` was retired with the in-memory status; a create is polled through `/job-status`).
     - *Internal:* `delta_upload`, `move_features`, `store`, gsheet import/export, and `sql_generate` (it spends Anthropic credit).
     - *Admin:* everything else, listed or not (fail closed).
-    - **`scs-admin` is admin on every atlas** (Scot, 2026-11-20: the default unless he says otherwise), including atlases created later, and is the only group allowed routes that name no atlas (`/create_atlas`, `/files`, `/dereference_url`). It gets one CloudFront cookie set at `Path=/` for `/*/staging/*` instead of one per atlas.
+    - **`scs-admin` is admin on every atlas** (Scot, 2026-11-20: the default unless he says otherwise), including atlases created later, and is the only group allowed routes that name no atlas (`/create_atlas`, `/dereference_url`). It gets one CloudFront cookie set at `Path=/` for `/*/staging/*` instead of one per atlas.
     - **Webedit always needs a login** (Scot, 2026-11-20): `delta_upload` stays internal; there will be no anonymous editing.
     - The email Lambda sends a service token (`x-atlas-service-token`, from `atlas/service-token-{env}`) to `/ingest/email_photo`.
     - The test `test_every_listed_route_exists` fails if the table names a route that no longer exists.

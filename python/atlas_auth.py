@@ -9,7 +9,7 @@ The model (documents/cloud_native_plan.md, 4e):
   ``{atlas}-internal`` and ``{atlas}-admin``; admin includes internal.
 * **``scs-admin`` is admin on every atlas** (Scot, 2026-11-20), including ones
   made after the account, and is the only group allowed the few routes that
-  name no atlas (``/create_atlas``, ``/files``, ``/log``...). Its CloudFront
+  name no atlas (``/create_atlas``, ``/log``...). Its CloudFront
   cookies are one set at ``Path=/`` covering ``/*/staging/*``.
 * **Every route has a required role in ROUTE_ROLES; an unlisted route needs
   admin.** Fail closed: a new endpoint is admin-only until someone lists it.
