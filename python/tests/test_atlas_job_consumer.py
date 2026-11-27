@@ -37,7 +37,7 @@ class FakeSqs:
         self.visibility.append((QueueUrl, ReceiptHandle, VisibilityTimeout))
 
 
-def busy(job):
+def busy(job, report):
     raise atlas_lock.AtlasLocked('kennedy', {'owner': 'box', 'purpose': 'refresh_layer roads'})
 
 
@@ -59,18 +59,18 @@ class TestBoxWorker(ConsumerTest):
                                  wait_seconds=0, **kw)
 
     def test_idle(self):
-        self.assertEqual(self.work(lambda j: None), 'idle')
+        self.assertEqual(self.work(lambda j, report: None), 'idle')
 
     def test_a_job_runs_and_its_message_is_deleted(self):
         job = self.submit()
-        self.assertEqual(self.work(lambda j: 'ok'), 'done')
+        self.assertEqual(self.work(lambda j, report: 'ok'), 'done')
         self.assertEqual(self.state(job), jobs.SUCCEEDED)
         self.assertEqual(self.sqs.queue, [])
 
     def test_a_failed_job_is_deleted_too(self):
         job = self.submit()
 
-        def boom(j):
+        def boom(j, report):
             raise ValueError('no')
 
         self.assertEqual(self.work(boom), 'done')
@@ -86,13 +86,13 @@ class TestBoxWorker(ConsumerTest):
 
     def test_a_missing_status_leaves_the_message_for_redelivery(self):
         self.sqs.send_message(QURL, json.dumps({'atlas': 'kennedy', 'id': 'gone'}))
-        self.assertEqual(self.work(lambda j: 'ok'), 'error')
+        self.assertEqual(self.work(lambda j, report: 'ok'), 'error')
         self.assertEqual(len(self.sqs.queue), 1)
 
     def test_a_long_job_keeps_its_message_invisible(self):
         self.submit()
 
-        def slow(j):
+        def slow(j, report):
             time.sleep(0.25)
 
         self.work(slow, extend_every=0.05)
@@ -112,7 +112,7 @@ class TestLambda(ConsumerTest):
 
     def test_success_reports_no_failures(self):
         job = self.submit()
-        self.assertEqual(self.handle(lambda j: 'ok'), {'batchItemFailures': []})
+        self.assertEqual(self.handle(lambda j, report: 'ok'), {'batchItemFailures': []})
         self.assertEqual(self.state(job), jobs.SUCCEEDED)
 
     def test_busy_is_a_partial_failure_retried_soon(self):
@@ -125,7 +125,7 @@ class TestLambda(ConsumerTest):
     def test_a_job_that_failed_is_not_retried(self):
         self.submit()
 
-        def boom(j):
+        def boom(j, report):
             raise ValueError('no')
 
         self.assertEqual(self.handle(boom), {'batchItemFailures': []})

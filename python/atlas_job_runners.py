@@ -1,5 +1,8 @@
 """What each job kind does (atlas_jobs.KINDS), each in its own session.
 
+Every runner is ``(job, report)``; ``report(message)`` adds a progress line to
+the job's status (``atlas_jobs.run``).
+
 The same runners serve both consumers; ``target`` changes only how much is
 hydrated and how long to wait for a busy atlas:
 
@@ -28,7 +31,7 @@ def _session(job, inputs=None, wanted=None):
         inputs=None if on_box else inputs, wanted=None if on_box else wanted)
 
 
-def run_materialize(job):
+def run_materialize(job, report):
     import atlas
     asset = job['params']['asset']
     with _session(job, inputs=lambda c: asset_inputs.asset_inputs(c, asset)) as session:
@@ -37,7 +40,7 @@ def run_materialize(job):
         return atlas.materialize(session.config, asset)
 
 
-def run_refresh_layer(job):
+def run_refresh_layer(job, report):
     import atlas_dagster
     p = job['params']
     layer, mode, cascade = p['layer'], p.get('mode', 'update'), bool(p.get('cascade', True))
@@ -49,14 +52,14 @@ def run_refresh_layer(job):
         return f"refreshed {layer} ({mode}, cascade={cascade})"
 
 
-def run_publish(job):
+def run_publish(job, report):
     import versioning
     # Publish promotes the staging catalog server-side; only the config is read.
     with _session(job, wanted=asset_inputs.wanted(asset_inputs.publish_inputs())) as session:
         return versioning.publish_new_version(session.config)
 
 
-def run_slides(job):
+def run_slides(job, report):
     import outlets_slides
     p = job['params']
     with _session(job) as session:
@@ -66,7 +69,7 @@ def run_slides(job):
         return outlets_slides.outlet_slides(config, 'slides')
 
 
-def run_add_layer(job):
+def run_add_layer(job, report):
     import atlas
     p = dict(job['params'])
     layer = p.pop('layer')
@@ -76,7 +79,7 @@ def run_add_layer(job):
         return f"Layer '{layer}' added and materialized."
 
 
-def run_edit_layer(job):
+def run_edit_layer(job, report):
     import atlas
     layer, changes = job['params']['layer'], job['params']['changes']
     with _session(job, inputs=lambda c: asset_inputs.layer_change_inputs(
@@ -85,7 +88,7 @@ def run_edit_layer(job):
         return f"Layer '{layer}' restyled; rebuilt {', '.join(materialized) or 'nothing'}."
 
 
-def run_delete_layer(job):
+def run_delete_layer(job, report):
     import atlas
     layer = job['params']['layer']
     # Archives the layer and edits every asset naming it: everything is read.
@@ -94,7 +97,15 @@ def run_delete_layer(job):
         return f"Layer '{layer}' deleted; rebuilt {', '.join(plan.get('materialized') or []) or 'nothing'}."
 
 
+def run_create_atlas(job, report):
+    import atlas_create
+    # Opens its own session: there is no config to hydrate yet.
+    return atlas_create.create(job, report,
+                               wait=BOX_LEASE_WAIT if job.get('target') == 'box' else 0.0)
+
+
 RUNNERS = {
+    'create_atlas': run_create_atlas,
     'add_layer': run_add_layer,
     'edit_layer': run_edit_layer,
     'delete_layer': run_delete_layer,

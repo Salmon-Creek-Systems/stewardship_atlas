@@ -57,6 +57,10 @@ class TestRouting(unittest.TestCase):
         self.assertEqual(jobs.route(CONFIG, self.job('publish')), 'lambda')
         self.assertEqual(jobs.route(CONFIG, self.job('slides', asset='slides')), 'box')
 
+    def test_a_create_runs_on_the_box_with_no_config(self):
+        job = jobs.new_job('newatlas', 'create_atlas', slug='newatlas')
+        self.assertEqual(jobs.route({}, job), 'box')
+
     def test_layer_changes_run_on_lambda(self):
         for kind in ('add_layer', 'edit_layer', 'delete_layer'):
             self.assertEqual(jobs.route(CONFIG, self.job(kind, layer='roads')), 'lambda')
@@ -107,7 +111,7 @@ class TestSubmitAndRun(unittest.TestCase):
         job = self.submit(asset='runbook')
         seen = []
 
-        def runner(j):
+        def runner(j, report):
             seen.append(self.status(j)['state'])     # running while it works
             return 'built 3 PDFs'
 
@@ -117,10 +121,42 @@ class TestSubmitAndRun(unittest.TestCase):
         self.assertEqual(self.status(job)['result'], 'built 3 PDFs')
         self.assertEqual(self.status(job)['attempts'], 1)
 
+    def test_progress_is_written_as_it_happens_and_kept(self):
+        job = self.submit(asset='runbook')
+        seen = []
+
+        def runner(j, report):
+            report('Fetching roads')
+            seen.append([m for _t, m in self.status(j)['progress']])
+            report('Finished roads')
+            return 'ok'
+
+        done = jobs.run(self.s3, BUCKET, self.message(), {'materialize': runner})
+        self.assertEqual(seen, [['Fetching roads']])          # visible mid-run
+        self.assertEqual([m for _t, m in self.status(job)['progress']],
+                         ['Fetching roads', 'Finished roads'])
+        self.assertEqual(done['progress'], self.status(job)['progress'])
+
+    def test_progress_is_kept_on_failure_and_reset_on_a_rerun(self):
+        job = self.submit(asset='runbook')
+
+        def runner(j, report):
+            report('Materializing webmap')
+            raise ValueError('boom')
+
+        jobs.run(self.s3, BUCKET, self.message(), {'materialize': runner})
+        self.assertEqual([m for _t, m in self.status(job)['progress']], ['Materializing webmap'])
+        jobs.write_status(self.s3, BUCKET, dict(self.status(job), state=jobs.RUNNING))
+        jobs.run(self.s3, BUCKET, self.message(), {'materialize': lambda j, report: 'ok'})
+        self.assertEqual(self.status(job)['progress'], [])
+
+    def test_a_new_job_has_empty_progress(self):
+        self.assertEqual(jobs.new_job('kennedy', 'publish')['progress'], [])
+
     def test_a_failure_is_recorded_not_raised(self):
         job = self.submit(asset='runbook')
 
-        def runner(j):
+        def runner(j, report):
             raise ValueError('QGIS exploded')
 
         done = jobs.run(self.s3, BUCKET, self.message(), {'materialize': runner})
@@ -130,7 +166,7 @@ class TestSubmitAndRun(unittest.TestCase):
     def test_a_redelivered_finished_job_does_not_run_again(self):
         self.submit(asset='runbook')
         calls = []
-        runners = {'materialize': lambda j: calls.append(1)}
+        runners = {'materialize': lambda j, report: calls.append(1)}
         jobs.run(self.s3, BUCKET, self.message(), runners)
         jobs.run(self.s3, BUCKET, self.message(), runners)
         self.assertEqual(len(calls), 1)
@@ -139,13 +175,13 @@ class TestSubmitAndRun(unittest.TestCase):
         job = self.submit(asset='runbook')
         jobs.write_status(self.s3, BUCKET, dict(self.status(job), state=jobs.RUNNING,
                                                 attempts=1))
-        done = jobs.run(self.s3, BUCKET, self.message(), {'materialize': lambda j: 'ok'})
+        done = jobs.run(self.s3, BUCKET, self.message(), {'materialize': lambda j, report: 'ok'})
         self.assertEqual((done['state'], done['attempts']), (jobs.SUCCEEDED, 2))
 
     def test_a_busy_atlas_requeues_and_raises_for_redelivery(self):
         job = self.submit(asset='runbook')
 
-        def runner(j):
+        def runner(j, report):
             raise Busy('lease held by refresh_layer roads')
 
         with self.assertRaises(Busy):

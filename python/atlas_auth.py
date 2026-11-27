@@ -61,7 +61,6 @@ ROUTE_ROLES = {
     '/create': PUBLIC,
     '/create-preview': PUBLIC,
     '/create-starters': PUBLIC,
-    '/create-status': PUBLIC,
     '/api/biochar/suitability': PUBLIC,
     '/api/biochar/ssurgo_point': PUBLIC,
     '/api/biochar/landscape': PUBLIC,

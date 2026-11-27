@@ -22,8 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def fixture_repo(root: Path, manuals=('user_manual',), help_pages=('draw_vector',)):
     """A minimal checkout: the files site_assets reads, and nothing else."""
     (root / 'templates' / 'css').mkdir(parents=True)
-    for name in site_assets.CSS_FILES:
+    for name in site_assets.CSS_FILES + site_assets.CREATE_PAGE_CSS:
         (root / 'templates' / 'css' / name).write_text('body {}')
+    (root / 'templates' / 'create_atlas.html').write_text('<html>create</html>')
     (root / 'templates' / site_assets.LOGO_FILE).write_bytes(b'PNG')
     (root / 'templates' / 'login_required.html').write_text('<html>log in</html>')
     (root / 'templates' / 'help.html').write_text(
@@ -117,6 +118,30 @@ class TestLandingPage(SiteAssetsTestCase):
         fn = (Path(__file__).resolve().parents[2] / 'infrastructure' / 'cdk' /
               'functions' / 'viewer_request.js').read_text()
         self.assertIn("'/local/index.html'", fn)
+
+
+class TestCreatePage(SiteAssetsTestCase):
+    def test_published_where_the_viewer_function_points(self):
+        paths = self.paths()
+        self.assertIn('create/index.html', paths)
+        self.assertEqual(site_assets.site_key('create/index.html'), 'local/create/index.html')
+        fn = (Path(__file__).resolve().parents[2] / 'infrastructure' / 'cdk' /
+              'functions' / 'viewer_request.js').read_text()
+        self.assertIn("'/local/create/index.html'", fn)
+
+    def test_every_stylesheet_the_page_links_is_published(self):
+        import re
+        page = (REPO_ROOT / 'templates' / 'create_atlas.html').read_text()
+        linked = re.findall(r"href='/local/(css/[^']+)'", page)
+        self.assertTrue(linked)
+        for path in linked:
+            self.assertIn(path, self.paths())
+
+    def test_the_page_calls_the_api_on_its_own_origin(self):
+        page = (REPO_ROOT / 'templates' / 'create_atlas.html').read_text()
+        self.assertIn("const API = '/api';", page)
+        self.assertNotIn("fetch('/", page)
+        self.assertNotIn('/templates/', page)
 
 
 class TestHelpIndex(SiteAssetsTestCase):

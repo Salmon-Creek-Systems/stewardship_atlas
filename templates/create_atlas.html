@@ -6,8 +6,8 @@
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <script src="https://unpkg.com/terra-draw@1.0.0-beta.0/dist/terra-draw.umd.js"></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
-    <link href='/templates/css/map.css' rel='stylesheet' />
-    <link href='/templates/css/shared_controls.css' rel='stylesheet' />
+    <link href='/local/css/map.css' rel='stylesheet' />
+    <link href='/local/css/shared_controls.css' rel='stylesheet' />
 </head>
 <body>
     <div id="controls">
@@ -120,6 +120,10 @@
 
     map.addControl(new maplibregl.NavigationControl(), 'top-left');
 
+    // Served by the distribution at /create (local/create/index.html); the
+    // API is on the same origin.
+    const API = '/api';
+
     // Populate the starter dropdown from the server.
     let starters = [];
     const starterSelect = document.getElementById('starter-select');
@@ -131,7 +135,7 @@
     }
     starterSelect.addEventListener('change', updateStarterDescription);
 
-    fetch('/create-starters')
+    fetch(API + '/create-starters')
         .then(r => r.json())
         .then(data => {
             starters = data.starters || [];
@@ -288,7 +292,7 @@
     async function previewBoundary(gj) {
         let resp;
         try {
-            resp = await fetch('/create-preview', {
+            resp = await fetch(API + '/create-preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ boundary: gj, starter: starterSelect.value || 'simple' })
@@ -375,7 +379,7 @@
 
         let resp;
         try {
-            resp = await fetch('/create_atlas', {
+            resp = await fetch(API + '/create_atlas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // An uploaded boundary wins: the server derives the bbox from
@@ -396,7 +400,8 @@
             return;
         }
 
-        pollStatus(slug);
+        const started = await resp.json();
+        pollStatus(slug, started.job_id, started.expected_steps);
     });
 
     function appendLog(msg) {
@@ -405,14 +410,30 @@
         log.scrollTop = log.scrollHeight;
     }
 
-    async function pollStatus(slug) {
+    // How far along a create is: a phase label and a percentage. The runner
+    // reports about expectedSteps lines (atlas_create.expected_steps); an
+    // upload adds a few, so the bar stops short of full until the job ends.
+    function createProgress(job, expectedSteps) {
+        const lines = job.progress || [];
+        const last = lines.length ? lines[lines.length - 1][1] : 'Waiting for the worker';
+        if (job.state === 'succeeded') return { phase: 'Done', percent: 100 };
+        if (job.state === 'failed') return { phase: 'Failed', percent: 100 };
+        if (job.state === 'queued') return { phase: 'Queued', percent: 0 };
+        const percent = expectedSteps ? Math.min(95, Math.round(100 * lines.length / expectedSteps)) : 0;
+        return { phase: last, percent: percent };
+    }
+
+    async function pollStatus(slug, jobId, expectedSteps) {
+        const url = API + '/job-status?swale=' + encodeURIComponent(slug) + '&id=' + encodeURIComponent(jobId);
+        const fill = document.querySelector('#loading-progress .progress-fill');
+        const text = document.querySelector('#loading-progress .progress-text');
         while (true) {
             await new Promise(r => setTimeout(r, 1500));
-            let data;
+            let job;
             try {
-                const r = await fetch('/create-status?atlas_slug=' + encodeURIComponent(slug));
-                data = await r.json();
-                if (!r.ok || !data.log) {
+                const r = await fetch(url);
+                job = await r.json();
+                if (!r.ok || !job.state) {
                     appendLog('Poll error: unexpected response (' + r.status + ')');
                     continue;
                 }
@@ -421,17 +442,19 @@
                 continue;
             }
             const log = document.getElementById('progress-log');
-            log.textContent = data.log.map(e => e[0]).join('\n');
+            log.textContent = (job.progress || []).map(e => e[1]).join('\n');
             log.scrollTop = log.scrollHeight;
+            const p = createProgress(job, expectedSteps);
+            fill.style.width = p.percent + '%';
+            text.textContent = p.phase;
 
-            if (!data.creating) {
-                document.getElementById('loading-progress').style.display = 'none';
-                if (data.log.some(e => e[0].startsWith('ERROR'))) {
-                    appendLog('\nCreation failed. Check server logs.');
-                } else {
-                    appendLog('\nRedirecting to your new atlas...');
-                    setTimeout(() => { window.location.href = '/' + slug + '/staging/outlets/console/public/'; }, 1500);
-                }
+            if (job.state === 'failed') {
+                appendLog('\nCreation failed: ' + (job.error || '').split('\n')[0]);
+                break;
+            }
+            if (job.state === 'succeeded') {
+                appendLog('\nRedirecting to your new atlas...');
+                setTimeout(() => { window.location.href = '/' + slug + '/staging/outlets/console/public/'; }, 1500);
                 break;
             }
         }

@@ -42,6 +42,10 @@ SITE_PAGES = ('about', 'contact')
 LOGIN_REQUIRED_PAGE = 'auth/login-required.html'   # key local/auth/login-required.html
 # The site's landing page; the distribution serves it at / (viewer_request.js).
 LANDING_PAGE = 'index.html'                        # key local/index.html
+# The create page, served at /create (viewer_request.js), and the stylesheets
+# it links by absolute /local/css/ URL.
+CREATE_PAGE = 'create/index.html'                  # key local/create/index.html
+CREATE_PAGE_CSS = ('map.css', 'shared_controls.css')
 
 
 def site_key(relative_posix: str) -> str:
@@ -98,6 +102,11 @@ def plan_site_assets(repo_root) -> list:
                     'source': templates / 'login_required.html', 'required': True})
     entries.append({'path': LANDING_PAGE, 'kind': 'copy',
                     'source': documents / 'html' / 'index.html', 'required': True})
+    entries.append({'path': CREATE_PAGE, 'kind': 'copy',
+                    'source': templates / 'create_atlas.html', 'required': True})
+    for name in CREATE_PAGE_CSS:
+        entries.append({'path': f'css/{name}', 'kind': 'copy',
+                        'source': templates / 'css' / name, 'required': True})
 
     for source in sorted((documents / 'help').glob('*.md')):
         entries.append({'path': f'documents/help/{source.stem}.html',

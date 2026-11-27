@@ -77,6 +77,12 @@ test('the landing page', () => {
     assert.equal(prod(event('/')).uri, '/local/index.html');
 });
 
+test('the create page', () => {
+    for (const uri of ['/create', '/create/']) {
+        assert.equal(prod(event(uri)).uri, '/local/create/index.html');
+    }
+});
+
 test('old per-atlas hosts redirect to the path form', () => {
     let r = prod(event('/staging/outlets/webmap/', { host: 'scvfd.fireatlas.org', query: { s: 'x' } }));
     assert.equal(r.statusCode, 301);

@@ -16,7 +16,8 @@ the shared templates, overridable per atlas) — not from a hardcoded list.
 
 A job's status is ``{atlas}/jobs/{id}.json`` in the private bucket, which the
 console polls through ``/job-status``. Only the submitter writes ``queued``;
-after that only the consumer writes it.
+after that only the consumer writes it. A runner reports steps as it goes
+(``report(message)``), kept in the status as ``progress``.
 
 SQS delivers at least once, so ``run`` skips a job that already finished, and
 a job found ``running`` (its consumer died) simply runs again: every job runs
@@ -30,7 +31,7 @@ import traceback
 import uuid
 
 KINDS = ('materialize', 'refresh_layer', 'publish', 'slides',
-         'add_layer', 'edit_layer', 'delete_layer')
+         'add_layer', 'edit_layer', 'delete_layer', 'create_atlas')
 QUEUED, RUNNING, SUCCEEDED, FAILED = 'queued', 'running', 'succeeded', 'failed'
 FINISHED = (SUCCEEDED, FAILED)
 TARGETS = ('lambda', 'box')
@@ -45,7 +46,8 @@ def _now() -> str:
 
 def new_job(atlas: str, kind: str, requested_by: str = None, **params) -> dict:
     """A queued job. ``params`` are kind-specific: ``asset``; ``layer``,
-    ``mode``, ``cascade``; ``tour``, ``gslides``."""
+    ``mode``, ``cascade``; ``tour``, ``gslides``; for ``create_atlas`` see
+    ``atlas_create``."""
     if kind not in KINDS:
         raise ValueError(f"unknown job kind {kind!r}; expected one of {KINDS}")
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
@@ -53,7 +55,7 @@ def new_job(atlas: str, kind: str, requested_by: str = None, **params) -> dict:
             'params': params, 'requested_by': requested_by,
             'state': QUEUED, 'submitted_at': _now(), 'started_at': None,
             'finished_at': None, 'attempts': 0, 'target': None,
-            'result': None, 'error': None}
+            'result': None, 'error': None, 'progress': []}
 
 
 def status_key(atlas: str, job_id: str) -> str:
@@ -96,6 +98,8 @@ def route(config: dict, job: dict, layer_inlets=None) -> str:
     (``asset_inputs.layer_inlets``); passed in to keep this module stdlib-only.
     """
     kind, params = job['kind'], job['params']
+    if kind == 'create_atlas':
+        return 'box'                          # inlets and every outlet, from nothing
     if kind in ('publish', 'add_layer', 'edit_layer', 'delete_layer'):
         # Layer changes re-materialize the webmaps and console, never a PDF.
         return 'lambda'
@@ -137,7 +141,10 @@ def submit(s3, sqs, bucket: str, queue_urls: dict, job: dict, target: str) -> di
 def run(s3, bucket: str, message: dict, runners: dict, retry_on=()) -> dict:
     """Run the job a queue message names; returns its final status.
 
-    ``runners[kind](job) -> result`` does the work (it opens its own session).
+    ``runners[kind](job, report) -> result`` does the work (it opens its own
+    session); ``report(message)`` adds a timestamped line to the status's
+    ``progress`` and writes it, so a poller sees each step. A rerun starts
+    its progress afresh.
     An exception from a runner is recorded as ``failed`` and *not* re-raised:
     the job ran and failed, and redelivering it would only fail again. Errors
     before the job starts (S3 unreachable) do propagate, so SQS retries them.
@@ -153,11 +160,16 @@ def run(s3, bucket: str, message: dict, runners: dict, retry_on=()) -> dict:
     if job['state'] in FINISHED:
         return job                            # a redelivery of finished work
     job = dict(job, state=RUNNING, started_at=_now(), attempts=job.get('attempts', 0) + 1,
-               error=None)
+               error=None, progress=[])
     write_status(s3, bucket, job)
+
+    def report(message):
+        job['progress'].append([_now(), str(message)])
+        write_status(s3, bucket, job)
+
     try:
         runner = runners[job['kind']]
-        result = runner(job)
+        result = runner(job, report)
         job = dict(job, state=SUCCEEDED, finished_at=_now(),
                    result=None if result is None else str(result)[:ERROR_TAIL])
     except retry_on as exc:

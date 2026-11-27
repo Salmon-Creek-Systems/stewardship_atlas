@@ -166,5 +166,65 @@ class TestPublishAndStatus(JobEndpointTest):
         self.assertEqual(self.client.get("/job-status?swale=testatlas&id=nope").status_code, 404)
 
 
+class TestCreateAtlas(JobEndpointTest):
+    """POST /create_atlas becomes a create_atlas job on the box queue."""
+    BBOX = {"west": -124.0, "east": -123.8, "south": 40.16, "north": 40.26}
+
+    def setUp(self):
+        super().setUp()
+        for p in (patch('atlas_workspace.is_seeded', lambda *a: False),
+                  patch('atlas_store._s3', lambda: self.s3)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def post(self, **body):
+        return self.client.post("/create_atlas", json={"name": "New Atlas", "slug": "newatlas",
+                                                       "starter": "simple", **body})
+
+    def started(self, resp):
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        [(url, msg)] = self.sqs.sent
+        self.assertEqual(url, 'q-render')
+        self.assertEqual(msg, {'atlas': 'newatlas', 'id': body['job_id']})
+        return body, self.client.get(f"/job-status?swale=newatlas&id={body['job_id']}").json()
+
+    def test_a_bbox_create_is_queued_for_the_box(self):
+        body, job = self.started(self.post(bbox=self.BBOX))
+        self.assertEqual(job['kind'], 'create_atlas')
+        self.assertEqual(job['state'], 'queued')
+        self.assertEqual(job['params']['bbox'], self.BBOX)
+        self.assertEqual(job['params']['starter'], 'simple')
+        self.assertGreater(body['expected_steps'], 5)
+        self.assertNotIn('boundary_key', job['params'])
+
+    def test_an_upload_is_stored_beside_the_job_not_in_it(self):
+        boundary = {"type": "FeatureCollection", "features": [{
+            "type": "Feature", "properties": {},
+            "geometry": {"type": "Polygon", "coordinates": [[
+                [-124.0, 40.16], [-123.8, 40.16], [-123.8, 40.26], [-124.0, 40.16]]]}}]}
+        body, job = self.started(self.post(boundary=boundary))
+        key = job['params']['boundary_key']
+        self.assertEqual(key, f"newatlas/jobs/{body['job_id']}.boundary.geojson")
+        self.assertEqual(json.loads(self.s3.objects[('privb', key)]['body']), boundary)
+        self.assertNotIn('boundary', job['params'])
+
+    def test_email_is_not_registered_off_prod_or_without_a_login(self):
+        _body, job = self.started(self.post(bbox=self.BBOX))
+        self.assertFalse(job['params']['register_email'])
+        self.assertIsNone(job['requested_by'])
+
+    def test_a_taken_name_is_refused_without_a_job(self):
+        with patch('atlas_workspace.is_seeded', lambda *a: True):
+            resp = self.post(bbox=self.BBOX)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self.sqs.sent, [])
+
+    def test_an_unknown_starter_is_a_400(self):
+        resp = self.post(bbox=self.BBOX, starter="no_such_starter")
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self.sqs.sent, [])
+
+
 if __name__ == '__main__':
     unittest.main()
