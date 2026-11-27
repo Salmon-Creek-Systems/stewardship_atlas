@@ -126,7 +126,7 @@ class TestCreate(unittest.TestCase):
         self.lines = []
         self.materialized = []
         self.seeded = False
-        self.ses = MagicMock()
+        self.ses = MagicMock(return_value=None)
 
         @contextmanager
         def open_session(slug, purpose='', wait=0.0, require_config=True):
