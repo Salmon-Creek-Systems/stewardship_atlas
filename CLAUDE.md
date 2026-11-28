@@ -80,6 +80,28 @@ The full record is in `documents/cloud_native_plan.md` (Phase 4). These are the 
   - **What it covers:** old `{atlas}.fireatlas.org` hosts, `/identify_as_scs`, the landing page, bare `/{atlas}`, `CURRENT`→`current`, `html`→`console`, and directory index pages.
   - **New paths:** a new top-level path that isn't an atlas must be added to its `RESERVED` list.
   - **Function name:** it keeps the name `atlas-directory-index-{env}` so CloudFormation updates it in place.
+  - **Also:** `/create` → `local/create/index.html`, `/usage` → `/api/usage/index.html`. Node tests: `node --test infrastructure/cdk/functions/*.test.mjs` (a bare directory argument doesn't work).
+- **The API must never redirect** (`redirect_slashes=False`; don't add routes ending in `/`). Behind the function URL a request's trailing slash arrives stripped, and any redirect the app builds is absolute to the function URL's own host, which strands the browser on `not_via_cloudfront`. Found via `/usage` on staging, 2026-11-28.
+- **`/create` is a `create_atlas` job, always on the box** (`python/atlas_create.py`).
+  - **Request vs job:** the request does the quick checks; the runner re-checks that the name is free, because two creates seconds apart both pass the request's check.
+  - **Uploads:** an uploaded boundary is stored beside the job at `{slug}/jobs/{id}.boundary.geojson`.
+  - **The page:** a site asset (`local/create/index.html`) that calls `/api` and polls `/job-status`.
+  - **SES:** the address is registered only when `ATLAS_ENV=prod` and the creator is logged in. This is the gate for anonymous creates, which Scot may allow later.
+  - **`port: 9000`:** stays in new atlases only because `build_atlas_from_geojson` requires the key.
+- **Job runners are `(job, report)`.** `report(message)` appends to the job status's `progress`, and a rerun resets it. Every runner takes it; only create reports so far.
+- **Email Lambda is ready for cutover but still posts to the box.**
+  - **Token:** it reads `x-atlas-service-token` from `atlas/service-token-{env}` at runtime.
+  - **Large photos:** with `IMAGE_BY_REFERENCE=1`, it stages the photo in `atlas-ingress/images/` (not the watched `incoming/`) and sends the key, because a function URL takes at most 6 MB. `/ingest/email_photo` reads only `images/{email}/{file}`.
+  - **At cutover:** in `infrastructure/cdk/app.py`, set `webapp_url` to the prod distribution's `/api` and `image_by_reference=True`.
+  - **Rehearsing:** `scripts/rehearse_email_photo.py` runs the handler locally against any API, with no SES.
+- **Log-in/log-out link: console only** (Scot, 2026-11-28; not the webmap). `/local/js/auth_link.js` fills `<a data-auth-link>` from `/api/me`. **The console outlet renders `templates/console_new.html`;** `console.html` is the retired html console's template. Edit the former.
+- **Usage report after cutover** (`usage_report.py --source cloudfront`, cron `infrastructure/cron/fireatlas-usage-cloud`).
+  - **Raw logs:** CloudFront logs go to `scs-atlas-logs-{env}`, cookies included, and expire after 30 days (Scot) because they hold session and signed cookies.
+  - **Cleaned logs:** they keep only `fa_owner` and live under `usage/logs/` in the private bucket for 400 days.
+  - **Serving:** the report is served at `/api/usage/` for `scs-admin`.
+- **The box worker needs `HOME`** (the service template sets `HOME=/root`); without it every DuckDB inlet fails. **Overpass refuses generic User-Agents** (406), so `fetch_osm` sends `stewardship-atlas/1.0`. Both fixes reach prod with the cutover; Scot chose to wait, and the plan doc's cutover sequence has the checks.
+- **`/files` and `/create-status` are retired** (#244). `tests/test_retired_routes.py` keeps them gone.
+- **Staging jobs without a login:** `scripts/submit_job.py --env staging <atlas> <kind> k=v…` queues a job and prints its progress.
 
 ## Core Architecture Concepts
 
@@ -305,7 +327,7 @@ Issues #70 (combine trace/reprocess) and #71 (unified logging, re-enable bounces
 
 ### SES Auto-Registration
 
-`/create_atlas` automatically appends `{slug}@fireatlas.org` to the `atlas-email-inlet` receipt rule set when a new atlas is created. EC2 role needs `ses:DescribeReceiptRuleSet` + `ses:UpdateReceiptRule` (in CDK stack).
+On the box (main), `/create_atlas` appends `{slug}@fireatlas.org` to the `atlas-email-inlet` receipt rule set. On the cloud branch it is a step of the `create_atlas` job (`atlas_create.register_email_address`, run by the box worker), taken only on prod for a logged-in creator. EC2 role needs `ses:DescribeReceiptRuleSet` + `ses:UpdateReceiptRule` (in CDK stack).
 
 ### Technical Console Log
 
