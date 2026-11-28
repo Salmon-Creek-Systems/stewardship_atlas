@@ -12,6 +12,9 @@ Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/atlas-worker.env
+# systemd sets no HOME; DuckDB needs one to load its extensions (spatial,
+# httpfs), so every DuckDB inlet failed with "Can't find the home directory".
+Environment=HOME=/root
 WorkingDirectory=/root/swales_dev/app
 ExecStart=/usr/bin/python3 scripts/atlas_worker.py
 Restart=always
