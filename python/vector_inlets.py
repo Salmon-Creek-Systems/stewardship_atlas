@@ -52,11 +52,17 @@ LOAD spatial;
             utils.alter_geojson(outpath, inlet_config['alterations'])
     return len(feature_collection['features'])
 
+# Generic on purpose: no contact address (the repo is public).
+OVERPASS_HEADERS = {"Accept-Charset": "utf-8;q=0.7,*;q=0.7",
+                    "User-Agent": "stewardship-atlas/1.0"}
+
+
 def fetch_osm(config=None, name=None, delta_queue=DELTA_QUEUE, quick=False):
     """Fetch OpenStreetMap data and store in versioned directory"""
     
-    # Initialize Overpass API
-    api = overpass.API(timeout=60)
+    # overpass-api.de refuses generic User-Agents (the library's default,
+    # curl's, a browser's) with 406 since 2026-11; a descriptive one is served.
+    api = overpass.API(timeout=60, headers=OVERPASS_HEADERS)
     
     # Get query from template
     query = config['assets'][name]['config']['template'].format(**config['dataswale']['bbox'])

@@ -21,5 +21,17 @@ class TestRetiredRoutes(unittest.TestCase):
         self.assertIn('/create_atlas', paths)
 
 
+class TestNoSlashRedirects(unittest.TestCase):
+    """A redirect from the API is absolute to the function URL's host, which
+    strands a browser outside CloudFront; a wrong slash must not redirect."""
+
+    def test_a_wrong_slash_is_a_404_not_a_redirect(self):
+        from fastapi.testclient import TestClient
+        client = TestClient(webapp.app)
+        for path in ('/job-status/', '/usage/', '/create-starters/'):
+            r = client.get(path, follow_redirects=False)
+            self.assertNotIn(r.status_code, (301, 302, 307, 308), path)
+
+
 if __name__ == '__main__':
     unittest.main()

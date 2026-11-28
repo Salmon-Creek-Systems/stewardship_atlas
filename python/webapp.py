@@ -54,7 +54,12 @@ from fastapi import Depends
 
 # Every route passes webapp_auth.enforce first: a required role per route
 # (atlas_auth.ROUTE_ROLES), admin when unlisted. ATLAS_AUTH=off for tests only.
-app = FastAPI(dependencies=[Depends(webapp_auth.enforce)])
+#
+# redirect_slashes off: Starlette's add/remove-the-slash redirect is absolute,
+# built from the Host header, which behind CloudFront is the function URL's
+# own host. A browser sent there gets not_via_cloudfront on every request
+# (found on staging 2026-11-28 via /usage). A mismatched slash is a 404 instead.
+app = FastAPI(dependencies=[Depends(webapp_auth.enforce)], redirect_slashes=False)
 logger.logger.setLevel(0)
 
 

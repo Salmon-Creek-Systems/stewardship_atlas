@@ -341,6 +341,8 @@ Each atlas's source `{atlas}.geojson` lives at `staging/atlas.geojson`, seeded f
 2. Freeze edits; final seed of every active atlas (`config_checks.ACTIVE_ATLASES`; abandoned ones are not seeded — the EBS snapshot keeps them). The seed builds each staging catalog. **Then** push each repo config: `atlas_config.py push <atlas> configuration/<atlas>.geojson` — after the seed, which would otherwise copy the box's stale `staging/atlas.geojson` back (the stale copies were moved to `/root/stale_atlas_geojson_20261117/` on 2026-11-17).
 3. Publish each atlas; publish site assets.
 4. Deploy the API image and worker; flip DNS; verify every atlas through `verify_published.py`.
+   - **Check an OSM inlet runs on prod** (`osm_poi`, e.g. a create's `public_landmarks`). Overpass started refusing generic User-Agents in 2026-11, so every OSM inlet on the box fails until this branch merges (fixed here; Scot chose to wait for cutover, 2026-11-28).
+   - **The prod worker needs `HOME`.** The service template sets it now; check that the installed copy does too, or DuckDB inlets fail.
 5. Close the box to the public.
 
 #### Known gaps at cutover
