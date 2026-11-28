@@ -79,11 +79,6 @@ ul {
 }
 .ab-toggle:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 
-/* Right-hand group of the top bar: A/B and Log in / Log out (auth_link.js). */
-.top-bar-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
-.top-bar-actions .ab-toggle { margin-left: 0; }
-.auth-link[hidden] { display: none; }
-
 #logo {
   height: 34px;
   width: 34px;

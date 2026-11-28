@@ -84,6 +84,19 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
 }
 
+/* Log in / Log out (auth_link.js), at the right of the bar. */
+.topbar-auth {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.topbar-auth:hover { color: var(--text); text-decoration: none; }
+.topbar-auth[hidden] { display: none; }
+
 /* ── Main layout ─────────────────────────────────────── */
 
 .layout {

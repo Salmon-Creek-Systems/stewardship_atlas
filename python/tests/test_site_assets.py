@@ -150,7 +150,11 @@ class TestCreatePage(SiteAssetsTestCase):
 class TestAuthLink(SiteAssetsTestCase):
     def test_the_console_links_the_published_script(self):
         self.assertIn('js/auth_link.js', self.paths())
-        console = (REPO_ROOT / 'templates' / 'console.html').read_text()
+        # The console outlet's template, as outlets.outlet_console names it.
+        outlets_src = (REPO_ROOT / 'python' / 'outlets.py').read_text()
+        self.assertIn("make_swale_html(config, outlet_config, template_name='console_new.html')",
+                      outlets_src)
+        console = (REPO_ROOT / 'templates' / 'console_new.html').read_text()
         self.assertIn('<script src="/local/js/auth_link.js"></script>', console)
         self.assertIn('data-auth-link hidden', console)
 

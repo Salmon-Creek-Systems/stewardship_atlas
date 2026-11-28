@@ -47,7 +47,7 @@ LANDING_PAGE = 'index.html'                        # key local/index.html
 CREATE_PAGE = 'create/index.html'                  # key local/create/index.html
 CREATE_PAGE_CSS = ('map.css', 'shared_controls.css')
 # Scripts every page links by absolute /local/js/ URL.
-SITE_JS = ('auth_link.js',)                        # the console's Log in / Log out
+SITE_JS = ('auth_link.js',)                        # the console's Log in / Log out (console_new.html)
 
 
 def site_key(relative_posix: str) -> str:
