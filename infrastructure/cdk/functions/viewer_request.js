@@ -6,7 +6,7 @@
 //   2. /identify_as_scs         -> sets the fa_owner cookie (usage report)
 //   3. /                        -> the landing page (local/index.html)
 //      /create                  -> the create page (local/create/index.html)
-//      /usage                   -> /api/usage/ (the usage report, scs-admin)
+//      /usage                   -> /api/usage/index.html (the usage report, scs-admin)
 //   4. /biochar_atlas_poc       -> the ABI demo's biochar page
 //   5. /{atlas} or /{atlas}/    -> that atlas's published public console
 //   6. /{atlas}/CURRENT/...     -> /{atlas}/current/...  (the box's symlink)
@@ -110,7 +110,8 @@ function handler(event) {
         return request;
     }
     if (uri === '/usage' || uri.indexOf('/usage/') === 0) {
-        return redirect(302, '/api' + (uri === '/usage' ? '/usage/' : uri) + query);
+        var page = (uri === '/usage' || uri === '/usage/') ? '/usage/index.html' : uri;
+        return redirect(302, '/api' + page + query);
     }
 
     // 4.

@@ -30,7 +30,7 @@ class TestUsageRoute(unittest.TestCase):
     def test_index_and_report(self):
         self.s3.put_object(Bucket='privb', Key='usage/index.html', Body=b'<p>index</p>')
         self.s3.put_object(Bucket='privb', Key='usage/report.html', Body=b'<p>report</p>')
-        r = self.client.get('/usage/')
+        r = self.client.get('/usage')
         self.assertEqual((r.status_code, r.text), (200, '<p>index</p>'))
         self.assertTrue(r.headers['content-type'].startswith('text/html'))
         self.assertEqual(r.headers['cache-control'], 'no-store')
@@ -42,10 +42,17 @@ class TestUsageRoute(unittest.TestCase):
             self.assertEqual(self.client.get(path).status_code, 404, path)
 
     def test_before_the_first_run(self):
-        self.assertEqual(self.client.get('/usage/').status_code, 404)
+        self.assertEqual(self.client.get('/usage/index.html').status_code, 404)
+
+    def test_no_trailing_slash_route(self):
+        # Behind the function URL /api/usage/ arrives as /usage; a "/usage/"
+        # route made FastAPI redirect to add the slash, forever.
+        paths = {getattr(r, 'path', None) for r in webapp.app.routes}
+        self.assertIn('/usage', paths)
+        self.assertNotIn('/usage/', paths)
 
     def test_only_scs_admin(self):
-        for path in ('/usage/', '/usage/{page}'):
+        for path in ('/usage', '/usage/{page}'):
             required = atlas_auth.required_role(path)
             self.assertIsNone(atlas_auth.authorize(required, None, [atlas_auth.SCS_ADMIN_GROUP]))
             self.assertIsNotNone(atlas_auth.authorize(required, None, ['kennedy-admin']))

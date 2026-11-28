@@ -80,8 +80,8 @@ test('the landing page', () => {
 test('the usage report is served by the API', () => {
     let r = prod(event('/usage'));
     assert.equal(r.statusCode, 302);
-    assert.equal(location(r), '/api/usage/');
-    assert.equal(location(prod(event('/usage/'))), '/api/usage/');
+    assert.equal(location(r), '/api/usage/index.html');
+    assert.equal(location(prod(event('/usage/'))), '/api/usage/index.html');
     assert.equal(location(prod(event('/usage/report.html'))), '/api/usage/report.html');
 });
 

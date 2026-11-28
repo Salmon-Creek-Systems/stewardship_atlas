@@ -893,11 +893,12 @@ def _started(job: dict, **extra) -> dict:
 # The usage report (scripts/usage_report.py --source cloudfront, a box cron)
 # writes these to usage/ in the private bucket. Not in ROUTE_ROLES and naming
 # no atlas, so only scs-admin may read them. The viewer function sends
-# /usage to /api/usage/.
+# /usage to /api/usage/index.html. No "/usage/" route: behind the function URL
+# the trailing slash arrives stripped, and FastAPI's slash redirect then loops.
 USAGE_PAGES = ('index.html', 'report.html')
 
 
-@app.get("/usage/")
+@app.get("/usage")
 @app.get("/usage/{page}")
 async def usage_page(page: str = 'index.html'):
     if page not in USAGE_PAGES:
